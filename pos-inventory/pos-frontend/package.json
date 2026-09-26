@@ -11,10 +11,11 @@
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.11.2",
+    "@tanstack/query-sync-storage-persister": "^5.90.21",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-query-persist-client": "^5.90.21",
-    "@tanstack/query-sync-storage-persister": "^5.90.21",
     "axios": "^1.13.4",
+    "lucide-react": "^1.48.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-redux": "^9.2.0",

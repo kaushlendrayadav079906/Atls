@@ -389,3 +389,53 @@ export interface CustomerInsightsData {
   totalCLV: number;
 }
 
+
+
+// Atlas Analytics ======================================
+
+export interface AtlasOverview {
+  totalSales: number;
+  invoiceCount: number;
+  averageOrderValue: number;
+  paymentBreakdown: PaymentMethodSummary[];
+}
+
+export interface AtlasSalesTrend {
+  trend: SalesTrendPoint[];
+}
+
+export interface AtlasInventoryItem {
+  itemCode: string;
+  itemName: string;
+  inStock: number;
+  warehouse: string;
+}
+
+export interface AtlasInventorySummary {
+  snapshotTime: string;
+  items: AtlasInventoryItem[];
+}
+
+export interface AtlasBranchComparison {
+  branches: BranchSummary[];
+}
+
+export interface AtlasReturnsSummary {
+  pendingApprovalsCount: number;
+  sapCreditNotesCount: number;
+  sapCreditNotesTotal: number;
+}
+
+export interface AtlasTopCustomer {
+  customerCode: string;
+  customerName: string;
+  totalSales: number;
+  invoiceCount: number;
+}
+
+export interface AtlasProductVelocity {
+  itemCode: string;
+  itemName: string;
+  quantitySold: number;
+  salesAmount: number;
+}

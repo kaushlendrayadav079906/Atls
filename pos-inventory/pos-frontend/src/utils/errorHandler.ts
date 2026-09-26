@@ -24,6 +24,8 @@ const USER_FRIENDLY_MESSAGES: Record<string, string> = {
   'session expired': 'Your session has expired. Please login again',
   'unauthorized': 'Please login to continue',
   'invalid credentials': 'Incorrect username or password',
+  'invalid username or password': 'Incorrect username or password',
+  'already exists': 'An account with this username or email already exists',
   'authentication': 'Please login to continue',
   
   // Resource errors

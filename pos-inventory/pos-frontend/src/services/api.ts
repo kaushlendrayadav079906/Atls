@@ -516,3 +516,85 @@ export const getCustomerInsights = async (
   return response.data;
 };
 
+// ============================================================
+// Atlas Analytics
+// ============================================================
+
+export const getAtlasOverview = async (range: string, from_date?: string, to_date?: string, branch?: string) => {
+  const params: Record<string, string> = { range };
+  if (from_date) params.from_date = from_date;
+  if (to_date) params.to_date = to_date;
+  if (branch) params.branch = branch;
+  const response = await api.get('/atlas/overview', { params });
+  return response.data;
+};
+
+export const getAtlasSalesTrends = async (range: string, from_date?: string, to_date?: string, branch?: string) => {
+  const params: Record<string, string> = { range };
+  if (from_date) params.from_date = from_date;
+  if (to_date) params.to_date = to_date;
+  if (branch) params.branch = branch;
+  const response = await api.get('/atlas/sales-trends', { params });
+  return response.data;
+};
+
+export const getAtlasInventorySummary = async (branch?: string) => {
+  const params: Record<string, string> = {};
+  if (branch) params.branch = branch;
+  const response = await api.get('/atlas/inventory-summary', { params });
+  return response.data;
+};
+
+export const getAtlasBranchComparison = async (range: string, from_date?: string, to_date?: string) => {
+  const params: Record<string, string> = { range };
+  if (from_date) params.from_date = from_date;
+  if (to_date) params.to_date = to_date;
+  const response = await api.get('/atlas/branch-comparison', { params });
+  return response.data;
+};
+
+export const getAtlasReturnsSummary = async (range: string, from_date?: string, to_date?: string, branch?: string) => {
+  const params: Record<string, string> = { range };
+  if (from_date) params.from_date = from_date;
+  if (to_date) params.to_date = to_date;
+  if (branch) params.branch = branch;
+  const response = await api.get('/atlas/returns-summary', { params });
+  return response.data;
+};
+
+export const cancelSale = async (docEntry: number): Promise<{ success: boolean; message: string }> => {
+  const response = await api.post(`/sales/${docEntry}/cancel`);
+  return response.data;
+};
+
+export const getTopCustomers = async (params: {
+  range: string;
+  from_date?: string;
+  to_date?: string;
+  branch?: string;
+  limit?: number;
+}) => {
+  const response = await api.get('/atlas/top-customers', { params });
+  return response.data;
+};
+
+export const getProductVelocity = async (params: {
+  range: string;
+  from_date?: string;
+  to_date?: string;
+  branch?: string;
+  limit?: number;
+}) => {
+  const response = await api.get('/atlas/product-velocity', { params });
+  return response.data;
+};
+
+export const getAlerts = async () => {
+  const response = await api.get('/dashboard/alerts');
+  return response.data;
+};
+
+export const getInventoryRisk = async () => {
+  const response = await api.get('/dashboard/inventory-risk');
+  return response.data;
+};

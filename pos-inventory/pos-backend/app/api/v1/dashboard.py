@@ -15,7 +15,7 @@ from collections import defaultdict
 
 from app.core.cache import cache_get, cache_set, cache_delete, cache_delete_prefix, DASHBOARD_SUMMARY_KEY
 from app.core.rate_limiter import limiter
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_manager_or_admin
 
 # Shared thread pool for blocking SAP calls
 _executor = ThreadPoolExecutor(max_workers=min(32, (_os.cpu_count() or 4) * 4))
@@ -40,6 +40,9 @@ from app.core.product_store import product_store
 from app.services.sap.business_partners_service import SAPBusinessPartnersService
 from app.services.sap.client import get_sap_client
 from app.api.v1.customers import _compute_customer_insights
+from app.api.v1.atlas import _get_permitted_branch
+from app.services import approval_service
+from app.models.schemas import DashboardAlert
 
 
 router = APIRouter()
@@ -912,3 +915,80 @@ async def export_operator_reports(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+@router.get("/alerts", response_model=List[DashboardAlert])
+async def get_alerts(current_user: dict = Depends(require_manager_or_admin)):
+    """Fetch pending approvals as alerts for authorized users. Branch scoped."""
+    target_branch = _get_permitted_branch(current_user, None)
+    
+    try:
+        pending_approvals = approval_service.get_pending_approvals(branch_id=target_branch)
+    except Exception as e:
+        logger.error(f"Failed to fetch alerts: {e}")
+        raise HTTPException(status_code=500, detail="Could not fetch alerts")
+        
+    alerts = []
+    for req in pending_approvals:
+        alerts.append(
+            DashboardAlert(
+                id=req["id"],
+                request_type=req["request_type"],
+                status=req["status"],
+                amount=req["amount"],
+                reason=req["reason"],
+                branch_id=req["branch_id"],
+                created_at=req["created_at"]
+            )
+        )
+    return alerts
+
+from app.models.schemas import InventoryRiskItem
+from app.services.sap.inventory_service import SAPInventoryService
+
+@router.get('/inventory-risk', response_model=List[InventoryRiskItem])
+async def get_inventory_risk(current_user: dict = Depends(require_manager_or_admin)):
+    target_branch = _get_permitted_branch(current_user, None)
+    
+    try:
+        service = SAPInventoryService()
+        items = service.get_warehouse_stock(target_branch)
+        
+        risky_items = []
+        for item in items:
+            code = item.get('ItemCode', '')
+            name = item.get('ItemName', '')
+            wh_info = item.get('ItemWarehouseInfoCollection', [])
+            
+            in_stock = 0.0
+            committed = 0.0
+            ordered = 0.0
+            minimal_stock = 0.0
+            
+            for wh in wh_info:
+                if wh.get('WarehouseCode') == target_branch:
+                    in_stock = float(wh.get('InStock', 0.0))
+                    committed = float(wh.get('Committed', 0.0))
+                    ordered = float(wh.get('Ordered', 0.0))
+                    minimal_stock = float(wh.get('MinimalStock', 0.0))
+                    break
+            
+            # Only consider items with an active threshold defined in SAP
+            if minimal_stock > 0.0:
+                projected_stock = in_stock + ordered - committed
+                if projected_stock <= minimal_stock:
+                    risky_items.append(
+                        InventoryRiskItem(
+                            item_code=code,
+                            name=name,
+                            in_stock=in_stock,
+                            committed=committed,
+                            ordered=ordered,
+                            minimal_stock=minimal_stock,
+                            warehouse=target_branch
+                        )
+                    )
+                    
+        return risky_items
+    except Exception as e:
+        logger.error(f'Error fetching inventory risk: {e}')
+        raise HTTPException(status_code=500, detail='Failed to fetch inventory risk')

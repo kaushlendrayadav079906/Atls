@@ -49,6 +49,7 @@ const Checkout = () => {
   const [isPrinting, setIsPrinting] = useState(false);
   const [printError, setPrintError] = useState<string>('');
   const [hasTriggeredAutoPrint, setHasTriggeredAutoPrint] = useState(false);
+  const [checkoutWarning, setCheckoutWarning] = useState<string>('');
 
   // Mobile autocomplete
   const [phoneSuggestions, setPhoneSuggestions] = useState<CustomerSearchResult[]>([]);
@@ -266,13 +267,25 @@ const Checkout = () => {
         setHasTriggeredAutoPrint(false);
         setPrintError('');
         setShowReceipt(true);
+        setCheckoutWarning('');
         handleSuccess('Sale completed successfully', 'Sale');
         toast.success('Payment processed successfully!');
       },
       onError: (error) => {
         setIsProcessing(false);
-        const errorMsg = handleError(error, 'Sale');
-        toast.error(errorMsg);
+        const err = error as any;
+        const statusCode = err?.response?.status;
+        const isTimeout = err?.code === 'ECONNABORTED' || (err?.message || '').toLowerCase().includes('timeout');
+        
+        if (statusCode === 502 || statusCode === 504 || isTimeout) {
+            const warningMsg = 'Sale status uncertain: The connection to SAP timed out. The invoice MAY have been created successfully in SAP. Do not retry this sale immediately. Please check the recent sales feed or ask a manager to verify to avoid duplicate charges.';
+            setCheckoutWarning(warningMsg);
+            toast.error('Sale status uncertain', { autoClose: 5000 });
+        } else if (statusCode === 401 || statusCode === 403) {
+            toast.error('Authorization failed: Please log in again.');
+        } else {
+            toast.error(handleError(error, 'Sale'));
+        }
       },
     });
   };
@@ -424,6 +437,23 @@ const Checkout = () => {
   return (
     <div className="h-full p-4 sm:p-6 lg:p-8 overflow-auto">
       <div className="max-w-6xl mx-auto">
+        {checkoutWarning && (
+          <div className="mb-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-md shadow-sm">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-amber-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-bold text-amber-800">Attention Required</h3>
+                <div className="mt-2 text-sm text-amber-700">
+                  <p>{checkoutWarning}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="mb-6 sm:mb-8">
           <button
             onClick={() => navigate('/pos')}

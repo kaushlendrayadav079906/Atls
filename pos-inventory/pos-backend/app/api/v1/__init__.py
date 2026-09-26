@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import auth, products, sales, dashboard, admin, returns, customers
+from app.api.v1 import auth, products, sales, dashboard, admin, returns, customers, atlas
 
 
 router = APIRouter()
@@ -15,3 +15,4 @@ router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 router.include_router(admin.router, prefix="/admin", tags=["Admin"])
 router.include_router(returns.router, prefix="/returns", tags=["Returns & Exchange"])
 router.include_router(customers.router, prefix="/customers", tags=["Customers"])
+router.include_router(atlas.router, prefix="/atlas", tags=["Atlas Analytics"])

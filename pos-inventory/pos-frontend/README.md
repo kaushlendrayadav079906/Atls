@@ -1,182 +1,53 @@
-# POS Frontend - Retail Manager
+# POS-Inventory Kool
 
-A modern, responsive Point of Sale (POS) system built with React, TypeScript, and Redux Toolkit.
+## Project Purpose & Users
+POS-Inventory Kool is a comprehensive Point of Sale (POS) and inventory management system designed to connect directly with SAP Business One. The system provides real-time operational workflows for cashiers (Operators) and reporting/management tools for Administrators and Managers.
 
-## 🚀 Features
+## System Architecture
 
-### Dashboard
-- **Real-time Sales Metrics**: Today's total sales, bill count, and average sale
-- **Quick Actions**: Fast navigation to POS and Product Management
-- **Responsive Cards**: Clean, modern UI with color-coded metrics
-
-### Product Management
-- **Full CRUD Operations**: Add, Edit, Delete products
-- **Real-time Search**: Filter products by name or barcode
-- **Stock Management**: Track inventory with low-stock warnings
-- **Loading States**: Smooth user experience with spinners during operations
-
-### POS (Point of Sale)
-- **Barcode Scanner Support**: Instant product lookup via barcode input
-- **Shopping Cart**: Add, update quantity, remove items
-- **Auto-calculation**: Real-time subtotal and total calculation
-- **Receipt Preview**: Digital receipt display after checkout
-- **Keyboard-friendly**: Optimized for barcode scanner workflow
-
-## 🛠️ Tech Stack
-
-- **Frontend Framework**: React 19.2
-- **Build Tool**: Vite 7.3
-- **Language**: TypeScript
-- **State Management**: Redux Toolkit
-- **Routing**: React Router DOM 7.13
-- **HTTP Client**: Axios
-- **Styling**: Tailwind CSS 4.1
-- **Code Quality**: ESLint
-
-## 📦 Installation
-
-```bash
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Lint code
-npm run lint
+```mermaid
+graph TD;
+    Frontend["React + TypeScript + Vite"] -- "REST API (Authenticated)" --> Backend["FastAPI Backend"];
+    Backend -- "User & Workflow Data" --> PostgreSQL["PostgreSQL DB"];
+    Backend -- "Operational Data" --> SAP["SAP Business One (Service Layer)"];
+    
+    subgraph SAP Business One
+        SAP_Invoices["Invoices / Sales"]
+        SAP_Returns["Credit Notes / Returns"]
+        SAP_Inventory["Items / Inventory"]
+        SAP_Branches["Warehouses / Branches"]
+    end
+    
+    SAP --> SAP_Invoices;
+    SAP --> SAP_Returns;
+    SAP --> SAP_Inventory;
+    SAP --> SAP_Branches;
 ```
 
-## 🏗️ Project Structure
+## Main Modules and Data Flow
+- **Frontend**: React-based SPA that handles Operator workflows (POS cart, checkout, basic dashboard) and Admin workflows (branch management, return approvals, analytics). 
+- **Backend (FastAPI)**: Serves as the central API gateway. Handles user authentication natively and acts as a facade over SAP Business One.
+- **PostgreSQL**: Stores user credentials, roles, branch assignments, and approval workflow requests (returns, exchanges).
+- **SAP Business One**: The absolute source of truth for all operational data (products, inventory, invoices, credit notes, business partners).
 
-```
-src/
-├── app/
-│   ├── store.ts          # Redux store configuration
-│   └── hooks.ts          # Typed Redux hooks
-├── features/
-│   ├── products/
-│   │   └── productsSlice.ts   # Products state & async actions
-│   ├── cart/
-│   │   └── cartSlice.ts       # Cart state & actions
-│   └── sales/
-│       └── salesSlice.ts      # Sales summary state
-├── pages/
-│   ├── Dashboard.tsx     # Dashboard with sales metrics
-│   ├── Products.tsx      # Product management page
-│   └── POS.tsx           # Point of sale page
-├── components/
-│   ├── Layout.tsx        # Main layout with navigation
-│   └── Loader.tsx        # Reusable loading component
-├── services/
-│   └── api.ts            # Axios instance & API services
-└── types/
-    └── index.ts          # TypeScript type definitions
-```
+## Security and Role Boundaries
+- **Operator (User)**: Can view their assigned branch's dashboard, execute sales, request returns/exchanges, and view operator reports.
+- **Manager**: Can view their assigned branch's analytics (Atlas Dashboard), approve/reject returns for their branch, and access operator tools.
+- **Administrator**: Unrestricted access across all branches. Can create users, assign branches, run global reports, and manage all approvals.
 
-## 🔌 API Integration
+## Current Implementation Status
+- **Authentication**: Fully implemented (JWT-based, stored in PostgreSQL).
+- **POS & Checkout**: Fully implemented and integrated with SAP Service Layer.
+- **Approvals & Returns**: Fully implemented (Multi-step exchange, credit notes, PostgreSQL workflow state).
+- **Admin Dashboard**: Implemented (aggregates SAP invoices and credit notes).
+- **Atlas Dashboard**: *Next Phase* (Analytics visualization separated from Admin operations).
 
-The application uses mock data with placeholder API endpoints. To integrate with a real backend:
+## Next Phase Scope: Atlas Analytics Dashboard
+The upcoming Atlas Analytics Dashboard is a distinct, read-only analytics module located at `/atlas`. It will provide:
+1. Executive Overview (Sales, Invoices, Average Order Value).
+2. Sales Trends.
+3. Inventory Insights (Current Snapshot).
+4. Branch Comparison (For Admins).
+5. Returns & Exceptions (SAP Credit Notes + PostgreSQL Workflow counts).
 
-1. Update the `baseURL` in `src/services/api.ts`
-2. Remove the mock data fallbacks
-3. Ensure API endpoints match:
-   - `GET /api/products` - Fetch all products
-   - `POST /api/products` - Create product
-   - `PUT /api/products/:id` - Update product
-   - `DELETE /api/products/:id` - Delete product
-   - `POST /api/sales` - Create sale
-   - `GET /api/dashboard/summary` - Get dashboard summary
-
-## 📊 State Management
-
-### Redux Slices
-
-1. **productsSlice**
-   - Manages product list
-   - Handles CRUD operations
-   - Tracks loading and error states
-
-2. **cartSlice**
-   - Manages shopping cart items
-   - Actions: `addItem`, `removeItem`, `updateQty`, `clearCart`
-   - Selectors: `selectCartTotal`, `selectCartItemCount`
-
-3. **salesSlice**
-   - Tracks today's sales summary
-   - Handles sale creation
-   - Updates dashboard metrics
-
-## 🎨 UI/UX Features
-
-- **Responsive Design**: Works on desktop, tablet, and mobile
-- **Loading States**: Spinners and loaders for all async operations
-- **Error Handling**: User-friendly error messages
-- **Modal Dialogs**: Clean modals for product editing
-- **Receipt Preview**: Digital receipt after checkout
-- **Keyboard Navigation**: Optimized for barcode scanners
-
-## 🔑 Key Components
-
-### Loader Component
-Reusable loading component with three sizes and full-screen option:
-```tsx
-<Loader message="Loading..." size="medium" fullScreen={false} />
-```
-
-### Layout Component
-Main application layout with navigation and routing
-
-### Pages
-- **Dashboard**: Sales metrics and quick actions
-- **Products**: Product management with search and CRUD
-- **POS**: Billing interface with barcode scanner
-
-## 🚦 Development
-
-The application includes:
-- ✅ TypeScript type checking
-- ✅ ESLint code quality checks
-- ✅ Production build optimization
-- ✅ Hot Module Replacement (HMR)
-- ✅ Responsive design
-- ✅ Loading states for all async operations
-
-## 📝 Build Output
-
-```
-dist/
-├── index.html                    0.46 kB
-├── assets/
-│   ├── index-[hash].css         18.48 kB (gzipped: 4.46 kB)
-│   └── index-[hash].js         317.14 kB (gzipped: 102.66 kB)
-```
-
-## 🔄 Next Steps (Phase 2)
-
-- [ ] Connect to real backend/SAP integration
-- [ ] Add user authentication
-- [ ] Implement payment processing
-- [ ] Add print receipt functionality
-- [ ] Add product categories
-- [ ] Implement inventory alerts
-- [ ] Add sales reports and analytics
-- [ ] Multi-currency support
-- [ ] Offline mode support
-
-## 📄 License
-
-MIT
-
-## 👨‍💻 Development Team
-
-Built for retail management operations with focus on speed, reliability, and user experience.
-
----
-
-**Status**: ✅ Phase 1 Complete - Ready for backend integration
+Access will be strictly limited to Managers (branch-scoped) and Administrators (global).

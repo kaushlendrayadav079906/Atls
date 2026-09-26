@@ -26,7 +26,7 @@ class UserRegister(BaseModel):
     password: str = Field(..., min_length=6, max_length=72)
     name: str = Field(..., min_length=1, max_length=100)
     master_password: str = Field(..., min_length=1, max_length=255)
-    role: str = Field("user", pattern="^(user|admin)$")
+    role: str = Field("user", pattern="^(user|admin|operator|manager)$")
     branch_id: Optional[str] = None
     store_name: Optional[str] = None
 
@@ -60,7 +60,7 @@ class AdminUserCreate(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=72)
     name: str = Field(..., min_length=1, max_length=100)
-    role: str = Field("user", pattern="^(user|admin)$")
+    role: str = Field("user", pattern="^(user|admin|operator|manager)$")
     branch_id: Optional[str] = None
     store_name: Optional[str] = None
 
@@ -70,7 +70,7 @@ class AdminUserUpdate(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=50)
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     email: Optional[EmailStr] = None
-    role: Optional[str] = Field(None, pattern="^(user|admin)$")
+    role: Optional[str] = Field(None, pattern="^(user|admin|operator|manager)$")
     branch_id: Optional[str] = None
     store_name: Optional[str] = None
     is_active: Optional[bool] = None
@@ -537,3 +537,66 @@ class ReturnDetail(BaseModel):
 
 AdminDashboardData.model_rebuild()
 OperatorDashboardData.model_rebuild()
+
+# ============================================================
+# Atlas Dashboard Models
+# ============================================================
+
+class AtlasOverview(BaseModel):
+    totalSales: float
+    invoiceCount: int
+    averageOrderValue: float
+    paymentBreakdown: List[PaymentMethodSummary] = Field(default_factory=list)
+
+class AtlasSalesTrend(BaseModel):
+    trend: List[SalesTrendPoint] = Field(default_factory=list)
+
+class AtlasInventoryItem(BaseModel):
+    itemCode: str
+    itemName: str
+    inStock: float
+    warehouse: str
+
+class AtlasInventorySummary(BaseModel):
+    snapshotTime: str
+    items: List[AtlasInventoryItem] = Field(default_factory=list)
+
+class AtlasBranchComparison(BaseModel):
+    branches: List[BranchSummary] = Field(default_factory=list)
+
+class AtlasReturnsSummary(BaseModel):
+    pendingApprovalsCount: int
+    sapCreditNotesCount: int
+    sapCreditNotesTotal: float
+
+
+class AtlasTopCustomer(BaseModel):
+    customerCode: str
+    customerName: str
+    totalSales: float
+    invoiceCount: int
+
+class AtlasProductVelocity(BaseModel):
+    itemCode: str
+    itemName: str
+    quantitySold: float
+    salesAmount: float
+
+
+class DashboardAlert(BaseModel):
+    id: str
+    request_type: str
+    status: str
+    amount: float
+    reason: str
+    branch_id: str
+    created_at: str
+
+class InventoryRiskItem(BaseModel):
+    item_code: str
+    name: str
+    in_stock: float
+    committed: float
+    ordered: float
+    minimal_stock: float
+    warehouse: str

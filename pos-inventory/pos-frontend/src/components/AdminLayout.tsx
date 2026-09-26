@@ -33,19 +33,19 @@ const AdminLayout = () => {
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center ${collapsed ? 'justify-center' : 'gap-3'} my-2 px-4 py-3 rounded-lg transition-all duration-200 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 ${
       isActive
-        ? 'bg-gray-900 text-white shadow-sm'
-        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+        ? 'bg-cyan-500/10 text-white shadow-sm'
+        : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
     }`;
 
   const closeMobile = () => setMobileOpen(false);
 
   return (
-    <div className="admin-shell flex h-screen bg-gray-50/50">
+    <div className="admin-shell flex h-screen bg-slate-50/50">
       {/* Mobile menu button */}
       <button
         aria-label="Toggle Admin Mobile Menu"
         onClick={() => setMobileOpen(!mobileOpen)}
-        className={`${mobileOpen ? 'hidden' : ''} lg:hidden fixed top-4 left-4 z-50 bg-white text-gray-800 border border-gray-200 p-2 rounded-lg shadow-sm hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900`}
+        className={`${mobileOpen ? 'hidden' : ''} lg:hidden fixed top-4 left-4 z-50 bg-white text-slate-800 border border-slate-200 p-2 rounded-lg shadow-sm hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900`}
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -54,12 +54,12 @@ const AdminLayout = () => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 ${collapsed ? 'lg:w-20' : 'w-64'} bg-white shadow-xl flex flex-col border-r border-gray-200 z-[140] transition-all duration-300 ${
+        className={`fixed lg:static inset-y-0 left-0 ${collapsed ? 'lg:w-20' : 'w-64'} bg-slate-950 shadow-2xl flex flex-col border-r border-slate-800 z-[140] transition-all duration-300 ${
           mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'
         }`}
       >
         {/* Brand */}
-        <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between h-20">
+        <div className="px-4 py-4 border-b border-slate-800 flex items-center justify-between h-20">
           {!collapsed && (
             <div className="flex-1 flex flex-col items-start justify-center">
               <img
@@ -67,11 +67,11 @@ const AdminLayout = () => {
                 alt="Logo"
                 className="w-32 h-auto object-contain"
               />
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1">Admin Center</span>
+              <span className="text-[10px] font-bold text-cyan-500 uppercase tracking-widest mt-1">Admin Center</span>
             </div>
           )}
           {mobileOpen ? (
-            <button aria-label="Close Admin Menu" onClick={closeMobile} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-900">
+            <button aria-label="Close Admin Menu" onClick={closeMobile} className="p-2 rounded-lg hover:bg-slate-800/50 text-cyan-500 focus:outline-none focus:ring-2 focus:ring-gray-900">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -80,7 +80,7 @@ const AdminLayout = () => {
             <button
               aria-label={collapsed ? "Expand Admin Sidebar" : "Collapse Admin Sidebar"}
               onClick={() => setCollapsed(!collapsed)}
-              className="hidden lg:flex p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900 mx-auto"
+              className="hidden lg:flex p-2 rounded-lg hover:bg-slate-800/50 text-gray-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900 mx-auto"
             >
               <svg
                 className={`w-5 h-5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`}
@@ -132,7 +132,7 @@ const AdminLayout = () => {
           </NavLink>
 
           {/* POS Shortcut */}
-          <div className="pt-4 mt-2 border-t border-gray-100">
+          <div className="pt-4 mt-2 border-t border-slate-800">
             {!collapsed && (
               <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Shortcuts</p>
             )}
@@ -142,27 +142,33 @@ const AdminLayout = () => {
               </svg>
               {!collapsed && <span>Go to POS</span>}
             </NavLink>
+            <NavLink to="/project" className={navClass} onClick={closeMobile}>
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+              {!collapsed && <span>Project Summary</span>}
+            </NavLink>
           </div>
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-100 bg-white space-y-3">
+        <div className="p-4 border-t border-slate-800 bg-white space-y-3">
           {!collapsed ? (
             <>
               <div className="flex items-center gap-3 px-2">
-                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 bg-slate-800/50 rounded-full flex items-center justify-center shrink-0">
                   <span className="text-gray-700 font-semibold text-sm">
                     {user?.name?.charAt(0).toUpperCase()}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Admin</p>
+                  <p className="text-sm font-semibold text-white truncate">{user?.name}</p>
+                  <p className="text-[10px] font-bold text-cyan-500 uppercase tracking-wider">Admin</p>
                 </div>
               </div>
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-900"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-slate-800/50 hover:text-white transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-900"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -172,14 +178,14 @@ const AdminLayout = () => {
             </>
           ) : (
             <div className="flex flex-col items-center gap-3">
-              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center shrink-0" title={user?.name}>
+              <div className="w-10 h-10 bg-slate-800/50 rounded-full flex items-center justify-center shrink-0" title={user?.name}>
                 <span className="text-gray-700 font-semibold text-sm">
                   {user?.name?.charAt(0).toUpperCase()}
                 </span>
               </div>
               <button
                 onClick={handleLogout}
-                className="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900"
+                className="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-slate-800/50 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900"
                 title="Logout"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -194,13 +200,13 @@ const AdminLayout = () => {
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-30 lg:hidden transition-opacity"
+          className="fixed inset-0 bg-cyan-500/10/50 backdrop-blur-sm z-30 lg:hidden transition-opacity"
           onClick={closeMobile}
         />
       )}
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto bg-gray-50/50 lg:ml-0 pt-16 lg:pt-0">
+      <main className="flex-1 overflow-auto bg-slate-50/50 lg:ml-0 pt-16 lg:pt-0">
         <div className="admin-page-container">
           <Outlet />
         </div>

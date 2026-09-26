@@ -103,3 +103,13 @@ async def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)
             detail="Admin access required.",
         )
     return current_user
+
+
+async def require_manager_or_admin(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Dependency that requires the current user to have 'admin' or 'manager' role."""
+    if current_user.get("role") not in ("admin", "manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Manager or Admin access required.",
+        )
+    return current_user

@@ -279,3 +279,100 @@ async def get_sale(
         sapDocEntry=inv.get("DocEntry"),
         sapDocNum=inv.get("DocNum"),
     )
+
+
+@router.post("/{sale_id}/cancel")
+@limiter.limit(settings.RATE_LIMIT_SALES)
+async def cancel_sale(
+    request: Request,
+    sale_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+):
+    """Cancel/Void a specific SAP AR Invoice."""
+    try:
+        doc_entry = int(sale_id)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="sale_id must be a numeric DocEntry")
+
+    loop = asyncio.get_running_loop()
+    
+    # 1. Fetch invoice to verify authorization and status
+    try:
+        inv = await loop.run_in_executor(
+            _executor, lambda: _invoice_service.get_invoice(doc_entry)
+        )
+    except Exception as exc:
+        logger.error(f"SAP get_invoice failed for cancellation of {sale_id}: {exc}")
+        raise HTTPException(status_code=502, detail="Could not retrieve sale from SAP")
+
+    if not inv:
+        raise HTTPException(status_code=404, detail=f"Sale {sale_id} not found")
+
+    # 2. Authorization check
+    role = current_user.get("role")
+    inv_branch = _normalize_branch(_extract_branch_from_invoice(inv))
+    user_branch = _normalize_branch(current_user.get("branch_id"))
+    
+    if role not in ("admin", "manager"):
+        if inv_branch != user_branch:
+            raise HTTPException(
+                status_code=403, 
+                detail="Operators can only void sales from their own branch."
+            )
+
+    # 3. Check SAP status
+    if inv.get("Cancelled") == "tYES":
+        raise HTTPException(status_code=400, detail="Sale is already cancelled.")
+    
+    if inv.get("DocumentStatus") == "bost_Close":
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot void: Invoice is closed. It may have linked incoming payments. Use the return/refund workflow instead."
+        )
+
+    # 4. Attempt Cancellation
+    try:
+        success = await loop.run_in_executor(
+            _executor, lambda: _invoice_service.cancel_invoice(doc_entry)
+        )
+        if not success:
+            raise HTTPException(status_code=500, detail="SAP cancellation returned failure.")
+            
+        # Invalidate cache for dashboard
+        background_tasks.add_task(cache_delete, DASHBOARD_SUMMARY_KEY)
+        background_tasks.add_task(cache_delete_prefix, f"{DASHBOARD_SUMMARY_KEY}:operator:{inv_branch}")
+        
+        # Restore stock in the long-lived product store immediately
+        sold_deltas = [
+            {"itemCode": line.get("ItemCode"), "qty_change": float(line.get("Quantity", 0))}
+            for line in inv.get("DocumentLines", []) if line.get("ItemCode")
+        ]
+        if sold_deltas:
+            background_tasks.add_task(product_store.patch_stock, inv_branch, sold_deltas)
+            background_tasks.add_task(cache_delete_prefix, f"{PRODUCTS_LIST_KEY}:branch:{inv_branch}")
+
+        return {"success": True, "message": "Sale cancelled successfully."}
+
+    except SAPValidationError as e:
+        error_msg = str(e).lower()
+        logger.error(f"SAP validation error for cancelling {sale_id}: {error_msg}")
+        if "payment" in error_msg or "reconciled" in error_msg:
+            raise HTTPException(
+                status_code=400, 
+                detail="Cannot void: Invoice is linked to a payment. Use the return/refund workflow."
+            )
+        elif "period" in error_msg:
+            raise HTTPException(
+                status_code=400, 
+                detail="Cannot void: Accounting period is locked."
+            )
+        raise HTTPException(status_code=400, detail=f"SAP rejected cancellation: {str(e)}")
+        
+    except Exception as e:
+        logger.error(f"Failed to cancel invoice {sale_id}: {e}")
+        # Return 502 for ambiguous outcome to avoid blind retry of financial action
+        raise HTTPException(
+            status_code=502, 
+            detail="SAP cancellation failed or timed out. Please check SAP manually before retrying."
+        )

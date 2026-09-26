@@ -25,6 +25,9 @@ const ExportReports = lazy(() => import('./pages/admin/ExportReports'));
 const OperatorExportReports = lazy(() => import('./pages/OperatorExportReports'));
 const ReturnsExchange = lazy(() => import('./pages/ReturnsExchange'));
 const Approvals = lazy(() => import('./pages/admin/Approvals'));
+const Project = lazy(() => import('./pages/Project'));
+const AtlasDashboard = lazy(() => import('./pages/atlas/AtlasDashboard'));
+const InventoryRiskView = lazy(() => import('./pages/atlas/InventoryRiskView'));
 
 function App() {
   return (
@@ -66,6 +69,9 @@ function App() {
                 <Route path="checkout" element={<Checkout />} />
                 <Route path="reports" element={<OperatorExportReports />} />
                 <Route path="returns" element={<ReturnsExchange />} />
+                <Route path="project" element={<Project />} />
+                <Route path="atlas" element={<AtlasDashboard />} />
+          <Route path="inventory-alerts" element={<InventoryRiskView />} />
               </Route>
             </Routes>
           </Suspense>
