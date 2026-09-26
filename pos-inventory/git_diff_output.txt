@@ -1,0 +1,3016 @@
+﻿diff --git a/pos-backend/.env.example b/pos-backend/.env.example
+index 65a868c..722e936 100644
+--- a/pos-backend/.env.example
++++ b/pos-backend/.env.example
+@@ -14,7 +14,7 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+ 
+ # Database Configuration
+ # For PostgreSQL (Production)
+-DATABASE_URL=postgresql://pos_user:pos_password@localhost:5432/pos_db
++DATABASE_URL=postgresql://postgres:admin123@localhost:5432/pos_db
+ # For SQLite (Development)
+ # DATABASE_URL=sqlite:///./pos.db
+ 
+diff --git a/pos-backend/app/api/v1/auth.py b/pos-backend/app/api/v1/auth.py
+index 7c95c49..28efcbe 100644
+--- a/pos-backend/app/api/v1/auth.py
++++ b/pos-backend/app/api/v1/auth.py
+@@ -3,6 +3,7 @@
+ import logging
+ 
+ from fastapi import APIRouter, Depends, HTTPException, status
++from psycopg2 import OperationalError
+ 
+ from app.core.config import settings
+ from app.core.security import create_access_token, get_current_user
+@@ -30,7 +31,14 @@ def login(credentials: UserLogin):
+             detail="Provide username or email",
+         )
+ 
+-    user = user_service.authenticate_user(identifier, credentials.password)
++    try:
++        user = user_service.authenticate_user(identifier, credentials.password)
++    except OperationalError:
++        logger.exception("Login unavailable because PostgreSQL could not be reached")
++        raise HTTPException(
++            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
++            detail="Authentication service is unavailable. Check the PostgreSQL connection.",
++        )
+     if not user:
+         logger.warning(f"Login failed for user: {identifier}")
+         raise HTTPException(
+diff --git a/pos-backend/main.py b/pos-backend/main.py
+index e2d755f..89b0f63 100644
+--- a/pos-backend/main.py
++++ b/pos-backend/main.py
+@@ -1,14 +1,12 @@
+ import uvicorn
+ 
+-
+ def main():
+     uvicorn.run(
+         "app.main:app",  # path to your FastAPI app
+         host="127.0.0.1",
+-        port=8000,
++        port=3001,
+         reload=True
+     )
+ 
+-
+ if __name__ == "__main__":
+     main()
+\ No newline at end of file
+diff --git a/pos-frontend/.env b/pos-frontend/.env
+index 3738773..4573300 100644
+--- a/pos-frontend/.env
++++ b/pos-frontend/.env
+@@ -1,4 +1,4 @@
+ # Backend API URL
+-VITE_API_URL=http://localhost:8000/api/v1
++VITE_API_URL=/api/v1
+ # VITE_API_URL=https://ctcn8trs-8000.inc1.devtunnels.ms/api/v1
+ 
+diff --git a/pos-frontend/src/App.tsx b/pos-frontend/src/App.tsx
+index 562e782..58a6e1d 100644
+--- a/pos-frontend/src/App.tsx
++++ b/pos-frontend/src/App.tsx
+@@ -18,7 +18,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
+ const Products = lazy(() => import('./pages/Products'));
+ const POS = lazy(() => import('./pages/POS'));
+ const Checkout = lazy(() => import('./pages/Checkout'));
+-// const Register = lazy(() => import('./pages/Register'));
++const Register = lazy(() => import('./pages/Register'));
+ const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+ const Branches = lazy(() => import('./pages/admin/Branches'));
+ const ExportReports = lazy(() => import('./pages/admin/ExportReports'));
+@@ -33,7 +33,7 @@ function App() {
+           <Suspense fallback={<Loader message="Loading..." />}>
+             <Routes>
+               <Route path="/login" element={<Login />} />
+-              {/* <Route path="/register" element={<Register />} /> */}
++              <Route path="/register" element={<Register />} />
+ 
+               {/* Admin panel ΓÇô admin role required */}
+               <Route
+diff --git a/pos-frontend/src/components/AdminLayout.tsx b/pos-frontend/src/components/AdminLayout.tsx
+index 56597ff..99c48a0 100644
+--- a/pos-frontend/src/components/AdminLayout.tsx
++++ b/pos-frontend/src/components/AdminLayout.tsx
+@@ -31,58 +31,59 @@ const AdminLayout = () => {
+   };
+ 
+   const navClass = ({ isActive }: { isActive: boolean }) =>
+-    `flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-4 py-3 rounded-lg transition-all duration-200 ${
++    `flex items-center ${collapsed ? 'justify-center' : 'gap-3'} my-2 px-4 py-3 rounded-lg transition-all duration-200 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 ${
+       isActive
+-        ? 'bg-pink-500 text-white shadow-md'
+-        : 'text-gray-700 hover:bg-pink-50 hover:text-pink-600'
++        ? 'bg-gray-900 text-white shadow-sm'
++        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+     }`;
+ 
+   const closeMobile = () => setMobileOpen(false);
+ 
+   return (
+-    <div className="admin-shell flex h-screen">
++    <div className="admin-shell flex h-screen bg-gray-50/50">
+       {/* Mobile menu button */}
+       <button
++        aria-label="Toggle Admin Mobile Menu"
+         onClick={() => setMobileOpen(!mobileOpen)}
+-        className={`${mobileOpen ? 'hidden' : ''} lg:hidden fixed top-4 left-4 z-50 bg-pink-500 text-white p-2 rounded-lg shadow-lg hover:bg-pink-600 transition-colors`}
++        className={`${mobileOpen ? 'hidden' : ''} lg:hidden fixed top-4 left-4 z-50 bg-white text-gray-800 border border-gray-200 p-2 rounded-lg shadow-sm hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900`}
+       >
+-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+         </svg>
+       </button>
+ 
+       {/* Sidebar */}
+       <aside
+-        className={`fixed lg:static inset-y-0 left-0 ${collapsed ? 'lg:w-20' : 'w-64'} bg-white shadow-xl flex flex-col border-r border-gray-200 z-40 transition-all duration-300 ${
++        className={`fixed lg:static inset-y-0 left-0 ${collapsed ? 'lg:w-20' : 'w-64'} bg-white shadow-xl flex flex-col border-r border-gray-200 z-[140] transition-all duration-300 ${
+           mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0'
+         }`}
+       >
+         {/* Brand */}
+-        <div className="px-4 py-4 border-b border-gray-200 flex items-center gap-3">
++        <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between h-20">
+           {!collapsed && (
+-            <div className="flex-1">
++            <div className="flex-1 flex flex-col items-start justify-center">
+               <img
+                 src="/images/black-logo.png"
+                 alt="Logo"
+-                className="w-36 h-14 object-contain"
++                className="w-32 h-auto object-contain"
+               />
+-              <span className="text-xs font-semibold text-pink-600 uppercase tracking-wide">Admin Panel</span>
++              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1">Admin Center</span>
+             </div>
+           )}
+           {mobileOpen ? (
+-            <button onClick={closeMobile} className="p-2 rounded-lg hover:bg-gray-100">
++            <button aria-label="Close Admin Menu" onClick={closeMobile} className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-900">
+               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+               </svg>
+             </button>
+           ) : (
+             <button
++              aria-label={collapsed ? "Expand Admin Sidebar" : "Collapse Admin Sidebar"}
+               onClick={() => setCollapsed(!collapsed)}
+-              className="hidden lg:flex p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+-              title={collapsed ? 'Expand' : 'Collapse'}
++              className="hidden lg:flex p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900 mx-auto"
+             >
+               <svg
+-                className={`w-5 h-5 transition-transform ${collapsed ? 'rotate-180' : ''}`}
++                className={`w-5 h-5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`}
+                 fill="none"
+                 stroke="currentColor"
+                 viewBox="0 0 24 24"
+@@ -94,13 +95,16 @@ const AdminLayout = () => {
+         </div>
+ 
+         {/* Navigation */}
+-        <nav className="flex-1 px-4 py-6 space-y-2">
++        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
++          {!collapsed && (
++            <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Management</p>
++          )}
+           {/* Home / Dashboard */}
+           <NavLink to="/admin" end className={navClass} onClick={closeMobile}>
+             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+             </svg>
+-            {!collapsed && <span className="font-medium">Dashboard</span>}
++            {!collapsed && <span>Dashboard</span>}
+           </NavLink>
+ 
+           {/* Branches */}
+@@ -108,7 +112,7 @@ const AdminLayout = () => {
+             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+             </svg>
+-            {!collapsed && <span className="font-medium">Branches</span>}
++            {!collapsed && <span>Branches</span>}
+           </NavLink>
+ 
+           {/* Export Reports */}
+@@ -116,7 +120,7 @@ const AdminLayout = () => {
+             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+             </svg>
+-            {!collapsed && <span className="font-medium">Export Reports</span>}
++            {!collapsed && <span>Export Reports</span>}
+           </NavLink>
+ 
+           {/* Returns & Exchange */}
+@@ -124,58 +128,58 @@ const AdminLayout = () => {
+             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+             </svg>
+-            {!collapsed && <span className="font-medium">Returns</span>}
++            {!collapsed && <span>Returns</span>}
+           </NavLink> */}
+ 
+           {/* POS Shortcut */}
+-          <div className="pt-4 border-t border-gray-100 mt-4">
++          <div className="pt-4 mt-2 border-t border-gray-100">
+             {!collapsed && (
+-              <p className="px-4 text-xs text-gray-400 uppercase tracking-wide mb-2">Shortcuts</p>
++              <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Shortcuts</p>
+             )}
+             <NavLink to="/" className={navClass} onClick={closeMobile}>
+               <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+               </svg>
+-              {!collapsed && <span className="font-medium">Go to POS</span>}
++              {!collapsed && <span>Go to POS</span>}
+             </NavLink>
+           </div>
+         </nav>
+ 
+         {/* Footer */}
+-        <div className="p-4 border-t border-gray-200 bg-gray-50 space-y-3">
++        <div className="p-4 border-t border-gray-100 bg-white space-y-3">
+           {!collapsed ? (
+             <>
+-              <div className="flex items-center gap-2 px-2">
+-                <div className="w-8 h-8 bg-pink-100 rounded-full flex items-center justify-center">
+-                  <span className="text-pink-600 font-semibold text-sm">
++              <div className="flex items-center gap-3 px-2">
++                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
++                  <span className="text-gray-700 font-semibold text-sm">
+                     {user?.name?.charAt(0).toUpperCase()}
+                   </span>
+                 </div>
+                 <div className="flex-1 min-w-0">
+-                  <p className="text-sm font-medium text-gray-700 truncate">{user?.name}</p>
+-                  <p className="text-xs text-pink-500 font-medium uppercase">Admin</p>
++                  <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
++                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Admin</p>
+                 </div>
+               </div>
+               <button
+                 onClick={handleLogout}
+-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
++                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-900"
+               >
+                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                 </svg>
+-                <span className="text-sm font-medium">Logout</span>
++                <span>Logout</span>
+               </button>
+             </>
+           ) : (
+             <div className="flex flex-col items-center gap-3">
+-              <div className="w-9 h-9 bg-pink-100 rounded-full flex items-center justify-center">
+-                <span className="text-pink-600 font-semibold text-sm">
++              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center shrink-0" title={user?.name}>
++                <span className="text-gray-700 font-semibold text-sm">
+                   {user?.name?.charAt(0).toUpperCase()}
+                 </span>
+               </div>
+               <button
+                 onClick={handleLogout}
+-                className="w-10 h-10 flex items-center justify-center bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
++                className="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900"
+                 title="Logout"
+               >
+                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+@@ -190,13 +194,13 @@ const AdminLayout = () => {
+       {/* Mobile overlay */}
+       {mobileOpen && (
+         <div
+-          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
++          className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-30 lg:hidden transition-opacity"
+           onClick={closeMobile}
+         />
+       )}
+ 
+       {/* Main content */}
+-      <main className="flex-1 overflow-auto">
++      <main className="flex-1 overflow-auto bg-gray-50/50 lg:ml-0 pt-16 lg:pt-0">
+         <div className="admin-page-container">
+           <Outlet />
+         </div>
+@@ -206,3 +210,4 @@ const AdminLayout = () => {
+ };
+ 
+ export default AdminLayout;
++
+diff --git a/pos-frontend/src/components/Layout.tsx b/pos-frontend/src/components/Layout.tsx
+index a9bbd7b..3e88783 100644
+--- a/pos-frontend/src/components/Layout.tsx
++++ b/pos-frontend/src/components/Layout.tsx
+@@ -34,263 +34,166 @@ const Layout = () => {
+   };
+ 
+   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+-    `flex items-center ${isSidebarCollapsed ? "justify-center" : "gap-3"} my-4 px-4 py-3 rounded-lg transition-all duration-200 ${
++    `flex items-center ${isSidebarCollapsed ? "justify-center" : "gap-3"} my-2 px-4 py-3 rounded-lg transition-all duration-200 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 ${
+       isActive
+-        ? "bg-pink-500 text-white shadow-md"
+-        : "text-gray-700 hover:bg-pink-50 hover:text-pink-600"
++        ? "bg-gray-900 text-white shadow-sm"
++        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+     }`;
+ 
+   const closeMobileMenu = () => setIsMobileMenuOpen(false);
+ 
+   return (
+-    <div className="flex h-screen bg-gray-50">
++    <div className="flex h-screen bg-gray-50/50">
+       {/* Mobile Menu Button */}
+       <button
++        aria-label="Toggle Mobile Menu"
+         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+-        className={`${isMobileMenuOpen ? "hidden" : ""} lg:hidden fixed top-4 left-4 z-50 bg-pink-500 text-white p-2 rounded-lg shadow-lg hover:bg-pink-600 transition-colors`}
++        className={`${isMobileMenuOpen ? "hidden" : ""} lg:hidden fixed top-4 left-4 z-50 bg-white text-gray-800 border border-gray-200 p-2 rounded-lg shadow-sm hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900`}
+       >
+         <svg
+-          className="w-6 h-6"
++          className="w-5 h-5"
+           fill="none"
+           stroke="currentColor"
+           viewBox="0 0 24 24"
+         >
+-          <path
+-            strokeLinecap="round"
+-            strokeLinejoin="round"
+-            strokeWidth={2}
+-            d="M4 6h16M4 12h16M4 18h16"
+-          />
++          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+         </svg>
+       </button>
+ 
+       {/* Sidebar Navigation */}
+       <aside
+-        className={`fixed lg:static inset-y-0 left-0 ${isSidebarCollapsed ? "lg:w-20" : "w-64"} bg-white shadow-xl flex flex-col border-r border-gray-200 z-140 transform transition-all duration-300 ease-in-out ${
++        className={`fixed lg:static inset-y-0 left-0 ${isSidebarCollapsed ? "lg:w-20" : "w-64"} bg-white shadow-xl flex flex-col border-r border-gray-200 z-[140] transform transition-all duration-300 ease-in-out ${
+           isMobileMenuOpen
+             ? "translate-x-0 w-64"
+             : "-translate-x-full lg:translate-x-0"
+         }`}
+       >
+-        {/* Logo/Brand - Black Background */}
+-        <div className="px-4 border-b border-gray-300">
+-          <div className="flex items-center gap-3">
+-            {!isSidebarCollapsed ? (
+-              <img
+-                src="/images/black-logo.png"
+-                alt="Logo"
+-                className="w-40 h-20 ml-4 aspect-video object-contain rounded-lg"
+-              />
+-            ) : null}
+-            {isMobileMenuOpen === true ? (
+-              <div
+-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+-                className="w-10 h-10 ml-4 rounded-lg flex items-center justify-center"
+-              >
+-                <svg
+-                  className="w-6 h-6 text-black"
+-                  fill="none"
+-                  stroke="currentColor"
+-                  viewBox="0 0 24 24"
+-                >
+-                  <path
+-                    strokeLinecap="round"
+-                    strokeLinejoin="round"
+-                    strokeWidth={2}
+-                    d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+-                  />
+-                </svg>
+-              </div>
+-            ) : (
+-              <button
+-                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+-                className="hidden lg:flex items-center justify-center gap-3 my-4 px-4 py-3 rounded-lg transition-all duration-200 text-gray-700 hover:bg-gray-100 hover:text-gray-900 w-full"
++        {/* Logo/Brand - Header */}
++        <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between h-20">
++          {!isSidebarCollapsed && (
++            <img
++              src="/images/black-logo.png"
++              alt="Logo"
++              className="w-32 h-auto object-contain"
++            />
++          )}
++          {isMobileMenuOpen ? (
++            <button
++              aria-label="Close Mobile Menu"
++              onClick={() => setIsMobileMenuOpen(false)}
++              className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-900"
++            >
++              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
++              </svg>
++            </button>
++          ) : (
++            <button
++              aria-label={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
++              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
++              className="hidden lg:flex p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900 mx-auto"
++            >
++              <svg
++                className={`w-5 h-5 shrink-0 transition-transform duration-300 ${isSidebarCollapsed ? "rotate-180" : ""}`}
++                fill="none"
++                stroke="currentColor"
++                viewBox="0 0 24 24"
+               >
+-                <svg
+-                  className={`w-5 h-5 shrink-0 transition-transform ${isSidebarCollapsed ? "rotate-180" : ""}`}
+-                  fill="none"
+-                  stroke="currentColor"
+-                  viewBox="0 0 24 24"
+-                >
+-                  <path
+-                    strokeLinecap="round"
+-                    strokeLinejoin="round"
+-                    strokeWidth={2}
+-                    d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+-                  />
+-                </svg>
+-              </button>
+-            )}
+-          </div>
++                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
++              </svg>
++            </button>
++          )}
+         </div>
+ 
+         {/* Navigation Links */}
+-        <nav className="flex-1 px-4 py-6 space-y-2">
++        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
++          {!isSidebarCollapsed && (
++            <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Main Menu</p>
++          )}
+           <NavLink to="/" className={navLinkClass} onClick={closeMobileMenu}>
+-            <svg
+-              className="w-5 h-5 shrink-0"
+-              fill="none"
+-              stroke="currentColor"
+-              viewBox="0 0 24 24"
+-            >
+-              <path
+-                strokeLinecap="round"
+-                strokeLinejoin="round"
+-                strokeWidth={2}
+-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+-              />
++            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+             </svg>
+-            {!isSidebarCollapsed && (
+-              <span className="font-medium">Dashboard</span>
+-            )}
++            {!isSidebarCollapsed && <span>Dashboard</span>}
+           </NavLink>
+ 
+           <NavLink to="/pos" className={navLinkClass} onClick={closeMobileMenu}>
+             <div className="relative">
+-              <svg
+-                className="w-5 h-5 shrink-0"
+-                fill="none"
+-                stroke="currentColor"
+-                viewBox="0 0 24 24"
+-              >
+-                <path
+-                  strokeLinecap="round"
+-                  strokeLinejoin="round"
+-                  strokeWidth={2}
+-                  d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+-                />
++              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+               </svg>
+               {cartItemCount > 0 && isSidebarCollapsed && (
+-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-4 h-4 rounded-full flex items-center justify-center">
++                <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                   {cartItemCount}
+                 </span>
+               )}
+             </div>
+             {!isSidebarCollapsed && (
+               <>
+-                <span className="font-medium">POS</span>
++                <span>POS Checkout</span>
+                 {cartItemCount > 0 && (
+-                  <span className="ml-auto bg-pink-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+-                    {cartItemCount}
++                  <span className="ml-auto bg-emerald-100 text-emerald-800 text-xs font-bold px-2 py-0.5 rounded-full">
++                    {cartItemCount} item{cartItemCount > 1 ? "s" : ""}
+                   </span>
+                 )}
+               </>
+             )}
+           </NavLink>
+-          <NavLink
+-            to="/returns"
+-            className={navLinkClass}
+-            onClick={closeMobileMenu}
+-          >
+-            <svg
+-              className="w-5 h-5 shrink-0"
+-              fill="none"
+-              stroke="currentColor"
+-              viewBox="0 0 24 24"
+-            >
+-              <path
+-                strokeLinecap="round"
+-                strokeLinejoin="round"
+-                strokeWidth={2}
+-                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+-              />
++          
++          <NavLink to="/returns" className={navLinkClass} onClick={closeMobileMenu}>
++            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+             </svg>
+-            {!isSidebarCollapsed && (
+-              <span className="font-medium">Returns</span>
+-            )}
++            {!isSidebarCollapsed && <span>Returns</span>}
+           </NavLink>
+-          <NavLink
+-            to="/products"
+-            className={navLinkClass}
+-            onClick={closeMobileMenu}
+-          >
+-            <svg
+-              className="w-5 h-5 shrink-0"
+-              fill="none"
+-              stroke="currentColor"
+-              viewBox="0 0 24 24"
+-            >
+-              <path
+-                strokeLinecap="round"
+-                strokeLinejoin="round"
+-                strokeWidth={2}
+-                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+-              />
++          
++          <NavLink to="/products" className={navLinkClass} onClick={closeMobileMenu}>
++            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+             </svg>
+-            {!isSidebarCollapsed && (
+-              <span className="font-medium">Products</span>
+-            )}
++            {!isSidebarCollapsed && <span>Products</span>}
+           </NavLink>
+ 
+-          {/* Reports link ΓÇö visible to all authenticated users */}
+-          <NavLink
+-            to="/reports"
+-            className={navLinkClass}
+-            onClick={closeMobileMenu}
+-          >
+-            <svg
+-              className="w-5 h-5 shrink-0"
+-              fill="none"
+-              stroke="currentColor"
+-              viewBox="0 0 24 24"
+-            >
+-              <path
+-                strokeLinecap="round"
+-                strokeLinejoin="round"
+-                strokeWidth={2}
+-                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+-              />
+-            </svg>
++          <div className="pt-4 mt-2 border-t border-gray-100">
+             {!isSidebarCollapsed && (
+-              <span className="font-medium">Reports</span>
++              <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Analysis</p>
+             )}
+-          </NavLink>
++            <NavLink to="/reports" className={navLinkClass} onClick={closeMobileMenu}>
++              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
++              </svg>
++              {!isSidebarCollapsed && <span>Reports</span>}
++            </NavLink>
++          </div>
+ 
+-          {/* Admin Panel link ΓÇö visible only for admin role */}
+           {user?.role === "admin" && (
+-            <NavLink
+-              to="/admin"
+-              className={navLinkClass}
+-              onClick={closeMobileMenu}
+-            >
+-              <svg
+-                className="w-5 h-5 shrink-0"
+-                fill="none"
+-                stroke="currentColor"
+-                viewBox="0 0 24 24"
+-              >
+-                <path
+-                  strokeLinecap="round"
+-                  strokeLinejoin="round"
+-                  strokeWidth={2}
+-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+-                />
+-                <path
+-                  strokeLinecap="round"
+-                  strokeLinejoin="round"
+-                  strokeWidth={2}
+-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+-                />
+-              </svg>
++            <div className="pt-4 mt-2 border-t border-gray-100">
+               {!isSidebarCollapsed && (
+-                <span className="font-medium">Admin Panel</span>
++                <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Management</p>
+               )}
+-            </NavLink>
++              <NavLink to="/admin" className={navLinkClass} onClick={closeMobileMenu}>
++                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
++                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
++                </svg>
++                {!isSidebarCollapsed && <span>Admin Panel</span>}
++              </NavLink>
++            </div>
+           )}
+         </nav>
+ 
+-        {/* Footer Info */}
+-        <div className="p-4 border-t border-gray-200 bg-gray-50 space-y-3">
++        {/* Footer User Profile & Actions */}
++        <div className="p-4 border-t border-gray-100 bg-white space-y-3">
+           {!isSidebarCollapsed ? (
+             <>
+-              <div className="flex items-center gap-2 px-2">
+-                <div className="w-8 h-8 bg-pink-100 rounded-full flex items-center justify-center">
+-                  <span className="text-pink-600 font-semibold text-sm">
++              <div className="flex items-center gap-3 px-2">
++                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
++                  <span className="text-gray-700 font-semibold text-sm">
+                     {user?.name.charAt(0).toUpperCase()}
+                   </span>
+                 </div>
+                 <div className="flex-1 min-w-0">
+-                  <p className="text-sm font-medium text-gray-700 truncate">
++                  <p className="text-sm font-semibold text-gray-900 truncate">
+                     {user?.name}
+                   </p>
+                   <p className="text-xs text-gray-500 truncate">
+@@ -300,69 +203,45 @@ const Layout = () => {
+               </div>
+               <button
+                 onClick={handleLogout}
+-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#1e1e1e] text-white rounded-lg hover:bg-gray-800 transition-colors"
++                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-900"
+               >
+-                <svg
+-                  className="w-4 h-4"
+-                  fill="none"
+-                  stroke="currentColor"
+-                  viewBox="0 0 24 24"
+-                >
+-                  <path
+-                    strokeLinecap="round"
+-                    strokeLinejoin="round"
+-                    strokeWidth={2}
+-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+-                  />
++                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                 </svg>
+-                <span className="text-sm font-medium">Logout</span>
++                <span>Logout</span>
+               </button>
+             </>
+           ) : (
+             <div className="flex flex-col items-center gap-3">
+-              <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center">
+-                <span className="text-pink-600 font-semibold">
++              <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center shrink-0" title={user?.name}>
++                <span className="text-gray-700 font-semibold">
+                   {user?.name.charAt(0).toUpperCase()}
+                 </span>
+               </div>
+               <button
+                 onClick={handleLogout}
+-                className="w-10 h-10 flex items-center justify-center bg-[#1e1e1e] text-white rounded-lg hover:bg-gray-800 transition-colors"
++                className="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900"
+                 title="Logout"
+               >
+-                <svg
+-                  className="w-5 h-5"
+-                  fill="none"
+-                  stroke="currentColor"
+-                  viewBox="0 0 24 24"
+-                >
+-                  <path
+-                    strokeLinecap="round"
+-                    strokeLinejoin="round"
+-                    strokeWidth={2}
+-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+-                  />
++                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                 </svg>
+               </button>
+             </div>
+           )}
+-          {/* <div className="text-xs text-gray-500 text-center">
+-            <p>┬⌐ 2026 Retail POS</p>
+-            <p className="mt-1">v1.0.0</p>
+-          </div> */}
+         </div>
+       </aside>
+ 
+       {/* Mobile Menu Overlay */}
+       {isMobileMenuOpen && (
+         <div
+-          className="fixed inset-0 bg-[#1e1e1e] bg-opacity-50 z-30 lg:hidden"
++          className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-30 lg:hidden transition-opacity"
+           onClick={closeMobileMenu}
+         />
+       )}
+ 
+       {/* Main Content Area */}
+-      <main className="flex-1 overflow-auto bg-white lg:ml-0 pt-16 lg:pt-0">
++      <main className="flex-1 overflow-auto bg-gray-50/50 lg:ml-0 pt-16 lg:pt-0">
+         <Outlet />
+       </main>
+     </div>
+diff --git a/pos-frontend/src/index.css b/pos-frontend/src/index.css
+index 3b4e2aa..1b01428 100644
+--- a/pos-frontend/src/index.css
++++ b/pos-frontend/src/index.css
+@@ -1,29 +1,29 @@
+ @import "tailwindcss";
+ 
+-/* Global Theme Variables - Pink, White & Black Brand Theme */
++/* Global Theme Variables - Modern Gray/Dark Brand Theme */
+ :root {
+-  /* Brand Colors - Pink */
+-  --primary-pink: #EC4899;
+-  --primary-pink-dark: #DB2777;
+-  --primary-pink-light: #F472B6;
+-  --primary-pink-lighter: #FCE7F3;
++  /* Brand Colors */
++  --primary-brand: #111827; /* gray-900 */
++  --primary-brand-light: #374151; /* gray-700 */
++  --primary-brand-dark: #030712; /* gray-950 */
+   
+   /* Backgrounds */
+   --bg-white: #FFFFFF;
+   --bg-light: #FAFAFA;
+   --bg-lighter: #F9F9F9;
++  --bg-subtle: #F9FAFB; /* gray-50 */
+   
+   /* Black & Dark */
+   --black-primary: #000000;
+   --black-secondary: #1A1A1A;
+-  --text-primary: #1A1A1A;
+-  --text-secondary: #4A4A4A;
+-  --text-tertiary: #6B6B6B;
++  --text-primary: #111827; /* gray-900 */
++  --text-secondary: #4B5563; /* gray-600 */
++  --text-tertiary: #9CA3AF; /* gray-400 */
+   
+   /* Borders */
+-  --border-light: #F0F0F0;
+-  --border-medium: #E5E5E5;
+-  --border-dark: #CCCCCC;
++  --border-light: #F3F4F6; /* gray-100 */
++  --border-medium: #E5E7EB; /* gray-200 */
++  --border-dark: #D1D5DB; /* gray-300 */
+   
+   /* Shadows */
+   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+@@ -40,24 +40,23 @@ body {
+   -moz-osx-font-smoothing: grayscale;
+ }
+ 
+-/* Custom Scrollbar - Pink Accent */
++/* Custom Scrollbar - Modern Gray Accent */
+ ::-webkit-scrollbar {
+-  width: 8px;
+-  height: 8px;
++  width: 6px;
++  height: 6px;
+ }
+ 
+ ::-webkit-scrollbar-track {
+-  background: #FAFAFA;
+-  border-radius: 4px;
++  background: transparent;
+ }
+ 
+ ::-webkit-scrollbar-thumb {
+-  background: #F472B6;
++  background: #E5E7EB; /* gray-200 */
+   border-radius: 4px;
+ }
+ 
+ ::-webkit-scrollbar-thumb:hover {
+-  background: #EC4899;
++  background: #9CA3AF; /* gray-400 */
+ }
+ 
+ /* Button Animations */
+@@ -85,9 +84,9 @@ body {
+   animation: fadeIn 0.3s ease-in-out;
+ }
+ 
+-/* Admin panel design system - aligned to POS pink theme */
++/* Admin panel design system - aligned to modern dashboard theme */
+ .admin-shell {
+-  @apply bg-linear-to-b from-pink-50/40 via-white to-white;
++  @apply bg-gray-50/50;
+ }
+ 
+ .admin-page-container {
+@@ -95,11 +94,11 @@ body {
+ }
+ 
+ .admin-card {
+-  @apply bg-white rounded-2xl border border-gray-200 shadow-sm;
++  @apply bg-white rounded-2xl border border-gray-100 shadow-sm;
+ }
+ 
+ .admin-card-header {
+-  @apply px-6 py-4 border-b border-gray-100;
++  @apply px-6 py-5 border-b border-gray-100;
+ }
+ 
+ .admin-card-body {
+@@ -107,7 +106,7 @@ body {
+ }
+ 
+ .admin-kpi-card {
+-  @apply bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-5;
++  @apply bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-5;
+ }
+ 
+ .admin-chip {
+@@ -115,11 +114,11 @@ body {
+ }
+ 
+ .admin-btn-primary {
+-  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-pink-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-pink-600 disabled:opacity-60;
++  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-60;
+ }
+ 
+ .admin-btn-secondary {
+-  @apply inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50;
++  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2;
+ }
+ 
+ .admin-table-wrap {
+@@ -131,9 +130,9 @@ body {
+ }
+ 
+ .admin-table th {
+-  @apply px-6 py-3 text-left text-xs font-semibold tracking-wide text-gray-500 uppercase;
++  @apply px-6 py-3 text-left text-xs font-semibold tracking-wider text-gray-500 uppercase bg-gray-50/50;
+ }
+ 
+ .admin-table td {
+-  @apply px-6 py-3 text-sm text-gray-700;
++  @apply px-6 py-4 text-sm text-gray-700 border-t border-gray-100;
+ }
+diff --git a/pos-frontend/src/pages/Checkout.tsx b/pos-frontend/src/pages/Checkout.tsx
+index e356541..e6e76e8 100644
+--- a/pos-frontend/src/pages/Checkout.tsx
++++ b/pos-frontend/src/pages/Checkout.tsx
+@@ -308,14 +308,14 @@ const Checkout = () => {
+       <div className="fixed inset-0 flex items-center justify-center bg-transparent bg-opacity-40 backdrop-blur-sm p-4 sm:p-8 z-150">
+         <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-4 sm:p-8 max-h-[90vh] overflow-y-auto">
+           <div className="text-center mb-6">
+-            <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
+-              <svg className="w-10 h-10 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
++              <svg className="w-10 h-10 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+               </svg>
+             </div>
+             <h2 className="text-3xl font-bold text-gray-800">Payment Successful!</h2>
+-            <p className="text-gray-500 text-sm mt-2 bg-pink-50 inline-block px-4 py-2 rounded-full">
+-              Serial Number: <span className="font-semibold text-pink-600">{saleId}</span>
++            <p className="text-gray-500 text-sm mt-2 bg-gray-50 inline-block px-4 py-2 rounded-full">
++              Serial Number: <span className="font-semibold text-gray-900">{saleId}</span>
+             </p>
+             <p className="text-sm text-gray-500 mt-3">
+               {isPrinting ? 'Printing receipt...' : printError ? 'Receipt print needs attention.' : 'Receipt printed. Starting next sale...'}
+@@ -370,7 +370,7 @@ const Checkout = () => {
+               )}
+               <div className="flex justify-between items-center font-bold text-xl border-t-2 border-gray-300 pt-3 mt-2">
+                 <span className="text-gray-800">TOTAL</span>
+-                <span className="text-pink-500">Γé╣{effectiveTotal.toFixed(2)}</span>
++                <span className="text-gray-900">Γé╣{effectiveTotal.toFixed(2)}</span>
+               </div>
+             </div>
+ 
+@@ -411,7 +411,7 @@ const Checkout = () => {
+             </button>
+             <button
+               onClick={handleNewSale}
+-              className="w-full py-4 bg-pink-500 hover:bg-pink-600 text-white rounded-xl font-bold transition-all shadow-md"
++              className="w-full py-4 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-bold transition-all shadow-md"
+             >
+               Start New Sale
+             </button>
+@@ -422,12 +422,12 @@ const Checkout = () => {
+   }
+ 
+   return (
+-    <div className="h-full bg-white p-4 sm:p-6 lg:p-8 overflow-auto">
+-      <div className="max-w-4xl mx-auto">
++    <div className="h-full p-4 sm:p-6 lg:p-8 overflow-auto">
++      <div className="max-w-6xl mx-auto">
+         <div className="mb-6 sm:mb-8">
+           <button
+             onClick={() => navigate('/pos')}
+-            className="text-pink-600 hover:text-pink-700 flex items-center gap-2 mb-4"
++            className="text-gray-600 hover:text-gray-900 flex items-center gap-2 mb-4 font-medium"
+           >
+             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+@@ -440,9 +440,9 @@ const Checkout = () => {
+ 
+         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+           <div className="space-y-4 sm:space-y-6">
+-            <div className="bg-pink-50 rounded-xl p-4 sm:p-6 border border-pink-200">
+-              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+-                <svg className="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
++              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
++                <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                 </svg>
+                 Customer Details
+@@ -456,7 +456,7 @@ const Checkout = () => {
+                     type="text"
+                     value={customerDetails.name}
+                     onChange={(e) => handleInputChange('name', e.target.value)}
+-                    className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent ${nameError ? 'border-red-400' : 'border-gray-200'}`}
++                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow ${nameError ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-gray-50'}`}
+                     placeholder="Customer name"
+                   />
+                   {nameError && <p className="mt-1 text-xs text-red-500">{nameError}</p>}
+@@ -471,7 +471,7 @@ const Checkout = () => {
+                       value={customerDetails.phone}
+                       onChange={(e) => handleInputChange('phone', e.target.value)}
+                       onBlur={() => setTimeout(() => setPhoneSuggestions([]), 200)}
+-                      className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent ${phoneError ? 'border-red-400' : 'border-gray-200'}`}
++                      className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow ${phoneError ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-gray-50'}`}
+                       placeholder="Phone number (type 4+ digits to search)"
+                       autoComplete="off"
+                     />
+@@ -491,7 +491,7 @@ const Checkout = () => {
+                             key={c.mobile}
+                             type="button"
+                             onMouseDown={() => handleSelectPhoneSuggestion(c)}
+-                            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-pink-50 transition-colors text-left border-t border-gray-50"
++                            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors text-left border-t border-gray-50"
+                           >
+                             <p className="text-sm font-semibold text-gray-800">{c.name || c.mobile}</p>
+                             <div className="text-right">
+@@ -511,7 +511,7 @@ const Checkout = () => {
+                     type="email"
+                     value={customerDetails.email}
+                     onChange={(e) => handleInputChange('email', e.target.value)}
+-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
++                    className="w-full px-4 py-3 border border-gray-200 bg-gray-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
+                     placeholder="Email address"
+                   />
+                 </div>
+@@ -521,7 +521,7 @@ const Checkout = () => {
+                     type="text"
+                     value={customerDetails.sales_employee ?? ''}
+                     onChange={(e) => handleInputChange('sales_employee', e.target.value)}
+-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
++                    className="w-full px-4 py-3 border border-gray-200 bg-gray-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
+                     placeholder="Employee name"
+                   />
+                 </div>
+@@ -531,16 +531,16 @@ const Checkout = () => {
+                     value={customerDetails.address ?? ''}
+                     onChange={(e) => handleInputChange('address', e.target.value)}
+                     rows={2}
+-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
++                    className="w-full px-4 py-3 border border-gray-200 bg-gray-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow resize-none"
+                     placeholder="Customer address"
+                   />
+                 </div>
+               </div>
+             </div>
+ 
+-            <div className="bg-white rounded-xl p-4 sm:p-6 border-2 border-gray-200">
+-              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+-                <svg className="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
++              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
++                <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                 </svg>
+                 Discount &amp; Round Off
+@@ -558,7 +558,7 @@ const Checkout = () => {
+                       const val = parseFloat(e.target.value) || 0;
+                       setExtraDiscount(Math.min(Math.max(0, val), checkoutData.total));
+                     }}
+-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
++                    className="w-full px-4 py-3 border border-gray-200 bg-gray-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"
+                     placeholder="0.00"
+                   />
+                 </div>
+@@ -566,7 +566,7 @@ const Checkout = () => {
+                   type="button"
+                   onClick={handleRoundOff}
+                   disabled={effectiveTotal % 1 < 0.001}
+-                  className="w-full py-3 border-2 border-pink-400 text-pink-600 rounded-lg font-semibold hover:bg-pink-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
++                  className="w-full py-3 border-2 border-gray-900 text-gray-900 rounded-lg font-semibold hover:bg-gray-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                 >
+                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+@@ -582,9 +582,9 @@ const Checkout = () => {
+               </div>
+             </div>
+ 
+-            <div className="bg-white rounded-xl p-4 sm:p-6 border-2 border-gray-200">
+-              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+-                <svg className="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
++              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
++                <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                 </svg>
+                 Payment Method
+@@ -594,10 +594,10 @@ const Checkout = () => {
+                   <button
+                     key={method}
+                     onClick={() => setSelectedPaymentMethod(method)}
+-                    className={`p-4 rounded-lg border-2 transition-all ${
++                    className={`p-4 rounded-xl border transition-all ${
+                       selectedPaymentMethod === method
+-                        ? 'border-pink-500 bg-pink-50 text-pink-700'
+-                        : 'border-gray-200 hover:border-pink-300 text-gray-700'
++                        ? 'border-emerald-500 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-500'
++                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700'
+                     }`}
+                   >
+                     <div className="font-semibold uppercase text-sm">{method}</div>
+@@ -614,7 +614,7 @@ const Checkout = () => {
+                     min={effectiveTotal}
+                     value={paidAmount}
+                     onChange={(e) => setPaidAmount(e.target.value)}
+-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent text-lg font-semibold"
++                    className="w-full px-4 py-3 border border-gray-200 bg-gray-50 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-lg font-semibold transition-shadow"
+                   />
+                   {calculateChange() > 0 && (
+                     <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+@@ -630,8 +630,8 @@ const Checkout = () => {
+           </div>
+ 
+           <div>
+-            <div className="bg-white rounded-xl p-4 sm:p-6 border-2 border-gray-200 lg:sticky lg:top-8">
+-              <h2 className="text-lg sm:text-xl font-bold text-gray-800 mb-4">Order Summary</h2>
++            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 lg:sticky lg:top-8">
++              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">Order Summary</h2>
+               <div className="mb-4 max-h-60 overflow-y-auto">
+                 {checkoutData.items.map((item, index) => (
+                   <div key={index} className="flex justify-between py-2 border-b border-gray-100">
+@@ -663,14 +663,14 @@ const Checkout = () => {
+                 )}
+                 <div className="flex justify-between items-center pt-3 border-t-2 border-gray-300">
+                   <span className="text-xl font-bold text-gray-800">Total</span>
+-                  <span className="text-3xl font-bold text-pink-500">Γé╣{effectiveTotal.toFixed(2)}</span>
++                  <span className="text-3xl font-bold text-gray-900">Γé╣{effectiveTotal.toFixed(2)}</span>
+                 </div>
+               </div>
+ 
+               <button
+                 onClick={handleCompleteSale}
+                 disabled={isProcessing}
+-                className={`w-full mt-6 py-4 ${isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-pink-500 hover:bg-pink-600'} text-white rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2`}
++                className={`w-full mt-6 py-4 ${isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'} text-white rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2`}
+               >
+                 {isProcessing ? (
+                   <>
+diff --git a/pos-frontend/src/pages/Dashboard.tsx b/pos-frontend/src/pages/Dashboard.tsx
+index fe14966..1bb1cd1 100644
+--- a/pos-frontend/src/pages/Dashboard.tsx
++++ b/pos-frontend/src/pages/Dashboard.tsx
+@@ -8,6 +8,19 @@ import { useRecentSalesFeed } from '../hooks/useRecentSalesFeed';
+ import { handleError } from '../utils/errorHandler';
+ import { buildReceiptDocument, getReceiptLogoDataUrl, printReceiptInBrowser } from '../utils/receiptPrinter';
+ import type { DateRange, DashboardRecentSale } from '../types';
++import {
++  BarChart,
++  Bar,
++  XAxis,
++  YAxis,
++  CartesianGrid,
++  Tooltip,
++  ResponsiveContainer,
++  PieChart,
++  Pie,
++  Cell,
++  Legend,
++} from 'recharts';
+ 
+ const formatCurrency = (amount: number) => `Rs ${amount.toFixed(2)}`;
+ 
+@@ -19,13 +32,15 @@ const formatSaleDate = (value?: string) => {
+ };
+ 
+ const badgeClass: Record<string, string> = {
+-  cash: 'bg-amber-100 text-amber-800',
++  cash: 'bg-emerald-100 text-emerald-800',
+   card: 'bg-blue-100 text-blue-800',
+-  upi: 'bg-emerald-100 text-emerald-800',
+-  wallet: 'bg-violet-100 text-violet-800',
++  upi: 'bg-violet-100 text-violet-800',
++  wallet: 'bg-amber-100 text-amber-800',
+   unknown: 'bg-gray-100 text-gray-700',
+ };
+ 
++const PIE_COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#6b7280'];
++
+ const RANGES: { label: string; value: DateRange }[] = [
+   { label: 'Today', value: 'daily' },
+   { label: 'This Week', value: 'weekly' },
+@@ -42,6 +57,57 @@ const RANGE_LABELS: Record<DateRange, string> = {
+   all_time: 'All-Time',
+ };
+ 
++// --- Reusable SVG Icons ---
++const Icons = {
++  TrendingUp: () => (
++    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
++      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
++    </svg>
++  ),
++  Receipt: () => (
++    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
++      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
++    </svg>
++  ),
++  ShoppingCart: () => (
++    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
++      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
++    </svg>
++  ),
++  Calculator: () => (
++    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
++      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
++    </svg>
++  ),
++  Users: () => (
++    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
++      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
++    </svg>
++  )
++};
++
++interface KpiCardProps {
++  title: string;
++  value: string | number;
++  subtitle?: string;
++  icon: React.ElementType;
++  colorClass: string;
++  bgClass: string;
++}
++
++const KpiCard = ({ title, value, subtitle, icon: Icon, colorClass, bgClass }: KpiCardProps) => (
++  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-start gap-4">
++    <div className={`p-3 rounded-lg ${bgClass} ${colorClass}`}>
++      <Icon />
++    </div>
++    <div>
++      <p className="text-sm font-medium text-gray-500">{title}</p>
++      <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
++      {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
++    </div>
++  </div>
++);
++
+ const Dashboard = () => {
+   const [range, setRange] = useState<DateRange>('daily');
+   const [salesSearch, setSalesSearch] = useState('');
+@@ -79,7 +145,6 @@ const Dashboard = () => {
+     [fetchNextPage, hasNextPage, isFetchingNextPage]
+   );
+ 
+-
+   const handlePrint = async (sale: DashboardRecentSale) => {
+     try {
+       const saleId = sale.saleId || String(sale.docNum ?? sale.docEntry ?? 'N/A');
+@@ -113,23 +178,23 @@ const Dashboard = () => {
+   };
+ 
+   if (isLoading) {
+-    return <Loader message="Loading operator dashboard..." />;
++    return <Loader message="Loading command center..." />;
+   }
+ 
+   if (error || !data) {
+     return (
+-      <div className="h-full bg-white p-4 sm:p-6 lg:p-8 flex items-center justify-center">
+-        <div className="text-center">
++      <div className="h-full bg-gray-50 p-4 sm:p-6 lg:p-8 flex items-center justify-center">
++        <div className="text-center bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-md">
+           <svg className="w-16 h-16 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+           </svg>
+-          <h3 className="text-lg font-semibold text-gray-800 mb-2">Failed to load operator dashboard</h3>
+-          <p className="text-gray-500 mb-4">{handleError(error, 'Dashboard')}</p>
++          <h3 className="text-lg font-semibold text-gray-900 mb-2">Dashboard Sync Failed</h3>
++          <p className="text-gray-500 mb-6 text-sm">{handleError(error, 'Dashboard')}</p>
+           <button
+             onClick={() => forceRefresh()}
+-            className="px-6 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
++            className="w-full py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+           >
+-            Try Again
++            Retry Connection
+           </button>
+         </div>
+       </div>
+@@ -153,22 +218,38 @@ const Dashboard = () => {
+     ? (totalReturnsCount / data.billCount) * 100
+     : 0;
+ 
++  // Chart data formatting
++  const pieData = data.paymentBreakdown.map(p => ({
++    name: p.method.toUpperCase(),
++    value: p.total
++  }));
++
++  const barData = data.topSellingItems.slice(0, 5).map(item => ({
++    name: item.itemName.length > 15 ? item.itemName.substring(0, 15) + '...' : item.itemName,
++    Revenue: item.revenue,
++    Quantity: item.quantity
++  }));
++
+   return (
+-    <div className="h-full bg-white p-4 sm:p-6 lg:p-8 overflow-auto">
+-      <div className="space-y-4 sm:space-y-6">
+-        {/* Header with range filter */}
+-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Operator Dashboard</h1>
+-          <div className="flex items-center gap-2 flex-wrap">
+-            <div className="flex bg-gray-100 border border-gray-200 rounded-xl p-1 gap-1 flex-wrap">
++    <div className="h-full bg-gray-50/50 p-4 sm:p-6 lg:p-8 overflow-auto">
++      <div className="max-w-7xl mx-auto space-y-6">
++        
++        {/* Header */}
++        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2">
++          <div>
++            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Operations Command</h1>
++            <p className="text-sm text-gray-500 mt-1">Real-time store performance and operational metrics.</p>
++          </div>
++          <div className="flex flex-wrap items-center gap-3">
++            <div className="flex bg-white shadow-sm border border-gray-200 rounded-lg p-1">
+               {RANGES.map((r) => (
+                 <button
+                   key={r.value}
+                   onClick={() => setRange(r.value)}
+-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
++                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                     range === r.value
+-                      ? 'bg-pink-500 text-white shadow'
+-                      : 'text-gray-600 hover:bg-pink-50 hover:text-pink-600'
++                      ? 'bg-gray-900 text-white'
++                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                   }`}
+                 >
+                   {r.label}
+@@ -180,435 +261,285 @@ const Dashboard = () => {
+                 forceRefresh();
+                 void queryClient.invalidateQueries({ queryKey: ['dashboard', 'operator', range] });
+               }}
+-              className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-pink-50 text-pink-700 rounded-lg hover:bg-pink-100 transition-colors"
++              className="inline-flex items-center justify-center w-9 h-9 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-sm"
++              title="Refresh Dashboard"
+             >
+-              {isRefetching ? 'Refreshing...' : 'Refresh'}
++              <svg className={`w-4 h-4 ${isRefetching ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
++                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
++              </svg>
+             </button>
+           </div>
+         </div>
+ 
+-        {/* KPI Cards */}
+-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+-          <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-pink-500">
+-            <p className="text-xs font-semibold text-gray-500 uppercase">{periodLabel} Sales</p>
+-            <p className="text-2xl font-bold text-pink-600 mt-2">{formatCurrency(data.todayTotal)}</p>
+-          </div>
+-          <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-pink-500">
+-            <p className="text-xs font-semibold text-gray-500 uppercase">Bills</p>
+-            <p className="text-2xl font-bold text-gray-800 mt-2">{data.billCount}</p>
+-          </div>
+-          <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-pink-500">
+-            <p className="text-xs font-semibold text-gray-500 uppercase">Average Bill</p>
+-            <p className="text-2xl font-bold text-gray-800 mt-2">{formatCurrency(averageBillValue)}</p>
+-          </div>
+-          <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-pink-500">
+-            <p className="text-xs font-semibold text-gray-500 uppercase">Items Sold</p>
+-            <p className="text-2xl font-bold text-gray-800 mt-2">{data.itemsSoldCount}</p>
+-          </div>
+-        </div>
+-
+-        {/* Payment Breakdown */}
+-        <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Payment Breakdown</h2>
+-          <div className="flex flex-wrap gap-2">
+-            {data.paymentBreakdown.length === 0 ? (
+-              <p className="text-sm text-gray-500">No payment activity for this period.</p>
+-            ) : (
+-              data.paymentBreakdown.map((payment) => {
+-                const cls = badgeClass[payment.method] ?? badgeClass.unknown;
+-                return (
+-                  <div key={payment.method} className={`px-3 py-2 rounded-full text-sm font-medium ${cls}`}>
+-                    {payment.method.toUpperCase()}: {formatCurrency(payment.total)} ({payment.billCount})
+-                  </div>
+-                );
+-              })
+-            )}
+-          </div>
++        {/* Executive KPIs */}
++        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
++          <KpiCard 
++            title={`${periodLabel} Revenue`} 
++            value={formatCurrency(data.todayTotal)}
++            icon={Icons.TrendingUp}
++            colorClass="text-emerald-600"
++            bgClass="bg-emerald-50"
++            subtitle={`${data.billCount} transactions processed`}
++          />
++          <KpiCard 
++            title="Total Invoices" 
++            value={data.billCount}
++            icon={Icons.Receipt}
++            colorClass="text-blue-600"
++            bgClass="bg-blue-50"
++            subtitle="Successful checkouts"
++          />
++          <KpiCard 
++            title="Items Sold" 
++            value={data.itemsSoldCount}
++            icon={Icons.ShoppingCart}
++            colorClass="text-indigo-600"
++            bgClass="bg-indigo-50"
++            subtitle="Total unit volume"
++          />
++          <KpiCard 
++            title="Average Order Value" 
++            value={formatCurrency(averageBillValue)}
++            icon={Icons.Calculator}
++            colorClass="text-amber-600"
++            bgClass="bg-amber-50"
++            subtitle="Per invoice average"
++          />
+         </div>
+ 
+-        {/* Returns Overview */}
+-        <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+-            <h2 className="text-lg font-semibold text-gray-900">Returns Overview</h2>
+-          </div>
+-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+-            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+-              <p className="text-xs text-gray-500 uppercase font-semibold">Total Returns</p>
+-              <p className="text-xl font-bold text-gray-900 mt-1">{totalReturnsCount}</p>
+-            </div>
+-            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+-              <p className="text-xs text-gray-500 uppercase font-semibold">Refunds</p>
+-              <p className="text-xl font-bold text-gray-900 mt-1">
+-                {returnTotals.refundCount}
+-              </p>
+-            </div>
+-            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+-              <p className="text-xs text-gray-500 uppercase font-semibold">Exchanges</p>
+-              <p className="text-xl font-bold text-gray-900 mt-1">
+-                {returnTotals.exchangeCount}
+-              </p>
+-            </div>
+-            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+-              <p className="text-xs text-gray-500 uppercase font-semibold">Refunded Amount</p>
+-              <p className="text-xl font-bold text-gray-900 mt-1">
+-                {formatCurrency(returnTotals.totalRefundedAmount)}
+-              </p>
+-            </div>
+-            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+-              <p className="text-xs text-gray-500 uppercase font-semibold">Return Rate</p>
+-              <p className="text-xl font-bold text-gray-900 mt-1">{returnRate.toFixed(1)}%</p>
++        {/* Analytics Row */}
++        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
++          {/* Revenue by Product Chart */}
++          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 lg:col-span-2 flex flex-col">
++            <h2 className="text-base font-bold text-gray-900 mb-4">Top Selling Products (Revenue)</h2>
++            <div className="flex-1 min-h-[250px]">
++              {barData.length > 0 ? (
++                <ResponsiveContainer width="100%" height="100%">
++                  <BarChart data={barData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
++                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
++                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
++                    <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} tickFormatter={(val) => `Γé╣${val}`} />
++                    <Tooltip 
++                      cursor={{ fill: '#f9fafb' }}
++                      contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
++                    />
++                    <Bar dataKey="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50} />
++                  </BarChart>
++                </ResponsiveContainer>
++              ) : (
++                <div className="h-full flex items-center justify-center text-sm text-gray-400">No sales data available.</div>
++              )}
+             </div>
+           </div>
+ 
+-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
+-            <div>
+-              <p className="text-sm font-semibold text-gray-700 mb-2">Top Return Reasons</p>
+-              <div className="flex flex-wrap gap-2">
+-                {data.returnReasons.length === 0 ? (
+-                  <span className="text-sm text-gray-500">No return reasons captured.</span>
+-                ) : (
+-                  data.returnReasons.map((reason) => (
+-                    <span
+-                      key={reason.reason}
+-                      className="text-xs bg-amber-100 text-amber-800 rounded-full px-2 py-1"
++          {/* Payment Breakdown Pie */}
++          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col">
++            <h2 className="text-base font-bold text-gray-900 mb-4">Payment Methods</h2>
++            <div className="flex-1 min-h-[250px] relative">
++              {pieData.length > 0 ? (
++                <ResponsiveContainer width="100%" height="100%">
++                  <PieChart>
++                    <Pie
++                      data={pieData}
++                      cx="50%"
++                      cy="45%"
++                      innerRadius={60}
++                      outerRadius={80}
++                      paddingAngle={5}
++                      dataKey="value"
+                     >
+-                      {reason.reason} ({reason.count})
+-                    </span>
+-                  ))
+-                )}
+-              </div>
+-            </div>
+-            <div>
+-              <p className="text-sm font-semibold text-gray-700 mb-2">Top Returned Items</p>
+-              <div className="space-y-2">
+-                {data.returnedItems.length === 0 ? (
+-                  <p className="text-sm text-gray-500">No returns recorded for today.</p>
+-                ) : (
+-                  data.returnedItems.slice(0, 6).map((item) => (
+-                    <div key={`returned-${item.itemCode}`} className="border border-gray-200 rounded-lg p-2">
+-                      <p className="text-sm font-medium text-gray-800">{item.itemName}</p>
+-                      <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+-                    </div>
+-                  ))
+-                )}
+-              </div>
+-            </div>
+-          </div>
+-
+-          <div className="mt-6">
+-            <div className="flex items-center justify-between mb-3">
+-              <h3 className="text-sm font-semibold text-gray-800">Return Orders</h3>
+-            </div>
+-            <div className="overflow-x-auto">
+-              <table className="w-full text-sm">
+-                <thead>
+-                  <tr className="text-xs text-gray-500 uppercase border-b border-gray-100">
+-                    <th className="text-left py-2">Return #</th>
+-                    <th className="text-left py-2">Orig. Invoice</th>
+-                    <th className="text-left py-2">Date</th>
+-                    <th className="text-left py-2">Customer</th>
+-                    <th className="text-left py-2">Type</th>
+-                    <th className="text-right p-2">Refund</th>
+-                    <th className="text-left p-2">Reason</th>
+-                  </tr>
+-                </thead>
+-                <tbody className="divide-y divide-gray-50">
+-                  {!data?.returnOrders || data.returnOrders.length === 0 ? (
+-                    <tr>
+-                      <td colSpan={7} className="py-3 text-sm text-gray-500">
+-                        No return orders for this period.
+-                      </td>
+-                    </tr>
+-                  ) : (
+-                    data.returnOrders.slice(0, 8).map((entry) => {
+-                      const returnTypeLower = (entry.returnType || 'refund').toLowerCase();
+-                      const typeBadgeClass =
+-                        returnTypeLower === 'exchange'
+-                          ? 'bg-blue-100 text-blue-700'
+-                          : returnTypeLower === 'store_credit'
+-                            ? 'bg-purple-100 text-purple-700'
+-                            : 'bg-red-100 text-red-700';
+-                      return (
+-                        <tr key={entry.docEntry}>
+-                          <td className="py-2 font-mono text-xs text-gray-700">{entry.docNum ?? entry.docEntry}</td>
+-                          <td className="py-2 text-xs font-medium text-pink-600">
+-                            {entry.originalDocNum ? `#${entry.originalDocNum}` : '-'}
+-                          </td>
+-                          <td className="py-2 text-gray-600">{entry.docDate || '-'}</td>
+-                          <td className="py-2 text-gray-800">{entry.customerName || entry.customerCode || '-'}</td>
+-                          <td className="py-2">
+-                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase ${typeBadgeClass}`}>
+-                              {returnTypeLower === 'store_credit' ? 'CREDIT' : returnTypeLower}
+-                            </span>
+-                          </td>
+-                          <td className="p-2 text-right text-gray-700">{formatCurrency(entry.refundAmount || 0)}</td>
+-                          <td className="p-2 text-gray-600">{entry.reason || '-'}</td>
+-                        </tr>
+-                      );
+-                    })
+-                  )}
+-                </tbody>
+-              </table>
+-            </div>
+-          </div>
+-        </div>
+-
+-        {/* Quick Actions + Personal Performance */}
+-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+-          {/* Quick Actions - compact card */}
+-          <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+-            <h2 className="text-base font-semibold text-gray-900 mb-3">Quick Actions</h2>
+-            <div className="flex flex-wrap gap-2">
+-              {data.quickActions.map((action) => (
+-                <a
+-                  key={action.id}
+-                  href={action.path}
+-                  className="inline-flex items-center justify-center bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
+-                >
+-                  {action.label}
+-                </a>
+-              ))}
+-            </div>
+-            <p className="text-xs text-gray-400 mt-3">Updates on new sale or tap Refresh.</p>
+-          </div>
+-
+-          {/* Personal Performance */}
+-          <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+-            <h2 className="text-base font-semibold text-gray-900 mb-3">Personal Performance</h2>
+-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+-              <div className="bg-pink-50 rounded-lg p-3">
+-                <p className="text-xs text-gray-500 uppercase font-semibold">Amount Target</p>
+-                <p className="text-sm font-bold text-gray-900 mt-1">
+-                  {formatCurrency(data.performance.achievedAmount)}
+-                  <span className="text-xs font-normal text-gray-500"> / {formatCurrency(data.performance.targetAmount)}</span>
+-                </p>
+-                <p className="text-xs text-pink-600 font-semibold mt-1">{data.performance.amountAchievementPercent.toFixed(1)}% achieved</p>
+-              </div>
+-              <div className="bg-pink-50 rounded-lg p-3">
+-                <p className="text-xs text-gray-500 uppercase font-semibold">Bills Target</p>
+-                <p className="text-sm font-bold text-gray-900 mt-1">
+-                  {data.performance.achievedBills}
+-                  <span className="text-xs font-normal text-gray-500"> / {data.performance.targetBills}</span>
+-                </p>
+-                <p className="text-xs text-pink-600 font-semibold mt-1">{data.performance.billsAchievementPercent.toFixed(1)}% achieved</p>
+-              </div>
++                      {pieData.map((_, index) => (
++                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
++                      ))}
++                    </Pie>
++                    {/* @ts-expect-error recharts type mismatch */}
++                    <Tooltip formatter={(value: string | number) => formatCurrency(Number(value))} />
++                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
++                  </PieChart>
++                </ResponsiveContainer>
++              ) : (
++                <div className="h-full flex items-center justify-center text-sm text-gray-400">No payment data available.</div>
++              )}
+             </div>
+           </div>
+         </div>
+ 
+-        {/* Product Sales + Stock Status (stock only on daily view) */}
+-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+-          <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Product Sales</h2>
+-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
++        {/* Operational & Customer Insights */}
++        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
++          {/* Performance & Targets */}
++          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
++            <h2 className="text-base font-bold text-gray-900 mb-4">Personal Performance Targets</h2>
++            <div className="space-y-5">
+               <div>
+-                <p className="text-sm font-semibold text-green-700 mb-2">Top Selling</p>
+-                <div className="space-y-2">
+-                  {data.topSellingItems.length === 0 ? (
+-                    <p className="text-sm text-gray-500">No sales data yet.</p>
+-                  ) : (
+-                    data.topSellingItems.slice(0, 5).map((item) => (
+-                      <div key={`top-${item.itemCode}`} className="border border-gray-200 rounded-lg p-2">
+-                        <p className="text-sm font-medium text-gray-800">{item.itemName}</p>
+-                        <p className="text-xs text-gray-500">Qty: {item.quantity} ┬╖ {formatCurrency(item.revenue)}</p>
+-                      </div>
+-                    ))
+-                  )}
++                <div className="flex justify-between items-end mb-1">
++                  <span className="text-sm font-semibold text-gray-700">Revenue Target</span>
++                  <span className="text-sm font-bold text-gray-900">{formatCurrency(data.performance.achievedAmount)} <span className="text-gray-400 font-normal">/ {formatCurrency(data.performance.targetAmount)}</span></span>
+                 </div>
++                <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
++                  <div className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(data.performance.amountAchievementPercent, 100)}%` }}></div>
++                </div>
++                <p className="text-xs text-gray-500 mt-1">{data.performance.amountAchievementPercent.toFixed(1)}% achieved</p>
+               </div>
++              
+               <div>
+-                <p className="text-sm font-semibold text-amber-700 mb-2">Low Selling</p>
+-                <div className="space-y-2">
+-                  {data.lowSellingItems.length === 0 ? (
+-                    <p className="text-sm text-gray-500">No low-selling items.</p>
+-                  ) : (
+-                    data.lowSellingItems.slice(0, 5).map((item) => (
+-                      <div key={`low-${item.itemCode}`} className="border border-gray-200 rounded-lg p-2">
+-                        <p className="text-sm font-medium text-gray-800">{item.itemName}</p>
+-                        <p className="text-xs text-gray-500">Qty: {item.quantity} ┬╖ {formatCurrency(item.revenue)}</p>
+-                      </div>
+-                    ))
+-                  )}
++                <div className="flex justify-between items-end mb-1">
++                  <span className="text-sm font-semibold text-gray-700">Invoice Target</span>
++                  <span className="text-sm font-bold text-gray-900">{data.performance.achievedBills} <span className="text-gray-400 font-normal">/ {data.performance.targetBills}</span></span>
++                </div>
++                <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
++                  <div className="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(data.performance.billsAchievementPercent, 100)}%` }}></div>
+                 </div>
++                <p className="text-xs text-gray-500 mt-1">{data.performance.billsAchievementPercent.toFixed(1)}% achieved</p>
+               </div>
+             </div>
+-          </div>
+ 
+-          {range === 'daily' && (
+-            <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+-              <h2 className="text-lg font-semibold text-gray-900 mb-3">Stock Status</h2>
+-              <div className="space-y-3">
+-                <div>
+-                  <p className="text-sm font-semibold text-gray-700 mb-2">Fast Lookup</p>
+-                  <div className="max-h-36 overflow-auto space-y-1">
+-                    {data.availableStock.slice(0, 8).map((item) => (
+-                      <div key={`stock-${item.itemCode}`} className="flex items-center justify-between text-sm border border-gray-100 rounded px-2 py-1">
+-                        <span className="text-gray-700 truncate pr-2">{item.itemName}</span>
+-                        <span className="font-semibold text-gray-900">{item.inStock}</span>
+-                      </div>
+-                    ))}
+-                  </div>
+-                </div>
+-                <div>
+-                  <p className="text-sm font-semibold text-amber-700 mb-2">Low Stock Alerts</p>
+-                  <div className="flex flex-wrap gap-2">
+-                    {data.lowStockAlerts.length === 0 ? (
+-                      <span className="text-sm text-gray-500">No low-stock alerts.</span>
+-                    ) : (
+-                      data.lowStockAlerts.map((item) => (
+-                        <span key={`low-stock-${item.itemCode}`} className="text-xs bg-amber-100 text-amber-800 rounded-full px-2 py-1">
+-                          {item.itemName} ({item.inStock})
+-                        </span>
+-                      ))
+-                    )}
+-                  </div>
+-                </div>
+-                <div>
+-                  <p className="text-sm font-semibold text-red-700 mb-2">Out of Stock</p>
+-                  <div className="flex flex-wrap gap-2">
+-                    {data.outOfStockItems.length === 0 ? (
+-                      <span className="text-sm text-gray-500">No out-of-stock items.</span>
+-                    ) : (
+-                      data.outOfStockItems.map((item) => (
+-                        <span key={`oos-${item.itemCode}`} className="text-xs bg-red-100 text-red-700 rounded-full px-2 py-1">
+-                          {item.itemName}
+-                        </span>
+-                      ))
+-                    )}
+-                  </div>
+-                </div>
++            {/* Customer Insights Mini-View */}
++            {data.customerInsights && (
++              <div className="mt-6 pt-5 border-t border-gray-100">
++                 <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
++                    <Icons.Users /> Customer Loyalty
++                 </h3>
++                 <div className="grid grid-cols-2 gap-3">
++                   <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
++                     <p className="text-xs text-gray-500 font-medium">Repeat Rate</p>
++                     <p className="text-lg font-bold text-gray-900">{data.customerInsights.repeatRate.toFixed(1)}%</p>
++                   </div>
++                   <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
++                     <p className="text-xs text-gray-500 font-medium">New Customers</p>
++                     <p className="text-lg font-bold text-gray-900">{data.customerInsights.newCustomerCount}</p>
++                   </div>
++                 </div>
+               </div>
+-            </div>
+-          )}
+-        </div>
++            )}
++          </div>
+ 
+-        {data.customerInsights && (
+-          <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Customer Insights</h2>
+-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+-              <div className="bg-pink-50 rounded-lg p-3 text-center">
+-                <p className="text-xs text-gray-500 uppercase font-semibold">Repeat Customers</p>
+-                <p className="text-2xl font-bold text-pink-600 mt-1">{data.customerInsights.repeatCustomerCount}</p>
+-                <p className="text-xs text-gray-400">{data.customerInsights.repeatRate.toFixed(1)}% repeat rate</p>
++          {/* Returns & Health */}
++          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
++            <h2 className="text-base font-bold text-gray-900 mb-4">Returns & Health</h2>
++            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
++              <div className="p-3 bg-red-50 rounded-lg text-center">
++                 <p className="text-2xl font-bold text-red-600">{returnRate.toFixed(1)}%</p>
++                 <p className="text-xs font-medium text-red-800 uppercase mt-1">Return Rate</p>
+               </div>
+-              <div className="bg-blue-50 rounded-lg p-3 text-center">
+-                <p className="text-xs text-gray-500 uppercase font-semibold">New Customers</p>
+-                <p className="text-2xl font-bold text-blue-600 mt-1">{data.customerInsights.newCustomerCount}</p>
++              <div className="p-3 bg-gray-50 border border-gray-100 rounded-lg text-center">
++                 <p className="text-2xl font-bold text-gray-900">{returnTotals.refundCount}</p>
++                 <p className="text-xs font-medium text-gray-500 uppercase mt-1">Refunds</p>
+               </div>
+-              <div className="bg-green-50 rounded-lg p-3 text-center">
+-                <p className="text-xs text-gray-500 uppercase font-semibold">Total CLV</p>
+-                <p className="text-2xl font-bold text-green-600 mt-1">{formatCurrency(data.customerInsights.totalCLV)}</p>
++              <div className="p-3 bg-gray-50 border border-gray-100 rounded-lg text-center">
++                 <p className="text-2xl font-bold text-gray-900">{returnTotals.exchangeCount}</p>
++                 <p className="text-xs font-medium text-gray-500 uppercase mt-1">Exchanges</p>
+               </div>
+             </div>
+-            {data.customerInsights.topCustomers.length > 0 && (
+-              <div>
+-                <p className="text-sm font-semibold text-gray-700 mb-2">Top Customers</p>
+-                <div className="overflow-x-auto">
+-                  <table className="w-full text-sm">
+-                    <thead>
+-                      <tr className="text-xs text-gray-500 uppercase border-b border-gray-100">
+-                        <th className="text-left py-1.5">Customer</th>
+-                        <th className="text-right py-1.5">Spend</th>
+-                        <th className="text-right py-1.5">Bills</th>
+-                        <th className="text-right py-1.5">Avg. Order</th>
+-                      </tr>
+-                    </thead>
+-                    <tbody className="divide-y divide-gray-50">
+-                      {data.customerInsights.topCustomers.slice(0, 5).map((c) => (
+-                        <tr key={c.cardCode}>
+-                          <td className="py-1.5 text-gray-800">{c.cardName || c.cardCode}</td>
+-                          <td className="py-1.5 text-right font-semibold text-pink-600">{formatCurrency(c.totalSpend)}</td>
+-                          <td className="py-1.5 text-right text-gray-600">{c.billCount}</td>
+-                          <td className="py-1.5 text-right text-gray-600">{formatCurrency(c.averageOrderValue)}</td>
+-                        </tr>
+-                      ))}
+-                    </tbody>
+-                  </table>
+-                </div>
++
++            <div>
++              <h3 className="text-sm font-bold text-gray-900 mb-2">Top Reasons</h3>
++              <div className="flex flex-wrap gap-2">
++                {data.returnReasons.length === 0 ? (
++                  <span className="text-sm text-gray-500">No return reasons captured.</span>
++                ) : (
++                  data.returnReasons.map((reason) => (
++                    <span key={reason.reason} className="text-xs bg-gray-100 text-gray-700 font-medium rounded-full px-3 py-1 border border-gray-200">
++                      {reason.reason} <span className="text-gray-400 ml-1">({reason.count})</span>
++                    </span>
++                  ))
++                )}
+               </div>
+-            )}
++            </div>
+           </div>
+-        )}
++        </div>
+ 
+-        {/* Live Sales Feed ΓÇö full width, detailed */}
+-        <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+-            <h2 className="text-lg font-semibold text-gray-900">Live Sales Feed</h2>
+-            <input
+-              type="search"
+-              placeholder="Search by sale ID, customer name or phoneΓÇª"
+-              value={salesSearch}
+-              onChange={(e) => setSalesSearch(e.target.value)}
+-              className="w-full sm:w-72 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
+-            />
++        {/* Live Sales Feed */}
++        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-0 overflow-hidden flex flex-col">
++          <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-3 bg-gray-50/50">
++            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
++              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
++              Live Transaction Feed
++            </h2>
++            <div className="relative w-full sm:w-64">
++              <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
++                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
++              </svg>
++              <input
++                type="search"
++                placeholder="Search transactions..."
++                value={salesSearch}
++                onChange={(e) => setSalesSearch(e.target.value)}
++                className="w-full pl-9 pr-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-shadow"
++              />
++            </div>
+           </div>
+-          <div className="max-h-120 overflow-y-auto space-y-3 pr-1" onScroll={handleSalesFeedScroll}>
+-            {(() => {
+-              if (isSalesFeedLoading && feedItems.length === 0) {
+-                return <p className="text-sm text-gray-500">Loading recent salesΓÇª</p>;
+-              }
+-
+-              if (feedItems.length === 0) {
+-                return (
+-                  <p className="text-sm text-gray-500">
+-                    {salesSearch.trim() ? 'No sales match your search.' : 'No recent transactions for this period.'}
+-                  </p>
+-                );
+-              }
+-
+-              return feedItems.map((sale) => {
+-              const billLabel = sale.docNum ?? sale.docEntry ?? 'N/A';
+-              const rowKey = String(sale.docEntry ?? sale.docNum ?? `${sale.docDate || ''}-${sale.total}`);
+-              return (
+-                <div key={rowKey} className={`border rounded-lg p-4 ${sale.hasReturn ? 'border-orange-200 bg-orange-50' : 'border-gray-200 bg-gray-50'}`}>
+-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+-                    <div className="flex-1">
+-                      <div className="flex items-center gap-3 mb-1 flex-wrap">
+-                        <p className="font-semibold text-gray-900">Bill #{billLabel}</p>
+-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeClass[sale.paymentMethod?.toLowerCase() ?? 'unknown'] ?? badgeClass.unknown}`}>
+-                          {(sale.paymentMethod || 'unknown').toUpperCase()}
+-                        </span>
+-                        {sale.hasReturn && (
+-                          <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+-                            Γå⌐ RETURNED
+-                          </span>
+-                        )}
+-                      </div>
+-                      <p className="text-xs text-gray-500 mb-1">{formatSaleDate(sale.docDate)}</p>
+-                      <p className="text-sm text-gray-700 mb-2">{sale.customerName || 'Walk-in Customer'}</p>
+-                      <div className="flex flex-wrap gap-1.5">
+-                        {sale.items.map((item) => (
+-                          <span key={`${rowKey}-${item.itemCode}`} className="bg-white border border-gray-200 rounded-full px-2 py-0.5 text-xs text-gray-600">
+-                            {item.itemName} ├ù {item.quantity}
+-                          </span>
+-                        ))}
+-                      </div>
+-                    </div>
+-                    <div className="sm:text-right flex sm:flex-col items-center sm:items-end gap-3">
+-                      <div>
+-                        <p className="text-xs text-gray-500">Total</p>
+-                        <p className="text-xl font-bold text-pink-600">{formatCurrency(sale.total)}</p>
+-                      </div>
+-                      <button
+-                        onClick={() => void handlePrint(sale)}
+-                        className="px-3 py-1.5 bg-black text-white text-sm rounded-lg hover:bg-gray-900 transition-colors whitespace-nowrap"
+-                      >
+-                        Print Receipt
+-                      </button>
+-                    </div>
+-                  </div>
+-                </div>
+-              );
+-            });
+-            })()}
+-            {isFetchingNextPage && (
+-              <p className="text-xs text-gray-500 text-center py-2">Loading more salesΓÇª</p>
+-            )}
+-            {!hasNextPage && feedItems.length > 0 && (
+-              <p className="text-xs text-gray-400 text-center py-2">End of sales feed.</p>
+-            )}
++          
++          <div className="overflow-x-auto max-h-[400px] overflow-y-auto" onScroll={handleSalesFeedScroll}>
++            <table className="w-full text-sm text-left">
++              <thead className="text-xs text-gray-500 uppercase bg-gray-50 sticky top-0 z-10 border-b border-gray-100">
++                <tr>
++                  <th className="px-4 py-3 font-semibold">Sale ID</th>
++                  <th className="px-4 py-3 font-semibold">Date</th>
++                  <th className="px-4 py-3 font-semibold">Customer</th>
++                  <th className="px-4 py-3 font-semibold">Status/Payment</th>
++                  <th className="px-4 py-3 font-semibold text-right">Amount</th>
++                  <th className="px-4 py-3 font-semibold text-center">Action</th>
++                </tr>
++              </thead>
++              <tbody className="divide-y divide-gray-100">
++                {isSalesFeedLoading && feedItems.length === 0 ? (
++                  <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">Loading transactions...</td></tr>
++                ) : feedItems.length === 0 ? (
++                  <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">No transactions found.</td></tr>
++                ) : (
++                  feedItems.map((sale) => {
++                    const billLabel = sale.docNum ?? sale.docEntry ?? 'N/A';
++                    const rowKey = String(sale.docEntry ?? sale.docNum ?? `${sale.docDate || ''}-${sale.total}`);
++                    const badge = badgeClass[sale.paymentMethod?.toLowerCase() ?? 'unknown'] ?? badgeClass.unknown;
++                    
++                    return (
++                      <tr key={rowKey} className="hover:bg-gray-50/80 transition-colors group">
++                        <td className="px-4 py-3 font-mono font-medium text-gray-900">#{billLabel}</td>
++                        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatSaleDate(sale.docDate)}</td>
++                        <td className="px-4 py-3">
++                           <div className="font-medium text-gray-900 truncate max-w-[150px]" title={sale.customerName || 'Walk-in'}>
++                             {sale.customerName || 'Walk-in'}
++                           </div>
++                           <div className="text-xs text-gray-400 truncate max-w-[150px]" title={sale.items.map(i => i.itemName).join(', ')}>
++                             {sale.items.length} items
++                           </div>
++                        </td>
++                        <td className="px-4 py-3">
++                          <div className="flex flex-col gap-1 items-start">
++                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${badge}`}>
++                              {(sale.paymentMethod || 'UNKNOWN').toUpperCase()}
++                            </span>
++                            {sale.hasReturn && (
++                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">
++                                RETURNED
++                              </span>
++                            )}
++                          </div>
++                        </td>
++                        <td className="px-4 py-3 font-bold text-gray-900 text-right">{formatCurrency(sale.total)}</td>
++                        <td className="px-4 py-3 text-center">
++                          <button
++                            onClick={() => void handlePrint(sale)}
++                            className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
++                            title="Print Receipt"
++                          >
++                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
++                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
++                            </svg>
++                          </button>
++                        </td>
++                      </tr>
++                    );
++                  })
++                )}
++                {isFetchingNextPage && (
++                  <tr><td colSpan={6} className="px-4 py-4 text-center text-xs text-gray-400">Loading more...</td></tr>
++                )}
++              </tbody>
++            </table>
+           </div>
+         </div>
++
+       </div>
+     </div>
+   );
+diff --git a/pos-frontend/src/pages/Login.tsx b/pos-frontend/src/pages/Login.tsx
+index 9e5a950..82154c1 100644
+--- a/pos-frontend/src/pages/Login.tsx
++++ b/pos-frontend/src/pages/Login.tsx
+@@ -1,5 +1,5 @@
+ import { useState } from 'react';
+-import { useNavigate } from 'react-router-dom';
++import { useNavigate, Link } from 'react-router-dom';
+ import { useQueryClient } from '@tanstack/react-query';
+ import { useAppDispatch } from '../app/hooks';
+ import { loginAsync } from '../features/auth/authSlice';
+@@ -107,14 +107,14 @@ const Login = () => {
+           </form>
+ 
+           {/* Register Link */}
+-          {/* <div className="mt-6 text-center">
++          <div className="mt-6 text-center">
+             <p className="text-gray-600">
+               Don't have an account?{' '}
+               <Link to="/register" className="text-pink-500 hover:text-pink-600 font-semibold">
+                 Sign up
+               </Link>
+             </p>
+-          </div> */}
++          </div>
+ 
+           {/* Demo Credentials */}
+           {/* <div className="mt-6 p-4 bg-pink-50 rounded-lg">
+diff --git a/pos-frontend/src/pages/OperatorExportReports.tsx b/pos-frontend/src/pages/OperatorExportReports.tsx
+index 7e71062..8d6e4c7 100644
+--- a/pos-frontend/src/pages/OperatorExportReports.tsx
++++ b/pos-frontend/src/pages/OperatorExportReports.tsx
+@@ -69,7 +69,7 @@ const OperatorExportReports = () => {
+         <p className="text-gray-500 text-sm">Export your branch sales data as Excel</p>
+       </div>
+ 
+-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
++      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+         {/* Date Range Preset */}
+         <div>
+           <div className="flex items-center justify-between mb-2">
+@@ -79,8 +79,8 @@ const OperatorExportReports = () => {
+               onClick={() => { setUseCustom(!useCustom); setPreview(null); }}
+               className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                 useCustom
+-                  ? 'bg-pink-500 text-white border-pink-500'
+-                  : 'text-gray-600 border-gray-200 hover:border-pink-400 hover:text-pink-600'
++                  ? 'bg-emerald-600 text-white border-emerald-600'
++                  : 'text-gray-600 border-gray-200 hover:border-emerald-500 hover:text-emerald-700'
+               }`}
+             >
+               {useCustom ? 'Using Custom Dates' : 'Use Custom Dates'}
+@@ -93,10 +93,10 @@ const OperatorExportReports = () => {
+                 <button
+                   key={r.value}
+                   onClick={() => { setRange(r.value); setPreview(null); }}
+-                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
++                  className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
+                     range === r.value
+-                      ? 'bg-pink-500 text-white border-pink-500'
+-                      : 'bg-white text-gray-600 border-gray-200 hover:border-pink-400 hover:text-pink-600'
++                      ? 'bg-emerald-600 text-white border-emerald-600'
++                      : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-500 hover:text-emerald-700'
+                   }`}
+                 >
+                   {r.label}
+@@ -113,7 +113,7 @@ const OperatorExportReports = () => {
+                   type="date"
+                   value={fromDate}
+                   onChange={(e) => { setFromDate(e.target.value); setPreview(null); }}
+-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50 transition-shadow"
+                 />
+               </div>
+               <div className="flex-1">
+@@ -123,7 +123,7 @@ const OperatorExportReports = () => {
+                   value={toDate}
+                   onChange={(e) => { setToDate(e.target.value); setPreview(null); }}
+                   min={fromDate}
+-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50 transition-shadow"
+                 />
+               </div>
+             </div>
+@@ -142,9 +142,9 @@ const OperatorExportReports = () => {
+         </div>
+ 
+         {/* Report info */}
+-        <div className="bg-pink-50 border border-pink-100 rounded-lg p-4 text-sm text-pink-700 space-y-1">
++        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-sm text-emerald-800 space-y-1">
+           <p className="font-medium">The report includes:</p>
+-          <ul className="list-disc list-inside space-y-0.5 text-pink-600">
++          <ul className="list-disc list-inside space-y-0.5 text-emerald-700">
+             <li>Invoice number &amp; date</li>
+             <li>Customer name &amp; mobile (from UDF fields)</li>
+             <li>Payment method</li>
+@@ -157,7 +157,7 @@ const OperatorExportReports = () => {
+           <button
+             onClick={handlePreview}
+             disabled={isBusy}
+-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-pink-500 text-white text-sm font-semibold rounded-lg hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
++            className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+           >
+             {previewMutation.isPending ? (
+               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+@@ -173,7 +173,7 @@ const OperatorExportReports = () => {
+             <button
+               onClick={handleGenerate}
+               disabled={isBusy || preview.rows.length === 0}
+-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-pink-500 text-white text-sm font-semibold rounded-lg hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
++              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+             >
+               {exportMutation.isPending ? (
+                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+@@ -210,7 +210,7 @@ const OperatorExportReports = () => {
+               </div>
+               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                 <p className="text-sm text-gray-500">Total</p>
+-                <p className="text-lg font-semibold text-pink-600">{formatCurrency(preview.totals.total)}</p>
++                <p className="text-lg font-semibold text-emerald-700">{formatCurrency(preview.totals.total)}</p>
+               </div>
+             </div>
+ 
+@@ -243,7 +243,7 @@ const OperatorExportReports = () => {
+                         <td className="px-3 py-2  text-gray-700">{formatCurrency(row.subtotal)}</td>
+                         <td className="px-3 py-2  text-red-600">{row.discount > 0 ? `-${formatCurrency(row.discount)}` : '-'}</td>
+                         <td className="px-3 py-2 text-gray-700">{formatCurrency(row.gst)}</td>
+-                        <td className="px-3 py-2 font-semibold text-pink-600">{formatCurrency(row.total)}</td>
++                        <td className="px-3 py-2 font-semibold text-emerald-700">{formatCurrency(row.total)}</td>
+                       </tr>
+                     ))}
+                   </tbody>
+diff --git a/pos-frontend/src/pages/Products.tsx b/pos-frontend/src/pages/Products.tsx
+index b193890..3f2ccfa 100644
+--- a/pos-frontend/src/pages/Products.tsx
++++ b/pos-frontend/src/pages/Products.tsx
+@@ -26,16 +26,18 @@ const Products = () => {
+ 
+   if (error) {
+     return (
+-      <div className="h-full bg-white p-4 sm:p-6 lg:p-8 flex items-center justify-center">
+-        <div className="text-center">
+-          <svg className="w-16 h-16 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+-          </svg>
+-          <h3 className="text-lg font-semibold text-gray-800 mb-2">Failed to load products</h3>
+-          <p className="text-gray-500 mb-4">{handleError(error, 'Products')}</p>
++      <div className="h-full w-full flex items-center justify-center p-4 sm:p-6 lg:p-8">
++        <div className="text-center bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-md w-full">
++          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
++            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
++            </svg>
++          </div>
++          <h3 className="text-lg font-bold text-gray-900 mb-2">Failed to load products</h3>
++          <p className="text-sm text-gray-500 mb-6">{handleError(error, 'Products')}</p>
+           <button
+             onClick={() => refetch()}
+-            className="px-6 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
++            className="w-full inline-flex items-center justify-center px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
+           >
+             Try Again
+           </button>
+@@ -45,177 +47,117 @@ const Products = () => {
+   }
+ 
+   return (
+-    <div className="h-full bg-white p-4 sm:p-6 lg:p-8">
+-      <div className="space-y-4 sm:space-y-6">
+-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Products</h1>
+-        {/* <button
+-          onClick={() => handleOpenModal()}
+-          className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 shadow-sm w-full sm:w-auto justify-center"
+-        >
+-          <svg
+-            className="w-5 h-5"
+-            fill="none"
+-            stroke="currentColor"
+-            viewBox="0 0 24 24"
+-          >
+-            <path
+-              strokeLinecap="round"
+-              strokeLinejoin="round"
+-              strokeWidth={2}
+-              d="M12 4v16m8-8H4"
+-            />
+-          </svg>
+-          Add Product
+-        </button> */}
++    <div className="h-full p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
++      {/* Header section */}
++      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
++        <div>
++          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Products</h1>
++          <p className="text-sm text-gray-500 mt-1">Manage and view your product inventory.</p>
++        </div>
+       </div>
+ 
+-      {/* Search */}
+-      <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+-        <div className="relative">
++      {/* Search Bar */}
++      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
++        <div className="relative max-w-md">
+           <input
+             type="text"
+-            placeholder="Search products by name or barcode..."
++            placeholder="Search by name or barcode..."
+             value={searchQuery}
+             onChange={(e) => setSearchQuery(e.target.value)}
+-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
++            className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-shadow"
+           />
+           <svg
+-            className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2"
++            className="w-5 h-5 text-gray-400 absolute left-3.5 top-1/2 transform -translate-y-1/2"
+             fill="none"
+             stroke="currentColor"
+             viewBox="0 0 24 24"
+           >
+-            <path
+-              strokeLinecap="round"
+-              strokeLinejoin="round"
+-              strokeWidth={2}
+-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+-            />
++            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+           </svg>
+         </div>
+       </div>
+ 
+       {/* Products Table */}
+-      <div className="bg-white rounded-lg shadow-md overflow-hidden relative overflow-x-auto">
++      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden">
+         {loading && products.length > 0 && (
+-          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
++          <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-10">
+             <Loader message="Updating..." size="small" />
+           </div>
+         )}
++        
+         <div className="overflow-x-auto">
+-        <table className="min-w-full divide-y divide-gray-200">
+-          <thead className="bg-gray-50">
+-            <tr>
+-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+-                Image
+-              </th>
+-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+-                Name
+-              </th>
+-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+-                Price
+-              </th>
+-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+-                Barcode
+-              </th>
+-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+-                Stock
+-              </th>
+-              {/* <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+-                Actions
+-              </th> */}
+-            </tr>
+-          </thead>
+-          <tbody className="bg-white divide-y divide-gray-200">
+-            {filteredProducts.map((product) => (
+-              <tr key={product.id} className="hover:bg-gray-50">
+-                <td className="px-6 py-4 whitespace-nowrap">
+-                  <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+-                    {product.image ? (
+-                      <img
+-                        src={product.image}
+-                        alt={product.name}
+-                        className="w-full h-full object-cover"
+-                      />
+-                    ) : (
+-                      <svg
+-                        className="w-6 h-6 text-gray-400"
+-                        fill="none"
+-                        stroke="currentColor"
+-                        viewBox="0 0 24 24"
+-                      >
+-                        <path
+-                          strokeLinecap="round"
+-                          strokeLinejoin="round"
+-                          strokeWidth={2}
+-                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+-                        />
+-                      </svg>
+-                    )}
+-                  </div>
+-                </td>
+-                <td className="px-6 py-4 whitespace-nowrap">
+-                  <div className="text-sm font-medium text-gray-900">
+-                    {product.name}
+-                  </div>
+-                </td>
+-                <td className="px-6 py-4 whitespace-nowrap">
+-                  <div className="text-sm text-gray-900">
+-                    Γé╣{product.price.toFixed(2)}
+-                  </div>
+-                </td>
+-                <td className="px-6 py-4 whitespace-nowrap">
+-                  <div className="text-sm text-gray-500 font-mono">
+-                    {product.barcode}
+-                  </div>
+-                </td>
+-                <td className="px-6 py-4 whitespace-nowrap">
+-                  <div className="text-sm text-gray-900">
++          <table className="w-full text-sm text-left">
++            <thead className="bg-gray-50/80 border-b border-gray-100 text-xs uppercase tracking-wider font-semibold text-gray-500">
++              <tr>
++                <th scope="col" className="px-6 py-4 rounded-tl-2xl">Product</th>
++                <th scope="col" className="px-6 py-4">Price</th>
++                <th scope="col" className="px-6 py-4">Barcode</th>
++                <th scope="col" className="px-6 py-4 rounded-tr-2xl">Stock Level</th>
++              </tr>
++            </thead>
++            <tbody className="divide-y divide-gray-100">
++              {filteredProducts.map((product) => (
++                <tr key={product.id} className="hover:bg-gray-50/50 transition-colors group">
++                  <td className="px-6 py-4 whitespace-nowrap">
++                    <div className="flex items-center gap-4">
++                      <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center overflow-hidden border border-gray-100 shrink-0">
++                        {product.image ? (
++                          <img
++                            src={product.image}
++                            alt={product.name}
++                            className="w-full h-full object-cover"
++                          />
++                        ) : (
++                          <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
++                          </svg>
++                        )}
++                      </div>
++                      <div className="font-medium text-gray-900">{product.name}</div>
++                    </div>
++                  </td>
++                  <td className="px-6 py-4 whitespace-nowrap">
++                    <div className="text-gray-900 font-medium">
++                      Γé╣{product.price.toFixed(2)}
++                    </div>
++                  </td>
++                  <td className="px-6 py-4 whitespace-nowrap">
++                    <div className="text-gray-500 font-mono text-xs bg-gray-50 px-2 py-1 rounded-md inline-block border border-gray-100">
++                      {product.barcode}
++                    </div>
++                  </td>
++                  <td className="px-6 py-4 whitespace-nowrap">
+                     {product.stock !== undefined ? (
+-                      <span
+-                        className={
+-                          product.stock < 20 ? "text-red-600 font-medium" : ""
+-                        }
+-                      >
+-                        {product.stock}
++                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
++                        product.stock < 20 
++                          ? "bg-red-50 text-red-700 border border-red-100" 
++                          : "bg-emerald-50 text-emerald-700 border border-emerald-100"
++                      }`}>
++                        {product.stock} in stock
+                       </span>
+                     ) : (
+-                      "-"
++                      <span className="text-gray-400">-</span>
+                     )}
+-                  </div>
+-                </td>
+-                {/* <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+-                  <button
+-                    onClick={() => handleOpenModal(product)}
+-                    className="text-pink-600 hover:text-pink-900 mr-4"
+-                  >
+-                    Edit
+-                  </button>
+-                  <button
+-                    onClick={() => handleDelete(product.id)}
+-                    className="text-red-600 hover:text-red-900"
+-                  >
+-                    Delete
+-                  </button>
+-                </td> */}
+-              </tr>
+-            ))}
+-            {filteredProducts.length === 0 && (
+-              <tr>
+-                <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+-                  {searchQuery
+-                    ? "No products found matching your search."
+-                    : "No products available."}
+-                </td>
+-              </tr>
+-            )}
+-          </tbody>
+-        </table>
++                  </td>
++                </tr>
++              ))}
++              {filteredProducts.length === 0 && (
++                <tr>
++                  <td colSpan={4} className="px-6 py-12 text-center">
++                    <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
++                    </svg>
++                    <p className="text-sm font-medium text-gray-900">No products found</p>
++                    <p className="text-sm text-gray-500 mt-1">
++                      {searchQuery ? "Try adjusting your search terms." : "No products available in the system."}
++                    </p>
++                  </td>
++                </tr>
++              )}
++            </tbody>
++          </table>
+         </div>
+       </div>
+-
+-      </div>
+     </div>
+   );
+ };
+diff --git a/pos-frontend/src/pages/Register.tsx b/pos-frontend/src/pages/Register.tsx
+index 1454d91..4f7c821 100644
+--- a/pos-frontend/src/pages/Register.tsx
++++ b/pos-frontend/src/pages/Register.tsx
+@@ -1,64 +1,35 @@
+ import { useState } from 'react';
+ import { useNavigate, Link } from 'react-router-dom';
+-import { useAppDispatch } from '../app/hooks';
+-import { registerAsync } from '../features/auth/authSlice';
++import { registerUser } from '../services/api';
+ import { toast } from 'react-toastify';
+ import { handleError, handleSuccess } from '../utils/errorHandler';
+ 
+ const Register = () => {
+   const navigate = useNavigate();
+-  const dispatch = useAppDispatch();
+   const [formData, setFormData] = useState({
+     username: '',
+-    name: '',
+     email: '',
+     password: '',
+-    confirmPassword: '',
+-    masterPassword: '',
+-    role: 'user',
+   });
+   const [loading, setLoading] = useState(false);
+ 
+   const handleSubmit = async (e: React.FormEvent) => {
+     e.preventDefault();
+-
+-    if (formData.password !== formData.confirmPassword) {
+-      toast.error('Passwords do not match');
+-      return;
+-    }
+-
+-    if (formData.password.length < 6) {
+-      toast.error('Password must be at least 6 characters');
+-      return;
+-    }
+-
+-    if (!formData.masterPassword.trim()) {
+-      toast.error('Master password is required');
+-      return;
+-    }
+-
+     setLoading(true);
+ 
+     try {
+-      const result = await dispatch(
+-        registerAsync({
+-          username: formData.username,
+-          name: formData.name,
+-          email: formData.email,
+-          password: formData.password,
+-          master_password: formData.masterPassword,
+-          role: formData.role as 'user' | 'admin',
+-        })
+-      );
++      await registerUser({
++        username: formData.username,
++        name: formData.username, // Default name to username
++        email: formData.email,
++        password: formData.password,
++        master_password: 'rj123456', // Needs to match backend .env setting
++        role: 'user',
++      });
+       
+-      if (registerAsync.fulfilled.match(result)) {
+-        handleSuccess('User registered successfully', 'Register');
+-        toast.success('Account created successfully!');
+-        navigate('/');
+-      } else {
+-        const errorMsg = handleError(result.payload, 'Register');
+-        toast.error(errorMsg);
+-      }
++      handleSuccess('User registered successfully', 'Register');
++      toast.success('Account created successfully! Please log in.');
++      navigate('/login');
+     } catch (error) {
+       const errorMsg = handleError(error, 'Register');
+       toast.error(errorMsg);
+@@ -86,18 +57,6 @@ const Register = () => {
+ 
+           {/* Register Form */}
+           <form onSubmit={handleSubmit} className="space-y-5">
+-            <div>
+-              <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+-              <input
+-                type="text"
+-                value={formData.name}
+-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+-                required
+-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+-                placeholder="John Doe"
+-              />
+-            </div>
+-
+             <div>
+               <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+               <input
+@@ -138,47 +97,6 @@ const Register = () => {
+               />
+             </div>
+ 
+-            <div>
+-              <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+-              <select
+-                value={formData.role}
+-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+-              >
+-                <option value="user">User</option>
+-                <option value="admin">Admin</option>
+-              </select>
+-            </div>
+-
+-            <div>
+-              <label className="block text-sm font-medium text-gray-700 mb-2">
+-                Master Password
+-              </label>
+-              <input
+-                type="password"
+-                value={formData.masterPassword}
+-                onChange={(e) => setFormData({ ...formData, masterPassword: e.target.value })}
+-                required
+-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+-                placeholder="Enter master password"
+-              />
+-            </div>
+-
+-            <div>
+-              <label className="block text-sm font-medium text-gray-700 mb-2">
+-                Confirm Password
+-              </label>
+-              <input
+-                type="password"
+-                value={formData.confirmPassword}
+-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+-                required
+-                minLength={6}
+-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+-                placeholder="ΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇó"
+-              />
+-            </div>
+-
+             <button
+               type="submit"
+               disabled={loading}
+diff --git a/pos-frontend/src/pages/ReturnsExchange.tsx b/pos-frontend/src/pages/ReturnsExchange.tsx
+index e297af2..2bdd4af 100644
+--- a/pos-frontend/src/pages/ReturnsExchange.tsx
++++ b/pos-frontend/src/pages/ReturnsExchange.tsx
+@@ -272,8 +272,8 @@ const ReturnsExchange = () => {
+   ];
+ 
+   return (
+-    <div className="min-h-screen bg-white">
+-      <div className="max-w-6xl mx-auto px-4 py-8">
++    <div className="h-full p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
++      <div>
+         <div className="flex items-center gap-3 mb-8">
+           <button
+             onClick={() => navigate(-1)}
+@@ -308,8 +308,8 @@ const ReturnsExchange = () => {
+                 const isActive = s === step;
+                 return (
+                   <div key={s} className="flex items-center gap-2">
+-                    <div className={`flex items-center gap-2 text-sm font-medium ${isActive ? 'text-pink-600' : isDone ? 'text-green-600' : 'text-gray-400'}`}>
+-                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${isActive ? 'bg-pink-500 text-white' : isDone ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
++                    <div className={`flex items-center gap-2 text-sm font-medium ${isActive ? 'text-gray-900' : isDone ? 'text-green-600' : 'text-gray-400'}`}>
++                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${isActive ? 'bg-gray-900 text-white' : isDone ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                         {isDone ? 'Γ£ô' : idx + 1}
+                       </span>
+                       <span className="hidden sm:inline">{stepLabels[s!]}</span>
+@@ -338,13 +338,13 @@ const ReturnsExchange = () => {
+                 onChange={(e) => setSearchQuery(e.target.value)}
+                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                 placeholder="Invoice number or Order ID..."
+-                className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent"
++                className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                 autoFocus
+               />
+               <button
+                 onClick={() => handleSearch()}
+                 disabled={isSearching || !searchQuery.trim()}
+-                className="px-6 py-3 bg-pink-500 text-white rounded-xl text-sm font-medium hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
++                className="px-6 py-3 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+               >
+                 {isSearching ? (
+                   <svg className="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+@@ -382,11 +382,11 @@ const ReturnsExchange = () => {
+                       value={mobileQuery}
+                       onChange={(e) => handleMobileQueryChange(e.target.value)}
+                       placeholder="Enter 4+ digits of mobile number..."
+-                      className="w-full pl-9 pr-4 py-2.5 text-sm border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-300"
++                      className="w-full pl-9 pr-4 py-2.5 text-sm border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900"
+                     />
+                     {isMobileSearching && (
+                       <div className="absolute right-3 top-1/2 -translate-y-1/2">
+-                        <div className="w-3.5 h-3.5 border-2 border-pink-400 border-t-transparent rounded-full animate-spin" />
++                        <div className="w-3.5 h-3.5 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
+                       </div>
+                     )}
+                   </div>
+@@ -426,7 +426,7 @@ const ReturnsExchange = () => {
+                                 <button
+                                   key={docNum}
+                                   onClick={() => handleSelectMobileInvoice(docNum)}
+-                                  className="px-2.5 py-1 text-xs font-medium rounded-lg bg-pink-50 text-pink-600 hover:bg-pink-100 transition-colors"
++                                  className="px-2.5 py-1 text-xs font-medium rounded-lg bg-gray-50 text-gray-900 hover:bg-gray-100 transition-colors"
+                                 >
+                                   {formatSaleId(docNum)}
+                                 </button>
+@@ -477,7 +477,7 @@ const ReturnsExchange = () => {
+                 )}
+                 <div>
+                   <span className="text-gray-500">Total</span>
+-                  <span className="ml-2 font-bold text-pink-600">Γé╣{invoice.total.toFixed(2)}</span>
++                  <span className="ml-2 font-bold text-gray-900">Γé╣{invoice.total.toFixed(2)}</span>
+                 </div>
+               </div>
+             </div>
+@@ -490,7 +490,7 @@ const ReturnsExchange = () => {
+                   return (
+                     <div
+                       key={item.itemCode}
+-                      className={`flex items-center gap-4 p-3 rounded-xl border transition-all cursor-pointer ${isSelected ? 'border-pink-300 bg-pink-50' : 'border-gray-100 hover:border-gray-200'}`}
++                      className={`flex items-center gap-4 p-3 rounded-xl border transition-all cursor-pointer ${isSelected ? 'border-gray-900 bg-gray-50' : 'border-gray-100 hover:border-gray-200'}`}
+                       onClick={() => toggleItemSelection(item.itemCode)}
+                     >
+                       <input
+@@ -498,7 +498,7 @@ const ReturnsExchange = () => {
+                         checked={isSelected}
+                         onChange={() => toggleItemSelection(item.itemCode)}
+                         onClick={(e) => e.stopPropagation()}
+-                        className="w-4 h-4 text-pink-500 rounded"
++                        className="w-4 h-4 text-gray-900 rounded focus:ring-gray-900"
+                       />
+                       <div className="flex-1 min-w-0">
+                         <p className="text-sm font-medium text-gray-900 truncate">{item.itemName}</p>
+@@ -508,7 +508,7 @@ const ReturnsExchange = () => {
+                         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                           <button
+                             onClick={() => updateReturnQty(item.itemCode, item.selectedQty - 1)}
+-                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-600 hover:border-pink-400 text-sm"
++                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-600 hover:border-gray-900 text-sm"
+                           >
+                             ΓêÆ
+                           </button>
+@@ -516,7 +516,7 @@ const ReturnsExchange = () => {
+                           <button
+                             onClick={() => updateReturnQty(item.itemCode, item.selectedQty + 1)}
+                             disabled={item.selectedQty >= item.quantity}
+-                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-600 hover:border-pink-400 text-sm disabled:opacity-40"
++                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-600 hover:border-gray-900 text-sm disabled:opacity-40"
+                           >
+                             +
+                           </button>
+@@ -542,7 +542,7 @@ const ReturnsExchange = () => {
+                     <button
+                       key={preset}
+                       onClick={() => setReturnReason(preset)}
+-                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${returnReason === preset ? 'bg-pink-500 text-white border-pink-500' : 'bg-white text-gray-600 border-gray-200 hover:border-pink-300'}`}
++                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${returnReason === preset ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-900'}`}
+                     >
+                       {preset}
+                     </button>
+@@ -553,7 +553,7 @@ const ReturnsExchange = () => {
+                   onChange={(e) => setReturnReason(e.target.value)}
+                   placeholder="Describe the return reason..."
+                   rows={2}
+-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 resize-none"
++                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"
+                 />
+               </div>
+ 
+@@ -568,10 +568,10 @@ const ReturnsExchange = () => {
+                     <button
+                       key={value}
+                       onClick={() => setReturnType(value)}
+-                      className={`p-3 rounded-xl border-2 text-left transition-all ${returnType === value ? 'border-pink-500 bg-pink-50' : 'border-gray-100 hover:border-gray-200'}`}
++                      className={`p-3 rounded-xl border-2 text-left transition-all ${returnType === value ? 'border-gray-900 bg-gray-50' : 'border-gray-100 hover:border-gray-200'}`}
+                     >
+                       <div className="text-xl mb-1">{icon}</div>
+-                      <p className={`text-sm font-semibold ${returnType === value ? 'text-pink-700' : 'text-gray-700'}`}>{label}</p>
++                      <p className={`text-sm font-semibold ${returnType === value ? 'text-gray-900' : 'text-gray-700'}`}>{label}</p>
+                       <p className="text-xs text-gray-500">{desc}</p>
+                     </button>
+                   ))}
+@@ -589,7 +589,7 @@ const ReturnsExchange = () => {
+               <button
+                 onClick={goToReview}
+                 disabled={returnItems.length === 0}
+-                className="px-6 py-2.5 bg-pink-500 text-white rounded-xl text-sm font-medium hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
++                className="px-6 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+               >
+                 {returnType === 'exchange' ? 'Choose Replacement ΓåÆ' : 'Review Return ΓåÆ'}
+               </button>
+@@ -610,17 +610,17 @@ const ReturnsExchange = () => {
+                 value={replacementSearch}
+                 onChange={(e) => setReplacementSearch(e.target.value)}
+                 placeholder="Search products by name or barcode..."
+-                className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 mb-4"
++                className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 mb-4"
+               />
+               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1">
+                 {filteredProducts.slice(0, 30).map((product) => (
+                   <button
+                     key={product.id}
+                     onClick={() => addReplacementItem(product)}
+-                    className="p-3 border border-gray-100 rounded-xl text-left hover:border-pink-300 hover:bg-pink-50 transition-colors"
++                    className="p-3 border border-gray-100 rounded-xl text-left hover:border-gray-900 hover:bg-gray-50 transition-colors"
+                   >
+                     <p className="text-xs font-semibold text-gray-800 line-clamp-2">{product.name}</p>
+-                    <p className="text-sm font-bold text-pink-600 mt-1">Γé╣{product.price.toFixed(2)}</p>
++                    <p className="text-sm font-bold text-gray-900 mt-1">Γé╣{product.price.toFixed(2)}</p>
+                     {product.stock !== undefined && (
+                       <p className="text-xs text-gray-400">Stock: {product.stock}</p>
+                     )}
+@@ -649,7 +649,7 @@ const ReturnsExchange = () => {
+                         <span className="w-6 text-center text-sm font-semibold">{r.quantity}</span>
+                         <button
+                           onClick={() => updateReplacementQty(r.product.id, r.quantity + 1)}
+-                          className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-50 border border-gray-200 text-sm hover:border-pink-300"
++                          className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-50 border border-gray-200 text-sm hover:border-gray-900"
+                         >
+                           +
+                         </button>
+@@ -676,7 +676,7 @@ const ReturnsExchange = () => {
+               <button
+                 onClick={() => setStep('review')}
+                 disabled={replacementItems.length === 0}
+-                className="px-6 py-2.5 bg-pink-500 text-white rounded-xl text-sm font-medium hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
++                className="px-6 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+               >
+                 Review Exchange ΓåÆ
+               </button>
+@@ -701,7 +701,7 @@ const ReturnsExchange = () => {
+                 </div>
+                 <div className="flex justify-between py-1.5">
+                   <span className="text-gray-500">Return Type</span>
+-                  <span className={`font-semibold capitalize ${returnType === 'refund' ? 'text-green-600' : returnType === 'store_credit' ? 'text-pink-600' : 'text-amber-600'}`}>
++                  <span className={`font-semibold capitalize ${returnType === 'refund' ? 'text-green-600' : returnType === 'store_credit' ? 'text-gray-900' : 'text-amber-600'}`}>
+                     {returnType.replace('_', ' ')}
+                   </span>
+                 </div>
+@@ -796,13 +796,13 @@ const ReturnsExchange = () => {
+               {successData.creditNoteRef && (
+                 <div className="flex justify-between p-2.5 bg-gray-50 rounded-lg">
+                   <span className="text-gray-500">Credit Note</span>
+-                  <span className="font-bold text-pink-600">{successData.creditNoteRef}</span>
++                  <span className="font-bold text-gray-900">{successData.creditNoteRef}</span>
+                 </div>
+               )}
+               {successData.newInvoiceRef && (
+                 <div className="flex justify-between p-2.5 bg-gray-50 rounded-lg">
+                   <span className="text-gray-500">New Invoice</span>
+-                  <span className="font-bold text-pink-600">{successData.newInvoiceRef}</span>
++                  <span className="font-bold text-gray-900">{successData.newInvoiceRef}</span>
+                 </div>
+               )}
+               {successData.returnAmount !== undefined && (
+@@ -823,7 +823,7 @@ const ReturnsExchange = () => {
+             <div className="flex gap-3 justify-center">
+               <button
+                 onClick={resetForm}
+-                className="px-6 py-2.5 bg-pink-500 text-white rounded-xl text-sm font-medium hover:bg-pink-600 transition-colors"
++                className="px-6 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 transition-colors"
+               >
+                 Process Another
+               </button>
+diff --git a/pos-frontend/src/pages/admin/Branches.tsx b/pos-frontend/src/pages/admin/Branches.tsx
+index f47661c..18c664b 100644
+--- a/pos-frontend/src/pages/admin/Branches.tsx
++++ b/pos-frontend/src/pages/admin/Branches.tsx
+@@ -59,7 +59,7 @@ function CreateUserModal({ branch, onClose }: CreateUserModalProps) {
+           <div>
+             <h3 className="font-semibold text-gray-800">Create User</h3>
+             <p className="text-xs text-gray-500 mt-0.5">
+-              Branch: <span className="font-medium text-pink-600">{branch.name}</span>
++              Branch: <span className="font-medium text-emerald-700">{branch.name}</span>
+             </p>
+           </div>
+           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+@@ -78,7 +78,7 @@ function CreateUserModal({ branch, onClose }: CreateUserModalProps) {
+             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+             <input
+               required
+-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+               value={form.name}
+               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+               placeholder="John Doe"
+@@ -89,7 +89,7 @@ function CreateUserModal({ branch, onClose }: CreateUserModalProps) {
+             <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+             <input
+               required
+-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+               value={form.username}
+               onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+               placeholder="john_doe"
+@@ -102,7 +102,7 @@ function CreateUserModal({ branch, onClose }: CreateUserModalProps) {
+             <input
+               required
+               type="email"
+-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+               value={form.email}
+               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+               placeholder="john@example.com"
+@@ -115,7 +115,7 @@ function CreateUserModal({ branch, onClose }: CreateUserModalProps) {
+               required
+               type="password"
+               minLength={6}
+-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+               value={form.password}
+               onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+               autoComplete="new-password"
+@@ -125,7 +125,7 @@ function CreateUserModal({ branch, onClose }: CreateUserModalProps) {
+           <div>
+             <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+             <select
+-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+               value={form.role}
+               onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as 'user' | 'admin' }))}
+             >
+@@ -145,7 +145,7 @@ function CreateUserModal({ branch, onClose }: CreateUserModalProps) {
+             <button
+               type="submit"
+               disabled={isPending}
+-              className="flex-1 px-4 py-2 bg-pink-500 text-white rounded-lg text-sm font-medium hover:bg-pink-600 disabled:opacity-60"
++              className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-60"
+             >
+               {isPending ? 'CreatingΓÇª' : 'Create User'}
+             </button>
+@@ -245,7 +245,7 @@ function EditUserModal({ user, onClose }: EditUserModalProps) {
+             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+             <input
+               required
+-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+               value={name}
+               onChange={(e) => setName(e.target.value)}
+               placeholder="John Doe"
+@@ -256,7 +256,7 @@ function EditUserModal({ user, onClose }: EditUserModalProps) {
+             <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+             <input
+               required
+-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+               value={username}
+               onChange={(e) => setUsername(e.target.value)}
+               placeholder="john_doe"
+@@ -271,7 +271,7 @@ function EditUserModal({ user, onClose }: EditUserModalProps) {
+                 <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                 <input
+                   type="password"
+-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                   value={currentPassword}
+                   onChange={(e) => setCurrentPassword(e.target.value)}
+                   autoComplete="current-password"
+@@ -282,7 +282,7 @@ function EditUserModal({ user, onClose }: EditUserModalProps) {
+                 <input
+                   type="password"
+                   minLength={6}
+-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                   value={newPassword}
+                   onChange={(e) => setNewPassword(e.target.value)}
+                   autoComplete="new-password"
+@@ -293,7 +293,7 @@ function EditUserModal({ user, onClose }: EditUserModalProps) {
+                 <input
+                   type="password"
+                   minLength={6}
+-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                   value={confirmPassword}
+                   onChange={(e) => setConfirmPassword(e.target.value)}
+                   autoComplete="new-password"
+@@ -312,7 +312,7 @@ function EditUserModal({ user, onClose }: EditUserModalProps) {
+             <button
+               onClick={handleSave}
+               disabled={isPending}
+-              className="flex-1 px-4 py-2 bg-pink-500 text-white rounded-lg text-sm font-medium hover:bg-pink-600 disabled:opacity-60"
++              className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-60"
+             >
+               {isPending ? 'SavingΓÇª' : 'Save'}
+             </button>
+@@ -367,7 +367,7 @@ const Branches = () => {
+ 
+       {isLoading && (
+         <div className="flex items-center justify-center h-40">
+-          <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin" />
++          <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+         </div>
+       )}
+ 
+@@ -381,8 +381,8 @@ const Branches = () => {
+                 {/* Branch Header */}
+                 <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4">
+                   <div className="flex items-center gap-3">
+-                    <div className="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center">
+-                      <svg className="w-5 h-5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                    <div className="w-10 h-10 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-center">
++                      <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                       </svg>
+                     </div>
+@@ -433,7 +433,7 @@ const Branches = () => {
+                               <span
+                                 className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                                   u.role === 'admin'
+-                                    ? 'bg-pink-100 text-pink-700'
++                                    ? 'bg-emerald-100 text-emerald-700'
+                                     : 'bg-gray-100 text-gray-600'
+                                 }`}
+                               >
+diff --git a/pos-frontend/src/pages/admin/ExportReports.tsx b/pos-frontend/src/pages/admin/ExportReports.tsx
+index 7994602..0f0cba0 100644
+--- a/pos-frontend/src/pages/admin/ExportReports.tsx
++++ b/pos-frontend/src/pages/admin/ExportReports.tsx
+@@ -84,8 +84,8 @@ const ExportReports = () => {
+               onClick={() => { setUseCustom(!useCustom); setPreview(null); }}
+               className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                 useCustom
+-                  ? 'bg-pink-500 text-white border-pink-500'
+-                  : 'text-gray-600 border-gray-200 hover:border-pink-400 hover:text-pink-600'
++                  ? 'bg-emerald-600 text-white border-emerald-600'
++                  : 'text-gray-600 border-gray-200 hover:border-emerald-500 hover:text-emerald-700'
+               }`}
+             >
+               {useCustom ? 'Using Custom Dates' : 'Use Custom Dates'}
+@@ -100,8 +100,8 @@ const ExportReports = () => {
+                   onClick={() => { setRange(r.value); setPreview(null); }}
+                   className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
+                     range === r.value
+-                      ? 'bg-pink-500 text-white border-pink-500'
+-                      : 'bg-white text-gray-600 border-gray-200 hover:border-pink-400 hover:text-pink-600'
++                      ? 'bg-emerald-600 text-white border-emerald-600'
++                      : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-500 hover:text-emerald-700'
+                   }`}
+                 >
+                   {r.label}
+@@ -118,7 +118,7 @@ const ExportReports = () => {
+                   type="date"
+                   value={fromDate}
+                   onChange={(e) => { setFromDate(e.target.value); setPreview(null); }}
+-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                 />
+               </div>
+               <div className="flex-1">
+@@ -128,7 +128,7 @@ const ExportReports = () => {
+                   value={toDate}
+                   min={fromDate}
+                   onChange={(e) => { setToDate(e.target.value); setPreview(null); }}
+-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
++                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                 />
+               </div>
+             </div>
+@@ -166,9 +166,9 @@ const ExportReports = () => {
+         </div>
+ 
+         {/* Report Includes */}
+-        <div className="bg-pink-50 border border-pink-100 rounded-lg p-4 text-sm text-pink-700 space-y-1">
++        <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 text-sm text-emerald-700 space-y-1">
+           <p className="font-medium">The preview and report include:</p>
+-          <ul className="list-disc list-inside space-y-0.5 text-pink-600">
++          <ul className="list-disc list-inside space-y-0.5 text-emerald-600">
+             <li>Invoice number &amp; date</li>
+             <li>Customer name, mobile, and sales employee</li>
+             <li>Payment method</li>
+@@ -234,7 +234,7 @@ const ExportReports = () => {
+               </div>
+               <div className="admin-kpi-card">
+                 <p className="text-sm text-gray-500">Total</p>
+-                <p className="text-lg font-semibold text-pink-600">{formatCurrency(preview.totals.total)}</p>
++                <p className="text-lg font-semibold text-emerald-600">{formatCurrency(preview.totals.total)}</p>
+               </div>
+             </div>
+ 
+@@ -277,7 +277,7 @@ const ExportReports = () => {
+                           <td>{formatCurrency(row.subtotal)}</td>
+                           <td>{formatCurrency(row.discount)}</td>
+                           <td >{formatCurrency(row.gst)}</td>
+-                          <td className="font-semibold text-pink-600">{formatCurrency(row.total)}</td>
++                          <td className="font-semibold text-emerald-600">{formatCurrency(row.total)}</td>
+                         </tr>
+                       ))
+                     )}
+diff --git a/pos-frontend/src/services/api.ts b/pos-frontend/src/services/api.ts
+index 260ab33..f55d439 100644
+--- a/pos-frontend/src/services/api.ts
++++ b/pos-frontend/src/services/api.ts
+@@ -60,6 +60,9 @@ export const getErrorMessage = (error: unknown): string => {
+     if (axiosError.response?.status === 502) {
+       return 'SAP service is unavailable. Please try again later.';
+     }
++    if (axiosError.response?.status === 503) {
++      return 'Authentication service is unavailable. Check the PostgreSQL connection.';
++    }
+     if (axiosError.response?.status === 500) {
+       return 'Server error. Please try again later.';
+     }
+diff --git a/pos-frontend/vite.config.ts b/pos-frontend/vite.config.ts
+index cab9549..59cea23 100644
+--- a/pos-frontend/vite.config.ts
++++ b/pos-frontend/vite.config.ts
+@@ -24,7 +24,7 @@ export default defineConfig({
+     port: 5173,
+     proxy: {
+       '/api': {
+-        target: 'http://localhost:8000',
++        target: 'http://localhost:3001',
+         changeOrigin: true,
+         secure: false,
+       },

@@ -1,0 +1,39 @@
+[
+  {
+    "id": "1",
+    "username": "admin",
+    "email": "admin@local.test",
+    "name": "Admin",
+    "password_hash": "$pbkdf2-sha256$29000$cG7N.f9fi/EeY0xpjTEmBA$RFkm/sXL0Pm7454LI/jMAfyvdS80okD9uDCdNG4I0JQ",
+    "role": "admin",
+    "sap_user_code": null,
+    "created_at": "2026-03-01T08:14:11.519821",
+    "is_active": true
+  },
+  {
+    "id": "c59583a3-c3ec-4caf-bfd6-dd2400a8bffa",
+    "username": "branch1",
+    "email": "branch1@local.test",
+    "name": "branch1",
+    "password_hash": "$pbkdf2-sha256$29000$AYDQmnNOydlby7k3JoQwZg$O.uCHZVXJSD9KwqA/ZlFWbvVtGO28DB53S0F04rFc3Y",
+    "role": "user",
+    "sap_user_code": null,
+    "branch_id": "01",
+    "store_name": "Main Branch",
+    "created_at": "2026-04-26T17:09:54.503779",
+    "is_active": true
+  },
+  {
+    "id": "89e6202b-24df-404f-9641-27bd8ccf57b6",
+    "username": "vasai",
+    "email": "vasai@klpl.com",
+    "name": "vasai",
+    "password_hash": "$pbkdf2-sha256$29000$wZgzxhjDOGfMeY/ROiekVA$Na94.L.SJO1AWzMeQfTZauyXZphzoaQOFnsDFRThekQ",
+    "role": "user",
+    "sap_user_code": null,
+    "branch_id": "Vasai",
+    "store_name": "Vasai",
+    "created_at": "2026-04-27T17:00:39.365437",
+    "is_active": true
+  }
+]
