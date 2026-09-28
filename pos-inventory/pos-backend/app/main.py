@@ -291,11 +291,39 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Health check endpoint
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint distinguishing app liveness from SAP/DB liveness"""
+    sap_status = "unavailable"
+    db_status = "unavailable"
+    
+    # Check SAP
+    try:
+        from app.services.sap.client import get_sap_client
+        client = get_sap_client()
+        # Ensure it's logged in or try a lightweight call
+        if client.session_id:
+            sap_status = "connected"
+    except Exception as e:
+        logger.warning(f"Health check SAP failure: {e}")
+
+    # Check DB
+    try:
+        from app.services.user_service import _get_connection
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                if cur.fetchone():
+                    db_status = "connected"
+    except Exception as e:
+        logger.warning(f"Health check DB failure: {e}")
+
     return {
         "status": "healthy",
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
+        "dependencies": {
+            "sap": sap_status,
+            "database": db_status
+        }
     }
 
 

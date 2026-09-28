@@ -212,7 +212,6 @@ async def get_sales(
     current_user: dict = Depends(get_current_user),
 ):
     """Get recent sales from SAP AR Invoices."""
-    from datetime import date
     try:
         loop = asyncio.get_running_loop()
         invoices = await loop.run_in_executor(
@@ -221,6 +220,16 @@ async def get_sales(
     except Exception as exc:
         logger.error(f"SAP get_invoices failed: {exc}")
         raise HTTPException(status_code=502, detail="Could not retrieve sales from SAP")
+
+    # Enforce branch scope
+    role = current_user.get("role", "user")
+    user_branch = _normalize_branch(current_user.get("branch_id"))
+    
+    filtered_invoices = []
+    for inv in invoices:
+        inv_branch = _normalize_branch(_extract_branch_from_invoice(inv))
+        if role == "admin" or inv_branch == user_branch:
+            filtered_invoices.append(inv)
 
     return [
         SaleDetail(
@@ -238,7 +247,7 @@ async def get_sales(
             sapDocEntry=inv.get("DocEntry"),
             sapDocNum=inv.get("DocNum"),
         )
-        for inv in invoices
+        for inv in filtered_invoices
     ]
 
 
@@ -264,10 +273,18 @@ async def get_sale(
     if not inv:
         raise HTTPException(status_code=404, detail=f"Sale {sale_id} not found")
 
+    # Enforce branch scope
+    role = current_user.get("role", "user")
+    user_branch = _normalize_branch(current_user.get("branch_id"))
+    inv_branch = _normalize_branch(_extract_branch_from_invoice(inv))
+    
+    if role != "admin" and inv_branch != user_branch:
+        raise HTTPException(status_code=403, detail="Forbidden: You can only view sales from your assigned branch.")
+
     return SaleDetail(
         id=inv.get("DocEntry"),
         saleId=_format_sale_id(
-            _normalize_branch(_extract_branch_from_invoice(inv)),
+            inv_branch,
             inv.get("DocNum"),
             str(inv.get("DocEntry") or "")
         ),
@@ -314,11 +331,11 @@ async def cancel_sale(
     inv_branch = _normalize_branch(_extract_branch_from_invoice(inv))
     user_branch = _normalize_branch(current_user.get("branch_id"))
     
-    if role not in ("admin", "manager"):
+    if role != "admin":
         if inv_branch != user_branch:
             raise HTTPException(
                 status_code=403, 
-                detail="Operators can only void sales from their own branch."
+                detail="Forbidden: You can only void sales from your assigned branch."
             )
 
     # 3. Check SAP status

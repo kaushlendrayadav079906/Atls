@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900;
+  }
+}
+
+@layer components {
+  .auth-input {
+    @apply h-11 w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-11 pr-11 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400;
+  }
+
+  .auth-input:focus {
+    @apply border-blue-500 ring-4 ring-blue-100;
+  }
+
+  .auth-input--password {
+    @apply pr-11;
+  }
+}

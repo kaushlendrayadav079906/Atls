@@ -48,3 +48,16 @@ def test_get_inventory_risk_operator_forbidden(mock_service_class):
     
     mock_instance.get_warehouse_stock.assert_not_called()
     app.dependency_overrides.clear()
+
+
+@patch("app.api.v1.dashboard.SAPInventoryService")
+def test_get_inventory_risk_rejects_incomplete_snapshot(mock_service_class):
+    mock_service_class.return_value.get_warehouse_stock.return_value = [{"_truncated": True}]
+
+    from app.core.security import get_current_user
+    app.dependency_overrides[get_current_user] = lambda: {"role": "manager", "branch_id": "BRANCH_A"}
+    response = client.get("/api/v1/dashboard/inventory-risk")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Could not retrieve complete inventory risk data from SAP"

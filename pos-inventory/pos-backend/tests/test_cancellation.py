@@ -52,7 +52,23 @@ def test_cancel_sale_unauthorized_branch_operator(mock_invoice_service):
 
     response = client.post("/api/v1/sales/124/cancel")
     assert response.status_code == 403
-    assert "Operators can only void sales from their own branch" in response.json()["detail"]
+    assert "You can only void sales from your assigned branch" in response.json()["detail"]
+
+
+def test_cancel_sale_unauthorized_branch_manager(mock_invoice_service):
+    app.dependency_overrides[get_current_user] = mock_get_current_user_manager
+    
+    # Manager from BRANCH_A trying to cancel invoice from BRANCH_B
+    mock_invoice_service.get_invoice.return_value = {
+        "DocEntry": 124,
+        "U_Branch": "BRANCH_B",
+        "Cancelled": "tNO",
+        "DocumentStatus": "bost_Open"
+    }
+
+    response = client.post("/api/v1/sales/124/cancel")
+    assert response.status_code == 403
+    assert "You can only void sales from your assigned branch" in response.json()["detail"]
 
 
 def test_cancel_sale_already_cancelled(mock_invoice_service):

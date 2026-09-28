@@ -4,14 +4,11 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, date
 import logging
 
-from app.services.sap.client import get_sap_client, SAPValidationError, SAPDocumentClosedError
+from app.services.sap.client import get_sap_client, SAPValidationError, SAPConnectionError, SAPDocumentClosedError
 from app.core.config import settings
 
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_CUSTOMER_CODE = "C0001"
-
 
 class SAPReturnsService:
     """Service for SAP A/R Return and Credit Note operations"""
@@ -35,6 +32,9 @@ class SAPReturnsService:
             raise SAPValidationError("originalDocEntry must be a positive invoice DocEntry")
         reason = str(data.get("reason") or "").strip()
         return_type = str(data.get("returnType") or "refund").lower()
+        card_code = str(data.get("cardCode") or "").strip()
+        if not card_code:
+            raise SAPValidationError("cardCode must come from the original invoice")
 
         document_lines = []
         for item in data["items"]:
@@ -64,13 +64,10 @@ class SAPReturnsService:
         payload: Dict[str, Any] = {
             "DocDate": today,
             "DocDueDate": today,
-            "CardCode": str(data.get("cardCode") or DEFAULT_CUSTOMER_CODE),
+            "CardCode": card_code,
             "DocumentLines": document_lines,
             "Comments": " | ".join(comments_parts),
         }
-
-        if reason:
-            payload["U_Return_Reason"] = reason[:50]
 
         logger.info(
             "Creating SAP Credit Note from invoice: original_doc_entry=%s reason=%r type=%s",
@@ -80,101 +77,13 @@ class SAPReturnsService:
             result = self.client.post("CreditNotes", payload)
         except SAPDocumentClosedError:
             logger.warning(
-                "Invoice DocEntry=%s is already closed in SAP; "
-                "falling back to standalone credit note without base-document link.",
+                "Invoice DocEntry=%s is already closed in SAP; refusing to create an unlinked credit note.",
                 original_doc_entry,
             )
-            result = self._create_independent_credit_note(data)
+            raise
+        if not isinstance(result, dict) or not result.get("DocEntry"):
+            raise SAPConnectionError("SAP returned no credit-note document reference")
         logger.info("SAP Credit Note created: DocEntry=%s DocNum=%s", result.get("DocEntry"), result.get("DocNum"))
-        return result
-
-    def _fetch_invoice_ref(self, doc_entry: int) -> Dict[str, Any]:
-        """Fetch the DocNum and DocDate of an invoice by DocEntry.
-
-        Returns a dict with keys 'DocNum' and 'DocDate' (YYYY-MM-DD string),
-        or empty dict on failure.
-        """
-        try:
-            inv = self.client.get(
-                f"Invoices({doc_entry})",
-                {"$select": "DocNum,DocDate"},
-            )
-            doc_date = str(inv.get("DocDate") or "")[:10]
-            return {"DocNum": inv.get("DocNum"), "DocDate": doc_date}
-        except Exception as exc:
-            logger.debug("Could not fetch invoice ref for DocEntry=%s: %s", doc_entry, exc)
-            return {}
-
-    def _create_independent_credit_note(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a standalone A/R Credit Note NOT linked to any base document.
-
-        Used as fallback when the original invoice is already closed in SAP.
-        SAP company settings may require every credit note to reference the
-        original invoice number and date (error -10).  We satisfy this by:
-          - Setting NumAtCard to the original invoice DocNum (customer ref field)
-          - Setting Ref1 / Ref2 to the invoice DocNum and DocDate
-        """
-        today = date.today().strftime("%Y-%m-%d")
-        original_doc_entry = data.get("originalDocEntry")
-        reason = str(data.get("reason") or "").strip()
-        return_type = str(data.get("returnType") or "refund").lower()
-
-        # Fetch original invoice reference data so SAP's "reference required"
-        # validation passes (error -10).
-        inv_ref: Dict[str, Any] = {}
-        if original_doc_entry:
-            inv_ref = self._fetch_invoice_ref(int(original_doc_entry))
-
-        original_doc_num = data.get("originalDocNum") or inv_ref.get("DocNum")
-        original_doc_date = inv_ref.get("DocDate") or today
-
-        document_lines = []
-        for item in data["items"]:
-            warehouse = str(item.get("warehouse") or data.get("warehouse") or self.default_warehouse)
-            document_lines.append({
-                "ItemCode": item["itemCode"],
-                "Quantity": item["quantity"],
-                "UnitPrice": float(item.get("unitPrice") or 0),
-                "WarehouseCode": warehouse,
-                # No BaseType/BaseEntry/BaseLine — standalone note
-            })
-
-        comments_parts = [f"Return reason: {reason}"] if reason else []
-        comments_parts.append(f"Return type: {return_type}")
-        if original_doc_entry:
-            comments_parts.append(f"Ref original invoice DocEntry: {original_doc_entry}")
-        if original_doc_num:
-            comments_parts.append(f"Original DocNum: {original_doc_num}")
-        comments_parts.append("Note: Standalone CN – original invoice already closed")
-
-        payload: Dict[str, Any] = {
-            "DocDate": today,
-            "DocDueDate": today,
-            "TaxDate": original_doc_date,       # original invoice date (reference)
-            "CardCode": str(data.get("cardCode") or DEFAULT_CUSTOMER_CODE),
-            "DocumentLines": document_lines,
-            "Comments": " | ".join(comments_parts),
-        }
-
-        # Satisfy SAP's "Please reference the original invoice no. and date"
-        # requirement (error -10) using every available reference field:
-        #   OriginalRefNo / OriginalRefDate  — India GST localization fields
-        #   NumAtCard / Ref1 / Ref2          — generic reference fields
-        if original_doc_num is not None:
-            payload["NumAtCard"] = str(original_doc_num)
-            payload["Ref1"] = str(original_doc_num)
-            payload["OriginalRefNo"] = str(original_doc_num)
-        payload["Ref2"] = original_doc_date
-        payload["OriginalRefDate"] = original_doc_date
-
-        if reason:
-            payload["U_Return_Reason"] = reason[:50]
-
-        result = self.client.post("CreditNotes", payload)
-        logger.info(
-            "Standalone SAP Credit Note created: DocEntry=%s DocNum=%s",
-            result.get("DocEntry"), result.get("DocNum"),
-        )
         return result
 
     def check_invoice_has_return(self, doc_num: int) -> bool:
@@ -202,32 +111,69 @@ class SAPReturnsService:
             logger.warning("Could not fetch Credit Note %s: %s", doc_entry, exc)
             return None
 
-    def get_returns_by_date(self, start_date: date, end_date: date) -> List[Dict[str, Any]]:
+    def get_returns_by_date(
+        self,
+        start_date: date,
+        end_date: date,
+        warehouse: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         start_str = start_date.strftime("%Y-%m-%d")
         end_str = end_date.strftime("%Y-%m-%d")
-        params = {
-            "$filter": f"DocDate ge '{start_str}' and DocDate le '{end_str}'",
-            "$orderby": "DocEntry desc",
-            "$top": 500,
-        }
-        try:
+        page_size = 100
+        max_documents = 500
+        headers: List[Dict[str, Any]] = []
+        skip = 0
+        while len(headers) < max_documents:
+            top = min(page_size, max_documents - len(headers))
+            params = {
+                "$filter": f"DocDate ge '{start_str}' and DocDate le '{end_str}'",
+                "$orderby": "DocEntry desc",
+                "$top": top,
+                "$skip": skip,
+            }
             response = self.client.get("CreditNotes", params)
-            headers = response.get("value", [])
-        except Exception as exc:
-            logger.warning("Could not fetch Credit Notes by date: %s", exc)
-            return []
+            page = response.get("value")
+            if not isinstance(page, list):
+                raise RuntimeError("SAP returned an invalid credit-note page")
+            if not page:
+                break
+            headers.extend(page)
+            if len(page) < top:
+                break
+            skip += len(page)
+
+        if len(headers) >= max_documents:
+            probe = self.client.get("CreditNotes", {
+                "$filter": f"DocDate ge '{start_str}' and DocDate le '{end_str}'",
+                "$orderby": "DocEntry desc",
+                "$top": 1,
+                "$skip": max_documents,
+            })
+            if probe.get("value"):
+                raise RuntimeError(f"Credit-note query exceeds the configured limit of {max_documents} documents")
 
         results: List[Dict[str, Any]] = []
         for header in headers:
             doc_entry = header.get("DocEntry")
             if doc_entry is None:
-                results.append(header)
-                continue
-            try:
-                full_doc = self.client.get(f"CreditNotes({doc_entry})")
-                results.append(full_doc or header)
-            except Exception:
-                results.append(header)
+                raise RuntimeError("SAP credit-note header is missing DocEntry")
+            full_doc = self.client.get(f"CreditNotes({doc_entry})")
+            if not isinstance(full_doc, dict):
+                raise RuntimeError("SAP returned an invalid credit-note document")
+            lines = full_doc.get("CreditNoteLines")
+            if not isinstance(lines, list) or not lines:
+                raise RuntimeError("SAP credit note is missing warehouse-attributed lines")
+
+            if warehouse:
+                line_warehouses = {
+                    str(line.get("WarehouseCode") or "").strip().upper()
+                    for line in lines
+                }
+                if "" in line_warehouses or len(line_warehouses) != 1:
+                    raise RuntimeError("SAP credit note does not have a single attributable warehouse")
+                if warehouse.strip().upper() not in line_warehouses:
+                    continue
+            results.append(full_doc)
         return results
 
     def get_recent_returns(self, limit: int = 50) -> List[Dict[str, Any]]:

@@ -39,6 +39,77 @@ def _normalize_branch(value: Optional[str]) -> str:
     return str(getattr(settings, "SAP_DEFAULT_WAREHOUSE", "") or "").strip().upper() or "UNKNOWN"
 
 
+def _extract_document_branch(document: dict) -> Optional[str]:
+    for key in (
+        "U_Branch",
+        "U_BranchId",
+        "U_Branch_ID",
+        "U_BranchCode",
+        "U_Warehouse",
+        "U_WarehouseCode",
+        "U_Warehouse_Code",
+    ):
+        value = str(document.get(key) or "").strip()
+        if value:
+            return value
+
+    for line in document.get("DocumentLines") or document.get("CreditNoteLines") or []:
+        value = str(line.get("WarehouseCode") or "").strip()
+        if value:
+            return value
+    return None
+
+
+def _ensure_document_branch_access(document: dict, current_user: dict) -> None:
+    if str(current_user.get("role") or "").lower() == "admin":
+        return
+
+    document_branch = _extract_document_branch(document)
+    user_branch = _normalize_branch(current_user.get("branch_id"))
+    if not document_branch or _normalize_branch(document_branch) != user_branch:
+        raise HTTPException(status_code=403, detail="Forbidden: document is outside your assigned branch.")
+
+
+def _validate_return_items(invoice: dict, items: list) -> dict:
+    invoice_lines = invoice.get("DocumentLines")
+    if not isinstance(invoice_lines, list) or not invoice_lines:
+        raise HTTPException(status_code=409, detail="Original invoice lines are unavailable for return validation.")
+
+    lines_by_number = {}
+    for index, line in enumerate(invoice_lines):
+        if not isinstance(line, dict):
+            continue
+        try:
+            line_number = int(line.get("LineNum", index))
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=409, detail="Original invoice line identifiers are invalid.")
+        lines_by_number[line_number] = line
+
+    requested_quantities = {}
+    for item in items:
+        line_number = item.baseLine
+        original_line = lines_by_number.get(line_number)
+        if not original_line or str(original_line.get("ItemCode") or "") != item.itemCode:
+            raise HTTPException(status_code=422, detail="Return item does not match the original invoice line.")
+        requested_quantities[line_number] = requested_quantities.get(line_number, 0) + item.quantity
+
+    for line_number, quantity in requested_quantities.items():
+        try:
+            original_quantity = float(lines_by_number[line_number].get("Quantity"))
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=409, detail="Original invoice quantity is unavailable for return validation.")
+        if quantity > original_quantity:
+            raise HTTPException(status_code=422, detail="Return quantity exceeds the original invoice quantity.")
+    return lines_by_number
+
+
+def _authenticated_user_id(current_user: dict) -> str:
+    user_id = current_user.get("user_id") or current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authenticated user identity is unavailable.")
+    return str(user_id)
+
+
 def _parse_return_detail(doc: dict) -> ReturnDetail:
     lines = doc.get("CreditNoteLines") or []
     items = [
@@ -56,13 +127,12 @@ def _parse_return_detail(doc: dict) -> ReturnDetail:
     ]
     total = float(doc.get("DocTotal") or 0)
     comments = str(doc.get("Comments") or "")
-    reason = str(doc.get("U_Return_Reason") or "").strip()
-    if not reason:
-        for part in comments.split("|"):
-            part = part.strip()
-            if part.lower().startswith("return reason:"):
-                reason = part[len("return reason:"):].strip()
-                break
+    reason = ""
+    for part in comments.split("|"):
+        part = part.strip()
+        if part.lower().startswith("return reason:"):
+            reason = part[len("return reason:"):].strip()
+            break
 
     return_type = None
     for part in comments.split("|"):
@@ -113,12 +183,16 @@ async def lookup_invoice(
         try:
             invoice = await loop.run_in_executor(_executor, lambda: invoice_service.get_invoice(doc_entry))
             if invoice:
+                _ensure_document_branch_access(invoice, current_user)
                 return await _enrich_lookup_with_return_status(_build_lookup_response(invoice), loop)
             invoice_by_doc_num = await loop.run_in_executor(
                 _executor, lambda: invoice_service.get_invoice_by_doc_num(doc_entry)
             )
             if invoice_by_doc_num:
+                _ensure_document_branch_access(invoice_by_doc_num, current_user)
                 return await _enrich_lookup_with_return_status(_build_lookup_response(invoice_by_doc_num), loop)
+        except HTTPException:
+            raise
         except Exception as exc:
             logger.warning("Lookup by DocEntry %s failed: %s", doc_entry, exc)
 
@@ -133,9 +207,13 @@ async def lookup_invoice(
                             _executor, lambda: invoice_service.get_invoice(int(doc_entry))
                         )
                         if full_invoice:
+                            _ensure_document_branch_access(full_invoice, current_user)
                             return await _enrich_lookup_with_return_status(_build_lookup_response(full_invoice), loop)
+                    except HTTPException:
+                        raise
                     except Exception as exc:
                         logger.warning("Lookup hydration failed for DocEntry %s: %s", doc_entry, exc)
+                _ensure_document_branch_access(inv, current_user)
                 return await _enrich_lookup_with_return_status(_build_lookup_response(inv), loop)
     except Exception as exc:
         logger.warning("Lookup scan of recent invoices failed: %s", exc)
@@ -198,7 +276,6 @@ async def create_return(
 ):
     """Process a return: creates a pending approval request."""
     branch = _normalize_branch(current_user.get("branch_id"))
-    warehouse = return_data.warehouse or branch or settings.SAP_DEFAULT_WAREHOUSE
 
     # Validate invoice exists
     loop = asyncio.get_running_loop()
@@ -207,19 +284,34 @@ async def create_return(
         invoice = await loop.run_in_executor(_executor, lambda: invoice_service.get_invoice(return_data.originalDocEntry))
         if not invoice:
             raise HTTPException(status_code=404, detail="Original invoice not found.")
+        _ensure_document_branch_access(invoice, current_user)
     except Exception as exc:
+        if isinstance(exc, HTTPException):
+            raise
         raise HTTPException(status_code=502, detail="Failed to validate original invoice with SAP.")
 
+    if return_data.originalDocNum is not None and str(return_data.originalDocNum) != str(invoice.get("DocNum")):
+        raise HTTPException(status_code=422, detail="Original invoice number does not match the invoice record.")
+    source_lines = _validate_return_items(invoice, return_data.items)
+    card_code = str(invoice.get("CardCode") or "").strip()
+    if not card_code:
+        raise HTTPException(status_code=409, detail="Original invoice customer is unavailable for return validation.")
     refund_amount = sum(item.lineTotal for item in return_data.items)
+    payload = return_data.model_dump()
+    payload["warehouse"] = branch
+    for item in payload["items"]:
+        source_line = source_lines[item["baseLine"]]
+        item["warehouse"] = str(source_line.get("WarehouseCode") or branch)
+    payload["cardCode"] = card_code
 
     req = approval_service.create_approval_request(
         request_type=return_data.returnType,
-        requester_id=current_user.get("id") or current_user.get("username", "unknown"),
+        requester_id=_authenticated_user_id(current_user),
         branch_id=branch,
         original_doc_entry=return_data.originalDocEntry,
         original_doc_num=str(return_data.originalDocNum or invoice.get("DocNum") or ""),
         amount=refund_amount,
-        payload=return_data.model_dump(),
+        payload=payload,
         reason=return_data.reason,
     )
 
@@ -245,7 +337,6 @@ async def create_exchange(
 ):
     """Process an exchange: creates a pending approval request."""
     branch = _normalize_branch(current_user.get("branch_id"))
-    warehouse = exchange_data.warehouse or branch or settings.SAP_DEFAULT_WAREHOUSE
 
     loop = asyncio.get_running_loop()
     try:
@@ -253,21 +344,45 @@ async def create_exchange(
         invoice = await loop.run_in_executor(_executor, lambda: invoice_service.get_invoice(exchange_data.originalDocEntry))
         if not invoice:
             raise HTTPException(status_code=404, detail="Original invoice not found.")
+        _ensure_document_branch_access(invoice, current_user)
     except Exception as exc:
+        if isinstance(exc, HTTPException):
+            raise
         raise HTTPException(status_code=502, detail="Failed to validate original invoice with SAP.")
 
+    if exchange_data.originalDocNum is not None and str(exchange_data.originalDocNum) != str(invoice.get("DocNum")):
+        raise HTTPException(status_code=422, detail="Original invoice number does not match the invoice record.")
+    source_lines = _validate_return_items(invoice, exchange_data.returnItems)
+    card_code = str(invoice.get("CardCode") or "").strip()
+    if not card_code:
+        raise HTTPException(status_code=409, detail="Original invoice customer is unavailable for return validation.")
     return_amount = sum(item.lineTotal for item in exchange_data.returnItems)
     new_invoice_total = sum(item.product.price * item.quantity for item in exchange_data.replacementItems)
     price_difference = round(new_invoice_total - return_amount, 2)
 
     req = approval_service.create_approval_request(
         request_type="exchange",
-        requester_id=current_user.get("id") or current_user.get("username", "unknown"),
+        requester_id=_authenticated_user_id(current_user),
         branch_id=branch,
         original_doc_entry=exchange_data.originalDocEntry,
         original_doc_num=str(exchange_data.originalDocNum or invoice.get("DocNum") or ""),
         amount=return_amount,
-        payload=exchange_data.model_dump(),
+        payload={
+            **exchange_data.model_dump(),
+            "warehouse": branch,
+            "cardCode": card_code,
+            "returnItems": [
+                {
+                    **item,
+                    "warehouse": str(source_lines[item["baseLine"]].get("WarehouseCode") or branch),
+                }
+                for item in exchange_data.model_dump()["returnItems"]
+            ],
+            "replacementItems": [
+                {**item, "product": {**item["product"], "warehouse": branch}}
+                for item in exchange_data.model_dump()["replacementItems"]
+            ],
+        },
         reason=exchange_data.reason,
     )
 
@@ -303,23 +418,12 @@ async def list_returns(
 
     branch = _normalize_branch(current_user.get("branch_id"))
     role = str(current_user.get("role") or "user").lower()
-    if role != "admin" and branch:
-        branch_upper = branch.upper()
-        filtered = []
-        for d in docs:
-            header_branch = str(d.get("U_Branch") or d.get("U_BranchCode") or "").strip().upper()
-            if header_branch and header_branch == branch_upper:
-                filtered.append(d)
-                continue
-            if any(
-                str(line.get("WarehouseCode") or "").upper() == branch_upper
-                for line in (d.get("CreditNoteLines") or [])
-            ):
-                filtered.append(d)
-                continue
-            if not header_branch and not (d.get("CreditNoteLines") or []):
-                filtered.append(d)
-        docs = filtered
+    if role != "admin":
+        docs = [
+            doc for doc in docs
+            if _extract_document_branch(doc)
+            and _normalize_branch(_extract_document_branch(doc)) == branch
+        ]
 
     return [_parse_return_detail(d) for d in docs]
 
@@ -343,4 +447,5 @@ async def get_return(
     if not doc:
         raise HTTPException(status_code=404, detail="Return not found.")
 
+    _ensure_document_branch_access(doc, current_user)
     return _parse_return_detail(doc)

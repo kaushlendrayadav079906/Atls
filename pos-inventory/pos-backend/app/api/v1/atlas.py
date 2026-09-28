@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.core.config import settings
 from app.core.security import require_manager_or_admin
 from app.core.cache import cache_get, cache_set
 from app.models.schemas import (
@@ -77,7 +78,7 @@ async def get_overview(
     try:
         loop = asyncio.get_running_loop()
         invoices = await loop.run_in_executor(
-            _executor, lambda: SAPInvoicesService().get_invoices_by_date(start_date, end_date)
+            _executor, lambda: SAPInvoicesService().get_invoices_by_date_with_lines(start_date, end_date)
         )
         invoices = _filter_invoices_by_branch(invoices, target_branch)
     except Exception as e:
@@ -113,7 +114,7 @@ async def get_sales_trends(
     try:
         loop = asyncio.get_running_loop()
         invoices = await loop.run_in_executor(
-            _executor, lambda: SAPInvoicesService().get_invoices_by_date(start_date, end_date)
+            _executor, lambda: SAPInvoicesService().get_invoices_by_date_with_lines(start_date, end_date)
         )
         invoices = _filter_invoices_by_branch(invoices, target_branch)
     except Exception as e:
@@ -129,6 +130,9 @@ async def get_inventory_summary(
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
     current_user: dict = Depends(require_manager_or_admin),
 ):
+    if current_user.get("role") == "admin" and not branch:
+        raise HTTPException(status_code=400, detail="Branch must be provided for inventory snapshot.")
+
     target_branch = _get_permitted_branch(current_user, branch)
     if not target_branch:
         # Prevent massive global queries if no branch is specified, or limit it.
@@ -139,21 +143,38 @@ async def get_inventory_summary(
     try:
         loop = asyncio.get_running_loop()
         items = await loop.run_in_executor(
-            _executor, lambda: SAPInventoryService().get_items(warehouse=target_branch)
+            _executor, lambda: SAPInventoryService().get_warehouse_stock(target_branch)
         )
     except Exception as e:
         logger.error(f"Atlas inventory fetch failed: {e}")
         raise HTTPException(status_code=502, detail="Could not retrieve inventory from SAP")
 
-    snapshot_items = [
-        AtlasInventoryItem(
-            itemCode=item.get("ItemCode", ""),
-            itemName=item.get("ItemName", ""),
-            inStock=float(item.get("QuantityOnStock", 0.0)),
-            warehouse=target_branch,
+    if any(item.get("_truncated") for item in items):
+        raise HTTPException(status_code=502, detail="Inventory snapshot exceeded the SAP result limit.")
+
+    snapshot_items = []
+    for item in items:
+        warehouse_stock = next(
+            (
+                row for row in item.get("ItemWarehouseInfoCollection") or []
+                if str(row.get("WarehouseCode") or "").strip().upper() == target_branch.upper()
+            ),
+            None,
         )
-        for item in items
-    ]
+        if warehouse_stock is None:
+            raise HTTPException(status_code=502, detail="SAP returned incomplete warehouse inventory data.")
+        try:
+            in_stock = float(warehouse_stock.get("InStock") or 0.0)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=502, detail="SAP returned invalid warehouse inventory data.")
+        snapshot_items.append(
+            AtlasInventoryItem(
+                itemCode=item.get("ItemCode", ""),
+                itemName=item.get("ItemName", ""),
+                inStock=in_stock,
+                warehouse=target_branch,
+            )
+        )
 
     return AtlasInventorySummary(
         snapshotTime=datetime.utcnow().isoformat(),
@@ -176,7 +197,7 @@ async def get_branch_comparison(
     try:
         loop = asyncio.get_running_loop()
         invoices = await loop.run_in_executor(
-            _executor, lambda: SAPInvoicesService().get_invoices_by_date(start_date, end_date)
+            _executor, lambda: SAPInvoicesService().get_invoices_by_date_with_lines(start_date, end_date)
         )
         warehouses = await loop.run_in_executor(
             _executor, SAPWarehousesService().get_warehouses
@@ -191,7 +212,11 @@ async def get_branch_comparison(
         if w.get("WarehouseCode")
     }
 
-    branch_breakdown = _compute_branch_breakdown(invoices, warehouse_names)
+    try:
+        branch_breakdown = _compute_branch_breakdown(invoices, warehouse_names)
+    except Exception as e:
+        logger.error("Atlas branch comparison attribution failed: %s", e)
+        raise HTTPException(status_code=502, detail="Could not determine branch comparison data from SAP")
     return AtlasBranchComparison(branches=branch_breakdown)
 
 
@@ -217,11 +242,17 @@ async def get_returns_summary(
 
     total_cn_amount = sum(float(cn.get("DocTotal") or 0) for cn in credit_notes)
     
-    all_pending = approval_service.get_pending_approvals()
-    if target_branch:
-        pending_count = sum(1 for req in all_pending if req.get("branch_id") == target_branch)
-    else:
-        pending_count = len(all_pending)
+    approval_branch = str(target_branch or "").strip().upper() or None
+    all_pending = approval_service.get_pending_approvals(branch_id=approval_branch)
+    pending_count = sum(
+        1
+        for req in all_pending
+        if req.get("status") == "pending"
+        and (
+            approval_branch is None
+            or str(req.get("branch_id") or "").strip().upper() == approval_branch
+        )
+    )
 
     return AtlasReturnsSummary(
         pendingApprovalsCount=pending_count,
@@ -246,7 +277,7 @@ async def get_top_customers(
     try:
         loop = asyncio.get_running_loop()
         invoices = await loop.run_in_executor(
-            _executor, lambda: SAPInvoicesService().get_invoices_by_date(start_date, end_date)
+            _executor, lambda: SAPInvoicesService().get_invoices_by_date_with_lines(start_date, end_date)
         )
         invoices = _filter_invoices_by_branch(invoices, target_branch)
     except Exception as e:

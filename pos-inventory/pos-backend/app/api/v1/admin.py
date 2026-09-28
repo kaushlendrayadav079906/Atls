@@ -47,7 +47,7 @@ from app.models.schemas import (
 from app.services import user_service
 from app.services.sap.warehouses_service import SAPWarehousesService
 from app.services.sap.invoices_service import SAPInvoicesService
-from app.services.sap.client import get_sap_client
+from app.services.sap.client import get_sap_client, SAPConnectionError
 from app.api.v1.customers import _compute_customer_insights
 from app.services import approval_service
 from app.services.sap.returns_service import SAPReturnsService
@@ -78,11 +78,17 @@ def _get_date_range(range_str: str):
 
 def _get_date_range_with_custom(range_str: str, from_date: Optional[str] = None, to_date: Optional[str] = None):
     """Return (start_date, end_date), supporting custom date range."""
+    if bool(from_date) != bool(to_date):
+        raise HTTPException(status_code=422, detail="from_date and to_date must be provided together.")
     if from_date and to_date:
         try:
-            return date.fromisoformat(from_date), date.fromisoformat(to_date)
+            start_date = date.fromisoformat(from_date)
+            end_date = date.fromisoformat(to_date)
         except ValueError:
-            pass
+            raise HTTPException(status_code=422, detail="Custom dates must use YYYY-MM-DD format.")
+        if start_date > end_date:
+            raise HTTPException(status_code=422, detail="from_date must not be after to_date.")
+        return start_date, end_date
     return _get_date_range(range_str)
 
 
@@ -180,22 +186,14 @@ def _compute_branch_breakdown(
 
     for inv in invoices:
         invoice_branch_codes = set()
-        header_branch = _extract_invoice_branch(inv)
-        if header_branch:
-            header_branch = header_branch.strip()
         lines = inv.get("DocumentLines") or []
-        if lines:
-            for line in lines:
-                branch_id = str(line.get("WarehouseCode") or "").strip() or "UNASSIGNED"
-                grouped[branch_id]["total"] += float(line.get("LineTotal") or 0)
-                invoice_branch_codes.add(branch_id)
-        elif header_branch:
-            branch_id = header_branch
-            grouped[branch_id]["total"] += float(inv.get("DocTotal") or 0)
-            invoice_branch_codes.add(branch_id)
-        else:
-            branch_id = "UNASSIGNED"
-            grouped[branch_id]["total"] += float(inv.get("DocTotal") or 0)
+        if not lines:
+            raise ValueError("Cannot compare branches without invoice lines.")
+        for line in lines:
+            branch_id = str(line.get("WarehouseCode") or "").strip()
+            if not branch_id:
+                raise ValueError("Cannot compare branches without warehouse-attributed invoice lines.")
+            grouped[branch_id]["total"] += float(line.get("LineTotal") or 0)
             invoice_branch_codes.add(branch_id)
 
         for branch_id in invoice_branch_codes:
@@ -234,55 +232,7 @@ def _compute_payment_split(invoices: List[Dict[str, Any]]) -> List[PaymentMethod
 
 
 def _fetch_credit_notes_for_range(branch: Optional[str], start_date: date, end_date: date) -> List[Dict[str, Any]]:
-    """
-    Fetch credit notes for a date range (header fields only).
-    Paginates with $skip to handle ranges that exceed SAP's 100-row Prefer cap.
-    No per-note hydration needed.
-    """
-    start_str = start_date.strftime("%Y-%m-%d")
-    end_str = end_date.strftime("%Y-%m-%d")
-
-    try:
-        client = get_sap_client()
-        page_size = 100
-        all_notes: List[Dict[str, Any]] = []
-        skip = 0
-
-        while True:
-            params = {
-                "$filter": f"DocDate ge '{start_str}' and DocDate le '{end_str}'",
-                "$orderby": "DocEntry desc",
-                # "$expand": "CreditNoteLines",
-                "$top": page_size,
-                "$skip": skip,
-            }
-            response = client.get("CreditNotes", params)
-            page = response.get("value", [])
-            if not page:
-                break
-            all_notes.extend(page)
-            if len(page) < page_size:
-                break
-            skip += page_size
-
-    except Exception as exc:
-        logger.warning("Could not fetch credit notes for admin dashboard: %s", exc)
-        return []
-
-    if not branch:
-        return all_notes
-    branch_upper = branch.upper()
-    return [
-        n for n in all_notes
-        if (
-            str(n.get("U_Branch") or n.get("U_BranchCode") or "").strip().upper() == branch_upper
-            or any(
-                str(line.get("WarehouseCode") or "").upper() == branch_upper
-                for line in (n.get("CreditNoteLines") or [])
-            )
-            or not (n.get("CreditNoteLines") or [])
-        )
-    ]
+    return SAPReturnsService().get_returns_by_date(start_date, end_date, warehouse=branch)
 
 
 def _compute_returns_analytics(
@@ -297,7 +247,7 @@ def _compute_returns_analytics(
     for note in credit_notes:
         total_refunded += float(note.get("DocTotal") or 0)
         comments = str(note.get("Comments") or "").lower()
-        reason = str(note.get("U_Return_Reason") or "").strip().lower()
+        reason = ""
         if not reason:
             for part in comments.split("|"):
                 part = part.strip()
@@ -367,34 +317,21 @@ def _filter_invoices_by_branch(invoices: List[Dict[str, Any]], branch: Optional[
 
     filtered: List[Dict[str, Any]] = []
     for inv in invoices:
-        header_branch = _extract_invoice_branch(inv)
-        if header_branch:
-            header_branch = header_branch.strip()
         lines = inv.get("DocumentLines") or []
-
-        if header_branch and header_branch.upper() == branch.upper():
-            filtered.append(inv)
+        line_branches = {
+            str(line.get("WarehouseCode") or "").strip().upper()
+            for line in lines
+        }
+        if not lines or "" in line_branches:
+            raise ValueError("Cannot determine branch for one or more SAP invoices.")
+        if len(line_branches) > 1:
+            raise ValueError("Cannot allocate an invoice across multiple warehouses.")
+        if line_branches:
+            if branch.upper() in line_branches:
+                filtered.append(inv)
             continue
 
-        if lines:
-            branch_lines = [
-                line
-                for line in lines
-                if (str(line.get("WarehouseCode") or "").strip() or "UNASSIGNED") == branch
-            ]
-            if not branch_lines:
-                continue
-
-            branch_total = round(sum(float(line.get("LineTotal") or 0) for line in branch_lines), 2)
-            filtered.append({
-                **inv,
-                "DocumentLines": branch_lines,
-                "DocTotal": branch_total,
-            })
-            continue
-
-        if not header_branch:
-            filtered.append(inv)
+        continue
 
     return filtered
 
@@ -557,7 +494,7 @@ async def get_admin_dashboard(
         previous_invoices: List[Dict[str, Any]] = []
         if previous_start and previous_end:
             previous_invoices = await loop.run_in_executor(
-                _executor, lambda: invoice_service.get_invoices_by_date(previous_start, previous_end)
+                _executor, lambda: invoice_service.get_invoices_by_date_with_lines(previous_start, previous_end)
             )
             previous_invoices = _filter_invoices_by_branch(previous_invoices, branch)
     except Exception as e:
@@ -583,11 +520,19 @@ async def get_admin_dashboard(
             _executor, lambda: _fetch_credit_notes_for_range(branch, start_date, end_date)
         )
     except Exception as e:
-        logger.warning(f"Could not fetch credit notes for admin dashboard: {e}")
-        credit_notes = []
+        logger.error(f"Admin dashboard returns fetch failed: {e}")
+        raise HTTPException(status_code=502, detail="Could not retrieve return data from SAP")
 
     returns_analytics = _compute_returns_analytics(credit_notes, len(invoices))
-    branch_breakdown = _compute_branch_breakdown(invoices, warehouse_names)
+    try:
+        try:
+            branch_breakdown = _compute_branch_breakdown(invoices, warehouse_names)
+        except Exception as e:
+            logger.error("Admin dashboard branch attribution failed: %s", e)
+            raise HTTPException(status_code=502, detail="Could not determine branch sales data from SAP")
+    except Exception as e:
+        logger.error("Admin dashboard branch attribution failed: %s", e)
+        raise HTTPException(status_code=502, detail="Could not determine branch sales data from SAP")
     top_branch = branch_breakdown[0] if branch_breakdown else None
 
     active_users = sum(1 for user in user_service.get_all_users() if user.get("is_active", True))
@@ -660,7 +605,11 @@ async def export_reports(
         invoice_service = SAPInvoicesService()
         loop = asyncio.get_running_loop()
         all_invoices = await loop.run_in_executor(
-            _executor, lambda: invoice_service.get_invoices_by_date(start_date, end_date)
+            _executor,
+            lambda: (
+                invoice_service.get_invoices_by_date_with_lines(start_date, end_date)
+                if branch else invoice_service.get_invoices_by_date(start_date, end_date)
+            ),
         )
         invoices = _filter_invoices_by_branch(all_invoices, branch) if branch else all_invoices
     except Exception as e:
@@ -733,8 +682,46 @@ async def export_reports(
 @router.get("/approvals")
 async def get_approvals(current_user: dict = Depends(require_admin)):
     """Get all pending approval requests."""
-    # Assuming admins can see all, or branch-scoped if needed. We'll return all for now.
-    return approval_service.get_pending_approvals()
+    branch_id = str(current_user.get("branch_id") or "").strip().upper()
+    return approval_service.get_pending_approvals(branch_id=branch_id or None)
+
+
+def _approval_reviewer_id(current_user: dict) -> str:
+    reviewer_id = current_user.get("user_id") or current_user.get("id")
+    if not reviewer_id:
+        raise HTTPException(status_code=401, detail="Authenticated user identity is unavailable.")
+    return str(reviewer_id)
+
+
+def _ensure_approval_branch_access(req: dict, current_user: dict) -> None:
+    reviewer_branch = str(current_user.get("branch_id") or "").strip().upper()
+    request_branch = str(req.get("branch_id") or "").strip().upper()
+    if reviewer_branch and reviewer_branch != request_branch:
+        raise HTTPException(status_code=403, detail="Forbidden: request is outside your assigned branch.")
+
+
+def _complete_approval_request(req_id: str, reviewer_id: str, payload: dict) -> None:
+    try:
+        completed = approval_service.update_approval_status(
+            req_id, "completed", reviewer_id, from_status="processing", payload=payload
+        )
+    except Exception as exc:
+        logger.error("Could not persist completed approval %s: %s", req_id, exc)
+        completed = False
+
+    if completed:
+        return
+
+    try:
+        approval_service.update_approval_status(
+            req_id, "outcome-unknown", reviewer_id, from_status="processing", payload=payload
+        )
+    except Exception as exc:
+        logger.error("Could not persist unknown outcome for approval %s: %s", req_id, exc)
+    raise HTTPException(
+        status_code=502,
+        detail="SAP transaction succeeded but approval status could not be confirmed; outcome is unknown",
+    )
 
 
 @router.post("/approvals/{req_id}/approve")
@@ -743,14 +730,16 @@ async def approve_request(req_id: str, current_user: dict = Depends(require_admi
     req = approval_service.get_approval_request(req_id)
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
+    _ensure_approval_branch_access(req, current_user)
+    reviewer_id = _approval_reviewer_id(current_user)
     if req["status"] != "pending":
         raise HTTPException(status_code=400, detail=f"Request is already {req['status']}")
     
-    if req["requester_id"] == current_user["id"]:
+    if req["requester_id"] == reviewer_id:
         raise HTTPException(status_code=403, detail="You cannot approve your own request")
 
     # Mark as processing first to prevent replay
-    success = approval_service.update_approval_status(req_id, "processing", current_user["id"], from_status="pending")
+    success = approval_service.update_approval_status(req_id, "processing", reviewer_id, from_status="pending")
     if not success:
         raise HTTPException(status_code=400, detail="Failed to update status, request may not be pending")
 
@@ -762,6 +751,7 @@ async def approve_request(req_id: str, current_user: dict = Depends(require_admi
         # Re-validate source document
         invoice = await loop.run_in_executor(_executor, lambda: invoice_service.get_invoice(req["original_doc_entry"]))
         if not invoice:
+            approval_service.update_approval_status(req_id, "failed", reviewer_id, from_status="processing")
             raise HTTPException(status_code=404, detail="Original invoice not found during approval validation")
 
         if req["request_type"] in ("refund", "store_credit"):
@@ -789,15 +779,23 @@ async def approve_request(req_id: str, current_user: dict = Depends(require_admi
                 result = await loop.run_in_executor(
                     _executor, lambda: returns_service.create_credit_note_from_invoice(credit_note_payload)
                 )
+            except SAPConnectionError as sap_exc:
+                logger.error("SAP credit-note outcome is unknown: %s", sap_exc)
+                approval_service.update_approval_status(req_id, "outcome-unknown", reviewer_id, from_status="processing")
+                raise HTTPException(status_code=502, detail="SAP credit-note outcome is unknown; request marked accordingly")
             except Exception as sap_exc:
                 logger.error("Failed to execute credit note in SAP: %s", sap_exc)
-                approval_service.update_approval_status(req_id, "failed", current_user["id"], from_status="processing")
+                approval_service.update_approval_status(req_id, "failed", reviewer_id, from_status="processing")
                 raise HTTPException(status_code=502, detail="SAP execution failed, request marked as failed")
+
+            if not isinstance(result, dict) or not result.get("DocEntry"):
+                approval_service.update_approval_status(req_id, "outcome-unknown", reviewer_id, from_status="processing")
+                raise HTTPException(status_code=502, detail="SAP returned no credit-note reference; request outcome is unknown")
             
             # Update payload with result
             req["payload"]["creditNoteDocEntry"] = result.get("DocEntry")
             req["payload"]["creditNoteDocNum"] = result.get("DocNum")
-            approval_service.update_approval_status(req_id, "completed", current_user["id"], from_status="processing", payload=req["payload"])
+            _complete_approval_request(req_id, reviewer_id, req["payload"])
             
             return {"status": "success", "message": "Approved and executed", "docEntry": result.get("DocEntry")}
             
@@ -826,10 +824,19 @@ async def approve_request(req_id: str, current_user: dict = Depends(require_admi
                 return_result = await loop.run_in_executor(
                     _executor, lambda: returns_service.create_credit_note_from_invoice(credit_note_payload)
                 )
+            except SAPConnectionError as sap_exc:
+                logger.error("SAP credit-note outcome for exchange is unknown: %s", sap_exc)
+                approval_service.update_approval_status(req_id, "outcome-unknown", reviewer_id, from_status="processing")
+                raise HTTPException(status_code=502, detail="SAP credit-note outcome is unknown; request marked accordingly")
             except Exception as sap_exc:
                 logger.error("Failed to execute credit note for exchange in SAP: %s", sap_exc)
-                approval_service.update_approval_status(req_id, "failed", current_user["id"], from_status="processing")
+                approval_service.update_approval_status(req_id, "failed", reviewer_id, from_status="processing")
                 raise HTTPException(status_code=502, detail="SAP execution failed at credit note step")
+
+            if not isinstance(return_result, dict) or not return_result.get("DocEntry"):
+                req["payload"]["creditNoteDocEntry"] = None
+                approval_service.update_approval_status(req_id, "outcome-unknown", reviewer_id, from_status="processing", payload=req["payload"])
+                raise HTTPException(status_code=502, detail="SAP returned no credit-note reference; exchange outcome is unknown")
             
             # Step 1 succeeded. We now have a credit note.
             req["payload"]["creditNoteDocEntry"] = return_result.get("DocEntry")
@@ -871,24 +878,28 @@ async def approve_request(req_id: str, current_user: dict = Depends(require_admi
             except Exception as sap_exc:
                 logger.error("Failed to execute new invoice for exchange in SAP (credit note already created): %s", sap_exc)
                 # Partial failure: Credit note exists, invoice failed. Status is outcome-unknown to prevent blind retry.
-                approval_service.update_approval_status(req_id, "outcome-unknown", current_user["id"], from_status="processing", payload=req["payload"])
+                approval_service.update_approval_status(req_id, "outcome-unknown", reviewer_id, from_status="processing", payload=req["payload"])
                 raise HTTPException(status_code=502, detail="SAP execution partial failure: Credit note created, but replacement invoice failed")
+
+            if not isinstance(invoice_result, dict) or not invoice_result.get("DocEntry"):
+                approval_service.update_approval_status(req_id, "outcome-unknown", reviewer_id, from_status="processing", payload=req["payload"])
+                raise HTTPException(status_code=502, detail="SAP returned no replacement invoice reference; exchange outcome is unknown")
             
             req["payload"]["newInvoiceDocEntry"] = invoice_result.get("DocEntry")
             req["payload"]["newInvoiceDocNum"] = invoice_result.get("DocNum")
             
-            approval_service.update_approval_status(req_id, "completed", current_user["id"], from_status="processing", payload=req["payload"])
+            _complete_approval_request(req_id, reviewer_id, req["payload"])
             return {"status": "success", "message": "Approved and exchange completed", "returnDocEntry": return_result.get("DocEntry"), "newInvoiceDocEntry": invoice_result.get("DocEntry")}
             
         else:
-            approval_service.update_approval_status(req_id, "failed", current_user["id"], from_status="processing")
+            approval_service.update_approval_status(req_id, "failed", reviewer_id, from_status="processing")
             raise HTTPException(status_code=400, detail="Unknown request type")
             
     except HTTPException:
         raise
     except Exception as exc:
         # Unexpected error (like connection loss before checking)
-        approval_service.update_approval_status(req_id, "outcome-unknown", current_user["id"], from_status="processing")
+        approval_service.update_approval_status(req_id, "outcome-unknown", reviewer_id, from_status="processing")
         logger.error("Unexpected error executing approved request %s: %s", req_id, exc)
         raise HTTPException(status_code=502, detail="Unexpected error during execution, outcome unknown.")
 
@@ -899,13 +910,15 @@ async def reject_request(req_id: str, current_user: dict = Depends(require_admin
     req = approval_service.get_approval_request(req_id)
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
+    _ensure_approval_branch_access(req, current_user)
+    reviewer_id = _approval_reviewer_id(current_user)
     if req["status"] != "pending":
         raise HTTPException(status_code=400, detail=f"Request is already {req['status']}")
 
-    if req["requester_id"] == current_user["id"]:
+    if req["requester_id"] == reviewer_id:
         raise HTTPException(status_code=403, detail="You cannot reject your own request")
 
-    success = approval_service.update_approval_status(req_id, "rejected", current_user["id"])
+    success = approval_service.update_approval_status(req_id, "rejected", reviewer_id)
     if not success:
         raise HTTPException(status_code=400, detail="Failed to update status")
 

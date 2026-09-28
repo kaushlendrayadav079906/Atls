@@ -13,7 +13,10 @@ from app.services.sap.invoices_service import SAPInvoicesService
 @pytest.fixture
 def client():
     """Test client with SAP mocked out."""
-    with patch("app.services.sap.client.SAPServiceLayerClient.login", return_value=True):
+    with (
+        patch("app.services.sap.client.SAPServiceLayerClient.login", return_value=True),
+        patch("app.services.sap.items_service.SAPItemsService.get_items", return_value=[]),
+    ):
         app.dependency_overrides[get_current_user] = lambda: {"sub": "test"}
         with TestClient(app) as test_client:
             yield test_client
@@ -24,10 +27,14 @@ def client():
 # ─── Health Check ────────────────────────────────────────────────────────────
 
 def test_health_check(client):
-    """Health endpoint should always return 200."""
+    """Health endpoint should always return 200 and include dependency status."""
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json()["status"] == "healthy"
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert "dependencies" in data
+    assert "sap" in data["dependencies"]
+    assert "database" in data["dependencies"]
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -66,6 +73,37 @@ def test_login_returns_token(client):
         data = response.json()
         assert "access_token" in data
         assert data["token_type"] == "bearer"
+
+
+def test_register_without_master_password(client):
+    """Registration should work without the master password field in the UI."""
+    with patch(
+        "app.services.user_service.create_user",
+        return_value={
+            "id": "1",
+            "username": "newuser",
+            "email": "newuser@example.com",
+            "name": "New User",
+            "role": "user",
+            "sap_user_code": None,
+            "branch_id": None,
+            "store_name": None,
+        },
+    ):
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "username": "newuser",
+                "email": "newuser@example.com",
+                "password": "StrongPass123!",
+                "name": "New User",
+                "role": "user",
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["user"]["username"] == "newuser"
+        assert "access_token" in data
 
 
 # ─── Products: Image Proxy ─────────────────────────────────────────────────
@@ -202,7 +240,31 @@ def test_operator_dashboard_contains_expected_fields(client):
         assert key in data
 
 
-def test_operator_dashboard_returns_success_when_credit_notes_fail(client):
+def test_recent_sales_formats_document_date(client):
+    invoices_service = MagicMock()
+    invoices_service.get_recent_invoices_with_lines.return_value = [{
+        "DocEntry": 101,
+        "DocNum": 1001,
+        "DocDate": "2026-04-27T00:00:00Z",
+        "DocTotal": 50,
+        "DocumentLines": [{
+            "ItemCode": "ITEM-1",
+            "ItemDescription": "Widget",
+            "Quantity": 1,
+            "UnitPrice": 50,
+            "LineTotal": 50,
+            "WarehouseCode": "01",
+        }],
+    }]
+
+    with patch("app.api.v1.dashboard.SAPInvoicesService", return_value=invoices_service):
+        response = client.get("/api/v1/dashboard/recent-sales")
+
+    assert response.status_code == 200
+    assert response.json()[0]["docDate"] == "2026-04-27"
+
+
+def test_operator_dashboard_fails_when_credit_notes_are_unavailable(client):
     invoices_service = MagicMock()
     invoices_service.get_invoices_by_date.return_value = [
         {
@@ -237,11 +299,8 @@ def test_operator_dashboard_returns_success_when_credit_notes_fail(client):
     ):
         response = client.get("/api/v1/dashboard/operator")
 
-    assert response.status_code == 200
-    data = response.json()
-    assert data["returnsCount"] == 0
-    assert data["returnReasons"] == []
-    assert data["returnedItems"] == []
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Could not retrieve return data from SAP"
 
 
 def test_get_invoices_by_date_does_not_expand_document_lines():
@@ -264,6 +323,51 @@ def test_get_invoices_by_date_does_not_expand_document_lines():
     assert "$expand" not in params
 
 
+def test_get_invoices_by_date_propagates_sap_errors():
+    service = SAPInvoicesService()
+    service.client = MagicMock()
+    service.client.get.side_effect = RuntimeError("SAP unavailable")
+
+    with pytest.raises(RuntimeError, match="SAP unavailable"):
+        service.get_invoices_by_date(date(2026, 4, 27))
+
+
+def test_get_invoices_by_date_rejects_results_beyond_limit(monkeypatch):
+    from app.services.sap import invoices_service
+
+    monkeypatch.setattr(invoices_service, "_MAX_INVOICES_PER_DATE_RANGE", 1)
+    service = SAPInvoicesService()
+    service.client = MagicMock()
+    service.client.get.side_effect = [
+        {"value": [{"DocEntry": 1}]},
+        {"value": [{"DocEntry": 2}]},
+    ]
+
+    with pytest.raises(RuntimeError, match="exceeds the configured limit"):
+        service.get_invoices_by_date(date(2026, 4, 27))
+
+
+def test_get_invoices_by_date_with_lines_rejects_incomplete_hydration():
+    service = SAPInvoicesService()
+    service.get_invoices_by_date = MagicMock(return_value=[{"DocEntry": 101}])
+    service._get_invoice_lines_by_date = MagicMock(return_value=[])
+
+    with pytest.raises(RuntimeError, match="line hydration was incomplete"):
+        service.get_invoices_by_date_with_lines(date(2026, 4, 27))
+
+
+def test_invoice_line_query_rejects_results_beyond_limit():
+    service = SAPInvoicesService()
+    service.client = MagicMock()
+    service.client.post.side_effect = [
+        {"value": [{"Invoices": {"DocEntry": 1}, "DocumentLines": {"LineNum": 0}}]},
+        {"value": [{"Invoices": {"DocEntry": 2}, "DocumentLines": {"LineNum": 0}}]},
+    ]
+
+    with pytest.raises(RuntimeError, match="exceeds the configured limit"):
+        service._query_crossjoin_lines("DocDate ge '2026-01-01'", max_rows=1, page_size=1)
+
+
 def test_fetch_credit_notes_for_day_returns_paginated_notes():
     """Regression: credit note listing must paginate via $skip and return results."""
     from app.api.v1.dashboard import _fetch_credit_notes_for_day
@@ -272,10 +376,10 @@ def test_fetch_credit_notes_for_day_returns_paginated_notes():
     # Single page smaller than page_size — terminates after one request
     fake_client.get.side_effect = [
         {"value": [{"DocEntry": 301, "DocDate": "2026-05-06"}]},
-        {"value": []},
+        {"DocEntry": 301, "DocDate": "2026-05-06", "Comments": "Return reason: damaged", "CreditNoteLines": [{"WarehouseCode": "01"}]},
     ]
 
-    with patch("app.api.v1.dashboard.get_sap_client", return_value=fake_client):
+    with patch("app.services.sap.returns_service.get_sap_client", return_value=fake_client):
         notes = _fetch_credit_notes_for_day(None)
 
     assert len(notes) == 1
@@ -284,3 +388,37 @@ def test_fetch_credit_notes_for_day_returns_paginated_notes():
     params = list_call.args[1]
     assert "$filter" in params
     assert "$top" in params
+
+
+def test_returns_by_date_rejects_credit_note_without_single_warehouse():
+    from app.services.sap.returns_service import SAPReturnsService
+
+    service = SAPReturnsService.__new__(SAPReturnsService)
+    service.client = MagicMock()
+    service.client.get.side_effect = [
+        {"value": [{"DocEntry": 301}]},
+        {
+            "DocEntry": 301,
+            "CreditNoteLines": [
+                {"WarehouseCode": "B1"},
+                {"WarehouseCode": "B2"},
+            ],
+        },
+    ]
+
+    with pytest.raises(RuntimeError, match="single attributable warehouse"):
+        service.get_returns_by_date(date(2026, 5, 6), date(2026, 5, 6), warehouse="B1")
+
+
+def test_operator_return_reason_uses_workflow_comment_not_unverified_udf():
+    from app.api.v1.dashboard import _build_return_orders
+
+    orders = _build_return_orders([{
+        "DocEntry": 301,
+        "Comments": "Return reason: damaged | Return type: refund",
+        "U_Return_Reason": "unverified reason",
+        "CreditNoteLines": [],
+    }])
+
+    assert len(orders) == 1
+    assert orders[0].reason == "damaged"

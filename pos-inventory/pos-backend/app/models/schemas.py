@@ -25,7 +25,7 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=72)
     name: str = Field(..., min_length=1, max_length=100)
-    master_password: str = Field(..., min_length=1, max_length=255)
+    master_password: Optional[str] = Field(None, min_length=0, max_length=255)
     role: str = Field("user", pattern="^(user|admin|operator|manager)$")
     branch_id: Optional[str] = None
     store_name: Optional[str] = None

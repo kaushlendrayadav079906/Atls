@@ -69,10 +69,10 @@ def login(credentials: UserLogin):
 
 @router.post("/register", response_model=AccessTokenResponse)
 def register(user_data: UserRegister):
-    """Register a new user in PostgreSQL using the configured master password."""
+    """Register a new user without requiring an extra master-password prompt."""
     logger.info(f"Registration attempt for user: {user_data.username}")
 
-    if user_data.master_password != settings.REGISTER_MASTER_PASSWORD:
+    if user_data.master_password and user_data.master_password != settings.REGISTER_MASTER_PASSWORD:
         logger.warning("Registration failed: invalid master password for user %s", user_data.username)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

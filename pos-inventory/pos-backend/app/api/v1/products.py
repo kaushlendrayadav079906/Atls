@@ -19,7 +19,7 @@ from app.core.cache import (
 )
 from app.core.product_store import product_store
 from app.core.rate_limiter import limiter
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_admin, require_manager_or_admin
 from app.core.config import settings
 from app.models.schemas import ProductCreate, ProductUpdate, ProductResponse
 from app.services.sap.items_service import SAPItemsService
@@ -341,7 +341,7 @@ async def products_health():
 async def get_products(
     request: Request,
     response: Response,
-    search: Optional[str] = Query(None),
+    search: Optional[str] = Query(None, max_length=100, description="Search term (name, barcode, or code)"),
     force_refresh: bool = Query(False, description="Bypass and evict the server-side cache"),
     current_user: dict = Depends(get_current_user),
 ):
@@ -467,7 +467,17 @@ async def get_product_by_barcode(
             detail=f"Product with barcode {barcode} not found",
         )
 
-    product = _to_response(sap_item, sap_service)
+    # Apply branch-scoped stock (same logic as get_products)
+    role = str(current_user.get("role") or "user").lower()
+    user_branch: Optional[str] = None
+    if role != "admin":
+        raw_branch = str(current_user.get("branch_id") or "").strip()
+        if raw_branch:
+            user_branch = raw_branch
+        elif settings.SAP_DEFAULT_WAREHOUSE:
+            user_branch = settings.SAP_DEFAULT_WAREHOUSE
+
+    product = _to_response(sap_item, sap_service, branch=user_branch)
     return ProductResponse(**{**product.model_dump(), "image": _absolutize_image_url(product.image, public_base)})
 
 
@@ -476,9 +486,9 @@ async def get_product_by_barcode(
 async def create_product(
     request: Request,
     product: ProductCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
-    """Create a new product in SAP and invalidate the products cache."""
+    """Create a new product in SAP (admin only) and invalidate the products cache."""
     sap_service = SAPItemsService()
     try:
         sap_item = sap_service.create_item(
@@ -494,7 +504,7 @@ async def create_product(
         )
     except Exception as exc:
         logger.error(f"SAP create_item failed: {exc}")
-        raise HTTPException(status_code=502, detail=f"Failed to create product: {exc}")
+        raise HTTPException(status_code=502, detail="Failed to create product in SAP")
 
     await cache_delete(PRODUCTS_LIST_KEY)
     public_base = _public_base_url(request)
@@ -508,15 +518,15 @@ async def update_product(
     request: Request,
     item_code: str,
     product: ProductUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
-    """Update a product in SAP and invalidate the products cache."""
+    """Update a product in SAP (admin only) and invalidate the products cache."""
     sap_service = SAPItemsService()
     try:
         sap_service.update_item(item_code, product.model_dump(exclude_unset=True))
     except Exception as exc:
         logger.error(f"SAP update_item failed: {exc}")
-        raise HTTPException(status_code=502, detail=f"Failed to update product: {exc}")
+        raise HTTPException(status_code=502, detail="Failed to update product in SAP")
 
     await cache_delete(PRODUCTS_LIST_KEY)
 
@@ -534,15 +544,15 @@ async def update_product(
 async def delete_product(
     request: Request,
     item_code: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
-    """Soft-delete a product in SAP (freezes it) and invalidate the products cache."""
+    """Soft-delete a product in SAP (admin only, freezes it) and invalidate the products cache."""
     sap_service = SAPItemsService()
     try:
         sap_service.soft_delete_item(item_code)
     except Exception as exc:
         logger.error(f"SAP soft_delete_item failed: {exc}")
-        raise HTTPException(status_code=502, detail=f"Failed to delete product: {exc}")
+        raise HTTPException(status_code=502, detail="Failed to soft-delete product in SAP")
 
     await cache_delete(PRODUCTS_LIST_KEY)
 
@@ -566,10 +576,10 @@ async def _refresh_cache_background(sap_service: SAPItemsService):
 async def refresh_products_cache(
     request: Request,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_manager_or_admin),
 ):
     """
-    Trigger a background refresh of the products cache.
+    Trigger a background refresh of the products cache (manager/admin only).
     Returns immediately while cache is being refreshed.
     """
     sap_service = SAPItemsService()

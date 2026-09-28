@@ -13,6 +13,8 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+_MAX_INVOICES_PER_DATE_RANGE = 20000
+
 # Default customer for cash/walk-in sales
 DEFAULT_CUSTOMER_CODE = "C0001"
 DEFAULT_CUSTOMER_NAME = "CASH"
@@ -772,12 +774,13 @@ class SAPInvoicesService:
                 "U_C_Name,U_W_Number,U_P_Method,U_S_Employee"
             )
 
-            while True:
+            while len(all_invoices) < _MAX_INVOICES_PER_DATE_RANGE:
+                top = min(page_size, _MAX_INVOICES_PER_DATE_RANGE - len(all_invoices))
                 params = {
                     "$filter": filter_str,
                     "$orderby": "DocDate desc, DocEntry desc",
                     "$select": header_select,
-                    "$top": page_size,
+                    "$top": top,
                     "$skip": skip,
                 }
                 response = self.client.get("Invoices", params)
@@ -785,15 +788,28 @@ class SAPInvoicesService:
                 if not page:
                     break
                 all_invoices.extend(page)
-                if len(page) < page_size:
+                if len(page) < top:
                     break
-                skip += page_size
+                skip += len(page)
+
+            if len(all_invoices) >= _MAX_INVOICES_PER_DATE_RANGE:
+                probe = self.client.get("Invoices", {
+                    "$filter": filter_str,
+                    "$orderby": "DocDate desc, DocEntry desc",
+                    "$select": header_select,
+                    "$top": 1,
+                    "$skip": _MAX_INVOICES_PER_DATE_RANGE,
+                })
+                if probe.get("value"):
+                    raise RuntimeError(
+                        f"Invoice query exceeds the configured limit of {_MAX_INVOICES_PER_DATE_RANGE} documents."
+                    )
 
             return all_invoices
 
         except Exception as e:
             logger.error(f"Error fetching invoices by date: {str(e)}")
-            return []
+            raise
 
     def get_invoices_by_date_with_lines(
         self,
@@ -814,6 +830,8 @@ class SAPInvoicesService:
             page_size=page_size,
         )
         self._attach_lines_to_invoices(headers, line_rows)
+        if any(not invoice.get("DocumentLines") for invoice in headers):
+            raise RuntimeError("SAP invoice line hydration was incomplete")
         return headers
 
     def _get_invoice_lines_by_date(
@@ -900,7 +918,13 @@ class SAPInvoicesService:
             skip += top
 
         if len(rows) >= max_rows:
-            logger.info("Crossjoin lines capped at %s rows", max_rows)
+            probe_option = f"{expand}&$filter={filter_str}&$top=1&$skip={max_rows}"
+            probe = self.client.post(
+                "QueryService_PostQuery",
+                {"QueryPath": "$crossjoin(Invoices,Invoices/DocumentLines)", "QueryOption": probe_option},
+            )
+            if probe.get("value"):
+                raise RuntimeError(f"Invoice line query exceeds the configured limit of {max_rows} rows.")
         return rows[:max_rows]
 
     def _attach_lines_to_invoices(

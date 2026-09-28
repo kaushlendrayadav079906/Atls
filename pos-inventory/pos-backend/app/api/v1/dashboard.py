@@ -38,7 +38,7 @@ from app.models.schemas import (
 from app.services.sap.invoices_service import SAPInvoicesService
 from app.core.product_store import product_store
 from app.services.sap.business_partners_service import SAPBusinessPartnersService
-from app.services.sap.client import get_sap_client
+from app.services.sap.returns_service import SAPReturnsService
 from app.api.v1.customers import _compute_customer_insights
 from app.api.v1.atlas import _get_permitted_branch
 from app.services import approval_service
@@ -157,11 +157,17 @@ def _get_date_range_with_custom(
     to_date: Optional[str] = None,
 ) -> Tuple[date, date]:
     """Return (start_date, end_date), supporting custom date range."""
+    if bool(from_date) != bool(to_date):
+        raise HTTPException(status_code=422, detail="from_date and to_date must be provided together.")
     if from_date and to_date:
         try:
-            return date.fromisoformat(from_date), date.fromisoformat(to_date)
+            start_date = date.fromisoformat(from_date)
+            end_date = date.fromisoformat(to_date)
         except ValueError:
-            pass
+            raise HTTPException(status_code=422, detail="Custom dates must use YYYY-MM-DD format.")
+        if start_date > end_date:
+            raise HTTPException(status_code=422, detail="from_date must not be after to_date.")
+        return start_date, end_date
     return _get_date_range(range_str)
 
 
@@ -199,17 +205,16 @@ def _filter_invoices_by_branch(invoices: List[Dict[str, Any]], branch: Optional[
     filtered: List[Dict[str, Any]] = []
     branch_upper = branch.upper()
     for inv in invoices:
-        header_branch = _extract_branch_from_invoice(inv)
-        if header_branch and header_branch.upper() == branch_upper:
-            filtered.append(inv)
-            continue
-
         lines = inv.get("DocumentLines") or []
-        if any(str(line.get("WarehouseCode") or "").upper() == branch_upper for line in lines):
-            filtered.append(inv)
-            continue
-
-        if not header_branch and not lines:
+        line_branches = {
+            str(line.get("WarehouseCode") or "").strip().upper()
+            for line in lines
+        }
+        if not lines or "" in line_branches:
+            raise ValueError("Cannot determine branch for one or more SAP invoices.")
+        if len(line_branches) > 1:
+            raise ValueError("Cannot allocate an invoice across multiple warehouses.")
+        if branch_upper in line_branches:
             filtered.append(inv)
 
     return filtered
@@ -222,12 +227,9 @@ def _to_date_str(value: Any) -> Optional[str]:
 
 
 def _extract_base_doc_entries_from_credit_notes(notes: List[Dict[str, Any]]) -> set:
-    """Parse credit note Comments to extract referenced original invoice DocEntries.
+    """Parse credit-note Comments for referenced original invoice DocEntries.
 
-    When a credit note is created via our system it includes a comment like:
-      'Ref original invoice DocEntry: 36'
-    This helper builds a set of those DocEntries so the sales feed can mark
-    which invoices have an associated return.
+    POS-created credit notes include a comment such as ``Ref original invoice DocEntry: 36``.
     """
     doc_entries: set = set()
     for note in notes:
@@ -384,18 +386,11 @@ def _build_stock_sections(items: List[Dict[str, Any]], branch: Optional[str]) ->
 
 
 def _normalize_return_reason(note: Dict[str, Any]) -> str:
-    candidate = str(note.get("U_Return_Reason") or note.get("U_Reason") or "").strip().lower()
-    if not candidate:
-        comments = str(note.get("Comments") or "").lower()
-        if "size" in comments:
-            candidate = "size"
-        elif "defect" in comments or "damage" in comments:
-            candidate = "defect"
-        elif "exchange" in comments:
-            candidate = "exchange"
-        else:
-            candidate = "other"
-    return candidate
+    for part in str(note.get("Comments") or "").split("|"):
+        part = part.strip()
+        if part.lower().startswith("return reason:"):
+            return part[len("return reason:"):].strip().lower() or "other"
+    return "other"
 
 
 def _fetch_credit_notes(branch: Optional[str], start_date: Optional[date] = None, end_date: Optional[date] = None) -> List[Dict[str, Any]]:
@@ -408,45 +403,7 @@ def _fetch_credit_notes(branch: Optional[str], start_date: Optional[date] = None
         start_date = date.today()
     if end_date is None:
         end_date = start_date
-    start_str = start_date.strftime("%Y-%m-%d")
-    end_str = end_date.strftime("%Y-%m-%d")
-
-    client = get_sap_client()
-    page_size = 100
-    all_notes: List[Dict[str, Any]] = []
-    skip = 0
-
-    while True:
-        params = {
-            "$filter": f"DocDate ge '{start_str}' and DocDate le '{end_str}'",
-            "$orderby": "DocEntry desc",
-            # "$expand": "CreditNoteLines",
-            "$top": page_size,
-            "$skip": skip,
-        }
-        response = client.get("CreditNotes", params)
-        page = response.get("value", [])
-        if not page:
-            break
-        all_notes.extend(page)
-        if len(page) < page_size:
-            break
-        skip += page_size
-
-    if not branch:
-        return all_notes
-    branch_upper = branch.upper()
-    return [
-        n for n in all_notes
-        if (
-            str(n.get("U_Branch") or n.get("U_BranchCode") or "").strip().upper() == branch_upper
-            or any(
-                str(line.get("WarehouseCode") or "").upper() == branch_upper
-                for line in (n.get("CreditNoteLines") or [])
-            )
-            or not (n.get("CreditNoteLines") or [])
-        )
-    ]
+    return SAPReturnsService().get_returns_by_date(start_date, end_date, warehouse=branch)
 
 
 def _fetch_credit_notes_for_day(branch: Optional[str]) -> List[Dict[str, Any]]:
@@ -454,9 +411,6 @@ def _fetch_credit_notes_for_day(branch: Optional[str]) -> List[Dict[str, Any]]:
 
 
 def _extract_return_type(note: Dict[str, Any]) -> str:
-    candidate = str(note.get("U_Return_Type") or note.get("U_ReturnType") or "").strip().lower()
-    if candidate:
-        return candidate
     comments = str(note.get("Comments") or "").lower()
     for part in comments.split("|"):
         part = part.strip()
@@ -472,7 +426,7 @@ def _build_return_orders(notes: List[Dict[str, Any]]) -> List[ReturnDetail]:
         if not doc_entry:
             continue
         comments = str(note.get("Comments") or "")
-        reason = str(note.get("U_Return_Reason") or "").strip() or None
+        reason: Optional[str] = None
         original_doc_num: Optional[int] = None
 
         for part in comments.split("|"):
@@ -707,7 +661,8 @@ async def get_recent_sales_feed(
         )
         returned_doc_entries = _extract_base_doc_entries_from_credit_notes(credit_notes)
     except Exception as exc:
-        logger.warning("Could not fetch credit notes for returns marking in feed: %s", exc)
+        logger.error("Could not fetch credit notes for returns marking in feed: %s", exc)
+        raise HTTPException(status_code=502, detail="Could not retrieve return data from SAP")
 
     total = len(filtered)
     page = filtered[offset: offset + limit]
@@ -782,7 +737,8 @@ async def get_operator_dashboard(
             _executor, lambda: _fetch_credit_notes(effective_branch, start_date, end_date)
         )
     except Exception as exc:
-        logger.warning(f"Operator dashboard returns/exchange section failed, continuing with empty returns: {exc}")
+        logger.error(f"Operator dashboard returns fetch failed: {exc}")
+        raise HTTPException(status_code=502, detail="Could not retrieve return data from SAP")
 
     period_total = round(sum(_to_float(inv.get("DocTotal")) for inv in branch_invoices), 2)
     bill_count = len(branch_invoices)
@@ -852,7 +808,11 @@ async def export_operator_reports(
         invoice_service = SAPInvoicesService()
         loop = asyncio.get_running_loop()
         all_invoices = await loop.run_in_executor(
-            _executor, lambda: invoice_service.get_invoices_by_date(start_date, end_date)
+            _executor,
+            lambda: (
+                invoice_service.get_invoices_by_date_with_lines(start_date, end_date)
+                if branch else invoice_service.get_invoices_by_date(start_date, end_date)
+            ),
         )
         invoices = _filter_invoices_by_branch(all_invoices, branch)
     except Exception as exc:
@@ -952,6 +912,8 @@ async def get_inventory_risk(current_user: dict = Depends(require_manager_or_adm
     try:
         service = SAPInventoryService()
         items = service.get_warehouse_stock(target_branch)
+        if any(item.get("_truncated") for item in items):
+            raise RuntimeError("Inventory risk query exceeded the SAP result limit")
         
         risky_items = []
         for item in items:
@@ -991,4 +953,4 @@ async def get_inventory_risk(current_user: dict = Depends(require_manager_or_adm
         return risky_items
     except Exception as e:
         logger.error(f'Error fetching inventory risk: {e}')
-        raise HTTPException(status_code=500, detail='Failed to fetch inventory risk')
+        raise HTTPException(status_code=502, detail='Could not retrieve complete inventory risk data from SAP')
