@@ -35,9 +35,16 @@ export interface DashboardRecentSale {
   docNum?: number;
   saleId?: string;
   docDate?: string;
+  customerCode?: string;
   customerName?: string;
+  customerPhone?: string;
+  paymentMethod?: string;
+  subtotal?: number;
+  discount?: number;
+  gst?: number;
   total: number;
   items: DashboardSaleItem[];
+  hasReturn?: boolean;
 }
 
 export interface SalesTrendPoint {
@@ -99,16 +106,16 @@ export const dashboardApi = {
 };
 
 export const atlasApi = {
-  getSalesTrend: async (): Promise<{ trend: SalesTrendPoint[] }> => {
-    const res = await apiClient.get('/atlas/sales-trends');
+  getSalesTrend: async (branch_id?: string): Promise<{ trend: SalesTrendPoint[] }> => {
+    const res = await apiClient.get('/atlas/sales-trends', { params: { branch: branch_id } });
     return res.data;
   },
-  getOverview: async () => {
-    const res = await apiClient.get('/atlas/overview');
+  getOverview: async (branch_id?: string) => {
+    const res = await apiClient.get('/atlas/overview', { params: { branch: branch_id } });
     return res.data;
   },
-  getTopProducts: async (): Promise<TopProduct[]> => {
-    const res = await apiClient.get('/atlas/product-velocity');
+  getTopProducts: async (branch_id?: string): Promise<TopProduct[]> => {
+    const res = await apiClient.get('/atlas/product-velocity', { params: { branch: branch_id } });
     return res.data;
   }
 };

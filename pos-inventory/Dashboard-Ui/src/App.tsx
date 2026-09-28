@@ -6,6 +6,9 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { SalesReportPage } from './pages/reports/SalesReportPage';
+import { InvoiceReportPage } from './pages/reports/InvoiceReportPage';
+import { PaymentReportPage } from './pages/reports/PaymentReportPage';
 
 import { AtlasAnalyticsPage } from './pages/AtlasAnalyticsPage';
 import { CustomersPage } from './pages/CustomersPage';
@@ -67,7 +70,15 @@ function App() {
               <Route path="sales/:id" element={<InvoiceDetail />} />
               <Route path="returns" element={<ReturnsApprovalsPage />} />
               <Route path="analytics" element={<AtlasAnalyticsPage />} />
-              <Route path="reports" element={<ReportsPage />} />
+              <Route path="reports">
+                <Route index element={<ReportsPage />} />
+                <Route path="sales" element={<SalesReportPage />} />
+                <Route path="invoice" element={<InvoiceReportPage />} />
+                <Route path="payment" element={<PaymentReportPage />} />
+                <Route path="inventory" element={<div className="p-8 text-white">Inventory Report - Building...</div>} />
+                <Route path="customer" element={<div className="p-8 text-white">Customer Report - Building...</div>} />
+                <Route path="ai" element={<div className="p-8 text-white">AI Report - Building...</div>} />
+              </Route>
               <Route path="settings" element={<SettingsUsersPage />} />
               {/* Fallback routes for "Coming soon" */}
               <Route path="*" element={<div className="p-8 text-center text-gray-500">Coming soon</div>} />

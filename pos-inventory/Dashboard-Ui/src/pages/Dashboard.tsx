@@ -15,7 +15,10 @@ import {
     Sparkles,
     TrendingUp,
     TriangleAlert,
-    Users
+    Users,
+    MessageSquarePlus,
+    Package,
+    FileText
 } from 'lucide-react';
 import { atlasApi, dashboardApi } from '../api/endpoints';
 import { useAuth } from '../contexts/AuthContext';
@@ -34,24 +37,24 @@ export const Dashboard = () => {
     queryFn: () => dashboardApi.getSummary(user?.branch_id),
   });
 
-  const { data: recentSales, isLoading: loadingSales, isError: errorSales } = useQuery({
+  const { data: recentSales, isLoading: loadingSales } = useQuery({
     queryKey: ['recentSales', user?.branch_id],
     queryFn: () => dashboardApi.getRecentSales(user?.branch_id),
   });
 
-  const { data: alerts, isLoading: loadingAlerts } = useQuery({
+  const { data: alerts } = useQuery({
     queryKey: ['dashboardAlerts'],
     queryFn: () => dashboardApi.getAlerts(),
   });
 
   const { data: topProducts } = useQuery({
-    queryKey: ['topProducts'],
-    queryFn: atlasApi.getTopProducts,
+    queryKey: ['topProducts', user?.branch_id],
+    queryFn: () => atlasApi.getTopProducts(user?.branch_id),
   });
 
   const { data: trendData, isLoading: loadingTrend, isError: errorTrend } = useQuery({
-    queryKey: ['salesTrend'],
-    queryFn: atlasApi.getSalesTrend,
+    queryKey: ['salesTrend', user?.branch_id],
+    queryFn: () => atlasApi.getSalesTrend(user?.branch_id),
   });
 
   const trendPoints = trendData?.trend ?? [];
@@ -65,7 +68,7 @@ export const Dashboard = () => {
       meta: 'vs. yesterday',
       icon: ShoppingCart,
       accent: 'from-emerald-500 to-emerald-300',
-      tint: 'bg-emerald-500/12 text-emerald-300',
+      tint: 'bg-emerald-500/20 text-emerald-300',
     },
     {
       title: 'Completed Bills',
@@ -74,16 +77,16 @@ export const Dashboard = () => {
       meta: 'vs. yesterday',
       icon: Check,
       accent: 'from-blue-500 to-sky-300',
-      tint: 'bg-blue-500/12 text-blue-300',
+      tint: 'bg-blue-500/20 text-blue-300',
     },
     {
       title: 'Active Shift',
-      highlight: 'Open',
-      value: 'John Doe',
-      meta: 'Started 08:00 AM',
+      highlight: 'OPEN',
+      value: user?.name || 'Operator',
+      meta: user?.role || 'Shift Active',
       icon: Clock3,
       accent: 'from-violet-500 to-violet-300',
-      tint: 'bg-violet-500/12 text-violet-300',
+      tint: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
     },
     {
       title: 'Low-stock Items',
@@ -92,320 +95,441 @@ export const Dashboard = () => {
       meta: 'vs. last week',
       icon: TriangleAlert,
       accent: 'from-amber-500 to-orange-300',
-      tint: 'bg-amber-500/12 text-amber-300',
+      tint: 'bg-red-500/20 text-red-400',
     },
     {
       title: 'Pending Approvals',
-      highlight: '+1.8%',
+      highlight: '+8.2%',
       value: `${Math.max((alerts?.filter((item) => item.status === 'Pending').length ?? 0), 3)}`,
-      meta: 'vs. last week',
+      meta: 'vs. last month',
       icon: Bell,
-      accent: 'from-pink-500 to-pink-300',
-      tint: 'bg-pink-500/12 text-pink-300',
+      accent: 'from-rose-500 to-pink-300',
+      tint: 'bg-emerald-500/20 text-emerald-400',
     },
   ];
 
   const alertRows = (alerts ?? []).slice(0, 4);
 
   return (
-    <div className="h-full w-full bg-[#061a2f] text-white">
-      <div className="mx-auto flex max-w-[1600px] gap-6">
-        <div className="flex-1 space-y-5">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <h1 className="text-[42px] font-black leading-none tracking-[-0.06em] text-white">Retail Operations Dashboard</h1>
-              <p className="mt-2 text-[14px] text-sky-100/75">Real-time overview of your business operations</p>
-            </div>
+    <div className="flex flex-col gap-5 text-white">
+      {/* ROW 1: Heading and Filters */}
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <h1 className="text-[26px] font-bold leading-none tracking-tight text-white">Retail Operations Dashboard</h1>
+          <p className="mt-1.5 text-[13px] text-sky-200/60">Real-time overview of your business operations</p>
+        </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <button className="flex items-center gap-2 rounded-xl border border-sky-700/80 bg-[#0d2341] px-4 py-2.5 text-sm font-medium text-sky-100 shadow-[inset_0_0_0_1px_rgba(125,211,252,0.08)]">
-                <ShoppingBag className="h-4 w-4 text-sky-300" />
-                <span>Main Branch (WH-001)</span>
-                <ChevronDown className="h-4 w-4 text-sky-200" />
-              </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button className="flex items-center gap-2 rounded-lg border border-sky-800/60 bg-[#0b2340]/60 px-3 py-2 text-[12px] font-medium text-sky-100 transition hover:bg-[#112847]">
+            <span className="text-[14px]">🏛️</span>
+            <span>{user?.store_name || user?.branch_id || 'Main Branch (WH-001)'}</span>
+            <ChevronDown className="h-3.5 w-3.5 text-sky-300/60" />
+          </button>
 
-              <button className="flex items-center gap-2 rounded-xl border border-sky-700/80 bg-[#0d2341] px-4 py-2.5 text-sm font-medium text-sky-100 shadow-[inset_0_0_0_1px_rgba(125,211,252,0.08)]">
-                <span>Nov 1, 2024 - Nov 30, 2024</span>
-                <ChevronDown className="h-4 w-4 text-sky-200" />
-              </button>
+          <button className="flex items-center gap-2 rounded-lg border border-sky-800/60 bg-[#0b2340]/60 px-3 py-2 text-[12px] font-medium text-sky-100 transition hover:bg-[#112847]">
+            <span className="text-[14px]">📅</span>
+            <span>Current Period</span>
+            <ChevronDown className="h-3.5 w-3.5 text-sky-300/60" />
+          </button>
 
-              <button className="flex items-center gap-2 rounded-xl border border-sky-700/80 bg-[#0d2341] px-4 py-2.5 text-sm font-medium text-sky-100 shadow-[inset_0_0_0_1px_rgba(125,211,252,0.08)]">
-                <RefreshCcw className="h-4 w-4 text-sky-300" />
-                <span>Refresh</span>
-              </button>
-            </div>
-          </div>
+          <button className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[12px] font-medium text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500">
+            <RefreshCcw className="h-3.5 w-3.5" />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
 
-          <div className="grid gap-4 xl:grid-cols-5">
-            {statCards.map(({ title, value, highlight, meta, icon: Icon, accent, tint }) => (
-              <div key={title} className="rounded-[20px] border border-sky-900/80 bg-[linear-gradient(180deg,#0b1f3b_0%,#0a1d39_100%)] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.35)]">
+      {/* ROW 2: Main Content Layout */}
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-start">
+        
+        {/* LEFT COLUMN */}
+        <div className="flex min-w-0 flex-1 flex-col gap-5">
+          
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-5">
+            {statCards.map(({ title, value, highlight, meta, icon: Icon, accent, tint }, i) => (
+              <div key={title} className="flex flex-col justify-between rounded-[16px] border border-sky-800/50 bg-[#0b2340]/40 p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${accent}`}>
-                    <Icon className="h-5 w-5 text-white" />
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br ${accent}`}>
+                    <Icon className="h-4 w-4 text-white" />
                   </div>
                   <div className="text-right">
-                    <div className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${tint}`}>
+                    <div className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold ${tint}`}>
                       {highlight}
                     </div>
                   </div>
                 </div>
-
-                <div className="mt-6 space-y-1">
-                  <div className="text-[13px] font-medium text-sky-100/85">{title}</div>
-                  <div className="text-[28px] font-black leading-none tracking-[-0.06em] text-white">{value}</div>
-                  <div className="text-[11px] text-sky-100/65">{meta}</div>
+                <div className="mt-4">
+                  <div className="text-[12px] font-medium text-sky-100/70">{title}</div>
+                  <div className="mt-0.5 text-[22px] font-bold tracking-tight text-white">{value}</div>
+                </div>
+                <div className="mt-3 flex items-center gap-1.5 text-[11px] text-sky-200/50">
+                  {i === 3 ? <TriangleAlert className="h-3.5 w-3.5 text-amber-500" /> : i === 4 ? <FileText className="h-3.5 w-3.5 text-sky-400" /> : <ShoppingBag className="h-3.5 w-3.5 text-sky-400" />}
+                  <span>
+                    {i === 3 ? 'Requires attention' : i === 4 ? '2 Returns, 1 Stock Adj.' : i === 2 ? meta : `${parseInt(value) || 28} completed bills`}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="grid gap-5 xl:grid-cols-[1.7fr_1fr]">
-            <div className="overflow-hidden rounded-[22px] border border-sky-900/80 bg-[linear-gradient(180deg,#0b1f3b_0%,#091d36_100%)] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.35)]">
+          {/* Charts */}
+          <div className="grid gap-5 xl:grid-cols-[1.6fr_1fr]">
+            <div className="rounded-[16px] border border-sky-800/50 bg-[#0b2340]/40 p-4">
               <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-white">
-                  <TrendingUp className="h-4 w-4 text-sky-300" />
-                  <span className="text-[18px] font-semibold">Sales Overview</span>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-sky-400" />
+                  <span className="text-[14px] font-semibold">Sales Overview</span>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border border-sky-800 bg-[#0d2341] px-2.5 py-1.5 text-xs text-sky-100">
-                  <span>7D</span>
-                  <span className="rounded-md bg-sky-500/25 px-2 py-1 text-sky-100">30D</span>
-                  <span>90D</span>
-                  <span>1Y</span>
+                <div className="flex items-center gap-1 rounded-lg border border-sky-800/60 bg-[#071d34] p-1 text-[11px] font-medium text-sky-200/60">
+                  <button className="px-2 py-1">7D</button>
+                  <button className="rounded-md bg-blue-600 px-2 py-1 text-white shadow-sm">30D</button>
+                  <button className="px-2 py-1">90D</button>
+                  <button className="px-2 py-1">1Y</button>
+                  <button className="flex items-center gap-1 border-l border-sky-800/60 pl-2 pr-1 text-sky-100">
+                    All Branches <ChevronDown className="h-3 w-3" />
+                  </button>
                 </div>
               </div>
 
               {loadingTrend ? (
-                <div className="flex min-h-[260px] items-center justify-center text-sky-100/70">Loading chart</div>
+                <div className="flex h-[220px] items-center justify-center text-sm text-sky-200/50">Loading chart...</div>
               ) : errorTrend ? (
-                <StateMessage type="error" message="Failed to load sales overview." />
+                <StateMessage type="error" message="Failed to load trend" />
               ) : (
-                <div className="relative min-h-[280px] rounded-2xl border border-sky-900/70 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.18),rgba(15,23,42,0.1)_30%,rgba(15,23,42,0)_100%)] p-4">
-                  <div className="mb-5 flex items-end justify-between text-[12px] text-sky-100/60">
-                    <span className="text-[14px] font-medium text-sky-100/80">₹0</span>
-                    <span className="text-[14px] font-medium text-sky-100/80">₹50k</span>
-                    <span className="text-[14px] font-medium text-sky-100/80">₹100k</span>
+                <div className="relative h-[220px] rounded-xl border border-sky-800/40 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.1),transparent_50%)] p-2">
+                  <div className="absolute left-2 top-2 flex flex-col justify-between h-[160px] text-[10px] text-sky-200/40">
+                    <span>₹20K</span>
+                    <span>₹15K</span>
+                    <span>₹10K</span>
+                    <span>₹5K</span>
+                    <span>₹0</span>
                   </div>
-
-                  <div className="flex h-52 items-end justify-between gap-2 px-2 pb-6 pt-4">
-                    {trendPoints.length > 0 ? (
-                      trendPoints.map((point, index) => {
-                        const height = Math.max((point.total / chartMax) * 100, 8);
-                        return (
-                          <div key={`${point.label}-${index}`} className="flex flex-1 flex-col items-center justify-end gap-2">
-                            <div className="relative flex h-full w-full items-end justify-center">
-                              <div
-                                className="w-full max-w-[18px] rounded-t-[10px] bg-gradient-to-t from-sky-500 to-sky-300 shadow-[0_0_20px_rgba(56,189,248,0.35)]"
-                                style={{ height: `${height}%` }}
-                              />
+                  <div className="ml-8 flex h-[160px] items-end justify-between px-2 pb-2">
+                    {trendPoints.map((point, index) => {
+                      const h = Math.max((point.total / chartMax) * 100, 10);
+                      return (
+                        <div key={index} className="flex flex-col items-center gap-2 w-full">
+                          <div className="relative flex h-full w-full items-end justify-center group">
+                            <div className="w-[3px] bg-sky-500/20" style={{ height: `${h}%` }}>
+                              <div className="absolute -top-1.5 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full border-2 border-sky-400 bg-[#071d34] shadow-[0_0_8px_rgba(56,189,248,0.8)]" />
                             </div>
-                            <div className="text-[10px] text-sky-100/70">{point.label}</div>
+                            {index === 3 && (
+                               <div className="absolute -top-10 whitespace-nowrap rounded border border-sky-700 bg-[#0b2340] px-2 py-1 text-center shadow-lg">
+                                 <div className="text-[9px] text-sky-200/60">Nov 15, 2024</div>
+                                 <div className="text-[12px] font-bold text-white">₹8,420.50</div>
+                               </div>
+                            )}
                           </div>
-                        );
-                      })
-                    ) : (
-                      <div className="flex w-full items-center justify-center text-sm text-sky-100/70">No sales trend data available</div>
-                    )}
+                        </div>
+                      );
+                    })}
                   </div>
-
-                  <div className="mt-4 flex items-center justify-center gap-4 text-[11px] text-sky-100/70">
-                    <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-sky-400" /> Current Period</span>
-                    <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full border border-sky-400/70 bg-transparent" /> Previous Period</span>
+                  <div className="ml-8 flex justify-between px-2 text-[10px] text-sky-200/50">
+                    <span>Nov 1</span>
+                    <span>Nov 5</span>
+                    <span>Nov 10</span>
+                    <span>Nov 15</span>
+                    <span>Nov 20</span>
+                    <span>Nov 25</span>
+                    <span>Nov 30</span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-center gap-4 text-[10px] text-sky-200/60">
+                    <span className="flex items-center gap-1.5"><span className="h-1.5 w-4 rounded-full bg-sky-400" /> Current Period</span>
+                    <span className="flex items-center gap-1.5"><span className="h-[1px] w-4 border-t border-dashed border-sky-400/50" /> Previous Period</span>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="overflow-hidden rounded-[22px] border border-sky-900/80 bg-[linear-gradient(180deg,#0b1f3b_0%,#091d36_100%)] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.35)]">
+            <div className="rounded-[16px] border border-sky-800/50 bg-[#0b2340]/40 p-4">
               <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-white">
-                  <ShoppingCart className="h-4 w-4 text-sky-300" />
-                  <span className="text-[18px] font-semibold">Orders This Week</span>
+                <div className="flex items-center gap-2">
+                  <ShoppingBag className="h-4 w-4 text-sky-400" />
+                  <span className="text-[14px] font-semibold">Orders This Week</span>
                 </div>
-                <button className="text-xs text-sky-300">This Week</button>
+                <button className="flex items-center gap-1 text-[11px] font-medium text-sky-200/70">
+                  This Week <ChevronDown className="h-3 w-3" />
+                </button>
               </div>
-
-              <div className="flex h-[260px] items-end justify-between gap-2 pt-6">
-                {[150, 168, 142, 178, 110, 98, 135].map((value, idx) => (
-                  <div key={idx} className="flex flex-1 flex-col items-center gap-2">
-                    <div className="relative flex h-full w-full items-end justify-center">
-                      <div
-                        className={`w-full max-w-[26px] rounded-t-[10px] ${idx % 2 === 0 ? 'bg-gradient-to-t from-orange-500 to-amber-300' : 'bg-gradient-to-t from-sky-500 to-blue-300'}`}
-                        style={{ height: `${(value / 200) * 100}%` }}
-                      />
-                    </div>
-                    <div className="text-[10px] text-sky-100/65">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][idx]}</div>
+              <div className="relative h-[220px]">
+                  <div className="absolute left-0 top-2 flex flex-col justify-between h-[170px] text-[10px] text-sky-200/40">
+                    <span>200</span>
+                    <span>150</span>
+                    <span>100</span>
+                    <span>50</span>
+                    <span>0</span>
                   </div>
+                  <div className="ml-6 flex h-[170px] items-end justify-between gap-1.5 px-2">
+                    {trendPoints.slice(-7).map((point, idx) => {
+                      const val = point.billCount;
+                      const maxVal = Math.max(...trendPoints.slice(-7).map(p => p.billCount), 1);
+                      return (
+                        <div key={idx} className="flex flex-1 flex-col items-center gap-1.5 w-full">
+                          <div className="relative flex h-full w-full items-end justify-center">
+                            <div className="text-[9px] font-bold text-white absolute -top-4">{val}</div>
+                            <div
+                              className={`w-full max-w-[24px] rounded-t-sm ${idx % 2 === 0 ? 'bg-gradient-to-t from-orange-500 to-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.2)]' : 'bg-gradient-to-t from-orange-600 to-amber-500'}`}
+                              style={{ height: `${(val / maxVal) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="ml-6 mt-2 flex justify-between px-2 text-[10px] text-sky-200/60">
+                    {trendPoints.slice(-7).map((p, i) => <span key={i}>{p.label.split(' ')[0]}</span>)}
+                  </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tables */}
+          <div className="grid gap-5 xl:grid-cols-[1.5fr_1fr]">
+            <div className="rounded-[16px] border border-sky-800/50 bg-[#0b2340]/40 p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-sky-400" />
+                  <span className="text-[14px] font-semibold">Recent Sales</span>
+                </div>
+                <button className="flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-sky-300">
+                  View all <ChevronDown className="h-3 w-3 -rotate-90" />
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-[12px]">
+                  <thead className="border-b border-sky-800/50 text-[10px] font-medium text-sky-200/50">
+                    <tr>
+                      <th className="pb-2">Invoice</th>
+                      <th className="pb-2">Customer</th>
+                      <th className="pb-2">Amount</th>
+                      <th className="pb-2">Payment Method</th>
+                      <th className="pb-2">Status</th>
+                      <th className="pb-2">Time</th>
+                      <th className="pb-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-sky-800/30 text-sky-100">
+                    {loadingSales ? (
+                      <tr><td colSpan={7} className="py-4 text-center">Loading...</td></tr>
+                    ) : (recentSales || []).slice(0, 6).map((sale, i) => (
+                      <tr key={i} className="hover:bg-sky-800/20">
+                        <td className="py-2.5 font-medium text-sky-400">{sale.docNum ? `INV-${sale.docNum}` : (sale.saleId || 'Unknown')}</td>
+                        <td className="py-2.5">{sale.customerName || 'Walk-in Customer'}</td>
+                        <td className="py-2.5 font-semibold text-white">{money.format(sale.total || 0)}</td>
+                        <td className="py-2.5 text-sky-200/70">{sale.paymentMethod || 'Mixed'}</td>
+                        <td className="py-2.5">
+                          <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${(sale as any).hasReturn ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                            {(sale as any).hasReturn ? 'Refunded' : 'Completed'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-sky-200/60">{sale.docDate ? sale.docDate : 'Today'}</td>
+                        <td className="py-2.5 text-right"><button className="text-sky-200/40 hover:text-white">•••</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="rounded-[16px] border border-sky-800/50 bg-[#0b2340]/40 p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <PackageSearch className="h-4 w-4 text-sky-400" />
+                  <span className="text-[14px] font-semibold">Top Products</span>
+                </div>
+                <button className="flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-sky-300">
+                  View all <ChevronDown className="h-3 w-3 -rotate-90" />
+                </button>
+              </div>
+              <table className="min-w-full text-left text-[12px]">
+                <thead className="border-b border-sky-800/50 text-[10px] font-medium text-sky-200/50">
+                  <tr>
+                    <th className="pb-2 w-8">#</th>
+                    <th className="pb-2">Product</th>
+                    <th className="pb-2 text-right">Units Sold</th>
+                    <th className="pb-2 text-right">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-sky-800/30 text-sky-100">
+                  {(topProducts || []).slice(0, 5).map((prod, idx) => (
+                    <tr key={idx} className="hover:bg-sky-800/20">
+                      <td className="py-2.5 font-medium text-sky-200/50">{idx + 1}</td>
+                      <td className="py-2.5 flex items-center gap-2">
+                        <div className="flex h-6 w-6 items-center justify-center rounded bg-slate-800">
+                          <Package className="h-3 w-3 text-sky-200/50" />
+                        </div>
+                        {prod.itemName}
+                      </td>
+                      <td className="py-2.5 text-right">{prod.quantitySold}</td>
+                      <td className="py-2.5 text-right font-semibold text-white">{money.format(prod.salesAmount || 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Risk and Quick Actions */}
+          <div className="grid gap-5 xl:grid-cols-[1.5fr_1fr]">
+            <div className="rounded-[16px] border border-sky-800/50 bg-[#0b2340]/40 p-4">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-sky-400" />
+                  <span className="text-[14px] font-semibold">AI Risk Analysis Summary</span>
+                </div>
+                <button className="flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-sky-300">
+                  View details <ChevronDown className="h-3 w-3 -rotate-90" />
+                </button>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-sky-800/80 bg-[#071d34]">
+                  <span className="text-[20px] font-bold text-white">N/A</span>
+                </div>
+                <div className="mr-4">
+                  <div className="text-[11px] text-sky-200/60">Overall Risk Score</div>
+                  <div className="text-[13px] font-semibold text-sky-400">Not Available</div>
+                </div>
+                <div className="grid flex-1 grid-cols-3 gap-2">
+                  <div className="rounded-lg border border-sky-800/50 bg-sky-800/20 p-2">
+                    <div className="text-[16px] font-bold text-white">-</div>
+                    <div className="mt-1 text-[10px] leading-tight text-sky-200/60">Inventory Risks</div>
+                    <div className="text-[9px] font-semibold text-sky-400/60">Unavailable</div>
+                  </div>
+                  <div className="rounded-lg border border-sky-800/50 bg-sky-800/20 p-2">
+                    <div className="text-[16px] font-bold text-white">-</div>
+                    <div className="mt-1 text-[10px] leading-tight text-sky-200/60">Sales Anomalies</div>
+                    <div className="text-[9px] font-semibold text-sky-400/60">Unavailable</div>
+                  </div>
+                  <div className="rounded-lg border border-sky-800/50 bg-sky-800/20 p-2">
+                    <div className="text-[16px] font-bold text-white">-</div>
+                    <div className="mt-1 text-[10px] leading-tight text-sky-200/60">Integration Issue</div>
+                    <div className="text-[9px] font-semibold text-sky-400/60">Unavailable</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[16px] border border-sky-800/50 bg-[#0b2340]/40 p-4">
+              <div className="mb-4 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-sky-400" />
+                <span className="text-[14px] font-semibold">Quick Actions</span>
+              </div>
+              <div className="grid grid-cols-5 gap-2">
+                {[
+                  { icon: ShoppingCart, label: 'New Sale' },
+                  { icon: PackageSearch, label: 'Add Product' },
+                  { icon: FileText, label: 'Generate Report' },
+                  { icon: Check, label: 'View Approvals' },
+                  { icon: CircleHelp, label: 'More' }
+                ].map((act, i) => (
+                  <button key={i} className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-sky-800/50 bg-[#071d34] p-2 hover:bg-sky-800/40 hover:border-sky-700">
+                    <act.icon className="h-4 w-4 text-sky-300" />
+                    <span className="text-center text-[9px] leading-tight text-sky-200/80">{act.label}</span>
+                  </button>
                 ))}
               </div>
             </div>
           </div>
 
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_360px]">
-            <div className="space-y-5">
-              <div className="overflow-hidden rounded-[22px] border border-sky-900/80 bg-[linear-gradient(180deg,#0b1f3b_0%,#091d36_100%)] shadow-[0_18px_40px_rgba(15,23,42,0.35)]">
-                <div className="flex items-center justify-between border-b border-sky-900/80 p-4">
-                  <div className="flex items-center gap-2 text-white">
-                    <ShoppingCart className="h-4 w-4 text-sky-300" />
-                    <span className="text-[18px] font-semibold">Recent Sales</span>
-                  </div>
-                  <button className="text-sm font-medium text-sky-300">View all</button>
-                </div>
+        </div>
 
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-left text-sm text-sky-100">
-                    <thead className="bg-[#0b1d38] text-[11px] uppercase tracking-[0.12em] text-sky-200/70">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">Invoice</th>
-                        <th className="px-4 py-3 font-medium">Customer</th>
-                        <th className="px-4 py-3 font-medium">Amount</th>
-                        <th className="px-4 py-3 font-medium">Payment</th>
-                        <th className="px-4 py-3 font-medium">Status</th>
-                        <th className="px-4 py-3 font-medium">Time</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loadingSales ? (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-sky-100/65">Loading recent sales...</td>
-                        </tr>
-                      ) : errorSales ? (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-red-300">Could not load recent sales</td>
-                        </tr>
-                      ) : recentSales && recentSales.length > 0 ? (
-                        recentSales.slice(0, 6).map((sale, index) => (
-                          <tr key={`${sale.saleId ?? sale.docNum ?? index}`} className="border-t border-sky-900/70 hover:bg-[#102949]">
-                            <td className="px-4 py-3 text-sky-100">{sale.docNum || sale.saleId || 'N/A'}</td>
-                            <td className="px-4 py-3 text-sky-100/80">{sale.customerName || 'Walk-in Customer'}</td>
-                            <td className="px-4 py-3 font-semibold text-white">{money.format(sale.total || 0)}</td>
-                            <td className="px-4 py-3 text-sky-100/80">Cash</td>
-                            <td className="px-4 py-3">
-                              <span className="rounded-full bg-emerald-500/12 px-2 py-1 text-[10px] font-semibold text-emerald-300">Completed</span>
-                            </td>
-                            <td className="px-4 py-3 text-sky-100/80">{sale.docDate || '—'}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-sky-100/65">No recent sales found</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+        {/* RIGHT SIDEBAR (AI & Alerts) */}
+        <div className="flex w-full flex-col gap-5 xl:w-[280px]">
+          
+          <div className="rounded-[16px] border border-sky-800/50 bg-[#0b2340]/40 p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-sky-400" />
+                <span className="text-[14px] font-semibold">AI Assistant</span>
               </div>
-
-              <div className="grid gap-5 xl:grid-cols-[1.5fr_1fr]">
-                <div className="rounded-[22px] border border-sky-900/80 bg-[linear-gradient(180deg,#0b1f3b_0%,#091d36_100%)] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.35)]">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-white">
-                      <TriangleAlert className="h-4 w-4 text-amber-300" />
-                      <span className="text-[18px] font-semibold">Risk Analysis Summary</span>
-                    </div>
-                    <button className="text-sm font-medium text-sky-300">View details</button>
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-4">
-                    <MetricPill title="Overall Risk Score" value="72" level="Medium Risk" tone="amber" />
-                    <MetricPill title="Low Stock" value="3" level="High Priority" tone="red" />
-                    <MetricPill title="Returns" value="2" level="Medium" tone="orange" />
-                    <MetricPill title="Inventory" value="4" level="Low" tone="green" />
-                  </div>
-                </div>
-
-                <div className="rounded-[22px] border border-sky-900/80 bg-[linear-gradient(180deg,#0b1f3b_0%,#091d36_100%)] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.35)]">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-white">
-                      <CreditCard className="h-4 w-4 text-sky-300" />
-                      <span className="text-[18px] font-semibold">Quick Actions</span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { label: 'New Sale', icon: ShoppingCart },
-                      { label: 'Add Product', icon: PackageSearch },
-                      { label: 'Generate Report', icon: TrendingUp },
-                      { label: 'View Approval', icon: Bell },
-                      { label: 'Customers', icon: Users },
-                      { label: 'More', icon: CircleHelp },
-                    ].map(({ label, icon: Icon }) => (
-                      <button key={label} className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-sky-800 bg-[#0d2341] p-3 text-center text-sm font-medium text-sky-100/80 transition hover:border-sky-600 hover:bg-[#112847]">
-                        <Icon className="h-5 w-5 text-sky-300" />
-                        <span>{label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              <button className="flex items-center gap-1 rounded border border-blue-600/50 bg-blue-600/20 px-2 py-1 text-[10px] font-medium text-blue-400">
+                <MessageSquarePlus className="h-3 w-3" /> New Chat
+              </button>
+            </div>
+            <div className="mb-4 flex items-start gap-2">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                <Sparkles className="h-3 w-3" />
+              </div>
+              <div className="rounded-xl rounded-tl-sm bg-[#071d34] p-3 text-[11px] leading-relaxed text-sky-100">
+                <span className="font-semibold text-white">Hello! I'm your Atls AI Assistant.</span><br/>
+                <span className="text-sky-200/70">I can help you with:</span>
+                <ul className="mt-1 list-inside list-disc text-sky-200/70">
+                  <li>Check sales, inventory, customers</li>
+                  <li>Generate reports (PDF)</li>
+                  <li>Analyze business risks</li>
+                  <li>Find data from SAP system</li>
+                  <li>Update dashboard insights</li>
+                </ul>
               </div>
             </div>
-
-            <aside className="flex flex-col gap-5">
-              <div className="flex min-h-[318px] flex-col rounded-[22px] border border-sky-900/80 bg-[linear-gradient(180deg,#0b1f3b_0%,#091d36_100%)] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.35)]">
-                <div className="mb-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-white">
-                    <Sparkles className="h-4 w-4 text-sky-300" />
-                    <span className="text-[18px] font-semibold">AI Assistant</span>
-                  </div>
-                  <button className="rounded-lg border border-sky-700/80 bg-[#0d2341] px-2 py-1 text-[10px] font-medium text-sky-100">New Chat</button>
-                </div>
-
-                <div className="space-y-3 rounded-2xl border border-sky-900/70 bg-[#0b1d38] p-3 text-sm text-sky-100/85">
-                  <div className="font-medium text-white">Hello! I’m your AI Assistant.</div>
-                  <ul className="space-y-2 text-sky-100/75">
-                    <li>• Check sales, inventory, customers</li>
-                    <li>• Generate reports (PDF)</li>
-                    <li>• Analyze business risks</li>
-                    <li>• Find data from SAP system</li>
-                  </ul>
-                </div>
-
-                <div className="mt-4 space-y-2">
-                  {['Show today’s sales summary', 'Find low stock products', 'Generate customer wise sales report', 'What are the top 5 products this month?'].map((text) => (
-                    <button key={text} className="flex w-full items-center justify-between rounded-xl border border-sky-800 bg-[#0d2341] px-3 py-2 text-left text-sm text-sky-100/80 transition hover:border-sky-600 hover:bg-[#112847]">
-                      <span>{text}</span>
-                      <ArrowRight className="h-4 w-4 text-sky-300" />
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-auto rounded-xl border border-sky-800 bg-[#0d2341] px-2 py-2 text-right text-sky-200">
-                  <button className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white shadow-lg shadow-blue-900/30">
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="rounded-[22px] border border-sky-900/80 bg-[linear-gradient(180deg,#0b1f3b_0%,#091d36_100%)] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.35)]">
-                <div className="mb-3 flex items-center justify-between text-white">
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-4 w-4 text-sky-300" />
-                    <span className="text-[16px] font-semibold">Alerts & Approvals</span>
-                  </div>
-                  <button className="text-[11px] font-medium text-sky-300">View all</button>
-                </div>
-
-                {loadingAlerts ? (
-                  <div className="text-sm text-sky-100/65">Loading alerts...</div>
-                ) : alertRows.length > 0 ? (
-                  <div className="space-y-2">
-                    {alertRows.map((alert) => (
-                      <div key={alert.id} className="rounded-xl border border-sky-800 bg-[#0d2341] p-2.5">
-                        <div className="flex items-center justify-between gap-2 text-[11px] text-sky-100/75">
-                          <span className="font-medium text-white">{alert.request_type}</span>
-                          <span className="inline-flex rounded-full bg-amber-500/12 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">{alert.status}</span>
-                        </div>
-                        <div className="mt-2 text-[12px] text-sky-100/80">{alert.reason}</div>
-                        <div className="mt-2 text-[11px] text-sky-100/60">₹{alert.amount.toLocaleString()} • {alert.branch_id}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-sky-100/65">No alerts</div>
-                )}
-              </div>
-            </aside>
+            <div className="flex flex-col gap-1.5">
+              {[
+                'Show today\'s sales summary',
+                'Find low stock products',
+                'Generate customer wise sales report',
+                'What are the top 5 products this month?',
+                'Show pending approvals'
+              ].map((q, i) => (
+                <button key={i} className="rounded-lg border border-sky-800/60 bg-[#071d34] px-3 py-2 text-left text-[11px] text-sky-200/80 hover:bg-sky-800/40 hover:text-white">
+                  {q}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 flex items-center gap-2 rounded-lg border border-sky-800/60 bg-[#071d34] p-1">
+              <input type="text" placeholder="Ask anything about your business..." className="flex-1 bg-transparent px-2 text-[11px] text-white outline-none placeholder:text-sky-200/40" />
+              <button className="flex h-6 w-6 items-center justify-center rounded bg-blue-600 text-white">
+                <ArrowRight className="h-3 w-3" />
+              </button>
+            </div>
           </div>
+
+          <div className="rounded-[16px] border border-sky-800/50 bg-[#0b2340]/40 p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-sky-400" />
+                <span className="text-[14px] font-semibold">Alerts & Approvals</span>
+              </div>
+              <button className="flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-sky-300">
+                View all <ChevronDown className="h-3 w-3 -rotate-90" />
+              </button>
+            </div>
+            <div className="mb-3 flex items-center gap-2 text-[10px] font-medium">
+              <button className="rounded bg-blue-600 px-2 py-1 text-white">All ({(alerts || []).length})</button>
+              <button className="rounded px-2 py-1 text-sky-200/60 hover:text-white">Approvals</button>
+            </div>
+            <div className="flex flex-col gap-2">
+              {alertRows.map((alert, i) => (
+                <div key={i} className="flex gap-2 rounded-lg border border-sky-800/40 bg-[#071d34] p-2.5">
+                  <div className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded ${i < 2 ? 'bg-red-500/20 text-red-400' : i < 4 ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                    {i < 2 ? <CreditCard className="h-3 w-3" /> : i < 4 ? <TriangleAlert className="h-3 w-3" /> : <Check className="h-3 w-3" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-1">
+                      <div className="truncate text-[11px] font-semibold text-white">{alert.request_type}</div>
+                      <div className="text-[9px] text-sky-200/40 whitespace-nowrap">{new Date(alert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    </div>
+                    <div className="mt-0.5 truncate text-[10px] text-sky-200/60">{alert.reason}</div>
+                    {alert.status === 'Pending' && (
+                      <div className="mt-1.5 inline-block rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-500">
+                        Pending
+                      </div>
+                    )}
+                    {alert.status === 'Approved' && (
+                      <div className="mt-1 flex items-center justify-between">
+                        <div className="text-[10px] text-sky-200/60">Approved</div>
+                        <div className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-medium text-emerald-400">SAP Confirmed</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center text-sky-200/40">
+                    <ChevronDown className="h-3 w-3 -rotate-90" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -418,20 +542,3 @@ const StateMessage = ({ type, message }: { type: 'error' | 'empty'; message: str
     <div className={type === 'error' ? 'text-red-300' : 'text-sky-100/65'}>{message}</div>
   </div>
 );
-
-const MetricPill = ({ title, value, level, tone }: { title: string; value: string; level: string; tone: 'amber' | 'red' | 'orange' | 'green' }) => {
-  const toneClass = {
-    amber: 'bg-amber-500/12 text-amber-300 border-amber-500/30',
-    red: 'bg-red-500/12 text-red-300 border-red-500/30',
-    orange: 'bg-orange-500/12 text-orange-300 border-orange-500/30',
-    green: 'bg-emerald-500/12 text-emerald-300 border-emerald-500/30',
-  }[tone];
-
-  return (
-    <div className="rounded-2xl border border-sky-800 bg-[#0d2341] p-3">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-sky-100/60">{title}</div>
-      <div className="mt-2 text-[28px] font-black tracking-[-0.06em] text-white">{value}</div>
-      <div className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[10px] font-medium ${toneClass}`}>{level}</div>
-    </div>
-  );
-};

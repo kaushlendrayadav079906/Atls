@@ -17,6 +17,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authApi } from '../api/endpoints';
 import { useAuth } from '../contexts/AuthContext';
+import posBg from '../assets/pos_bg_clear.jpg';
 
 const featureItems = [
   { label: 'Manage Sales & Invoices', description: 'Fast, accurate and reliable', icon: ShoppingBag },
@@ -27,7 +28,7 @@ const featureItems = [
 ];
 
 export const Login = () => {
-  const [identifier, setIdentifier] = useState('');
+  const [identifier, setIdentifier] = useState('kaushl2@gmail.com');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -65,225 +66,232 @@ export const Login = () => {
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-[#eef3f9] text-slate-900">
-      <div className="flex h-screen w-full overflow-hidden">
-        <aside className="relative hidden h-screen w-[36%] flex-col justify-between overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(134,180,255,0.18),_transparent_35%),linear-gradient(180deg,#0b254d_0%,#0b1d3a_48%,#071a2d_100%)] px-6 py-5 lg:flex">
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.04),transparent_35%,rgba(59,130,246,0.06))]" />
-          <div className="relative z-10">
-            <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#0d438c] shadow-[0_0_30px_rgba(59,130,246,0.28)]">
-                <div className="relative h-9 w-9">
-                  <div className="absolute left-0 top-0 h-7 w-3 rounded-[10px] bg-white/90 rotate-[-42deg]" />
-                  <div className="absolute right-0 top-0 h-7 w-3 rounded-[10px] bg-white/90 rotate-[42deg]" />
-                  <div className="absolute inset-x-2 bottom-0 h-2 rounded-full bg-[#7dd3fc]" />
+    <div className="h-screen w-full overflow-hidden bg-[#edf3f8] text-slate-900 font-sans flex">
+      
+      {/* Left Sidebar */}
+      <aside 
+        className="relative hidden lg:flex flex-col justify-between h-full w-[40%] text-white px-10 py-12"
+        style={{ clipPath: 'polygon(0 0, 85% 0, 100% 100%, 0% 100%)' }}
+      >
+        <div className="absolute inset-0 z-0">
+          <img src={posBg} className="h-full w-full object-cover" alt="" />
+          <div className="absolute inset-0 bg-[#0a1e3a]/50" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#071324]/90 via-transparent to-transparent" />
+        </div>
+        
+        <div className="relative z-10 flex flex-col h-full">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0e6fe9] shadow-lg">
+                <div className="relative h-6 w-6">
+                  <div className="absolute left-0 top-0 h-4 w-2 rounded-full bg-white rotate-[-40deg]" />
+                  <div className="absolute right-0 top-0 h-4 w-2 rounded-full bg-white rotate-[40deg]" />
+                  <div className="absolute inset-x-1 bottom-0 h-1.5 rounded-full bg-sky-200" />
                 </div>
               </div>
-              <div className="text-[58px] font-black leading-none tracking-[-0.06em] text-white">Atls</div>
+              <div>
+                <div className="text-[32px] font-black leading-none tracking-tight">Atls</div>
+                <div className="text-[14px] font-medium tracking-wide text-sky-100">POS Inventory</div>
+              </div>
             </div>
-            <div className="mt-4 ml-2 text-[18px] font-medium tracking-[-0.04em] text-sky-100/90">POS Inventory</div>
-          </div>
+            
+            <div className="mt-12">
+              <div className="text-[22px] font-bold tracking-tight text-white/95 leading-snug">
+                Smart Retail Operations <br />for a Better Tomorrow
+              </div>
 
-          <div className="relative z-10 mt-12 space-y-6 pl-2 text-white">
-            <div className="text-[20px] font-semibold tracking-[-0.04em] text-white/95">Smart Retail Operations <br />for a Better Tomorrow</div>
-
-            <div className="space-y-4 pt-2">
-              {featureItems.map(({ label, description, icon: Icon }) => (
-                <div key={label} className="flex items-center gap-4 text-white/90">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/15 bg-white/10 shadow-inner shadow-sky-500/10">
-                    <Icon className="h-5 w-5 text-sky-100" />
-                  </div>
-                  <div>
-                    <div className="text-[17px] font-medium leading-tight text-white">{label}</div>
-                    <div className="text-[12px] text-sky-100/75">{description}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="relative z-10 mt-4 space-y-3 px-2">
-            <div className="text-[22px] font-medium italic text-sky-100/90">“All your store operations, <br />in one powerful platform.”</div>
-            <div className="mt-3 h-[150px] rounded-t-[22px] border border-sky-300/15 bg-[radial-gradient(circle_at_top,_rgba(147,197,253,0.25),_rgba(5,12,30,0.2)_50%,rgba(2,6,23,0.6)_100%)] shadow-[0_0_40px_rgba(14,116,144,0.22)]">
-              <div className="relative flex h-full items-end justify-center p-4">
-                <div className="absolute inset-x-0 bottom-0 h-20 bg-[radial-gradient(circle_at_center,_rgba(32,103,173,0.4),_transparent_60%)]" />
-                <div className="relative h-32 w-56 rounded-[18px] border border-sky-200/20 bg-[linear-gradient(180deg,#0b264f,#071d36)] shadow-2xl shadow-sky-950/40">
-                  <div className="flex h-full flex-col">
-                    <div className="h-10 rounded-t-[18px] border-b border-sky-200/10 bg-sky-500/10" />
-                    <div className="grid flex-1 grid-cols-3 gap-2 p-3">
-                      <div className="rounded-md bg-sky-500/20" />
-                      <div className="rounded-md bg-sky-500/20" />
-                      <div className="rounded-md bg-sky-500/20" />
-                      <div className="rounded-md bg-sky-500/20" />
-                      <div className="rounded-md bg-sky-500/20" />
-                      <div className="rounded-md bg-sky-500/20" />
+              <div className="mt-8 space-y-6">
+                {featureItems.map(({ label, description, icon: Icon }) => (
+                  <div key={label} className="flex items-center gap-4 text-white/90">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10">
+                      <Icon className="h-5 w-5 text-sky-100" />
+                    </div>
+                    <div>
+                      <div className="text-[15px] font-semibold leading-tight text-white">{label}</div>
+                      <div className="text-[12px] text-sky-100/75 mt-0.5">{description}</div>
                     </div>
                   </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
-        </aside>
 
-        <main className="flex h-screen flex-1 flex-col bg-[#edf3f8] px-4 py-2 sm:px-6 xl:px-8">
-          <header className="flex items-center justify-end gap-3 pb-1 pt-1">
-            <div className="flex items-center gap-2 rounded-full border border-slate-300/70 bg-white/60 px-3 py-2 text-sm text-slate-700 shadow-sm shadow-slate-200/60 backdrop-blur-sm">
-              <Globe className="h-4 w-4 text-slate-600" />
-              <span>English</span>
-              <svg viewBox="0 0 20 20" className="h-4 w-4 fill-current text-slate-600" aria-hidden="true"><path d="M5.25 7.5 10 12.25 14.75 7.5H5.25Z" /></svg>
+          <div className="mt-auto pb-4">
+            <div className="text-[18px] font-medium italic text-sky-100/90 leading-snug">
+              “All your store operations, <br />in one powerful platform.”
             </div>
-            <button className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300/70 bg-white/60 text-slate-700 shadow-sm shadow-slate-200/60 backdrop-blur-sm" aria-label="Light mode">
-              <Moon className="h-4 w-4" />
-            </button>
-          </header>
+          </div>
+        </div>
+      </aside>
 
-          <div className="flex flex-1 items-center justify-center">
-            <div className="w-full max-w-[900px]">
-              <div className="mx-auto w-full max-w-[560px] rounded-[26px] border border-slate-200/70 bg-[#f7f9fb] p-4 shadow-[0_25px_70px_rgba(148,163,184,0.15)] sm:p-5">
-                <div className="flex items-center justify-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#edf3ff] shadow-sm">
-                    <div className="relative h-8 w-8">
-                      <div className="absolute left-0 top-0 h-6 w-2.5 rounded-[8px] bg-[#0e6fe9] rotate-[-42deg]" />
-                      <div className="absolute right-0 top-0 h-6 w-2.5 rounded-[8px] bg-[#0e6fe9] rotate-[42deg]" />
-                    </div>
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col h-full relative z-10 -ml-[5%] lg:ml-0">
+        
+        {/* Header Options */}
+        <header className="absolute top-4 right-6 flex items-center gap-3">
+          <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm text-slate-600 shadow-sm">
+            <Globe className="h-4 w-4" />
+            <span className="font-medium">English</span>
+            <svg viewBox="0 0 20 20" className="h-4 w-4 fill-current" aria-hidden="true"><path d="M5.25 7.5 10 12.25 14.75 7.5H5.25Z" /></svg>
+          </div>
+          <button className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm">
+            <Moon className="h-4 w-4" />
+          </button>
+        </header>
+
+        <div className="flex-1 flex items-center justify-center px-4 lg:px-0">
+          <div className="flex flex-col xl:flex-row items-center justify-center gap-6 w-full max-w-[900px]">
+            
+            {/* Login Card */}
+            <div className="w-full max-w-[440px] rounded-3xl bg-white p-8 shadow-[0_10px_40px_rgba(0,0,0,0.06)]">
+              <div className="flex flex-col items-center text-center">
+                <div className="flex items-center gap-3">
+                  <div className="text-[#0e6fe9]">
+                    {/* SVG Logo */}
+                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M20 0C8.954 0 0 8.954 0 20C0 31.046 8.954 40 20 40C31.046 40 40 31.046 40 20C40 8.954 31.046 0 20 0Z" fill="#EDF3FF"/>
+                      <path d="M15.5 11L11 20L15.5 29H18L13.5 20L18 11H15.5Z" fill="#0E6FE9"/>
+                      <path d="M24.5 11L29 20L24.5 29H22L26.5 20L22 11H24.5Z" fill="#0E6FE9"/>
+                    </svg>
                   </div>
-                  <div className="flex items-end gap-2 text-[#0c1f3d]">
-                    <span className="text-[48px] font-black tracking-[-0.08em]">Atls</span>
+                  <div className="flex flex-col items-start">
+                    <span className="text-[24px] font-black tracking-tight text-[#0c1f3d] leading-none">Atls</span>
+                    <span className="text-[11px] font-bold text-[#0c1f3d]">POS Inventory</span>
                   </div>
                 </div>
-                <div className="mt-3 text-center text-[22px] font-medium tracking-[-0.06em] text-[#0c1f3d]">POS Inventory</div>
 
-                <h1 className="mt-3 text-center text-[30px] font-black leading-none tracking-[-0.06em] text-[#0b1f46]">Welcome Back</h1>
-                <p className="mt-1.5 text-center text-[13px] text-slate-500">Sign in to access your POS inventory dashboard and manage your retail operations.</p>
+                <h1 className="mt-6 text-[28px] font-black tracking-tight text-[#0b1f46]">Welcome Back</h1>
+                <p className="mt-2 text-[14px] text-slate-500 max-w-[300px]">
+                  Sign in to access your POS Inventory dashboard and manage your retail operations.
+                </p>
+              </div>
 
-                {error && (
-                  <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
-                    <span>{error}</span>
+              {error && (
+                <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+                <div>
+                  <label className="mb-1.5 block text-[13px] font-bold text-[#0b1f46]">Email or Username</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      type="text"
+                      placeholder="Enter your email or username"
+                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-[#0e6fe9] focus:ring-1 focus:ring-[#0e6fe9]"
+                      disabled={loading}
+                    />
                   </div>
-                )}
+                </div>
 
-                <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-                  <div>
-                    <label className="mb-1.5 block text-[14px] font-medium text-slate-700">Email or Username</label>
-                    <div className="relative">
-                      <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        value={identifier}
-                        onChange={(event) => setIdentifier(event.target.value)}
-                        type="text"
-                        autoComplete="username"
-                        placeholder="Enter your email or username"
-                        className="auth-input"
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-1.5 block text-[14px] font-medium text-slate-700">Password</label>
-                    <div className="relative">
-                      <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        type={showPassword ? 'text' : 'password'}
-                        autoComplete="current-password"
-                        placeholder="••••••••"
-                        className="auth-input auth-input--password"
-                        disabled={loading}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((value) => !value)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                        aria-label="Toggle password visibility"
-                      >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-3 text-[13px] text-slate-600">
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" defaultChecked />
-                      <span>Remember me</span>
-                    </label>
-                    <Link to="/register" className="font-medium text-slate-600 hover:text-blue-600">Forgot password?</Link>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="mt-1 flex w-full items-center justify-center gap-3 rounded-xl bg-[#0c6ce8] px-4 py-2.5 text-[16px] font-semibold text-white shadow-[0_12px_24px_rgba(12,108,232,0.35)] transition hover:bg-[#0b5fd0] disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    <ArrowRight className="h-5 w-5" />
-                    <span>{loading ? 'Signing in...' : 'Sign in'}</span>
-                  </button>
-                </form>
-
-                <div className="mt-4 text-center text-[12px] uppercase tracking-[0.18em] text-slate-400">Or continue with</div>
-
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  {['Google', 'Microsoft', 'SSO'].map((label) => (
+                <div>
+                  <label className="mb-1.5 block text-[13px] font-bold text-[#0b1f46]">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-11 text-sm outline-none transition focus:border-[#0e6fe9] focus:ring-1 focus:ring-[#0e6fe9] font-medium tracking-widest placeholder:tracking-normal"
+                      disabled={loading}
+                    />
                     <button
-                      key={label}
                       type="button"
-                      className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-2 py-2.5 text-[14px] font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                     >
-                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">{label.charAt(0)}</span>
-                      {label}
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
-                  ))}
+                  </div>
                 </div>
 
-                <div className="mt-5 text-center text-[15px] text-slate-600">
-                  Don’t have an account?{' '}
-                  <Link to="/register" className="font-semibold text-blue-600 hover:text-blue-700">Create account</Link>
+                <div className="flex items-center justify-between text-[13px] font-semibold text-[#0b1f46]">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-[#0e6fe9] focus:ring-[#0e6fe9]" defaultChecked />
+                    <span>Remember me</span>
+                  </label>
+                  <Link to="/register" className="text-[#0e6fe9] hover:underline">Forgot password?</Link>
                 </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0c6ce8] py-3.5 text-[15px] font-bold text-white transition hover:bg-[#0b5fd0] disabled:opacity-70"
+                >
+                  <span>{loading ? 'Signing in...' : 'Sign in'}</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </form>
+
+              <div className="mt-6 flex items-center justify-center gap-4">
+                <div className="h-px flex-1 bg-slate-200" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Or continue with</span>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
+
+              <div className="mt-6 grid grid-cols-3 gap-3">
+                {['Google', 'Microsoft', 'SSO'].map((label) => (
+                  <button
+                    key={label}
+                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-[13px] font-bold text-slate-600 transition hover:bg-slate-50"
+                  >
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[10px] font-black text-[#0b1f46]">
+                      {label.charAt(0)}
+                    </span>
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-8 text-center text-[13px] font-medium text-slate-500">
+                Don’t have an account?{' '}
+                <Link to="/register" className="font-bold text-[#0e6fe9] hover:underline">Create account</Link>
               </div>
             </div>
-          </div>
-        </main>
 
-        <aside className="hidden h-screen w-[28%] items-center justify-center bg-[#edf3f8] p-4 xl:flex">
-          <div className="w-full max-w-[360px] rounded-[24px] border border-sky-200 bg-[#dfeefc] p-5 shadow-[0_16px_40px_rgba(148,163,184,0.18)]">
-            <h2 className="text-[28px] font-black tracking-[-0.06em] text-[#0b1f46]">New to Atls?</h2>
-            <p className="mt-2 text-[16px] leading-6 text-slate-600">Create your account to get started.</p>
+            {/* Registration Promo Card (Right) */}
+            <div className="hidden xl:block w-[320px] rounded-3xl bg-white p-8 shadow-[0_10px_40px_rgba(0,0,0,0.06)] border border-slate-100">
+              <h2 className="text-[22px] font-black tracking-tight text-[#0b1f46]">New to Atls?</h2>
+              <p className="mt-2 text-[13px] font-medium text-slate-500">Create your account to get started.</p>
 
-            <div className="mt-5 space-y-4">
-              {[
-                { title: 'Set up your store details', subtitle: 'Get your account ready', icon: User },
-                { title: 'Start managing sales', subtitle: 'Track invoices and payments', icon: ShoppingBag },
-                { title: 'Monitor inventory', subtitle: 'Keep stock in sync', icon: Check },
-                { title: 'Access insights', subtitle: 'Make data driven decisions', icon: Sparkles },
-              ].map(({ title, subtitle, icon: Icon }) => (
-                <div key={title} className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[#dcecff] text-[#0a5ed5] shadow-inner shadow-blue-200">
-                    <Icon className="h-6 w-6" />
+              <div className="mt-8 space-y-6">
+                {[
+                  { title: 'Set up your store details', subtitle: 'Get your account ready', icon: User },
+                  { title: 'Start managing sales', subtitle: 'Track invoices and payments', icon: ShoppingBag },
+                  { title: 'Monitor inventory', subtitle: 'Keep stock in sync', icon: Check },
+                  { title: 'Access insights', subtitle: 'Make data driven decisions', icon: Sparkles },
+                ].map(({ title, subtitle, icon: Icon }) => (
+                  <div key={title} className="flex items-start gap-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#edf3ff] text-[#0e6fe9]">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="pt-0.5">
+                      <div className="text-[14px] font-bold text-[#0b1f46]">{title}</div>
+                      <div className="mt-0.5 text-[12px] font-medium text-slate-500">{subtitle}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-[20px] font-semibold text-[#0b1f46]">{title}</div>
-                    <div className="text-[15px] text-slate-600">{subtitle}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            <div className="mt-8 rounded-[18px] border border-sky-300 bg-[#dfeefc] p-3">
               <Link
                 to="/register"
-                className="flex w-full items-center justify-between rounded-xl border border-sky-300 bg-white/20 px-4 py-4 text-[20px] font-semibold text-[#0c1f3d] transition hover:bg-white/50"
+                className="mt-10 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[#edf3ff] bg-white py-3 text-[14px] font-bold text-[#0e6fe9] transition hover:bg-[#edf3ff]"
               >
-                <span className="flex items-center gap-3">
-                  <User className="h-5 w-5" />
-                  Create Account
-                </span>
-                <ArrowRight className="h-5 w-5" />
+                <User className="h-4 w-4" />
+                <span>Create Account</span>
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
+
           </div>
-        </aside>
-      </div>
+        </div>
+      </main>
     </div>
   );
 };

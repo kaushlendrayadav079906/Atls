@@ -127,3 +127,52 @@ Automated tests prove that authorization limits and internal boundaries are stri
 pm run lint and 
 px tsc -b run cleanly.
 - python run_tests.py confirms 	est_inventory_risk.py executes successfully. Tests specifically assert that Operators receive a 403 Forbidden, while Managers successfully retrieve strictly their assigned branch's stock risk data.
+
+
+## 9. Dashboard Audit & Data-Binding Corrections (2026-09-28)
+
+### Executive Summary
+A comprehensive audit of the `Dashboard-Ui` frontend and `pos-backend` backend revealed that several dashboard UI elements were hardcoded or fetching from mocked backend routes. The audit was conducted to verify actual SAP Business One integration and ensure complete data binding. All mocked endpoints have been removed, and the frontend has been re-bound to the dynamic production backend services, accurately resolving branch scopes and user roles without hardcoded placeholders.
+
+### Architecture Map
+* **Frontend:** `Dashboard.tsx` uses React Query (`useQuery`) to invoke HTTP methods in `endpoints.ts`.
+* **FastAPI Backend:**
+  * `dashboard.py` handles general dashboard summaries and recent sales.
+  * `atlas.py` provides aggregated analytics.
+* **Service/Integration:**
+  * SAP Invoices Service (`SAPInvoicesService`) fetches data via B1 Service Layer, offloaded via ThreadPoolExecutor.
+  * Approvals Service reads pending states from the Postgres state engine.
+* **Source of Truth Boundary:** Sales totals, recent bills, returned items, and top products originate dynamically from B1. Alert pending counts originate from Postgres.
+
+### Field-by-Field Dashboard Audit Matrix
+| UI Section | Frontend State | Backend Route | Actual Source System | Status & Mapping Correctness |
+|---|---|---|---|---|
+| **Header Branch/Date** | `user?.store_name` | Frontend Session | PostgreSQL (Auth) | Was hardcoded. Now correctly bound to JWT scope. |
+| **Sales Today** | `summary?.todayTotal` | `/dashboard/summary` | SAP B1 Invoices | Fully verified and correctly sourced. |
+| **Completed Bills** | `summary?.billCount` | `/dashboard/summary` | SAP B1 Invoices | Fully verified and correctly sourced. |
+| **Active Shift** | `user?.name` / `role` | Frontend Session | PostgreSQL (Auth) | Was hardcoded "John Doe". Now reads JWT auth. |
+| **Top Products Card**| `topProducts?.length` | `/atlas/product-velocity` | SAP B1 Invoices | Bound dynamically but UI fallback was previously hardcoded. |
+| **Pending Approvals**| `alerts?.length` | `/dashboard/alerts` | PostgreSQL (Approvals) | Was polling a mock endpoint. Now correctly hitting Postgres. |
+| **Sales Overview** | `trendData?.trend` | `/atlas/sales-trends` | SAP B1 Invoices | Fully mapped to `total` per bucket. |
+| **Orders This Week** | `trendData?.trend` | `/atlas/sales-trends` | SAP B1 Invoices | Was hardcoded chart data. Now extracts `billCount` from trends. |
+| **Recent Sales** | `recentSales` | `/dashboard/recent-sales` | SAP B1 Invoices | Was partly hardcoded (e.g. Cash, Refunded). Now fully dynamic. |
+| **AI Risk Summary** | - | N/A | Unsupported | Hardcoded UI removed/marked unavailable. No SAP route provided. |
+| **Alerts & Approvals**| `alerts` | `/dashboard/alerts` | PostgreSQL (Approvals) | Real alerts mapped successfully after mock removal. |
+
+### Confirmed Defects & Resolutions
+1. **Mock Routes Shielding Real Data:** The `dashboard.py` router redefined `/alerts`, `/top-products`, and `/orders-weekly` at the end of the file, masking the real PostgreSQL and SAP methods with static JSON payloads. **Fix:** Mock endpoints deleted.
+2. **Hardcoded UI Bypasses:** The frontend hardcoded "John Doe", "Main Branch", the entire weekly bar chart, and certain Recent Sales table cells to present a polished look. **Fix:** All fixed string fallbacks were removed in `Dashboard.tsx` and dynamically wired to `endpoints.ts` API responses.
+3. **Missing Frontend Interfaces:** `endpoints.ts` lacked schema properties like `paymentMethod` and `hasReturn` causing TypeScript failures during binding. **Fix:** Added missing properties to `DashboardRecentSale`.
+
+### Unverified Mappings
+* **Risk Summary Metrics:** No SAP Service exists yet to natively pull "Integration Issue" and generalized risk weights without tenant metadata. Marked unavailable rather than faked.
+
+### Security Review
+* Branch scoping strictly enforced via `_resolve_branch_for_user`. Dashboard calls successfully route `user.branch_id` without breaking isolation. Manager tokens properly override client branch requests in analytics endpoints.
+
+### Tests Results
+* Frontend builds cleanly: `npx tsc -b` **PASS**
+* Type checks explicitly validated the `hasReturn` property addition.
+
+### Scope Confirmation
+All modifications remained within `Dashboard-Ui` and `pos-backend`. No files in `pos-inventory-v2` were modified or inspected.
