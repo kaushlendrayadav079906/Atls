@@ -593,11 +593,13 @@ async def export_reports(
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
     format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    report_type: str = Query("sales", pattern="^(sales|invoice|payment)$"),
 ):
     """
-    Download sales data as a CSV or XLSX file for the selected date range.
+    Download sales-related data as a CSV or XLSX file for the selected date range.
     Supports custom from_date/to_date in addition to preset ranges.
-    Rows contain: DocNum, Date, Customer Name, Mobile, Payment Method, Subtotal, Discount, GST, Total.
+    The report_type value can be used to present the same child-page layout for sales,
+    invoice, and payment exports without altering the underlying invoice data contract.
     """
     start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
 
@@ -617,6 +619,7 @@ async def export_reports(
         raise HTTPException(status_code=502, detail="Could not fetch data from SAP")
 
     range_label = f"{from_date}_to_{to_date}" if from_date and to_date else range
+    sheet_title = {"sales": "Sales Report", "invoice": "Invoice Report", "payment": "Payment Report"}[report_type]
     headers = [
         "DocNum", "Date", "Customer Name", "Mobile", "Sales Employee", "Payment Method",
         "Subtotal", "Discount", "GST", "Total",
@@ -645,7 +648,7 @@ async def export_reports(
     if format == "xlsx":
         workbook = Workbook()
         sheet = workbook.active
-        sheet.title = "Sales Report"
+        sheet.title = sheet_title
         sheet.append(headers)
         for row in rows:
             sheet.append(row)
@@ -653,7 +656,7 @@ async def export_reports(
         output = io.BytesIO()
         workbook.save(output)
         output.seek(0)
-        filename = f"sales_report_{range_label}_{date.today().isoformat()}.xlsx"
+        filename = f"{report_type}_report_{range_label}_{date.today().isoformat()}.xlsx"
         return StreamingResponse(
             iter([output.getvalue()]),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -667,7 +670,7 @@ async def export_reports(
         writer.writerow(row)
 
     output.seek(0)
-    filename = f"sales_report_{range_label}_{date.today().isoformat()}.csv"
+    filename = f"{report_type}_report_{range_label}_{date.today().isoformat()}.csv"
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",

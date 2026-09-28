@@ -1,27 +1,27 @@
 import axios, { AxiosError } from 'axios';
 import type {
-  Product,
-  CartItem,
-  DashboardSummary,
-  CheckoutData,
-  GstValuesResponse,
-  DashboardRecentSale,
-  DashboardRecentSalesPage,
-  Branch,
-  AdminUser,
-  AdminDashboardData,
-  OperatorDashboardData,
-  DateRange,
-  ReportPreviewData,
-  ReportPreviewRow,
-  ReturnCreate,
-  ExchangeCreate,
-  ReturnResponse,
-  ExchangeResponse,
-  ReturnDetail,
-  InvoiceLookupResult,
-  CustomerSearchResult,
-  CustomerInsightsData,
+    AdminDashboardData,
+    AdminUser,
+    Branch,
+    CartItem,
+    CheckoutData,
+    CustomerInsightsData,
+    CustomerSearchResult,
+    DashboardRecentSale,
+    DashboardRecentSalesPage,
+    DashboardSummary,
+    DateRange,
+    ExchangeCreate,
+    ExchangeResponse,
+    GstValuesResponse,
+    InvoiceLookupResult,
+    OperatorDashboardData,
+    Product,
+    ReportPreviewData,
+    ReportPreviewRow,
+    ReturnCreate,
+    ReturnDetail,
+    ReturnResponse,
 } from '../types';
 import { deleteCookie } from '../utils/cookies';
 import { getValidToken } from '../utils/jwt';
@@ -367,8 +367,9 @@ export const getReportPreview = async (
   branch?: string,
   fromDate?: string,
   toDate?: string,
+  reportType: 'sales' | 'invoice' | 'payment' = 'sales',
 ): Promise<ReportPreviewData> => {
-  const params: Record<string, string> = { range, format: 'csv' };
+  const params: Record<string, string> = { range, format: 'csv', report_type: reportType };
   if (branch) params.branch = branch;
   if (fromDate) params.from_date = fromDate;
   if (toDate) params.to_date = toDate;
@@ -388,8 +389,9 @@ export const exportReport = async (
   branch?: string,
   fromDate?: string,
   toDate?: string,
+  reportType: 'sales' | 'invoice' | 'payment' = 'sales',
 ): Promise<void> => {
-  const params: Record<string, string> = { range, format };
+  const params: Record<string, string> = { range, format, report_type: reportType };
   if (branch) params.branch = branch;
   if (fromDate) params.from_date = fromDate;
   if (toDate) params.to_date = toDate;
@@ -419,8 +421,9 @@ export const getOperatorReportPreview = async (
   range: DateRange = 'monthly',
   fromDate?: string,
   toDate?: string,
+  reportType: 'sales' | 'invoice' | 'payment' = 'sales',
 ): Promise<ReportPreviewData> => {
-  const params: Record<string, string> = { range, format: 'csv' };
+  const params: Record<string, string> = { range, format: 'csv', report_type: reportType };
   if (fromDate) params.from_date = fromDate;
   if (toDate) params.to_date = toDate;
 
@@ -437,8 +440,9 @@ export const exportOperatorReport = async (
   range: DateRange = 'monthly',
   fromDate?: string,
   toDate?: string,
+  reportType: 'sales' | 'invoice' | 'payment' = 'sales',
 ): Promise<void> => {
-  const params: Record<string, string> = { range, format: 'xlsx' };
+  const params: Record<string, string> = { range, format: 'xlsx', report_type: reportType };
   if (fromDate) params.from_date = fromDate;
   if (toDate) params.to_date = toDate;
 

@@ -240,6 +240,102 @@ def test_operator_dashboard_contains_expected_fields(client):
         assert key in data
 
 
+def test_admin_report_export_accepts_invoice_report_type(client):
+    """The admin report endpoint should accept the same child-page report types used by the UI."""
+    invoices_service = MagicMock()
+    invoices_service.get_invoices_by_date.return_value = [
+        {
+            "DocEntry": 1001,
+            "DocNum": 5001,
+            "DocDate": "2026-04-27",
+            "DocTotal": 350.0,
+            "DiscSum": 0.0,
+            "VatSum": 30.0,
+            "TotalDiscount": 0.0,
+            "U_C_Name": "Jane Smith",
+            "U_W_Number": "+91 98765 43210",
+            "U_S_Employee": "Emp-01",
+            "U_P_Method": "card",
+            "DocumentLines": [],
+        }
+    ]
+
+    app.dependency_overrides[get_current_user] = lambda: {"sub": "admin-1", "role": "admin", "user_id": "admin-1", "branch_id": "WH-001"}
+    try:
+        with patch("app.api.v1.admin.SAPInvoicesService", return_value=invoices_service):
+            response = client.get(
+                "/api/v1/admin/reports/export",
+                params={"range": "daily", "report_type": "invoice", "format": "csv"},
+            )
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+    assert response.status_code == 200
+    assert response.headers["content-disposition"].endswith('.csv"')
+    assert "DocNum" in response.text
+    assert "Jane Smith" in response.text
+
+
+def test_dashboard_customer_search_falls_back_to_invoice_udf_data(client):
+    """Customer search should fall back to invoice UDF data when SAP BP lookup fails."""
+    recent_invoices = [
+        {
+            "DocEntry": 1001,
+            "DocNum": 5001,
+            "DocDate": "2026-04-27",
+            "DocTotal": 1200.0,
+            "U_C_Name": "Jane Smith",
+            "U_W_Number": "+91 98765 43210",
+            "U_Email": "jane@example.com",
+            "U_S_Employee": "Emp-01",
+            "U_Address": "Bengaluru",
+            "U_P_Method": "card",
+            "DocumentLines": [],
+        },
+        {
+            "DocEntry": 1002,
+            "DocNum": 5002,
+            "DocDate": "2026-04-28",
+            "DocTotal": 800.0,
+            "U_C_Name": "Jane Smith",
+            "U_W_Number": "+91 98765 43210",
+            "U_Email": "jane@example.com",
+            "U_S_Employee": "Emp-01",
+            "U_Address": "Bengaluru",
+            "U_P_Method": "upi",
+            "DocumentLines": [],
+        },
+        {
+            "DocEntry": 1003,
+            "DocNum": 5003,
+            "DocDate": "2026-04-29",
+            "DocTotal": 640.0,
+            "U_C_Name": "Amit Verma",
+            "U_W_Number": "+91 91234 56789",
+            "U_Email": "amit@example.com",
+            "U_S_Employee": "Emp-02",
+            "U_Address": "Hyderabad",
+            "U_P_Method": "cash",
+            "DocumentLines": [],
+        },
+    ]
+
+    with (
+        patch("app.api.v1.dashboard.SAPBusinessPartnersService.search_customers", side_effect=Exception("SAP login error")),
+        patch("app.api.v1.dashboard.SAPInvoicesService.get_recent_invoices_with_lines", return_value=recent_invoices),
+        patch("app.api.v1.dashboard.cache_get", new=AsyncMock(return_value=None)),
+        patch("app.api.v1.dashboard.cache_set", new=AsyncMock()),
+    ):
+        response = client.get("/api/v1/dashboard/customers?search=Jane")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) >= 1
+    assert any(item["cardName"] == "Jane Smith" for item in data)
+    assert any(item["phone"] == "+91 98765 43210" for item in data)
+    assert any(item["salesEmployee"] == "Emp-01" for item in data)
+
+
 def test_recent_sales_formats_document_date(client):
     invoices_service = MagicMock()
     invoices_service.get_recent_invoices_with_lines.return_value = [{

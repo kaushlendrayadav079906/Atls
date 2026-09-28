@@ -1,26 +1,33 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
-  AlertCircle,
-  ArrowRight,
-  BarChart3,
-  CalendarDays,
-  ChevronDown,
-  Download,
-  FileText,
-  FileUp,
-  PackageSearch,
-  RefreshCw,
-  ShieldAlert,
-  ShoppingCart,
-  TrendingUp,
-  Warehouse,
+    AlertCircle,
+    ArrowRight,
+    BarChart3,
+    CalendarDays,
+    ChevronDown,
+    Download,
+    FileText,
+    FileUp,
+    PackageSearch,
+    RefreshCw,
+    ShieldAlert,
+    ShoppingCart,
+    TrendingUp,
+    Warehouse,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { apiClient } from '../api/client';
-import { useAuth } from '../contexts/AuthContext';
+import { useAppSelector } from '../app/hooks';
+import {
+    exportOperatorReport,
+    exportReport,
+    getAdminBranches,
+    getOperatorReportPreview,
+    getReportPreview,
+} from '../services/api';
+import type { DateRange, ReportPreviewData } from '../types';
 
 type ReportType = 'sales' | 'invoice' | 'payment' | 'inventory' | 'low-stock' | 'returns';
-type RangeKey = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all_time';
+type RangeKey = DateRange;
 type OutputFormat = 'csv' | 'xlsx';
 
 type RecentReport = {
@@ -50,14 +57,14 @@ const REPORTS: Array<{
 ];
 
 const RANGE_OPTIONS: Array<{ value: RangeKey; label: string }> = [
-  { value: 'monthly', label: 'Nov 1, 2024 - Nov 30, 2024' },
+  { value: 'monthly', label: 'This month' },
   { value: 'daily', label: 'Today' },
   { value: 'weekly', label: 'This week' },
   { value: 'yearly', label: 'This year' },
   { value: 'all_time', label: 'All time' },
 ];
 
-const STORAGE_KEY = 'atlas_recent_reports_v1';
+const STORAGE_KEY = 'pos_recent_reports_v1';
 
 const formatDate = (value: Date) =>
   new Intl.DateTimeFormat('en-US', {
@@ -77,9 +84,9 @@ const readRecentReports = (): RecentReport[] => {
           id: 'seed-1',
           name: 'Sales Summary Report',
           type: 'Sales',
-          period: 'Nov 1, 2024 - Nov 30, 2024',
-          createdAt: 'Nov 30, 2024 10:24 AM',
-          requestedBy: 'Admin User',
+          period: 'This month',
+          createdAt: formatDate(new Date()),
+          requestedBy: 'System',
           format: 'xlsx',
           status: 'Completed',
         },
@@ -87,10 +94,10 @@ const readRecentReports = (): RecentReport[] => {
           id: 'seed-2',
           name: 'Invoice Detail Report',
           type: 'Invoice',
-          period: 'Nov 1, 2024 - Nov 30, 2024',
-          createdAt: 'Nov 29, 2024 04:18 PM',
-          requestedBy: 'Admin User',
-          format: 'pdf',
+          period: 'This month',
+          createdAt: formatDate(new Date(Date.now() - 86400000)),
+          requestedBy: 'System',
+          format: 'csv',
           status: 'Completed',
         },
       ] as RecentReport[];
@@ -105,27 +112,26 @@ const writeRecentReports = (items: RecentReport[]) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, 6)));
 };
 
-export const ReportsPage = () => {
-  const { user } = useAuth();
+const ReportsPage = () => {
+  const user = useAppSelector((state) => state.auth.user);
+  const isAdmin = user?.role?.toLowerCase() === 'admin';
+
   const [selectedReport, setSelectedReport] = useState<ReportType>('sales');
   const [range, setRange] = useState<RangeKey>('monthly');
   const [branch, setBranch] = useState(user?.branch_id || 'WH-001');
-  const [outputFormat, setOutputFormat] = useState<'csv' | 'xlsx'>('csv');
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>('csv');
   const [groupBy, setGroupBy] = useState('Date (Daily)');
   const [salesType, setSalesType] = useState('All Sales');
   const [paymentMethod, setPaymentMethod] = useState('All Payment Methods');
   const [showValidation, setShowValidation] = useState<string | null>(null);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [recentReports, setRecentReports] = useState<RecentReport[]>(readRecentReports);
-  const [fromDate, setFromDate] = useState('2024-11-01');
-  const [toDate, setToDate] = useState('2024-11-30');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
-  const isAdmin = user?.role?.toLowerCase() === 'admin';
   const selectedMeta = REPORTS.find((item) => item.id === selectedReport) ?? REPORTS[0];
   const dateRangeLabel = RANGE_OPTIONS.find((item) => item.value === range)?.label ?? 'Custom';
-
-  const isSelectedReportSupported = ['sales', 'invoice', 'payment'].includes(selectedReport);
-
+  const isSalesReportSupported = ['sales', 'invoice', 'payment'].includes(selectedReport);
   const hasReverseDateRange = !!fromDate && !!toDate && new Date(fromDate) > new Date(toDate);
 
   const reportTypeOptions = useMemo(
@@ -137,12 +143,19 @@ export const ReportsPage = () => {
       { value: 'low-stock', label: 'Low Stock Report' },
       { value: 'returns', label: 'Returns Report' },
     ],
-    []
+    [],
   );
 
-  const exportReport = useMutation({
+  const { data: branches = [] } = useQuery({
+    queryKey: ['admin-branches'],
+    queryFn: getAdminBranches,
+    staleTime: 5 * 60_000,
+    enabled: isAdmin,
+  });
+
+  const exportReportMutation = useMutation({
     mutationFn: async () => {
-      if (!isSelectedReportSupported) {
+      if (!isSalesReportSupported) {
         throw new Error('This report type is not supported by the current backend contract.');
       }
 
@@ -150,69 +163,37 @@ export const ReportsPage = () => {
         throw new Error('The end date must be later than or equal to the start date.');
       }
 
-      const endpoint = isAdmin ? '/admin/reports/export' : '/dashboard/reports/export';
-      const params: Record<string, string | undefined> = {
-        range,
-        report_type: selectedReport,
-        from_date: fromDate || undefined,
-        to_date: toDate || undefined,
-        format: outputFormat,
-      };
+      const normalizedRange = range || 'monthly';
+      const reportName = selectedReport === 'invoice' ? 'invoice' : selectedReport === 'payment' ? 'payment' : 'sales';
 
       if (isAdmin) {
-        params.branch = branch || undefined;
+        await exportReport(normalizedRange, outputFormat, branch || undefined, fromDate || undefined, toDate || undefined, selectedReport);
+        return { filename: `${reportName}_report_${normalizedRange}_${new Date().toISOString().slice(0, 10)}.${outputFormat}` };
       }
 
-      const response = await apiClient.get(endpoint, {
-        params,
-        responseType: 'blob',
-      });
-
-      const contentDisposition = response.headers['content-disposition'] || '';
-      const filenameFromHeader = contentDisposition
-        .split('filename=')[1]
-        ?.replace(/"/g, '')
-        .replace(/;.*$/, '') || `report_${Date.now()}.${outputFormat}`;
-
-      const contentTypeHeader = Array.isArray(response.headers['content-type'])
-        ? response.headers['content-type'][0]
-        : response.headers['content-type'];
-      const normalizedContentType = typeof contentTypeHeader === 'string' && contentTypeHeader.length > 0
-        ? contentTypeHeader
-        : 'application/octet-stream';
-
-      const blob = new Blob([response.data], {
-        type: normalizedContentType,
-      });
-
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filenameFromHeader;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-
-      return {
-        filename: filenameFromHeader,
-      };
+      await exportOperatorReport(normalizedRange, fromDate || undefined, toDate || undefined, selectedReport);
+      return { filename: `${reportName}_report_${normalizedRange}_${new Date().toISOString().slice(0, 10)}.xlsx` };
     },
     onSuccess: () => {
       setExportNotice(null);
+      const reportLabel = selectedReport === 'invoice' ? 'Invoice Summary Report' : selectedReport === 'payment' ? 'Payment Summary Report' : 'Sales Summary Report';
+      const reportTypeLabel = selectedReport === 'invoice' ? 'Invoice' : selectedReport === 'payment' ? 'Payment' : 'Sales';
       const newEntry: RecentReport = {
         id: `report-${Date.now()}`,
-        name: 'Sales Summary Report',
-        type: 'Sales',
-        period: `${fromDate || 'N/A'} - ${toDate || 'N/A'}`,
+        name: reportLabel,
+        type: reportTypeLabel,
+        period: fromDate && toDate ? `${fromDate} - ${toDate}` : dateRangeLabel,
         createdAt: formatDate(new Date()),
-        requestedBy: user?.name || 'Admin User',
+        requestedBy: user?.name || 'System',
         format: outputFormat,
         status: 'Completed',
       };
-      const next = [newEntry, ...recentReports.filter((item) => item.id !== newEntry.id)].slice(0, 6);
-      setRecentReports(next);
-      writeRecentReports(next);
+
+      setRecentReports((previous) => {
+        const next = [newEntry, ...previous.filter((item) => item.id !== newEntry.id)].slice(0, 6);
+        writeRecentReports(next);
+        return next;
+      });
       setShowValidation(null);
       setExportNotice(`Report exported successfully as ${outputFormat.toUpperCase()}.`);
     },
@@ -223,9 +204,35 @@ export const ReportsPage = () => {
     },
   });
 
+  const previewMutation = useMutation({
+    mutationFn: async () => {
+      if (!isSalesReportSupported) {
+        throw new Error('This report type is not available through the current backend contract.');
+      }
+
+      if (hasReverseDateRange) {
+        throw new Error('The end date must be later than or equal to the start date.');
+      }
+
+      if (isAdmin) {
+        return getReportPreview(range, branch || undefined, fromDate || undefined, toDate || undefined, selectedReport);
+      }
+
+      return getOperatorReportPreview(range, fromDate || undefined, toDate || undefined, selectedReport);
+    },
+    onSuccess: () => {
+      setShowValidation(null);
+      setExportNotice(null);
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'The report preview could not be generated.';
+      setShowValidation(message);
+    },
+  });
+
   const handleGenerate = () => {
     setShowValidation(null);
-    if (!isSelectedReportSupported) {
+    if (!isSalesReportSupported) {
       setShowValidation('This report type is not available through the current backend contract.');
       return;
     }
@@ -233,8 +240,23 @@ export const ReportsPage = () => {
       setShowValidation('The end date must be the same as or later than the start date.');
       return;
     }
-    exportReport.mutate();
+    exportReportMutation.mutate();
   };
+
+  const handlePreview = () => {
+    setShowValidation(null);
+    if (!isSalesReportSupported) {
+      setShowValidation('This report type is not available through the current backend contract.');
+      return;
+    }
+    if (hasReverseDateRange) {
+      setShowValidation('The end date must be the same as or later than the start date.');
+      return;
+    }
+    previewMutation.mutate();
+  };
+
+  const previewData = previewMutation.data as ReportPreviewData | undefined;
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-6 text-slate-100">
@@ -277,11 +299,21 @@ export const ReportsPage = () => {
               value={branch}
               onChange={(event) => setBranch(event.target.value)}
               disabled={!isAdmin}
-              className="w-full bg-transparent text-sm text-slate-100 outline-none disabled:cursor-not-allowed"
+              className="w-full bg-transparent text-sm text-slate-100 outline-none disabled:cursor-not-allowed disabled:text-slate-400"
             >
-              <option value="WH-001" className="bg-[#071d34]">Main Branch (WH-001)</option>
-              <option value="WH-002" className="bg-[#071d34]">North Branch (WH-002)</option>
-              <option value="WH-003" className="bg-[#071d34]">South Branch (WH-003)</option>
+              {branches.length > 0 ? (
+                branches.map((item) => (
+                  <option key={item.id} value={item.id} className="bg-[#071d34]">
+                    {item.name} ({item.id})
+                  </option>
+                ))
+              ) : (
+                <>
+                  <option value="WH-001" className="bg-[#071d34]">Main Branch (WH-001)</option>
+                  <option value="WH-002" className="bg-[#071d34]">North Branch (WH-002)</option>
+                  <option value="WH-003" className="bg-[#071d34]">South Branch (WH-003)</option>
+                </>
+              )}
             </select>
           </div>
         </div>
@@ -307,11 +339,11 @@ export const ReportsPage = () => {
         <button
           type="button"
           onClick={handleGenerate}
-          disabled={exportReport.isPending}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-900/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={exportReportMutation.isPending}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-900/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-sky-800"
         >
           <Download className="h-4 w-4" />
-          {exportReport.isPending ? 'Exporting...' : 'Export'}
+          {exportReportMutation.isPending ? 'Exporting...' : 'Export'}
         </button>
       </div>
 
@@ -469,15 +501,24 @@ export const ReportsPage = () => {
             </div>
           )}
 
-          <div className="mt-6 flex justify-end">
+          <div className="mt-6 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={handlePreview}
+              disabled={previewMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-xl border border-sky-800 bg-[#0a2744] px-5 py-3 text-base font-semibold text-sky-100 shadow-sm transition hover:border-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              <FileText className="h-4 w-4" />
+              {previewMutation.isPending ? 'Previewing...' : 'Preview'}
+            </button>
             <button
               type="button"
               onClick={handleGenerate}
-              disabled={exportReport.isPending}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-sm shadow-blue-900/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={exportReportMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-sm shadow-blue-900/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-sky-800"
             >
               <ArrowRight className="h-4 w-4" />
-              {exportReport.isPending ? 'Generating...' : 'Generate Report'}
+              {exportReportMutation.isPending ? 'Generating...' : 'Generate Report'}
             </button>
           </div>
         </div>
@@ -525,6 +566,52 @@ export const ReportsPage = () => {
           </div>
         </aside>
       </div>
+
+      {previewData && (
+        <section className="rounded-2xl border border-sky-900/80 bg-[#061f39] p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.05)]">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-white">Preview</h3>
+              <p className="text-sm text-slate-400">Rows: {previewData.rows.length} · Total: ₹{previewData.totals.total.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-sky-800">
+            <table className="min-w-full text-left text-sm text-slate-200">
+              <thead className="bg-[#0a2744] text-xs uppercase tracking-[0.18em] text-sky-200">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Doc #</th>
+                  <th className="px-4 py-3 font-medium">Date</th>
+                  <th className="px-4 py-3 font-medium">Customer</th>
+                  <th className="px-4 py-3 font-medium">Mobile</th>
+                  <th className="px-4 py-3 font-medium">Sales Employee</th>
+                  <th className="px-4 py-3 font-medium">Payment</th>
+                  <th className="px-4 py-3 font-medium text-right">Subtotal</th>
+                  <th className="px-4 py-3 font-medium text-right">Discount</th>
+                  <th className="px-4 py-3 font-medium text-right">GST</th>
+                  <th className="px-4 py-3 font-medium text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previewData.rows.slice(0, 8).map((row, index) => (
+                  <tr key={`${row.docNum}-${index}`} className="border-t border-sky-800 bg-[#081d34] hover:bg-[#0a2744]">
+                    <td className="px-4 py-3 font-medium text-slate-100">{row.docNum}</td>
+                    <td className="px-4 py-3 text-slate-300">{row.date}</td>
+                    <td className="px-4 py-3 text-slate-200">{row.customer || '-'}</td>
+                    <td className="px-4 py-3 text-slate-300">{row.mobile || '-'}</td>
+                    <td className="px-4 py-3 text-slate-300">{row.salesEmployee || '-'}</td>
+                    <td className="px-4 py-3 text-slate-300 capitalize">{row.paymentMethod || 'unknown'}</td>
+                    <td className="px-4 py-3 text-right text-slate-200">₹{row.subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+                    <td className="px-4 py-3 text-right text-slate-200">₹{row.discount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+                    <td className="px-4 py-3 text-right text-slate-200">₹{row.gst.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-300">₹{row.total.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <section className="rounded-2xl border border-sky-900/80 bg-[#061f39] p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.05)]">
         <div className="mb-4 flex items-center justify-between">

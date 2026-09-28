@@ -1,28 +1,28 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense } from 'react';
 import { Provider } from 'react-redux';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { store } from './app/store';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { queryClient } from './app/queryClient';
-import Layout from './components/Layout';
+import { store } from './app/store';
 import AdminLayout from './components/AdminLayout';
-import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
+import Layout from './components/Layout';
 import Loader from './components/Loader';
-import Login from './pages/Login';
+import ProtectedRoute from './components/ProtectedRoute';
 import './index.css';
+import Login from './pages/Login';
 
 // Lazy-load heavy pages so they are code-split into separate chunks.
 // The Login page stays eager because it is the first thing users see.
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Products = lazy(() => import('./pages/Products'));
+const Customers = lazy(() => import('./pages/Customers'));
 const POS = lazy(() => import('./pages/POS'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 const Register = lazy(() => import('./pages/Register'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const Branches = lazy(() => import('./pages/admin/Branches'));
-const ExportReports = lazy(() => import('./pages/admin/ExportReports'));
-const OperatorExportReports = lazy(() => import('./pages/OperatorExportReports'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const ReturnsExchange = lazy(() => import('./pages/ReturnsExchange'));
 const Approvals = lazy(() => import('./pages/admin/Approvals'));
 const Project = lazy(() => import('./pages/Project'));
@@ -50,7 +50,7 @@ function App() {
               >
                 <Route index element={<AdminDashboard />} />
                 <Route path="branches" element={<Branches />} />
-                <Route path="reports" element={<ExportReports />} />
+                <Route path="reports" element={<ReportsPage />} />
                 <Route path="approvals" element={<Approvals />} />
               </Route>
 
@@ -65,9 +65,10 @@ function App() {
               >
                 <Route index element={<Dashboard />} />
                 <Route path="products" element={<Products />} />
+                <Route path="customers" element={<Customers />} />
                 <Route path="pos" element={<POS />} />
                 <Route path="checkout" element={<Checkout />} />
-                <Route path="reports" element={<OperatorExportReports />} />
+                <Route path="reports" element={<ReportsPage />} />
                 <Route path="returns" element={<ReturnsExchange />} />
                 <Route path="project" element={<Project />} />
                 <Route path="atlas" element={<AtlasDashboard />} />

@@ -4,6 +4,7 @@ import asyncio
 import csv
 import io
 import os as _os
+import re
 from concurrent.futures import ThreadPoolExecutor  # kept for _executor pool
 from datetime import date, timedelta
 from typing import List, Any, Optional, Tuple, Dict
@@ -569,6 +570,79 @@ async def get_dashboard_summary(
     return DashboardSummary(**summary)
 
 
+async def _customer_search_fallback(search: Optional[str], top: int = 20) -> List[Dict[str, Any]]:
+    """Fallback to invoice UDF customer data when SAP Business Partners are unavailable."""
+    search_term = (search or "").strip().lower()
+    loop = asyncio.get_running_loop()
+    try:
+        invoice_service = SAPInvoicesService()
+        invoices = await loop.run_in_executor(
+            _executor,
+            lambda: invoice_service.get_recent_invoices_with_lines(limit=250, max_line_rows=5000),
+        )
+    except Exception as exc:
+        logger.error(f"Customer fallback lookup failed: {exc}")
+        raise HTTPException(status_code=502, detail="Could not search customers")
+
+    customer_map: Dict[str, Dict[str, Any]] = {}
+
+    for invoice in invoices:
+        name = str(invoice.get("U_C_Name") or invoice.get("CardName") or "").strip()
+        phone = str(invoice.get("U_W_Number") or "").strip()
+        email = str(invoice.get("U_Email") or "").strip() or None
+        sales_employee = str(invoice.get("U_S_Employee") or "").strip() or None
+        address = str(invoice.get("U_Address") or "").strip() or None
+        payment_method = str(invoice.get("U_P_Method") or "").strip() or None
+
+        if not name and not phone:
+            continue
+
+        if search_term:
+            haystack = " ".join(
+                value for value in [name, phone, email or "", sales_employee or "", address or ""] if value
+            ).lower()
+            if search_term not in haystack:
+                continue
+
+        lookup_key = re.sub(r"\D", "", phone).lower() if phone else name.lower()
+        if not lookup_key:
+            continue
+
+        if lookup_key not in customer_map:
+            customer_map[lookup_key] = {
+                "cardCode": phone or name or f"CUST-{len(customer_map) + 1}",
+                "cardName": name or "Customer",
+                "phone": phone or None,
+                "email": email,
+                "whatsappNumber": phone or None,
+                "paymentMethod": payment_method,
+                "salesEmployee": sales_employee,
+                "address": address,
+            }
+            continue
+
+        record = customer_map[lookup_key]
+        if not record.get("cardName") and name:
+            record["cardName"] = name
+        if not record.get("phone") and phone:
+            record["phone"] = phone
+        if not record.get("whatsappNumber") and phone:
+            record["whatsappNumber"] = phone
+        if not record.get("email") and email:
+            record["email"] = email
+        if not record.get("salesEmployee") and sales_employee:
+            record["salesEmployee"] = sales_employee
+        if not record.get("address") and address:
+            record["address"] = address
+        if not record.get("paymentMethod") and payment_method:
+            record["paymentMethod"] = payment_method
+
+    result = list(customer_map.values())[:top]
+    for item in result:
+        item.setdefault("cardCode", item.get("cardName") or f"CUST-{len(result)}")
+    return result
+
+
 @router.get("/customers")
 @limiter.limit(settings.RATE_LIMIT_GENERAL)
 async def search_customers(
@@ -576,25 +650,27 @@ async def search_customers(
     search: str = Query(None, description="Search term for customer name or code"),
     current_user: dict = Depends(get_current_user),
 ):
-    """Search for customers in SAP. Useful for selecting customer during checkout."""
+    """Search for customers with SAP BP first, then invoice UDF fallback."""
     try:
         bp_service = SAPBusinessPartnersService()
         customers = bp_service.search_customers(search_term=search, top=20)
-        return [
-            {
-                "cardCode": c.get("CardCode"),
-                "cardName": c.get("CardName"),
-                "phone": c.get("Phone1"),
-                "email": c.get("EmailAddress"),
-                "whatsappNumber": c.get("Cellular"),  # standard BP field (was U_W_Number UDF)
-                "paymentMethod": None,   # stored on Invoice UDF only, not on BusinessPartner
-                "salesEmployee": None,   # stored on Invoice UDF only, not on BusinessPartner
-            }
-            for c in customers
-        ]
+        if customers:
+            return [
+                {
+                    "cardCode": c.get("CardCode"),
+                    "cardName": c.get("CardName"),
+                    "phone": c.get("Phone1"),
+                    "email": c.get("EmailAddress"),
+                    "whatsappNumber": c.get("Cellular"),
+                    "paymentMethod": None,
+                    "salesEmployee": None,
+                }
+                for c in customers
+            ]
     except Exception as exc:
-        logger.error(f"Customer search failed: {exc}")
-        raise HTTPException(status_code=502, detail="Could not search customers")
+        logger.warning(f"Customer search via SAP Business Partners failed, falling back to invoice UDF data: {exc}")
+
+    return await _customer_search_fallback(search, top=20)
 
 
 @router.get("/recent-sales", response_model=List[DashboardRecentSale])
@@ -795,11 +871,13 @@ async def export_operator_reports(
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
     format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    report_type: str = Query("sales", pattern="^(sales|invoice|payment)$"),
 ):
     """
     Download the operator's own branch sales data as a CSV or XLSX file.
     Operators see only their branch; admins may use the admin reports endpoint for cross-branch data.
     Supports preset ranges (daily/weekly/monthly/yearly/all_time) and custom from_date/to_date.
+    report_type allows the same child-page layout to be used for sales, invoice, and payment exports.
     """
     branch = _resolve_branch_for_user(current_user)
     start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
@@ -819,6 +897,7 @@ async def export_operator_reports(
         logger.error(f"Operator report export failed: {exc}")
         raise HTTPException(status_code=502, detail="Could not fetch data from SAP")
 
+    sheet_title = {"sales": "My Sales Report", "invoice": "My Invoice Report", "payment": "My Payment Report"}[report_type]
     headers = [
         "DocNum", "Date", "Customer Name", "Mobile", "Payment Method",
         "Subtotal", "Discount", "GST", "Total",
@@ -847,7 +926,7 @@ async def export_operator_reports(
         workbook = Workbook()
         sheet = workbook.active
         assert sheet is not None
-        sheet.title = "My Sales Report"
+        sheet.title = sheet_title
         sheet.append(headers)
         for row in rows:
             sheet.append(row)
@@ -855,7 +934,7 @@ async def export_operator_reports(
         output = io.BytesIO()
         workbook.save(output)
         output.seek(0)
-        filename = f"my_sales_report_{range}_{date.today().isoformat()}.xlsx"
+        filename = f"my_{report_type}_report_{range}_{date.today().isoformat()}.xlsx"
         return StreamingResponse(
             iter([output.getvalue()]),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -869,7 +948,7 @@ async def export_operator_reports(
         writer.writerow(row)
 
     output.seek(0)
-    filename = f"my_sales_report_{range}_{date.today().isoformat()}.csv"
+    filename = f"my_{report_type}_report_{range}_{date.today().isoformat()}.csv"
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",

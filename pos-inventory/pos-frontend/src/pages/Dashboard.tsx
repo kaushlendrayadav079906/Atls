@@ -1,27 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { UIEvent } from 'react';
-import { toast } from 'react-toastify';
 import { useQueryClient } from '@tanstack/react-query';
+import type { UIEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'react-toastify';
 import Loader from '../components/Loader';
 import { useOperatorDashboard } from '../hooks/useOperatorDashboard';
 import { useRecentSalesFeed } from '../hooks/useRecentSalesFeed';
+import { cancelSale } from '../services/api';
+import type { DashboardRecentSale, DateRange } from '../types';
 import { handleError } from '../utils/errorHandler';
 import { buildReceiptDocument, getReceiptLogoDataUrl, printReceiptInBrowser } from '../utils/receiptPrinter';
-import { cancelSale } from '../services/api';
-import type { DateRange, DashboardRecentSale } from '../types';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from 'recharts';
 
 const formatCurrency = (amount: number) => `Rs ${amount.toFixed(2)}`;
 
@@ -32,24 +19,6 @@ const formatSaleDate = (value?: string) => {
   return dateValue.toLocaleString();
 };
 
-const badgeClass: Record<string, string> = {
-  cash: 'bg-emerald-100 text-emerald-800',
-  card: 'bg-blue-100 text-blue-800',
-  upi: 'bg-violet-100 text-violet-800',
-  wallet: 'bg-amber-100 text-amber-800',
-  unknown: 'bg-gray-100 text-gray-700',
-};
-
-const PIE_COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#6b7280'];
-
-const RANGES: { label: string; value: DateRange }[] = [
-  { label: 'Today', value: 'daily' },
-  { label: 'This Week', value: 'weekly' },
-  { label: 'This Month', value: 'monthly' },
-  { label: 'This Year', value: 'yearly' },
-  { label: 'All Time', value: 'all_time' },
-];
-
 const RANGE_LABELS: Record<DateRange, string> = {
   daily: "Today's",
   weekly: "This Week's",
@@ -58,64 +27,13 @@ const RANGE_LABELS: Record<DateRange, string> = {
   all_time: 'All-Time',
 };
 
-// --- Reusable SVG Icons ---
-const Icons = {
-  TrendingUp: () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-    </svg>
-  ),
-  Receipt: () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
-  ),
-  ShoppingCart: () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-    </svg>
-  ),
-  Calculator: () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-    </svg>
-  ),
-  Users: () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-  )
-};
-
-interface KpiCardProps {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  icon: React.ElementType;
-  colorClass: string;
-  bgClass: string;
-}
-
-const KpiCard = ({ title, value, subtitle, icon: Icon, colorClass, bgClass }: KpiCardProps) => (
-  <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex items-start gap-4">
-    <div className={`p-3 rounded-lg ${bgClass} ${colorClass}`}>
-      <Icon />
-    </div>
-    <div>
-      <p className="text-sm font-medium text-slate-500">{title}</p>
-      <p className="text-2xl font-bold text-slate-800 mt-1">{value}</p>
-      {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
-    </div>
-  </div>
-);
-
 const Dashboard = () => {
   const [range, setRange] = useState<DateRange>('daily');
   const [salesSearch, setSalesSearch] = useState('');
   const [cancellingSaleId, setCancellingSaleId] = useState<string | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const queryClient = useQueryClient();
-  const { data, isLoading, error, forceRefresh, isRefetching, dataUpdatedAt } = useOperatorDashboard(range);
+  const { data, isLoading, error, forceRefresh, dataUpdatedAt } = useOperatorDashboard(range);
   const {
     data: salesFeed,
     isLoading: isSalesFeedLoading,
@@ -233,34 +151,7 @@ const Dashboard = () => {
     );
   }
 
-  const averageBillValue = data.billCount > 0 ? data.todayTotal / data.billCount : 0;
   const periodLabel = RANGE_LABELS[range];
-  const returnTotals = (data.returnOrders ?? []).reduce(
-    (acc, entry) => {
-      const returnType = (entry.returnType || '').toLowerCase();
-      if (returnType === 'exchange') acc.exchangeCount += 1;
-      else acc.refundCount += 1;
-      acc.totalRefundedAmount += entry.refundAmount || 0;
-      return acc;
-    },
-    { refundCount: 0, exchangeCount: 0, totalRefundedAmount: 0 }
-  );
-  const totalReturnsCount = data.returnsCount;
-  const returnRate = data.billCount > 0
-    ? (totalReturnsCount / data.billCount) * 100
-    : 0;
-
-  // Chart data formatting
-  const pieData = data.paymentBreakdown.map(p => ({
-    name: p.method.toUpperCase(),
-    value: p.total
-  }));
-
-  const barData = data.topSellingItems.slice(0, 5).map(item => ({
-    name: item.itemName.length > 15 ? item.itemName.substring(0, 15) + '...' : item.itemName,
-    Revenue: item.revenue,
-    Quantity: item.quantity
-  }));
 
   return (
     <div className="h-full bg-gray-50/50 p-4 sm:p-6 lg:p-8 overflow-auto">
@@ -466,7 +357,6 @@ const Dashboard = () => {
                     feedItems.map((sale) => {
                       const billLabel = sale.docNum ?? sale.docEntry ?? 'N/A';
                       const rowKey = String(sale.docEntry ?? sale.docNum ?? `${sale.docDate || ''}-${sale.total}`);
-                      const badge = badgeClass[sale.paymentMethod?.toLowerCase() ?? 'unknown'] ?? badgeClass.unknown;
                       
                       return (
                         <tr key={rowKey} className="hover:bg-slate-800/50 transition-colors group">
