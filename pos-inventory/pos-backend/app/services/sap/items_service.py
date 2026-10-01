@@ -68,11 +68,6 @@ class SAPItemsService:
                 "SalesVATGroup",
                 "AvgStdPrice",
                 "MovingAveragePrice",
-                "U_SUBG",
-                "U_Brand",
-                "U_Colour",
-                "U_Size",
-                "U_Category",
                 "ItemPrices",
                 "ItemWarehouseInfoCollection",
             ]

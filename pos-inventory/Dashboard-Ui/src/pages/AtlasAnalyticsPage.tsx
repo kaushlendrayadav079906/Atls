@@ -165,67 +165,91 @@ export const AtlasAnalyticsPage = () => {
   const returnSummary = returnsQuery.data;
 
   return (
-    <div className="min-h-full bg-[#071d34] text-slate-100">
+    <div className="min-h-full bg-slate-50">
       <div className="mx-auto max-w-[1500px] space-y-6 pb-10">
+
+        {/* ── Page Header ──────────────────────────────────────── */}
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Atlas Analytics</h1>
-            <p className="mt-1 text-sm text-slate-300">Understand performance across your retail operation</p>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Atlas Analytics</h1>
+            <p className="mt-1 text-sm text-slate-500">Understand performance across your retail operation</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 rounded-xl border border-sky-800 bg-[#0a2744] px-3 py-2 text-sm text-sky-100">
-              <Warehouse className="h-4 w-4 text-sky-300" />
-              <span>{branchFilter ? `Main Branch (WH-${branchFilter})` : 'All branches'}</span>
+            {/* Branch pill */}
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm">
+              <Warehouse className="h-4 w-4 text-blue-600" />
+              <span className="font-medium">{branchFilter ? `Main Branch (WH-${branchFilter})` : 'All branches'}</span>
             </div>
 
-            <div className="flex items-center gap-2 rounded-xl border border-sky-800 bg-[#0a2744] p-2 text-sm text-sky-100">
-              <label className="flex items-center gap-2 rounded-lg bg-[#0d2f4e] px-2 py-1.5">
-                <CalendarRange className="h-4 w-4 text-sky-300" />
-                <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} className="bg-transparent text-sm text-sky-100 outline-none" />
+            {/* Date range */}
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 text-sm shadow-sm">
+              <label className="flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5 border border-slate-100">
+                <CalendarRange className="h-4 w-4 text-blue-600 shrink-0" />
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(event) => setFromDate(event.target.value)}
+                  className="bg-transparent text-sm text-slate-700 outline-none"
+                />
               </label>
-              <span className="text-slate-400">to</span>
-              <label className="flex items-center gap-2 rounded-lg bg-[#0d2f4e] px-2 py-1.5">
-                <CalendarRange className="h-4 w-4 text-sky-300" />
-                <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} className="bg-transparent text-sm text-sky-100 outline-none" />
+              <span className="text-slate-400 text-xs font-medium">to</span>
+              <label className="flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5 border border-slate-100">
+                <CalendarRange className="h-4 w-4 text-blue-600 shrink-0" />
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(event) => setToDate(event.target.value)}
+                  className="bg-transparent text-sm text-slate-700 outline-none"
+                />
               </label>
             </div>
 
+            {/* Range selector */}
             <div className="relative">
               <select
                 value={range}
                 onChange={(event) => setRange(event.target.value as RangeKey)}
-                className="appearance-none rounded-xl border border-sky-800 bg-[#0a2744] px-3 py-2.5 pr-8 text-sm font-medium text-sky-100 outline-none"
+                className="appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-8 text-sm font-medium text-slate-700 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               >
                 {rangeOptions.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-[#071d34] text-sky-100">
+                  <option key={option.value} value={option.value} className="bg-white text-slate-700">
                     {option.label}
                   </option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-4 w-4 text-sky-300" />
+              <ChevronDown className="pointer-events-none absolute right-2.5 top-3 h-4 w-4 text-slate-500" />
             </div>
 
-            <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-900/20 hover:bg-blue-500">
+            {/* Export */}
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors"
+            >
               <Download className="h-4 w-4" />
               Export
             </button>
           </div>
         </div>
 
+        {/* ── Date validation error ─────────────────────────────── */}
         {hasDateValidationError && (
-          <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
             The end date must be the same as or later than the start date.
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2 border-b border-sky-900/80 pb-3">
+        {/* ── Tabs ─────────────────────────────────────────────── */}
+        <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
           {['Overview', 'Sales Analysis', 'Product Insights', 'Customer Insights', 'Branch Comparison'].map((tab, index) => (
             <button
               key={tab}
               type="button"
-              className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
-                index === 0 ? 'bg-blue-600 text-white shadow-sm shadow-blue-900/20' : 'bg-[#0a2744] text-sky-200 hover:bg-[#113c63]'
+              className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                index === 0
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200'
               }`}
             >
               {tab}
@@ -233,49 +257,78 @@ export const AtlasAnalyticsPage = () => {
           ))}
         </div>
 
+        {/* ── KPI Metric Cards ──────────────────────────────────── */}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard title="Net Sales" value={currency(overview?.totalSales ?? 0)} change="Sales volume" positive icon={<ShoppingBag className="h-5 w-5" />} loading={overviewQuery.isLoading} error={overviewQuery.isError} />
-          <MetricCard title="Invoices" value={number(overview?.invoiceCount ?? 0)} change="Transactions" positive icon={<BarChart3 className="h-5 w-5" />} loading={overviewQuery.isLoading} error={overviewQuery.isError} />
-          <MetricCard title="Average Basket" value={currency(overview?.averageOrderValue ?? 0)} change="Per order" positive icon={<TrendingUp className="h-5 w-5" />} loading={overviewQuery.isLoading} error={overviewQuery.isError} />
-          <MetricCard title="Returns" value={number(returnSummary?.pendingApprovalsCount ?? 0)} change="Pending approval" positive={false} icon={<RefreshCw className="h-5 w-5" />} loading={returnsQuery.isLoading} error={returnsQuery.isError} />
+          <MetricCard
+            title="Net Sales"
+            value={currency(overview?.totalSales ?? 0)}
+            change="Sales volume"
+            positive
+            icon={<ShoppingBag className="h-5 w-5" />}
+            iconBg="bg-blue-100 text-blue-700"
+            loading={overviewQuery.isLoading}
+            error={overviewQuery.isError}
+          />
+          <MetricCard
+            title="Invoices"
+            value={number(overview?.invoiceCount ?? 0)}
+            change="Transactions"
+            positive
+            icon={<BarChart3 className="h-5 w-5" />}
+            iconBg="bg-emerald-100 text-emerald-700"
+            loading={overviewQuery.isLoading}
+            error={overviewQuery.isError}
+          />
+          <MetricCard
+            title="Average Basket"
+            value={currency(overview?.averageOrderValue ?? 0)}
+            change="Per order"
+            positive
+            icon={<TrendingUp className="h-5 w-5" />}
+            iconBg="bg-violet-100 text-violet-700"
+            loading={overviewQuery.isLoading}
+            error={overviewQuery.isError}
+          />
+          <MetricCard
+            title="Returns"
+            value={number(returnSummary?.pendingApprovalsCount ?? 0)}
+            change="Pending approval"
+            positive={false}
+            icon={<RefreshCw className="h-5 w-5" />}
+            iconBg="bg-amber-100 text-amber-700"
+            loading={returnsQuery.isLoading}
+            error={returnsQuery.isError}
+          />
         </div>
 
+        {/* ── Sales Trend + Payment Split ───────────────────────── */}
         <div className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
-          <div className="rounded-2xl border border-sky-900/80 bg-[#061f39] p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.05)]">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white">Sales Trend</h2>
-                <p className="text-sm text-slate-400">Compare the selected range across the current branch.</p>
-              </div>
-              <div className="rounded-lg bg-[#0d2f4e] px-2.5 py-1.5 text-xs font-medium text-sky-200">{rangeOptions.find((item) => item.value === range)?.label}</div>
-            </div>
-
+          <AnalyticsCard title="Sales Trend" subtitle="Compare the selected range across the current branch." badge={rangeOptions.find((item) => item.value === range)?.label}>
             {trendQuery.isLoading ? (
               <PanelLoading label="Loading sales trend..." />
             ) : trendQuery.isError ? (
               <PanelError message="Unable to load sales trend from the backend." retry={() => trendQuery.refetch()} />
             ) : chartData.length ? (
-              <div className="flex h-[260px] items-end gap-3 overflow-hidden rounded-xl bg-[#0a2744] px-3 pb-3 pt-5">
+              <div className="flex h-[260px] items-end gap-2 overflow-hidden rounded-xl bg-slate-50 border border-slate-100 px-3 pb-3 pt-5">
                 {chartData.map((point) => (
                   <div key={`${point.label}-${point.billCount}`} className="flex flex-1 flex-col items-center gap-2">
                     <div className="flex h-full w-full items-end justify-center">
-                      <div className="w-full max-w-[40px] rounded-t-xl bg-gradient-to-t from-blue-600 to-sky-400 shadow-sm" style={{ height: `${point.height}%` }} title={`${point.label}: ${currency(point.total)}`} />
+                      <div
+                        className="w-full max-w-[40px] rounded-t-lg bg-gradient-to-t from-blue-600 to-blue-400 shadow-sm"
+                        style={{ height: `${point.height}%` }}
+                        title={`${point.label}: ${currency(point.total)}`}
+                      />
                     </div>
-                    <div className="text-center text-[10px] font-medium text-slate-400">{point.label}</div>
+                    <div className="text-center text-[10px] font-medium text-slate-500">{point.label}</div>
                   </div>
                 ))}
               </div>
             ) : (
               <PanelEmpty message="No sales trend data is available for the selected range." />
             )}
-          </div>
+          </AnalyticsCard>
 
-          <div className="rounded-2xl border border-sky-900/80 bg-[#061f39] p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.05)]">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">Payment Split</h2>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-300">Live</span>
-            </div>
-
+          <AnalyticsCard title="Payment Split" liveBadge>
             {overviewQuery.isLoading ? (
               <PanelLoading label="Loading payment breakdown..." />
             ) : overviewQuery.isError ? (
@@ -284,12 +337,15 @@ export const AtlasAnalyticsPage = () => {
               <div className="space-y-4">
                 {overview?.paymentBreakdown.map((item) => (
                   <div key={item.method}>
-                    <div className="mb-1 flex items-center justify-between text-sm text-slate-300">
-                      <span className="capitalize">{item.method}</span>
-                      <span>{item.percentage.toFixed(1)}%</span>
+                    <div className="mb-1.5 flex items-center justify-between text-sm">
+                      <span className="capitalize font-medium text-slate-700">{item.method}</span>
+                      <span className="text-slate-500 tabular-nums">{item.percentage.toFixed(1)}%</span>
                     </div>
-                    <div className="h-2.5 overflow-hidden rounded-full bg-[#0d2f4e]">
-                      <div className="h-full rounded-full bg-gradient-to-r from-blue-600 to-sky-500" style={{ width: `${Math.min(item.percentage, 100)}%` }} />
+                    <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400"
+                        style={{ width: `${Math.min(item.percentage, 100)}%` }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -297,39 +353,35 @@ export const AtlasAnalyticsPage = () => {
             ) : (
               <PanelEmpty message="No payment data returned for the selected range." />
             )}
-          </div>
+          </AnalyticsCard>
         </div>
 
+        {/* ── Top Products + Top Customers ──────────────────────── */}
         <div className="grid gap-6 xl:grid-cols-2">
-          <div className="rounded-2xl border border-sky-900/80 bg-[#061f39] p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.05)]">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white">Top Products</h2>
-                <p className="text-sm text-slate-400">By quantity sold</p>
-              </div>
-              <button type="button" className="text-sm font-semibold text-sky-300 hover:text-sky-200">View all</button>
-            </div>
-
+          <AnalyticsCard title="Top Products" subtitle="By quantity sold" actionLabel="View all" onAction={() => {}}>
             {productsQuery.isLoading ? (
               <PanelLoading label="Loading product insights..." />
             ) : productsQuery.isError ? (
               <PanelError message="Top products are currently unavailable." retry={() => productsQuery.refetch()} />
             ) : topProducts.length ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {topProducts.map((product, index) => (
-                  <div key={`${product.itemCode}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border border-sky-800 bg-[#0b2c4d] p-3">
+                  <div
+                    key={`${product.itemCode}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 hover:bg-blue-50 hover:border-blue-100 transition-colors"
+                  >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/15 text-blue-200">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-700 shrink-0">
                         <PackageSearch className="h-4 w-4" />
                       </div>
                       <div>
-                        <div className="font-semibold text-slate-100">{product.itemName}</div>
-                        <div className="text-xs text-slate-400">{product.itemCode}</div>
+                        <div className="font-semibold text-slate-800 text-sm">{product.itemName}</div>
+                        <div className="text-xs text-slate-500">{product.itemCode}</div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-bold text-white">{number(product.quantitySold)}</div>
-                      <div className="text-xs text-slate-400">{currency(product.salesAmount)}</div>
+                    <div className="text-right shrink-0">
+                      <div className="font-bold text-slate-900 text-sm">{number(product.quantitySold)} units</div>
+                      <div className="text-xs text-slate-500">{currency(product.salesAmount)}</div>
                     </div>
                   </div>
                 ))}
@@ -337,37 +389,32 @@ export const AtlasAnalyticsPage = () => {
             ) : (
               <PanelEmpty message="No top products were returned by the backend for this range." />
             )}
-          </div>
+          </AnalyticsCard>
 
-          <div className="rounded-2xl border border-sky-900/80 bg-[#061f39] p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.05)]">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white">Top Customers</h2>
-                <p className="text-sm text-slate-400">Highest sales volume</p>
-              </div>
-              <button type="button" className="text-sm font-semibold text-sky-300 hover:text-sky-200">View all</button>
-            </div>
-
+          <AnalyticsCard title="Top Customers" subtitle="Highest sales volume" actionLabel="View all" onAction={() => {}}>
             {customersQuery.isLoading ? (
               <PanelLoading label="Loading customer insights..." />
             ) : customersQuery.isError ? (
               <PanelError message="Customer insights are currently unavailable." retry={() => customersQuery.refetch()} />
             ) : topCustomers.length ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {topCustomers.map((customer, index) => (
-                  <div key={`${customer.customerCode}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border border-sky-800 bg-[#0b2c4d] p-3">
+                  <div
+                    key={`${customer.customerCode}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 hover:bg-violet-50 hover:border-violet-100 transition-colors"
+                  >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-500/15 text-violet-200">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 text-violet-700 shrink-0">
                         <UserRound className="h-4 w-4" />
                       </div>
                       <div>
-                        <div className="font-semibold text-slate-100">{customer.customerName}</div>
-                        <div className="text-xs text-slate-400">{customer.customerCode}</div>
+                        <div className="font-semibold text-slate-800 text-sm">{customer.customerName}</div>
+                        <div className="text-xs text-slate-500">{customer.customerCode}</div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-bold text-white">{currency(customer.totalSales)}</div>
-                      <div className="text-xs text-slate-400">{customer.invoiceCount} invoices</div>
+                    <div className="text-right shrink-0">
+                      <div className="font-bold text-slate-900 text-sm">{currency(customer.totalSales)}</div>
+                      <div className="text-xs text-slate-500">{customer.invoiceCount} invoices</div>
                     </div>
                   </div>
                 ))}
@@ -375,33 +422,30 @@ export const AtlasAnalyticsPage = () => {
             ) : (
               <PanelEmpty message="No customer sales data was returned for the selected range." />
             )}
-          </div>
+          </AnalyticsCard>
         </div>
 
+        {/* ── Inventory Snapshot + Branch Comparison ────────────── */}
         <div className="grid gap-6 xl:grid-cols-2">
-          <div className="rounded-2xl border border-sky-900/80 bg-[#061f39] p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.05)]">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white">Inventory Snapshot</h2>
-                <p className="text-sm text-slate-400">Warehouse inventory for the selected branch</p>
-              </div>
-            </div>
-
+          <AnalyticsCard title="Inventory Snapshot" subtitle="Warehouse inventory for the selected branch">
             {inventoryQuery.isLoading ? (
               <PanelLoading label="Loading inventory snapshot..." />
             ) : inventoryQuery.isError ? (
               <PanelError message="Inventory snapshot is unavailable from SAP." retry={() => inventoryQuery.refetch()} />
             ) : inventoryItems.length ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {inventoryItems.slice(0, 5).map((item) => (
-                  <div key={`${item.itemCode}-${item.warehouse}`} className="flex items-center justify-between rounded-xl border border-sky-800 bg-[#0b2c4d] p-3">
+                  <div
+                    key={`${item.itemCode}-${item.warehouse}`}
+                    className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 p-3"
+                  >
                     <div>
-                      <div className="font-semibold text-slate-100">{item.itemName}</div>
-                      <div className="text-xs text-slate-400">{item.itemCode}</div>
+                      <div className="font-semibold text-slate-800 text-sm">{item.itemName}</div>
+                      <div className="text-xs text-slate-500">{item.itemCode}</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-bold text-white">{number(item.inStock)}</div>
-                      <div className="text-xs text-slate-400">in stock</div>
+                      <div className="font-bold text-slate-900 text-sm">{number(item.inStock)}</div>
+                      <div className="text-xs text-slate-500">in stock</div>
                     </div>
                   </div>
                 ))}
@@ -409,18 +453,14 @@ export const AtlasAnalyticsPage = () => {
             ) : (
               <PanelEmpty message="No inventory snapshot data is available for the selected branch." />
             )}
-          </div>
+          </AnalyticsCard>
 
-          <div className="rounded-2xl border border-sky-900/80 bg-[#061f39] p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.05)]">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white">Branch Comparison</h2>
-                <p className="text-sm text-slate-400">Admin-only branch totals</p>
-              </div>
-            </div>
-
+          <AnalyticsCard title="Branch Comparison" subtitle="Admin-only branch totals">
             {!isAdmin ? (
-              <div className="rounded-xl border border-sky-800 bg-[#0a2744] p-4 text-sm text-slate-300">Branch comparison is restricted to administrators.</div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-slate-400 shrink-0" />
+                Branch comparison is restricted to administrators.
+              </div>
             ) : comparisonQuery.isLoading ? (
               <PanelLoading label="Loading branch comparison..." />
             ) : comparisonQuery.isError ? (
@@ -432,12 +472,15 @@ export const AtlasAnalyticsPage = () => {
                   const width = (branch.total / max) * 100;
                   return (
                     <div key={branch.branchId}>
-                      <div className="mb-1 flex items-center justify-between text-sm text-slate-300">
-                        <span>{branch.branchName || branch.branchId}</span>
-                        <span>{currency(branch.total)}</span>
+                      <div className="mb-1.5 flex items-center justify-between text-sm">
+                        <span className="font-medium text-slate-700">{branch.branchName || branch.branchId}</span>
+                        <span className="text-slate-500 tabular-nums">{currency(branch.total)}</span>
                       </div>
-                      <div className="h-2.5 overflow-hidden rounded-full bg-[#0d2f4e]">
-                        <div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-600" style={{ width: `${width}%` }} />
+                      <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-600"
+                          style={{ width: `${width}%` }}
+                        />
                       </div>
                     </div>
                   );
@@ -446,108 +489,200 @@ export const AtlasAnalyticsPage = () => {
             ) : (
               <PanelEmpty message="No branch comparison data is available for the selected range." />
             )}
-          </div>
+          </AnalyticsCard>
         </div>
 
+        {/* ── Returns Summary + Operations Notes ────────────────── */}
         <div className="grid gap-6 xl:grid-cols-2">
-          <div className="rounded-2xl border border-sky-900/80 bg-[#061f39] p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.05)]">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white">Returns Summary</h2>
-                <p className="text-sm text-slate-400">Credit notes and approvals</p>
-              </div>
-            </div>
-
+          <AnalyticsCard title="Returns Summary" subtitle="Credit notes and approvals">
             {returnsQuery.isLoading ? (
               <PanelLoading label="Loading returns summary..." />
             ) : returnsQuery.isError ? (
               <PanelError message="Returns summary is unavailable." retry={() => returnsQuery.refetch()} />
             ) : returnSummary ? (
               <div className="grid gap-4 sm:grid-cols-3">
-                <MiniStat label="Pending" value={number(returnSummary.pendingApprovalsCount)} />
-                <MiniStat label="Credit notes" value={number(returnSummary.sapCreditNotesCount)} />
-                <MiniStat label="Total issued" value={currency(returnSummary.sapCreditNotesTotal)} />
+                <MiniStat label="Pending" value={number(returnSummary.pendingApprovalsCount)} accent="amber" />
+                <MiniStat label="Credit notes" value={number(returnSummary.sapCreditNotesCount)} accent="blue" />
+                <MiniStat label="Total issued" value={currency(returnSummary.sapCreditNotesTotal)} accent="emerald" />
               </div>
             ) : (
               <PanelEmpty message="No returns summary data returned for the selected range." />
             )}
-          </div>
+          </AnalyticsCard>
 
-          <div className="rounded-2xl border border-sky-900/80 bg-[#061f39] p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.05)]">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-white">Operations Notes</h2>
-                <p className="text-sm text-slate-400">Backend-supported analytics only</p>
+          <AnalyticsCard title="Operations Notes" subtitle="Backend-supported analytics only">
+            <div className="space-y-3 text-sm">
+              <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-3">
+                <Search className="mt-0.5 h-4 w-4 text-blue-600 shrink-0" />
+                <span className="text-slate-700">
+                  Sales trend, overview, top products, top customers, inventory snapshot, branch comparison, and returns summary are populated from the real Atlas endpoints.
+                </span>
+              </div>
+              <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 text-slate-500 shrink-0" />
+                <span className="text-slate-700">
+                  Unsupported metrics are intentionally omitted instead of being fabricated to match the dashboard reference.
+                </span>
               </div>
             </div>
-            <div className="space-y-3 text-sm text-slate-300">
-              <div className="flex items-start gap-3 rounded-xl bg-[#0a2744] p-3">
-                <Search className="mt-0.5 h-4 w-4 text-sky-300" />
-                <span>Sales trend, overview, top products, top customers, inventory snapshot, branch comparison, and returns summary are populated from the real Atlas endpoints.</span>
-              </div>
-              <div className="flex items-start gap-3 rounded-xl bg-[#0a2744] p-3">
-                <AlertCircle className="mt-0.5 h-4 w-4 text-sky-300" />
-                <span>Unsupported metrics are intentionally omitted instead of being fabricated to match the dashboard reference.</span>
-              </div>
-            </div>
-          </div>
+          </AnalyticsCard>
         </div>
+
       </div>
     </div>
   );
 };
 
-const MetricCard = ({ title, value, change, positive, icon, loading, error }: { title: string; value: string; change: string; positive?: boolean; icon: React.ReactNode; loading: boolean; error: boolean }) => (
-  <div className="rounded-2xl border border-sky-900/80 bg-[#061f39] p-4 shadow-[0_0_0_1px_rgba(59,130,246,0.05)]">
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-components
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Reusable card wrapper for all Analytics panels */
+const AnalyticsCard = ({
+  title,
+  subtitle,
+  badge,
+  liveBadge,
+  actionLabel,
+  onAction,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  liveBadge?: boolean;
+  actionLabel?: string;
+  onAction?: () => void;
+  children: React.ReactNode;
+}) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <h2 className="text-lg font-bold text-slate-900 leading-tight">{title}</h2>
+        {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+      </div>
+      <div className="shrink-0">
+        {badge && (
+          <span className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+            {badge}
+          </span>
+        )}
+        {liveBadge && (
+          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-600 flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+            Live
+          </span>
+        )}
+        {actionLabel && onAction && (
+          <button
+            type="button"
+            onClick={onAction}
+            className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            {actionLabel}
+          </button>
+        )}
+      </div>
+    </div>
+    {children}
+  </div>
+);
+
+/** KPI metric card */
+const MetricCard = ({
+  title,
+  value,
+  change,
+  positive,
+  icon,
+  iconBg,
+  loading,
+  error,
+}: {
+  title: string;
+  value: string;
+  change: string;
+  positive?: boolean;
+  icon: React.ReactNode;
+  iconBg: string;
+  loading: boolean;
+  error: boolean;
+}) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
     <div className="mb-4 flex items-start justify-between gap-3">
       <div>
-        <div className="text-sm font-medium text-slate-300">{title}</div>
-        <div className="mt-2 text-3xl font-bold tracking-tight text-white">
-          {loading ? <span className="inline-block h-8 w-20 animate-pulse rounded bg-slate-700" /> : error ? '—' : value}
+        <div className="text-sm font-medium text-slate-500">{title}</div>
+        <div className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
+          {loading ? (
+            <span className="inline-block h-8 w-28 animate-pulse rounded-lg bg-slate-100" />
+          ) : error ? (
+            <span className="text-slate-400 text-2xl">—</span>
+          ) : (
+            value
+          )}
         </div>
       </div>
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0d2f4e] text-sky-200">{icon}</div>
+      <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconBg}`}>{icon}</div>
     </div>
-    <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
-      {positive === false ? <ArrowDownRight className="h-3.5 w-3.5 text-amber-400" /> : <ArrowUpRight className="h-3.5 w-3.5 text-emerald-400" />}
-      <span>{change}</span>
+    <div className="flex items-center gap-1.5 text-xs font-medium">
+      {positive === false ? (
+        <ArrowDownRight className="h-3.5 w-3.5 text-amber-500" />
+      ) : (
+        <ArrowUpRight className="h-3.5 w-3.5 text-emerald-600" />
+      )}
+      <span className="text-slate-600">{change}</span>
     </div>
   </div>
 );
 
+/** Loading state for a panel section */
 const PanelLoading = ({ label }: { label: string }) => (
-  <div className="flex h-[180px] items-center justify-center rounded-xl border border-sky-800 bg-[#0a2744] text-sm text-slate-300">
+  <div className="flex h-[180px] items-center justify-center rounded-xl border border-slate-100 bg-slate-50 text-sm text-slate-500">
     <div className="flex items-center gap-2">
-      <RefreshCw className="h-4 w-4 animate-spin text-sky-300" />
+      <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
       {label}
     </div>
   </div>
 );
 
+/** Error state for a panel section — shows real backend error message */
 const PanelError = ({ message, retry }: { message: string; retry?: () => void }) => (
-  <div className="flex h-[180px] flex-col items-center justify-center gap-3 rounded-xl border border-red-400/30 bg-red-500/10 text-center text-sm text-red-100">
-    <AlertCircle className="h-5 w-5" />
-    <span>{message}</span>
+  <div className="flex h-[180px] flex-col items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-50 text-center text-sm">
+    <AlertCircle className="h-5 w-5 text-red-500" />
+    <span className="text-red-700 font-medium max-w-[260px] leading-snug">{message}</span>
     {retry && (
-      <button type="button" onClick={retry} className="rounded-lg bg-red-500 px-3 py-1.5 font-medium text-white hover:bg-red-400">
+      <button
+        type="button"
+        onClick={retry}
+        className="rounded-lg border border-red-300 bg-white px-4 py-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors shadow-sm"
+      >
         Retry
       </button>
     )}
   </div>
 );
 
+/** Empty state for a panel section */
 const PanelEmpty = ({ message }: { message: string }) => (
-  <div className="flex h-[180px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-sky-800 bg-[#0a2744] text-center text-sm text-slate-300">
+  <div className="flex h-[180px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center text-sm">
     <Search className="h-5 w-5 text-slate-400" />
-    <span>{message}</span>
+    <span className="text-slate-500 max-w-[240px] leading-snug">{message}</span>
   </div>
 );
 
-const MiniStat = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-xl border border-sky-800 bg-[#0b2c4d] p-3">
-    <div className="text-[10px] uppercase tracking-[0.18em] text-sky-300">{label}</div>
-    <div className="mt-2 text-xl font-bold text-white">{value}</div>
-  </div>
-);
+/** Small stat widget for Returns Summary */
+const MiniStat = ({ label, value, accent = 'blue' }: { label: string; value: string; accent?: 'blue' | 'emerald' | 'amber' }) => {
+  const accentMap: Record<string, string> = {
+    blue: 'text-blue-700 bg-blue-50 border-blue-100',
+    emerald: 'text-emerald-700 bg-emerald-50 border-emerald-100',
+    amber: 'text-amber-700 bg-amber-50 border-amber-100',
+  };
+  return (
+    <div className={`rounded-xl border p-4 ${accentMap[accent]}`}>
+      <div className="text-[10px] uppercase tracking-[0.18em] font-semibold opacity-70">{label}</div>
+      <div className="mt-2 text-xl font-bold text-slate-900">{value}</div>
+    </div>
+  );
+};
 
 export default AtlasAnalyticsPage;

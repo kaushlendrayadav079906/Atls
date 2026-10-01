@@ -87,7 +87,7 @@ export const Register = () => {
       
       {/* Left Sidebar */}
       <aside 
-        className="relative hidden lg:flex flex-col justify-between h-full w-[40%] text-white px-10 py-12"
+        className="relative hidden lg:flex flex-col justify-between h-full w-[40%] text-slate-900 px-10 py-12"
         style={{ clipPath: 'polygon(0 0, 85% 0, 100% 100%, 0% 100%)' }}
       >
         <div className="absolute inset-0 z-0">
@@ -108,12 +108,12 @@ export const Register = () => {
               </div>
               <div>
                 <div className="text-[32px] font-black leading-none tracking-tight">Atls</div>
-                <div className="text-[14px] font-medium tracking-wide text-sky-100">POS Inventory</div>
+                <div className="text-[14px] font-medium tracking-wide text-slate-700">POS Inventory</div>
               </div>
             </div>
             
             <div className="mt-12">
-              <div className="text-[22px] font-bold tracking-tight text-white/95 leading-snug">
+              <div className="text-[22px] font-bold tracking-tight text-slate-900/95 leading-snug">
                 Smart Retail Operations <br />for a Better Tomorrow
               </div>
 
@@ -125,13 +125,13 @@ export const Register = () => {
                   { label: 'Secure and Role Based Access', description: 'Your data stays protected', icon: Check },
                   { label: 'Multi-Branch Support', description: 'Built for growing retailers', icon: Globe },
                 ].map(({ label, description, icon: Icon }) => (
-                  <div key={label} className="flex items-center gap-4 text-white/90">
+                  <div key={label} className="flex items-center gap-4 text-slate-900/90">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10">
-                      <Icon className="h-5 w-5 text-sky-100" />
+                      <Icon className="h-5 w-5 text-slate-700" />
                     </div>
                     <div>
-                      <div className="text-[15px] font-semibold leading-tight text-white">{label}</div>
-                      <div className="text-[12px] text-sky-100/75 mt-0.5">{description}</div>
+                      <div className="text-[15px] font-semibold leading-tight text-slate-900">{label}</div>
+                      <div className="text-[12px] text-slate-500 mt-0.5">{description}</div>
                     </div>
                   </div>
                 ))}
@@ -140,7 +140,7 @@ export const Register = () => {
           </div>
 
           <div className="mt-auto pb-4">
-            <div className="text-[18px] font-medium italic text-sky-100/90 leading-snug">
+            <div className="text-[18px] font-medium italic text-slate-500 leading-snug">
               “All your store operations, <br />in one powerful platform.”
             </div>
           </div>
@@ -200,7 +200,7 @@ export const Register = () => {
                   <div>
                     <label className="mb-1.5 block text-[13px] font-bold text-[#0b1f46]">Full Name <span className="text-red-500">*</span></label>
                     <div className="relative">
-                      <User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                       <input
                         name="name"
                         type="text"
@@ -217,7 +217,7 @@ export const Register = () => {
                   <div>
                     <label className="mb-1.5 block text-[13px] font-bold text-[#0b1f46]">Email Address <span className="text-red-500">*</span></label>
                     <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                       <input
                         name="email"
                         type="email"
@@ -235,7 +235,7 @@ export const Register = () => {
                 <div>
                   <label className="mb-1.5 block text-[13px] font-bold text-[#0b1f46]">Username <span className="text-red-500">*</span></label>
                   <div className="relative">
-                    <User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                     <input
                       name="username"
                       type="text"
@@ -253,7 +253,7 @@ export const Register = () => {
                   <div>
                     <label className="mb-1.5 block text-[13px] font-bold text-[#0b1f46]">Password <span className="text-red-500">*</span></label>
                     <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                       <input
                         name="password"
                         type={showPassword ? 'text' : 'password'}
@@ -267,7 +267,7 @@ export const Register = () => {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-600"
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
@@ -277,7 +277,7 @@ export const Register = () => {
                   <div>
                     <label className="mb-1.5 block text-[13px] font-bold text-[#0b1f46]">Confirm Password <span className="text-red-500">*</span></label>
                     <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                       <input
                         name="confirmPassword"
                         type={showConfirmPassword ? 'text' : 'password'}
@@ -291,7 +291,7 @@ export const Register = () => {
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-600"
                       >
                         {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
@@ -318,7 +318,7 @@ export const Register = () => {
 
               <div className="mt-6 flex items-center justify-center gap-4">
                 <div className="h-px flex-1 bg-slate-200" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Or continue with</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Or continue with</span>
                 <div className="h-px flex-1 bg-slate-200" />
               </div>
 

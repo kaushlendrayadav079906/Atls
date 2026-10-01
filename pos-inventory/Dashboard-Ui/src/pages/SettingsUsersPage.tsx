@@ -40,10 +40,10 @@ const roleOptions = [
 ] as const;
 
 const roleBadgeClass: Record<string, string> = {
-  admin: 'bg-violet-500/15 text-violet-200 ring-1 ring-violet-400/30',
-  manager: 'bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/30',
-  operator: 'bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/30',
-  user: 'bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30',
+  admin: 'bg-violet-100 text-violet-700 ring-1 ring-violet-400/30',
+  manager: 'bg-amber-500/15 text-amber-800 ring-1 ring-amber-400/30',
+  operator: 'bg-sky-500/15 text-slate-600 ring-1 ring-sky-400/30',
+  user: 'bg-emerald-500/15 text-emerald-700 ring-1 ring-emerald-400/30',
 };
 
 const normalizeRole = (value?: string | null) => (value ?? 'user').toLowerCase();
@@ -192,13 +192,13 @@ export const SettingsUsersPage = () => {
 
   if (!canManageUsers) {
     return (
-      <div className="mx-auto max-w-4xl rounded-2xl border border-sky-900/80 bg-[#0b1f35] p-8 text-slate-200 shadow-2xl shadow-slate-950/40">
-        <div className="flex items-center gap-3 text-sky-300">
+      <div className="mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-8 text-slate-700 shadow-2xl shadow-slate-950/40">
+        <div className="flex items-center gap-3 text-blue-600">
           <ShieldCheck className="h-5 w-5" />
           <span className="text-sm font-semibold uppercase tracking-[0.2em]">Access restricted</span>
         </div>
-        <h1 className="mt-4 text-2xl font-bold text-white">Users & Roles</h1>
-        <p className="mt-3 max-w-xl text-sm text-slate-300">
+        <h1 className="mt-4 text-2xl font-bold text-slate-900">Users & Roles</h1>
+        <p className="mt-3 max-w-xl text-sm text-slate-600">
           This module is limited to administrators. Sign in with an admin account to manage users and permissions.
         </p>
       </div>
@@ -206,11 +206,11 @@ export const SettingsUsersPage = () => {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-8 text-slate-100">
-      <div className="flex flex-col gap-4 rounded-2xl border border-sky-900/80 bg-[#0b1f35] p-5 shadow-xl shadow-slate-950/20 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mx-auto max-w-7xl space-y-6 pb-8 text-slate-800">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-950/20 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-300">Administration</p>
-          <h1 className="mt-2 text-2xl font-bold text-white">Users & Roles</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600">Administration</p>
+          <h1 className="mt-2 text-2xl font-bold text-slate-900">Users & Roles</h1>
         </div>
 
         <button
@@ -231,26 +231,26 @@ export const SettingsUsersPage = () => {
       </div>
 
       {notice && (
-        <div className="rounded-xl border border-sky-700/60 bg-sky-950/40 px-4 py-3 text-sm text-sky-100">{notice}</div>
+        <div className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-700">{notice}</div>
       )}
 
-      <div className="rounded-2xl border border-sky-900/80 bg-[#0b1f35] p-4 shadow-xl shadow-slate-950/20">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-950/20">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="relative w-full max-w-md">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search user, email, branch..."
-              className="w-full rounded-lg border border-sky-800 bg-[#081c2e] py-2.5 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
             />
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-sky-900/80">
+        <div className="overflow-hidden rounded-xl border border-slate-200">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-sky-900/80 text-left text-sm">
-              <thead className="bg-[#081c2e] text-slate-300">
+            <table className="min-w-full divide-y divide-slate-100 text-left text-sm">
+              <thead className="bg-white text-slate-600">
                 <tr>
                   <th className="px-4 py-3 font-medium">Member</th>
                   <th className="px-4 py-3 font-medium">Role</th>
@@ -260,48 +260,48 @@ export const SettingsUsersPage = () => {
                   <th className="px-4 py-3 font-medium text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-sky-900/80 bg-[#0b1f35]">
+              <tbody className="divide-y divide-slate-100 bg-white">
                 {usersLoading ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                    <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
                       Loading users…
                     </td>
                   </tr>
                 ) : filteredUsers.length > 0 ? (
                   filteredUsers.map((member) => (
-                    <tr key={member.id} className="hover:bg-sky-950/30">
+                    <tr key={member.id} className="hover:bg-slate-100/30">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-slate-100">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-700 text-sm font-semibold text-slate-800">
                             {member.name?.charAt(0)?.toUpperCase() || <UserRound className="h-4 w-4" />}
                           </div>
                           <div>
-                            <div className="font-medium text-white">{member.name}</div>
-                            <div className="text-xs text-slate-400">{member.username}</div>
+                            <div className="font-medium text-slate-900">{member.name}</div>
+                            <div className="text-xs text-slate-500">{member.username}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass[normalizeRole(member.role)] ?? 'bg-slate-700 text-slate-200'}`}>
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass[normalizeRole(member.role)] ?? 'bg-slate-700 text-slate-700'}`}>
                           {roleOptions.find((role) => role.value === normalizeRole(member.role))?.label ?? member.role}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-slate-200">{member.store_name || member.branch_id || 'Unassigned'}</div>
-                        {member.branch_id && <div className="text-xs text-slate-400">{member.branch_id}</div>}
+                        <div className="text-slate-700">{member.store_name || member.branch_id || 'Unassigned'}</div>
+                        {member.branch_id && <div className="text-xs text-slate-500">{member.branch_id}</div>}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${member.is_active ? 'bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/30' : 'bg-red-500/15 text-red-200 ring-1 ring-red-400/30'}`}>
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${member.is_active ? 'bg-emerald-500/15 text-emerald-700 ring-1 ring-emerald-400/30' : 'bg-red-500/15 text-red-700 ring-1 ring-red-400/30'}`}>
                           {member.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-300">{formatDate(member.created_at)}</td>
+                      <td className="px-4 py-3 text-slate-600">{formatDate(member.created_at)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
                           <button
                             type="button"
                             onClick={() => setEditingUser(member)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-sky-700 bg-sky-900/60 px-2 py-1.5 text-xs font-medium text-sky-100 hover:bg-sky-800"
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-sky-800"
                           >
                             <PencilLine className="h-3.5 w-3.5" />
                             Edit
@@ -309,7 +309,7 @@ export const SettingsUsersPage = () => {
                           <button
                             type="button"
                             onClick={() => toggleUserStatus.mutate({ userId: member.id, isActive: !member.is_active })}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/80 px-2 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700"
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/80 px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-700"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                             {member.is_active ? 'Deactivate' : 'Activate'}
@@ -320,7 +320,7 @@ export const SettingsUsersPage = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                    <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
                       No matching users found.
                     </td>
                   </tr>
@@ -375,7 +375,7 @@ export const SettingsUsersPage = () => {
             </Field>
 
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={() => setIsCreateOpen(false)} className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700">
+              <button type="button" onClick={() => setIsCreateOpen(false)} className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm text-slate-700 hover:bg-slate-700">
                 Cancel
               </button>
               <button type="button" onClick={handleCreate} disabled={createUser.isPending} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60">
@@ -426,7 +426,7 @@ export const SettingsUsersPage = () => {
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={() => setEditingUser(null)} className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700">
+              <button type="button" onClick={() => setEditingUser(null)} className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm text-slate-700 hover:bg-slate-700">
                 Cancel
               </button>
               <button type="button" onClick={handleEditSave} disabled={updateUser.isPending} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60">
@@ -442,16 +442,16 @@ export const SettingsUsersPage = () => {
 
 function StatCard({ label, value, accent }: { label: string; value: string; accent: 'blue' | 'emerald' | 'violet' | 'amber' }) {
   const accentMap = {
-    blue: 'border-blue-500/30 bg-blue-500/10 text-blue-100',
-    emerald: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-100',
-    violet: 'border-violet-500/30 bg-violet-500/10 text-violet-100',
-    amber: 'border-amber-500/30 bg-amber-500/10 text-amber-100',
+    blue: 'border-blue-200 bg-blue-500/10 text-blue-100',
+    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-100',
+    violet: 'border-violet-500/30 bg-violet-50 text-violet-100',
+    amber: 'border-amber-200 bg-amber-50 text-amber-800',
   };
 
   return (
     <div className={`rounded-2xl border p-4 ${accentMap[accent]}`}>
-      <p className="text-xs uppercase tracking-[0.18em] text-slate-300">{label}</p>
-      <p className="mt-3 text-2xl font-bold text-white">{value}</p>
+      <p className="text-xs uppercase tracking-[0.18em] text-slate-600">{label}</p>
+      <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
     </div>
   );
 }
@@ -459,10 +459,10 @@ function StatCard({ label, value, accent }: { label: string; value: string; acce
 function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl border border-sky-900/80 bg-[#0b1f35] shadow-2xl shadow-slate-950/60">
-        <div className="flex items-center justify-between border-b border-sky-900/80 px-5 py-4">
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
-          <button type="button" onClick={onClose} className="rounded-md border border-slate-700 px-2 py-1 text-sm text-slate-300 hover:bg-slate-800">
+      <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/60">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+          <button type="button" onClick={onClose} className="rounded-md border border-slate-700 px-2 py-1 text-sm text-slate-600 hover:bg-slate-800">
             Close
           </button>
         </div>
@@ -474,8 +474,8 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block text-sm text-slate-300">
-      <span className="mb-1.5 block text-xs font-medium uppercase tracking-[0.12em] text-slate-400">{label}</span>
+    <label className="block text-sm text-slate-600">
+      <span className="mb-1.5 block text-xs font-medium uppercase tracking-[0.12em] text-slate-500">{label}</span>
       {children}
     </label>
   );

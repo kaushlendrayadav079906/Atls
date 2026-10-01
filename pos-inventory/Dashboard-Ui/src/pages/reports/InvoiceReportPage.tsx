@@ -5,9 +5,9 @@ import {
   Download,
   Eye,
   FileText,
-    MoreVertical,
+  MoreVertical,
   Receipt,
-      User,
+  User,
   Warehouse,
   ChevronLeft,
   ChevronRight,
@@ -49,42 +49,77 @@ export const InvoiceReportPage = () => {
     })
   });
 
-  
-
-  // Mocking the top KPI stats to match the screenshot UI perfectly
   const kpis = [
-    { title: 'Total Invoices', val: '1,248', icon: FileText, pct: '+12.5%', isUp: true, color: 'text-blue-400', bg: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-    { title: 'Total Sales', val: '₹ 12,48,650', icon: TrendingUp, pct: '+14.2%', isUp: true, color: 'text-emerald-400', bg: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-    { title: 'Total Paid', val: '₹ 11,92,300', icon: CreditCard, subtitle: '95.5% collection', isUp: true, color: 'text-emerald-400', bg: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-    { title: 'Total Due', val: '₹ 56,350', icon: Receipt, subtitle: '4.5% pending', isUp: false, color: 'text-red-400', bg: 'bg-red-500/20 text-red-400 border-red-500/30' },
-    { title: 'Avg. Invoice Value', val: '₹ 1,000', icon: PieChartIcon, pct: '+6.8%', isUp: true, color: 'text-purple-400', bg: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+    {
+      title: 'Total Invoices',
+      val: '1,248',
+      icon: FileText,
+      pct: '+12.5%',
+      isUp: true,
+      iconBg: 'bg-blue-100 text-blue-700',
+    },
+    {
+      title: 'Total Sales',
+      val: '₹12,48,650',
+      icon: TrendingUp,
+      pct: '+14.2%',
+      isUp: true,
+      iconBg: 'bg-emerald-100 text-emerald-700',
+    },
+    {
+      title: 'Total Paid',
+      val: '₹11,92,300',
+      icon: CreditCard,
+      subtitle: '95.5% collected',
+      isUp: true,
+      iconBg: 'bg-emerald-100 text-emerald-700',
+    },
+    {
+      title: 'Total Due',
+      val: '₹56,350',
+      icon: Receipt,
+      subtitle: '4.5% pending',
+      isUp: false,
+      iconBg: 'bg-red-100 text-red-600',
+    },
+    {
+      title: 'Avg. Invoice Value',
+      val: '₹1,000',
+      icon: PieChartIcon,
+      pct: '+6.8%',
+      isUp: true,
+      iconBg: 'bg-violet-100 text-violet-700',
+    },
   ];
 
   return (
-    <div className="flex flex-col h-[calc(100vh-60px)] bg-[#071d34] text-slate-100 font-sans -m-4 sm:-m-5 lg:-m-6 p-4 sm:p-5 lg:p-6 overflow-y-auto scrollbar-thin scrollbar-thumb-sky-800/50 scrollbar-track-transparent">
-      
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center justify-between mb-6">
+    <div className="flex flex-col min-h-full bg-slate-50 font-sans -m-4 sm:-m-5 lg:-m-6 p-4 sm:p-5 lg:p-6 overflow-y-auto">
+
+      {/* ── Page Header ──────────────────────────────────────────── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Invoice Report</h1>
-          <p className="mt-1 text-[13px] text-sky-200/60">View and analyze invoice details, payments and sales transactions.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Invoice Report</h1>
+          <p className="mt-1.5 text-[14px] font-medium text-slate-500">
+            View and analyze invoice details, payments and sales transactions.
+          </p>
         </div>
-        <button className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:bg-blue-500 transition-colors w-fit">
+        <button className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors w-fit">
           <Download className="h-4 w-4" />
           Export
-          <ChevronDown className="h-3.5 w-3.5 ml-1 opacity-70" />
+          <ChevronDown className="h-3.5 w-3.5 opacity-70" />
         </button>
       </div>
 
-      {/* Main Tabs */}
-      <div className="flex items-center gap-2 mb-6 border-b border-sky-900/40 pb-0">
+      {/* ── Main Tabs ────────────────────────────────────────────── */}
+      <div className="flex items-center gap-1 mb-8 bg-slate-200/50 p-1 rounded-xl w-fit">
         {['Invoice Report', 'Payment Report', 'Summary & Analytics'].map(tab => (
-          <button 
+          <button
             key={tab}
-            className={cn("px-6 py-2 text-[13px] font-medium rounded-t-xl transition-colors border border-b-0",
-              tab === 'Invoice Report' 
-                ? "bg-gradient-to-t from-blue-600/30 to-blue-600/10 text-white border-blue-500/40 shadow-[inset_0_2px_10px_rgba(59,130,246,0.2)]" 
-                : "bg-transparent text-sky-200/60 border-transparent hover:text-white hover:bg-sky-900/20"
+            className={cn(
+              'px-5 py-2 text-[13px] font-semibold rounded-lg transition-all',
+              tab === 'Invoice Report'
+                ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/50'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
             )}
           >
             {tab}
@@ -92,28 +127,30 @@ export const InvoiceReportPage = () => {
         ))}
       </div>
 
-      {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-6">
+      {/* ── KPI Cards ────────────────────────────────────────────── */}
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5 mb-8">
         {kpis.map((card, i) => (
-          <div key={i} className="rounded-xl border border-sky-800/60 bg-[#0b2340] p-4 flex flex-col justify-between">
-            <div className="flex items-start gap-3 mb-2">
-              <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border", card.bg)}>
+          <div key={i} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)] hover:shadow-[0_4px_15px_-3px_rgba(6,81,237,0.1)] transition-shadow flex flex-col justify-between gap-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[12px] font-bold uppercase tracking-widest text-slate-500 mb-2">{card.title}</p>
+                <div className="text-2xl font-extrabold text-slate-900 tracking-tight">{card.val}</div>
+              </div>
+              <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', card.iconBg)}>
                 <card.icon className="h-5 w-5" />
               </div>
-              <div className="flex-1">
-                <p className="text-[12px] font-medium text-sky-200/70 mb-1">{card.title}</p>
-                <div className="text-xl font-bold text-white">{card.val}</div>
-              </div>
             </div>
-            <div className="mt-1 text-[11px]">
+            <div className="text-[12px]">
               {card.pct && (
-                <span className={cn("font-bold", card.isUp ? 'text-emerald-400' : 'text-red-400')}>
-                  {card.pct}
-                </span>
+                <>
+                  <span className={cn('font-bold', card.isUp ? 'text-emerald-600' : 'text-red-500')}>
+                    {card.pct}
+                  </span>
+                  <span className="text-slate-400 font-medium ml-1.5">vs. prev. month</span>
+                </>
               )}
-              {card.pct && <span className="text-sky-200/50 ml-1">vs. previous month period</span>}
               {card.subtitle && (
-                <span className={cn("font-medium", card.isUp ? 'text-emerald-400' : 'text-red-400')}>
+                <span className={cn('font-bold', card.isUp ? 'text-emerald-600' : 'text-red-500')}>
                   {card.subtitle}
                 </span>
               )}
@@ -122,79 +159,79 @@ export const InvoiceReportPage = () => {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="mb-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* ── Filters ──────────────────────────────────────────────── */}
+      <div className="mb-8 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)] space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           <div>
-            <label className="mb-1.5 block text-[12px] font-medium text-sky-200/70">Date Range</label>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-600">Date Range</label>
             <div className="relative">
-              <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-400/60" />
-              <select className="w-full appearance-none rounded-lg border border-sky-800/60 bg-[#0b2340] py-2 pl-9 pr-8 text-[13px] text-white focus:border-blue-500 focus:outline-none">
-                <option>Nov 1, 2024 - Nov 30, 2024</option>
+              <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <select className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-8 text-sm text-slate-800 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100">
+                <option>Nov 1, 2024 – Nov 30, 2024</option>
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-400/60 pointer-events-none" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-[12px] font-medium text-sky-200/70">Branch</label>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-600">Branch</label>
             <div className="relative">
-              <Warehouse className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-400/60" />
-              <select className="w-full appearance-none rounded-lg border border-sky-800/60 bg-[#0b2340] py-2 pl-9 pr-8 text-[13px] text-white focus:border-blue-500 focus:outline-none">
+              <Warehouse className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <select className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-8 text-sm text-slate-800 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100">
                 <option>Main Branch (WH-001)</option>
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-400/60 pointer-events-none" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-[12px] font-medium text-sky-200/70">Customer</label>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-600">Customer</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-400/60" />
-              <select className="w-full appearance-none rounded-lg border border-sky-800/60 bg-[#0b2340] py-2 pl-9 pr-8 text-[13px] text-white focus:border-blue-500 focus:outline-none">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <select className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-8 text-sm text-slate-800 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100">
                 <option>All Customers</option>
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-400/60 pointer-events-none" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div>
-            <label className="mb-1.5 block text-[12px] font-medium text-sky-200/70">Invoice Status</label>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-600">Invoice Status</label>
             <div className="relative">
-              <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-400/60" />
-              <select className="w-full appearance-none rounded-lg border border-sky-800/60 bg-[#0b2340] py-2 pl-9 pr-8 text-[13px] text-white focus:border-blue-500 focus:outline-none">
+              <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <select className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-8 text-sm text-slate-800 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100">
                 <option>All Status</option>
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-400/60 pointer-events-none" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-[12px] font-medium text-sky-200/70">Payment Status</label>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-600">Payment Status</label>
             <div className="relative">
-              <CheckCircle2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-400/60" />
-              <select className="w-full appearance-none rounded-lg border border-sky-800/60 bg-[#0b2340] py-2 pl-9 pr-8 text-[13px] text-white focus:border-blue-500 focus:outline-none">
+              <CheckCircle2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <select className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-8 text-sm text-slate-800 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100">
                 <option>All</option>
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-400/60 pointer-events-none" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-[12px] font-medium text-sky-200/70">Payment Method</label>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-600">Payment Method</label>
             <div className="relative">
-              <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-400/60" />
-              <select className="w-full appearance-none rounded-lg border border-sky-800/60 bg-[#0b2340] py-2 pl-9 pr-8 text-[13px] text-white focus:border-blue-500 focus:outline-none">
+              <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <select className="w-full appearance-none rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-8 text-sm text-slate-800 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100">
                 <option>All Methods</option>
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-400/60 pointer-events-none" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex-1 rounded-lg bg-blue-600 py-2 text-[13px] font-semibold text-white shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:bg-blue-500 transition-colors">
+            <button className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 transition-colors shadow-sm">
               Apply Filters
             </button>
-            <button 
+            <button
               onClick={() => { setSearchTerm(''); setPage(1); }}
-              className="flex-1 rounded-lg border border-sky-800/60 bg-[#0b2340] py-2 text-[13px] font-semibold text-sky-200 hover:bg-[#112847] transition-colors"
+              className="flex-1 rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
             >
               Reset
             </button>
@@ -202,84 +239,88 @@ export const InvoiceReportPage = () => {
         </div>
       </div>
 
-      {/* List / Analytics Tabs */}
-      <div className="flex items-center gap-2 mb-4 border-b border-sky-900/40 pb-0">
+      {/* ── Sub-tabs: Invoice List / Analytics ───────────────────── */}
+      <div className="flex items-center gap-1 mb-5 border-b border-slate-200/60 pb-1 w-full">
         {['Invoice List', 'Analytics'].map(tab => (
-          <button 
+          <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={cn("px-6 py-2 text-[13px] font-medium rounded-t-xl transition-colors border border-b-0",
-              activeTab === tab 
-                ? "bg-gradient-to-t from-blue-600/30 to-blue-600/10 text-white border-blue-500/40 shadow-[inset_0_2px_10px_rgba(59,130,246,0.2)]" 
-                : "bg-transparent text-sky-200/60 border-transparent hover:text-white hover:bg-sky-900/20"
+            className={cn(
+              'px-4 py-2 text-[14px] font-bold rounded-lg transition-all relative',
+              activeTab === tab
+                ? 'text-blue-700 bg-blue-50/50'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
             )}
           >
             {tab}
+            {activeTab === tab && (
+              <span className="absolute bottom-[-5px] left-0 right-0 h-0.5 bg-blue-600 rounded-full" />
+            )}
           </button>
         ))}
       </div>
 
-      {/* Table Section */}
-      <div className="bg-[#0b2340] rounded-xl border border-sky-800/50 overflow-hidden flex-1 flex flex-col">
-        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-sky-800/50 scrollbar-track-transparent flex-1">
-          <table className="w-full text-left text-[13px] whitespace-nowrap">
-            <thead className="bg-[#061a2f] border-b border-sky-900/60 text-sky-400/70 font-semibold">
+      {/* ── Table ────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)] overflow-hidden flex flex-col">
+        <div className="overflow-x-auto flex-1">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-slate-50/80 border-b border-slate-200/80">
               <tr>
-                <th className="px-4 py-3 text-center w-10">#</th>
-                <th className="px-4 py-3">Invoice No</th>
-                <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3">Date & Time</th>
-                <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Payment Method</th>
-                <th className="px-4 py-3 text-center">Status</th>
-                <th className="px-4 py-3 text-center">Payment Status</th>
-                <th className="px-4 py-3 text-center">Actions</th>
+                <th className="px-5 py-4 text-center w-10 text-[11px] font-bold uppercase tracking-widest text-slate-500">#</th>
+                <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">Invoice No</th>
+                <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">Customer</th>
+                <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">Date &amp; Time</th>
+                <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">Amount</th>
+                <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">Payment Method</th>
+                <th className="px-5 py-4 text-center text-[11px] font-bold uppercase tracking-widest text-slate-500">Status</th>
+                <th className="px-5 py-4 text-center text-[11px] font-bold uppercase tracking-widest text-slate-500">Payment Status</th>
+                <th className="px-5 py-4 text-center text-[11px] font-bold uppercase tracking-widest text-slate-500">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-sky-900/40 text-slate-200">
+            <tbody className="divide-y divide-slate-100 bg-white">
               {isLoading ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-16 text-center">
-                    <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto" />
-                    <p className="mt-2 text-sm text-sky-400/60">Loading invoices...</p>
+                    <Loader2 className="w-7 h-7 text-blue-500 animate-spin mx-auto" />
+                    <p className="mt-2 text-sm text-slate-500">Loading invoices...</p>
                   </td>
                 </tr>
               ) : data?.items?.map((sale, idx) => {
                 const rowIndex = offset + idx + 1;
                 let paymentStatus = 'Paid';
-                let pClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-                
+                let pClass = 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+
                 if (sale.hasReturn) {
                   paymentStatus = 'Refunded';
-                  pClass = 'bg-red-500/20 text-red-400 border-red-500/30';
+                  pClass = 'bg-red-50 text-red-600 border border-red-200';
                 } else if (sale.saleId?.includes('38')) {
                   paymentStatus = 'Partially Paid';
-                  pClass = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+                  pClass = 'bg-amber-50 text-amber-700 border border-amber-200';
                 }
 
                 return (
-                  <tr key={sale.docEntry || idx} className="hover:bg-[#112847] transition-colors">
-                    <td className="px-4 py-3 text-center font-bold text-white">{rowIndex}</td>
-                    <td className="px-4 py-3 font-medium text-blue-400">{sale.saleId}</td>
-                    <td className="px-4 py-3 text-sky-100">{sale.customerName || 'Walk-in'}</td>
-                    <td className="px-4 py-3 text-sky-300/80">{sale.docDate}</td>
-                    <td className="px-4 py-3 font-medium text-white">{fmt(sale.total)}</td>
-                    <td className="px-4 py-3 text-sky-300/80 capitalize">{sale.paymentMethod || 'Cash'}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  <tr key={sale.docEntry || idx} className="hover:bg-slate-50/60 transition-colors group">
+                    <td className="px-5 py-4 text-center text-[13px] font-medium text-slate-400">{rowIndex}</td>
+                    <td className="px-5 py-4 text-[13px] font-bold text-blue-600">{sale.saleId}</td>
+                    <td className="px-5 py-4 text-[14px] font-semibold text-slate-800">{sale.customerName || 'Walk-in'}</td>
+                    <td className="px-5 py-4 text-[13px] font-medium text-slate-500">{sale.docDate}</td>
+                    <td className="px-5 py-4 text-[14px] font-extrabold text-slate-900">{fmt(sale.total)}</td>
+                    <td className="px-5 py-4 text-[13px] font-medium text-slate-600 capitalize">{sale.paymentMethod || 'Cash'}</td>
+                    <td className="px-5 py-4 text-center">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                         Completed
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={cn("inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border", pClass)}>
+                    <td className="px-5 py-4 text-center">
+                      <span className={cn('inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold tracking-wide border', pClass)}>
                         {paymentStatus}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-3">
-                        <button className="text-sky-400/80 hover:text-white transition-colors"><Eye size={16} /></button>
-                        <button className="text-sky-400/80 hover:text-white transition-colors"><Download size={16} /></button>
-                        <button className="text-sky-400/80 hover:text-white transition-colors"><MoreVertical size={16} /></button>
+                    <td className="px-5 py-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                        <button className="p-2 rounded-lg text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition-colors"><Eye size={16} /></button>
+                        <button className="p-2 rounded-lg text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition-colors"><Download size={16} /></button>
+                        <button className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"><MoreVertical size={16} /></button>
                       </div>
                     </td>
                   </tr>
@@ -289,28 +330,46 @@ export const InvoiceReportPage = () => {
           </table>
         </div>
 
-        {/* Pagination */}
-        <div className="bg-[#061a2f] border-t border-sky-900/60 p-3 flex items-center justify-between text-xs text-sky-400/60 mt-auto">
-          <div>
-            Showing {data?.total ? offset + 1 : 0} to {Math.min(offset + limit, data?.total || 0)} of {data?.total || 0} invoices
+        {/* ── Pagination ───────────────────────────────────────────── */}
+        <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between">
+          <div className="text-sm text-slate-500">
+            Showing{' '}
+            <span className="font-semibold text-slate-700">{data?.total ? offset + 1 : 0}</span>
+            {' '}–{' '}
+            <span className="font-semibold text-slate-700">{Math.min(offset + limit, data?.total || 0)}</span>
+            {' '}of{' '}
+            <span className="font-semibold text-slate-700">{data?.total || 0}</span>
+            {' '}invoices
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1">
-              <button 
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="p-1.5 rounded bg-[#0b2340] border border-sky-800/60 hover:bg-sky-900/40 disabled:opacity-50 transition-colors text-sky-300"
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="flex items-center justify-center h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40 transition-colors"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            {[1, 2, 3, 4, 5].map(n => (
+              <button
+                key={n}
+                onClick={() => setPage(n)}
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-lg text-sm font-medium transition-colors',
+                  page === n
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                )}
               >
-                <ChevronLeft size={14} />
+                {n}
               </button>
-              <button className="w-6 h-6 flex items-center justify-center rounded bg-blue-600 text-white font-medium">1</button>
-              <button className="w-6 h-6 flex items-center justify-center rounded hover:bg-sky-900/40 text-sky-300 font-medium">2</button>
-              <button className="w-6 h-6 flex items-center justify-center rounded hover:bg-sky-900/40 text-sky-300 font-medium">3</button>
-              <button className="w-6 h-6 flex items-center justify-center rounded hover:bg-sky-900/40 text-sky-300 font-medium">4</button>
-              <button className="w-6 h-6 flex items-center justify-center rounded hover:bg-sky-900/40 text-sky-300 font-medium">5</button>
-              <span className="px-1 text-sky-500/50">...</span>
-              <button className="w-6 h-6 flex items-center justify-center rounded hover:bg-sky-900/40 text-sky-300 font-medium"><ChevronRight size={14}/></button>
-            </div>
+            ))}
+            <span className="px-1 text-slate-400 text-sm">…</span>
+            <button
+              onClick={() => setPage(p => p + 1)}
+              className="flex items-center justify-center h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-colors"
+            >
+              <ChevronRight size={14} />
+            </button>
           </div>
         </div>
       </div>
@@ -318,8 +377,8 @@ export const InvoiceReportPage = () => {
   );
 };
 
-// SVG icon for PieChart
-function PieChartIcon(props: any) {
+// SVG icon for PieChart (no lucide equivalent)
+function PieChartIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>

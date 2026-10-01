@@ -99,8 +99,8 @@ async def warm_products_cache():
                 stock = float(sap_item.get("QuantityOnStock") or 0)
             
             product = ProductResponse(
-                id=sap_item.get("ItemCode", ""),
-                name=sap_item.get("ItemName", ""),
+                id=sap_item.get("ItemCode") or "",
+                name=sap_item.get("ItemName") or "",
                 price=sap_service.extract_price(sap_item),
                 barcode=sap_item.get("BarCode") or "",
                 stock=stock,

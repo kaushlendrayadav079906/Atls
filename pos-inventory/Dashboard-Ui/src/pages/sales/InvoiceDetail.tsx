@@ -93,14 +93,14 @@ export const InvoiceDetail = () => {
               <div>
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Date & Time</p>
                 <div className="flex items-center sm:justify-end text-sm text-slate-900 font-medium">
-                  <Calendar size={14} className="mr-1.5 text-slate-400" />
+                  <Calendar size={14} className="mr-1.5 text-slate-500" />
                   {invoice.createdAt ? new Date(invoice.createdAt).toLocaleString() : '-'}
                 </div>
               </div>
               <div>
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Payment Method</p>
                 <div className="flex items-center sm:justify-end text-sm text-slate-900 font-medium capitalize">
-                  <CreditCard size={14} className="mr-1.5 text-slate-400" />
+                  <CreditCard size={14} className="mr-1.5 text-slate-500" />
                   Cash/Card {/* We would pull this from real data if available in SaleDetail */}
                 </div>
               </div>
@@ -112,7 +112,7 @@ export const InvoiceDetail = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 border-b border-slate-200 divide-y sm:divide-y-0 sm:divide-x divide-slate-200">
           <div className="p-6 sm:p-8">
             <div className="flex items-center gap-2 mb-4">
-              <User className="text-slate-400" size={18} />
+              <User className="text-slate-500" size={18} />
               <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Customer Information</h3>
             </div>
             {invoice.customer ? (
@@ -128,7 +128,7 @@ export const InvoiceDetail = () => {
           
           <div className="p-6 sm:p-8">
             <div className="flex items-center gap-2 mb-4">
-              <Building2 className="text-slate-400" size={18} />
+              <Building2 className="text-slate-500" size={18} />
               <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Branch Details</h3>
             </div>
             <div>

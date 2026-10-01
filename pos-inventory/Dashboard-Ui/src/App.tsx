@@ -75,9 +75,9 @@ function App() {
                 <Route path="sales" element={<SalesReportPage />} />
                 <Route path="invoice" element={<InvoiceReportPage />} />
                 <Route path="payment" element={<PaymentReportPage />} />
-                <Route path="inventory" element={<div className="p-8 text-white">Inventory Report - Building...</div>} />
-                <Route path="customer" element={<div className="p-8 text-white">Customer Report - Building...</div>} />
-                <Route path="ai" element={<div className="p-8 text-white">AI Report - Building...</div>} />
+                <Route path="inventory" element={<div className="p-8 text-slate-900">Inventory Report - Building...</div>} />
+                <Route path="customer" element={<div className="p-8 text-slate-900">Customer Report - Building...</div>} />
+                <Route path="ai" element={<div className="p-8 text-slate-900">AI Report - Building...</div>} />
               </Route>
               <Route path="settings" element={<SettingsUsersPage />} />
               {/* Fallback routes for "Coming soon" */}

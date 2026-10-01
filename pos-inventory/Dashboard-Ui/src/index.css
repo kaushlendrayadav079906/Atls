@@ -7,6 +7,22 @@
 }
 
 @layer components {
+  .page-container {
+    @apply mx-auto max-w-[1600px] w-full;
+  }
+  
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+  }
+  
+  .page-title {
+    @apply text-2xl font-bold text-slate-900;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-slate-500 mt-1;
+  }
+
   .auth-input {
     @apply h-11 w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-11 pr-11 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400;
   }

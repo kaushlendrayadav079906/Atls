@@ -20,13 +20,13 @@ import { returnsApi, type ApprovalRequestRow } from '../../api/returns';
 import { useAuth } from '../../contexts/AuthContext';
 
 const badgePalette: Record<string, string> = {
-  pending: 'bg-amber-500/10 text-amber-200 border border-amber-400/30',
-  processing: 'bg-sky-500/10 text-sky-200 border border-sky-400/30',
-  completed: 'bg-emerald-500/10 text-emerald-200 border border-emerald-400/30',
-  approved: 'bg-emerald-500/10 text-emerald-200 border border-emerald-400/30',
-  rejected: 'bg-rose-500/10 text-rose-200 border border-rose-400/30',
-  failed: 'bg-red-500/10 text-red-200 border border-red-400/30',
-  'outcome-unknown': 'bg-violet-500/10 text-violet-200 border border-violet-400/30',
+  pending: 'bg-amber-50 text-amber-800 border border-amber-200',
+  processing: 'bg-sky-50 text-slate-600 border border-slate-200',
+  completed: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  approved: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  rejected: 'bg-rose-50 text-rose-700 border border-rose-200',
+  failed: 'bg-red-50 text-red-700 border border-red-200',
+  'outcome-unknown': 'bg-violet-50 text-violet-700 border border-violet-200',
 };
 
 const formatMoney = (value: number) =>
@@ -191,17 +191,17 @@ export const ReturnsApprovalsPage = () => {
   const selectedAmount = selectedRequest ? Number(selectedRequest.amount || selectedItems.reduce((sum, item) => sum + getLineTotalFromItem(item), 0)) : 0;
 
   return (
-    <div className="min-h-full bg-[#071d34] text-slate-100">
+    <div className="min-h-full bg-slate-50">
       <div className="mx-auto max-w-[1600px]">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Returns &amp; Approvals</h1>
-            <p className="mt-1 text-sm text-slate-300">Manage return requests, review approvals, and track workflow status.</p>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Returns &amp; Approvals</h1>
+            <p className="mt-1 text-sm text-slate-600">Manage return requests, review approvals, and track workflow status.</p>
           </div>
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-xl border border-sky-700 bg-[#0d2d4d] px-4 py-2 text-sm font-medium text-sky-100 hover:bg-[#113a61]"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
             >
               <Search className="h-4 w-4" />
               Search requests
@@ -224,27 +224,27 @@ export const ReturnsApprovalsPage = () => {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.85fr)_minmax(360px,0.8fr)]">
-          <div className="rounded-2xl border border-sky-900/80 bg-[#061f39] shadow-[0_0_0_1px_rgba(59,130,246,0.05)] overflow-hidden">
-            <div className="border-b border-sky-900/80 bg-[#0a2744] px-4 py-3">
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                <div className="flex flex-1 items-center gap-2 rounded-xl border border-sky-800 bg-[#0d2f4e] px-3 py-2">
-                  <Search className="h-4 w-4 text-sky-300" />
+                <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2">
+                  <Search className="h-4 w-4 text-blue-600" />
                   <input
                     type="text"
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
                     placeholder="Search request, customer, invoice..."
-                    className="w-full bg-transparent text-sm text-sky-100 placeholder:text-sky-300/80 outline-none"
+                    className="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-500 outline-none"
                   />
                 </div>
-                <button type="button" className="inline-flex items-center gap-2 rounded-xl border border-sky-700 bg-[#0d2f4e] px-3 py-2 text-sm text-sky-100 hover:bg-[#123c63]">
+                <button type="button" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
                   <ListFilter className="h-4 w-4" />
                   Filter
                 </button>
               </div>
             </div>
 
-            <div className="border-b border-sky-900/80 bg-[#0a2744] px-4 py-3">
+            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
               <div className="flex flex-wrap gap-2">
                 {tabs.map((item) => (
                   <button
@@ -254,7 +254,7 @@ export const ReturnsApprovalsPage = () => {
                     className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
                       tab === item.key
                         ? 'bg-blue-600 text-white shadow-sm shadow-blue-900/20'
-                        : 'bg-transparent text-sky-200 hover:bg-[#123d65]'
+                        : 'bg-transparent text-slate-600 hover:bg-[#123d65]'
                     }`}
                   >
                     {item.label} {item.count > 0 ? `(${item.count})` : ''}
@@ -264,8 +264,8 @@ export const ReturnsApprovalsPage = () => {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-sky-900/80 text-left">
-                <thead className="bg-[#0a2744] text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200">
+              <table className="min-w-full divide-y divide-slate-100 text-left">
+                <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
                   <tr>
                     <th className="px-4 py-3">#</th>
                     <th className="px-4 py-3">Request ID</th>
@@ -279,12 +279,12 @@ export const ReturnsApprovalsPage = () => {
                     <th className="px-4 py-3 text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-sky-900/80 bg-[#071d32]">
+                <tbody className="divide-y divide-slate-100 bg-white">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-sky-200">
+                      <td colSpan={10} className="px-4 py-12 text-center text-slate-600">
                         <div className="flex flex-col items-center justify-center gap-2">
-                          <Loader2 className="h-6 w-6 animate-spin text-sky-300" />
+                          <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
                           Loading returns...
                         </div>
                       </td>
@@ -292,20 +292,20 @@ export const ReturnsApprovalsPage = () => {
                   ) : isError ? (
                     <tr>
                       <td colSpan={10} className="px-4 py-12 text-center">
-                        <div className="space-y-2 text-sky-100">
-                          <p className="font-medium text-red-200">Unable to load return requests</p>
-                          <p className="text-sm text-slate-300">{(error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'The approval service is unavailable.'}</p>
-                          <button type="button" onClick={() => refetch()} className="rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-100 hover:bg-red-500/20">Retry</button>
+                        <div className="space-y-2 text-slate-700">
+                          <p className="font-medium text-red-700">Unable to load return requests</p>
+                          <p className="text-sm text-slate-600">{(error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'The approval service is unavailable.'}</p>
+                          <button type="button" onClick={() => refetch()} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50">Retry</button>
                         </div>
                       </td>
                     </tr>
                   ) : rows.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-sky-200">
+                      <td colSpan={10} className="px-4 py-12 text-center text-slate-600">
                         <div className="space-y-2">
-                          <RotateCcw className="mx-auto h-8 w-8 text-sky-300" />
+                          <RotateCcw className="mx-auto h-8 w-8 text-blue-600" />
                           <p className="font-medium">No return requests found</p>
-                          <p className="text-sm text-slate-400">Try adjusting your search or filters.</p>
+                          <p className="text-sm text-slate-500">Try adjusting your search or filters.</p>
                         </div>
                       </td>
                     </tr>
@@ -319,17 +319,17 @@ export const ReturnsApprovalsPage = () => {
                       return (
                         <tr
                           key={request.id}
-                          className={`cursor-pointer transition ${isSelected ? 'bg-sky-950/40' : 'hover:bg-sky-900/20'}`}
+                          className={`cursor-pointer transition ${isSelected ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
                           onClick={() => setSelectedId(request.id)}
                         >
-                          <td className="px-4 py-3 text-sm text-sky-200">{index + 1}</td>
-                          <td className="px-4 py-3 text-sm font-semibold text-sky-100">{getRequestNumber(request)}</td>
-                          <td className="px-4 py-3 text-sm text-sky-100">{getInvoiceNumber(request)}</td>
-                          <td className="px-4 py-3 text-sm text-sky-100">{getCustomerName(request)}</td>
-                          <td className="px-4 py-3 text-sm text-sky-200">{rowItems.length}</td>
-                          <td className="px-4 py-3 text-sm text-sky-200">{request.reason || 'Return'}</td>
-                          <td className="px-4 py-3 text-sm font-medium text-sky-100">{formatMoney(rowAmount)}</td>
-                          <td className="px-4 py-3 text-sm text-sky-200">{request.created_at ? new Date(request.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                          <td className="px-4 py-3 text-sm text-slate-600">{index + 1}</td>
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-700">{getRequestNumber(request)}</td>
+                          <td className="px-4 py-3 text-sm text-slate-700">{getInvoiceNumber(request)}</td>
+                          <td className="px-4 py-3 text-sm text-slate-700">{getCustomerName(request)}</td>
+                          <td className="px-4 py-3 text-sm text-slate-600">{rowItems.length}</td>
+                          <td className="px-4 py-3 text-sm text-slate-600">{request.reason || 'Return'}</td>
+                          <td className="px-4 py-3 text-sm font-medium text-slate-700">{formatMoney(rowAmount)}</td>
+                          <td className="px-4 py-3 text-sm text-slate-600">{request.created_at ? new Date(request.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${badgePalette[status] || badgePalette.pending}`}>
                               {status}
@@ -342,7 +342,7 @@ export const ReturnsApprovalsPage = () => {
                                 event.stopPropagation();
                                 setSelectedId(request.id);
                               }}
-                              className="rounded-lg border border-sky-700 bg-[#0d2f4e] p-2 text-sky-100 hover:bg-[#123d65]"
+                              className="rounded-lg border border-slate-200 bg-slate-100 p-2 text-slate-700 hover:bg-[#123d65]"
                               aria-label="Review request"
                             >
                               <ChevronRight className="h-4 w-4" />
@@ -356,40 +356,40 @@ export const ReturnsApprovalsPage = () => {
               </table>
             </div>
 
-            <div className="flex items-center justify-between border-t border-sky-900/80 bg-[#0a2744] px-4 py-3 text-sm text-sky-200">
+            <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
               <span>Showing {rows.length} requests</span>
               <div className="flex items-center gap-2">
-                <button type="button" className="rounded-md border border-sky-700 bg-[#0d2f4e] p-2 text-sky-100 hover:bg-[#123d65] disabled:opacity-50" disabled>
+                <button type="button" className="rounded-md border border-slate-200 bg-slate-100 p-2 text-slate-700 hover:bg-[#123d65] disabled:opacity-50" disabled>
                   <ChevronLeft className="h-4 w-4" />
                 </button>
-                <button type="button" className="rounded-md border border-sky-700 bg-[#0d2f4e] p-2 text-sky-100 hover:bg-[#123d65] disabled:opacity-50" disabled>
+                <button type="button" className="rounded-md border border-slate-200 bg-slate-100 p-2 text-slate-700 hover:bg-[#123d65] disabled:opacity-50" disabled>
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             </div>
           </div>
 
-          <aside className="rounded-2xl border border-sky-900/80 bg-[#091f35] p-5 shadow-[0_0_0_1px_rgba(59,130,246,0.04)]">
+          <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             {selectedRequest ? (
               <>
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">Return Request Details</p>
-                    <h2 className="mt-2 text-2xl font-bold text-white">{getRequestNumber(selectedRequest)}</h2>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">Return Request Details</p>
+                    <h2 className="mt-2 text-2xl font-bold text-slate-900">{getRequestNumber(selectedRequest)}</h2>
                   </div>
-                  <button type="button" onClick={() => navigate('/sales')} className="rounded-lg border border-sky-700 bg-[#0d2f4e] px-3 py-2 text-sm font-medium text-sky-100 hover:bg-[#123d65]">
+                  <button type="button" onClick={() => navigate('/sales')} className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[#123d65]">
                     View Invoice
                   </button>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-sky-800 bg-[#0b2c4d] p-3">
+                <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/20 text-blue-100">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-100">
                       <Ticket className="h-4 w-4" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-white">{getRequestNumber(selectedRequest)}</div>
-                      <div className="text-xs text-sky-300">Submitted on {selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</div>
+                      <div className="text-sm font-semibold text-slate-900">{getRequestNumber(selectedRequest)}</div>
+                      <div className="text-xs text-blue-600">Submitted on {selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</div>
                     </div>
                   </div>
                   <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${badgePalette[normalizeStatus(selectedRequest.status)] || badgePalette.pending}`}>
@@ -398,20 +398,20 @@ export const ReturnsApprovalsPage = () => {
                 </div>
 
                 <div className="mt-5 space-y-4">
-                  <div className="rounded-xl border border-sky-800 bg-[#0b2c4d] p-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-300">Invoice Information</h3>
-                    <div className="mt-3 grid gap-3 text-sm text-sky-100">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Invoice Information</h3>
+                    <div className="mt-3 grid gap-3 text-sm text-slate-700">
                       <InfoRow label="Invoice No." value={getInvoiceNumber(selectedRequest)} />
                       <InfoRow label="Customer" value={getCustomerName(selectedRequest)} />
                       <InfoRow label="Payment Method" value={safeText(selectedRequest.payload?.paymentMethod || selectedRequest.payload?.payment_method || 'Cash')} />
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-sky-800 bg-[#0b2c4d] p-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-300">Return Items</h3>
-                    <div className="mt-3 overflow-hidden rounded-lg border border-sky-800">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Return Items</h3>
+                    <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
                       <table className="min-w-full divide-y divide-sky-800 text-left text-sm">
-                        <thead className="bg-[#0d2f4e] text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-200">
+                        <thead className="bg-slate-100 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
                           <tr>
                             <th className="px-3 py-2">#</th>
                             <th className="px-3 py-2">Product</th>
@@ -420,19 +420,19 @@ export const ReturnsApprovalsPage = () => {
                             <th className="px-3 py-2 text-right">Total</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-sky-800 bg-[#0a2744]">
+                        <tbody className="divide-y divide-sky-800 bg-slate-50">
                           {selectedItems.length === 0 ? (
                             <tr>
-                              <td colSpan={5} className="px-3 py-4 text-center text-sky-200">No item data returned by the backend.</td>
+                              <td colSpan={5} className="px-3 py-4 text-center text-slate-600">No item data returned by the backend.</td>
                             </tr>
                           ) : (
                             selectedItems.map((item, index) => (
                               <tr key={`${item.itemCode || 'line'}-${index}`}>
-                                <td className="px-3 py-2 text-sky-200">{index + 1}</td>
-                                <td className="px-3 py-2 text-sky-50">{item.itemName || item.itemCode || 'Item'}</td>
-                                <td className="px-3 py-2 text-center text-sky-100">{item.quantity || 0}</td>
-                                <td className="px-3 py-2 text-right text-sky-100">{formatMoney(item.unitPrice || 0)}</td>
-                                <td className="px-3 py-2 text-right text-sky-50">{formatMoney(getLineTotalFromItem(item))}</td>
+                                <td className="px-3 py-2 text-slate-600">{index + 1}</td>
+                                <td className="px-3 py-2 text-slate-800">{item.itemName || item.itemCode || 'Item'}</td>
+                                <td className="px-3 py-2 text-center text-slate-700">{item.quantity || 0}</td>
+                                <td className="px-3 py-2 text-right text-slate-700">{formatMoney(item.unitPrice || 0)}</td>
+                                <td className="px-3 py-2 text-right text-slate-800">{formatMoney(getLineTotalFromItem(item))}</td>
                               </tr>
                             ))
                           )}
@@ -441,19 +441,19 @@ export const ReturnsApprovalsPage = () => {
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-sky-800 bg-[#0b2c4d] p-4">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-300">Requested Amount</h3>
-                      <span className="text-xl font-bold text-white">{formatMoney(selectedAmount)}</span>
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Requested Amount</h3>
+                      <span className="text-xl font-bold text-slate-900">{formatMoney(selectedAmount)}</span>
                     </div>
-                    <div className="mt-3 text-sm text-sky-100">
-                      <p className="mb-2 font-medium text-sky-200">Reason for Return</p>
-                      <p className="rounded-lg border border-sky-800 bg-[#0a2744] p-3 text-sky-100">{selectedRequest.reason || 'No reason was provided by the backend.'}</p>
+                    <div className="mt-3 text-sm text-slate-700">
+                      <p className="mb-2 font-medium text-slate-600">Reason for Return</p>
+                      <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-700">{selectedRequest.reason || 'No reason was provided by the backend.'}</p>
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-sky-800 bg-[#0b2c4d] p-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-300">Approval Workflow</h3>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Approval Workflow</h3>
                     <div className="mt-4 space-y-3 text-sm">
                       <WorkflowRow title="Request Submitted" time={selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} done />
                       <WorkflowRow title="Pending Review" time={isAdmin ? 'Admin approval queue' : 'Access restricted'} done={normalizeStatus(selectedRequest.status) !== 'rejected' && normalizeStatus(selectedRequest.status) !== 'completed'} />
@@ -461,16 +461,16 @@ export const ReturnsApprovalsPage = () => {
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-dashed border-sky-700 bg-[#0b2c4d] p-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-300">Reviewer Notes</h3>
-                    <div className="mt-3 rounded-lg border border-sky-800 bg-[#0a2744] p-3 text-sm text-sky-100">
+                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Reviewer Notes</h3>
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                       {selectedRequest.payload?.reviewerComment || 'No reviewer comment was returned by the backend yet.'}
                     </div>
                   </div>
                 </div>
 
                 {actionError && (
-                  <div className="mt-5 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+                  <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                     <div className="flex items-start gap-2">
                       <AlertCircle className="mt-0.5 h-4 w-4" />
                       <span>{actionError}</span>
@@ -498,13 +498,13 @@ export const ReturnsApprovalsPage = () => {
                 </div>
 
                 {!isAdmin && (
-                  <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                     Admin access is required to approve or reject return requests.
                   </div>
                 )}
               </>
             ) : (
-              <div className="flex h-full min-h-[320px] items-center justify-center rounded-xl border border-dashed border-sky-700 bg-[#0a2744] text-sky-200">
+              <div className="flex h-full min-h-[320px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-600">
                 Select a return request to review its details.
               </div>
             )}
@@ -517,47 +517,47 @@ export const ReturnsApprovalsPage = () => {
 
 const MetricTile = ({ title, value, change, tone, icon }: { title: string; value: string; change: string; tone: 'cyan' | 'green' | 'rose' | 'violet'; icon: ReactNode }) => {
   const palette: Record<string, string> = {
-    cyan: 'bg-[#0a2d49] text-cyan-200',
-    green: 'bg-[#0d2f2a] text-emerald-200',
-    rose: 'bg-[#3a1e2d] text-rose-200',
-    violet: 'bg-[#2a1f46] text-violet-200',
+    cyan: 'bg-white text-cyan-700',
+    green: 'bg-white text-emerald-700',
+    rose: 'bg-[#3a1e2d] text-rose-700',
+    violet: 'bg-violet-50 text-violet-700',
   };
 
   return (
-    <div className="rounded-2xl border border-sky-900/80 bg-[#071d31] p-4 shadow-[0_0_0_1px_rgba(59,130,246,0.04)]">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-sky-200">{title}</p>
-          <p className="mt-3 text-3xl font-bold tracking-tight text-white">{value}</p>
+          <p className="text-sm font-medium text-slate-600">{title}</p>
+          <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{value}</p>
         </div>
         <div className={`rounded-xl p-2.5 ${palette[tone]}`}>{icon}</div>
       </div>
       <div className="mt-4 flex items-center justify-between gap-2">
-        <span className="inline-flex items-center rounded-full bg-[#0f2343] px-2 py-1 text-[11px] font-semibold text-sky-200">Live</span>
-        <span className="text-xs text-sky-300">{change}</span>
+        <span className="inline-flex items-center rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-600">Live</span>
+        <span className="text-xs text-blue-600">{change}</span>
       </div>
     </div>
   );
 };
 
 const InfoRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-start justify-between gap-3 rounded-lg border border-sky-800 bg-[#0a2744] px-3 py-2">
-    <span className="text-xs font-medium uppercase tracking-[0.14em] text-sky-300">{label}</span>
-    <span className="max-w-[180px] text-right text-sm font-medium text-sky-50 break-words">{value}</span>
+  <div className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+    <span className="text-xs font-medium uppercase tracking-[0.14em] text-blue-600">{label}</span>
+    <span className="max-w-[180px] text-right text-sm font-medium text-slate-800 break-words">{value}</span>
   </div>
 );
 
 const WorkflowRow = ({ title, time, done }: { title: string; time: string; done: boolean }) => (
   <div className="flex items-start gap-3">
-    <div className={`relative mt-1 flex h-5 w-5 items-center justify-center rounded-full ${done ? 'bg-blue-500 text-white' : 'bg-sky-900 text-sky-300'}`}>
+    <div className={`relative mt-1 flex h-5 w-5 items-center justify-center rounded-full ${done ? 'bg-blue-500 text-white' : 'bg-sky-900 text-blue-600'}`}>
       <span className="h-2.5 w-2.5 rounded-full bg-current" />
     </div>
-    <div className="flex-1 rounded-lg border border-sky-800 bg-[#0a2744] px-3 py-2">
+    <div className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
       <div className="flex items-center justify-between gap-3">
-        <div className="font-medium text-sky-50">{title}</div>
-        <span className="text-[10px] uppercase tracking-[0.12em] text-sky-300">{done ? 'Done' : 'Pending'}</span>
+        <div className="font-medium text-slate-800">{title}</div>
+        <span className="text-[10px] uppercase tracking-[0.12em] text-blue-600">{done ? 'Done' : 'Pending'}</span>
       </div>
-      <div className="mt-1 text-xs text-sky-300">{time}</div>
+      <div className="mt-1 text-xs text-blue-600">{time}</div>
     </div>
   </div>
 );
