@@ -1,0 +1,576 @@
+﻿diff --git a/pos-inventory/Dashboard-Ui/src/api/endpoints.ts b/pos-inventory/Dashboard-Ui/src/api/endpoints.ts
+index 7c231c6..4104771 100644
+--- a/pos-inventory/Dashboard-Ui/src/api/endpoints.ts
++++ b/pos-inventory/Dashboard-Ui/src/api/endpoints.ts
+@@ -90,6 +90,15 @@ export const authApi = {
+   }
+ };
+ 
++export interface InventoryRiskItem {
++  item_code: string;
++  name: string;
++  in_stock: number;
++  minimal_stock: number;
++  projected_stock: number;
++  warehouse_code: string;
++}
++
+ export const dashboardApi = {
+   getSummary: async (branch_id?: string): Promise<DashboardSummary> => {
+     const res = await apiClient.get('/dashboard/summary', { params: { branch_id } });
+@@ -102,16 +111,24 @@ export const dashboardApi = {
+   getAlerts: async (): Promise<DashboardAlert[]> => {
+     const res = await apiClient.get('/dashboard/alerts');
+     return res.data;
++  },
++  getInventoryRisk: async (): Promise<InventoryRiskItem[]> => {
++    const res = await apiClient.get('/dashboard/inventory-risk');
++    return res.data;
+   }
+ };
+ 
+ export const atlasApi = {
+-  getSalesTrend: async (branch_id?: string): Promise<{ trend: SalesTrendPoint[] }> => {
+-    const res = await apiClient.get('/atlas/sales-trends', { params: { branch: branch_id } });
++  getSalesTrend: async (branch_id?: string, range: string = 'monthly'): Promise<{ trend: SalesTrendPoint[] }> => {
++    const res = await apiClient.get('/atlas/sales-trends', { params: { branch: branch_id, range } });
++    return res.data;
++  },
++  getRecentSalesFeed: async (params?: { range?: string, search?: string, limit?: number, offset?: number, branch?: string }) => {
++    const res = await apiClient.get('/dashboard/recent-sales-feed', { params });
+     return res.data;
+   },
+-  getOverview: async (branch_id?: string) => {
+-    const res = await apiClient.get('/atlas/overview', { params: { branch: branch_id } });
++  getOverview: async (branch_id?: string, range: string = 'monthly') => {
++    const res = await apiClient.get('/atlas/overview', { params: { branch: branch_id, range } });
+     return res.data;
+   },
+   getTopProducts: async (branch_id?: string): Promise<TopProduct[]> => {
+diff --git a/pos-inventory/Dashboard-Ui/src/pages/reports/SalesReportPage.tsx b/pos-inventory/Dashboard-Ui/src/pages/reports/SalesReportPage.tsx
+index c60607e..d29424d 100644
+--- a/pos-inventory/Dashboard-Ui/src/pages/reports/SalesReportPage.tsx
++++ b/pos-inventory/Dashboard-Ui/src/pages/reports/SalesReportPage.tsx
+@@ -1,26 +1,86 @@
+-import { useState } from 'react';
++import { useState, useCallback } from 'react';
++import { useQuery } from '@tanstack/react-query';
+ import {
+   CalendarDays,
+-  ChevronDown,
+   Download,
+   FileText,
+-  Filter,
+-  MoreVertical,
+   RotateCcw,
+-  Settings2,
+   TrendingUp,
+-  User,
+   Warehouse,
+   PieChart,
+-  Eye
++  AlertCircle,
++  ShoppingBag,
+ } from 'lucide-react';
++import { atlasApi } from '../../api/endpoints';
++
++const money = new Intl.NumberFormat('en-IN', {
++  style: 'currency',
++  currency: 'INR',
++  maximumFractionDigits: 2,
++});
++
++const StateMessage = ({ type, message }: { type: 'error' | 'empty'; message: string }) => (
++  <div className="flex h-full min-h-[180px] flex-col items-center justify-center gap-2 px-4 text-center">
++    {type === 'error' ? <AlertCircle className="h-8 w-8 text-red-400" /> : <FileText className="h-8 w-8 text-slate-500" />}
++    <div className={type === 'error' ? 'text-red-300 text-sm' : 'text-slate-500 text-sm'}>{message}</div>
++  </div>
++);
++
++const DEFAULT_RANGE = 'monthly';
+ 
+ export const SalesReportPage = () => {
+-  const [activeTab, setActiveTab] = useState('Sales Details');
++  const [range, setRange] = useState(DEFAULT_RANGE);
++  const [branchId, setBranchId] = useState<string | undefined>(undefined);
++  // Reset key forces React Query to refetch
++  const [resetKey, setResetKey] = useState(0);
++
++  const { data: overview, isLoading: loadingOverview, isError: isErrorOverview, error: overviewError } = useQuery({
++    queryKey: ['atlasOverview', branchId, range, resetKey],
++    queryFn: () => atlasApi.getOverview(branchId, range),
++    retry: 1,
++  });
++
++  const { data: trendData, isLoading: loadingTrend, isError: isErrorTrend, error: trendError } = useQuery({
++    queryKey: ['salesTrend', branchId, range, resetKey],
++    queryFn: () => atlasApi.getSalesTrend(branchId, range),
++    retry: 1,
++  });
++
++  const { data: feedData, isLoading: loadingFeed, isError: isErrorFeed, error: feedError } = useQuery({
++    queryKey: ['salesFeed', branchId, range, resetKey],
++    queryFn: () => atlasApi.getRecentSalesFeed({ range, branch: branchId, limit: 50, offset: 0 }),
++    retry: 1,
++  });
++
++  const handleReset = useCallback(() => {
++    setRange(DEFAULT_RANGE);
++    setBranchId(undefined);
++    setResetKey((k) => k + 1);
++  }, []);
++
++  const trendPoints = trendData?.trend ?? [];
++  const chartMax = Math.max(...trendPoints.map((point) => point.total), 1);
++  const paymentBreakdown = overview?.paymentBreakdown ?? [];
++  const feedItems = feedData?.items ?? [];
++
++  const getErrorMessage = (error: unknown): string => {
++    if (error && typeof error === 'object' && 'response' in error) {
++      const axiosError = error as { response?: { status?: number; data?: { detail?: string } } };
++      const status = axiosError.response?.status;
++      const detail = axiosError.response?.data?.detail;
++      if (status === 401) return 'Session expired. Please log in again.';
++      if (status === 403) return detail || 'Access denied for this branch or role.';
++      if (status === 404) return 'Report endpoint not found. Please contact support.';
++      if (status === 422) return `Invalid filter parameters: ${detail || 'check date range or branch.'}`;
++      if (status === 502) return `SAP data unavailable: ${detail || 'SAP Service Layer returned an error.'}`;
++      if (status === 503) return 'SAP Service Layer is offline. Please try again later.';
++      if (detail) return detail;
++    }
++    return 'Failed to load report data. Please try again.';
++  };
+ 
+   return (
+     <div className="mx-auto max-w-[1500px] space-y-5">
+-      
+       {/* Header */}
+       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+         <div className="flex items-center gap-3">
+@@ -32,7 +92,32 @@ export const SalesReportPage = () => {
+             <p className="mt-0.5 text-[13px] text-slate-500">View and export sales summary, items, and customer wise reports.</p>
+           </div>
+         </div>
+-        <button className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500">
++        <button
++          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500 disabled:opacity-50"
++          disabled={loadingFeed || isErrorFeed || feedItems.length === 0}
++          onClick={() => {
++            if (!feedItems.length) return;
++            const headers = ['#', 'Invoice No.', 'Date', 'Customer', 'Items', 'Amount', 'Payment Method', 'Status'];
++            const rows = feedItems.map((r: any, i: number) => [
++              i + 1,
++              r.docNum ? `INV-${r.docNum}` : r.saleId,
++              r.docDate || '',
++              r.customerName || r.customerCode || 'Walk-in',
++              r.items?.length || 0,
++              r.total,
++              r.paymentMethod || 'Unknown',
++              r.hasReturn ? 'Refunded' : 'Completed',
++            ]);
++            const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');
++            const blob = new Blob([csv], { type: 'text/csv' });
++            const url = URL.createObjectURL(blob);
++            const a = document.createElement('a');
++            a.href = url;
++            a.download = `sales-report-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
++            a.click();
++            URL.revokeObjectURL(url);
++          }}
++        >
+           <Download className="h-4 w-4" />
+           Quick Export
+         </button>
+@@ -45,78 +130,68 @@ export const SalesReportPage = () => {
+             <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Date Range</label>
+             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+               <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
+-              <span className="flex-1">Nov 1, 2024 - Nov 30, 2024</span>
+-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
++              <select
++                value={range}
++                onChange={(e) => setRange(e.target.value)}
++                className="flex-1 bg-transparent outline-none"
++              >
++                <option value="daily">Today</option>
++                <option value="weekly">This Week</option>
++                <option value="monthly">This Month</option>
++                <option value="yearly">This Year</option>
++                <option value="all_time">All Time</option>
++              </select>
+             </div>
+           </div>
+           <div>
+             <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Branch</label>
+             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+               <Warehouse className="h-3.5 w-3.5 text-blue-600" />
+-              <span className="flex-1">Main Branch (WH-001)</span>
+-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+-            </div>
+-          </div>
+-          <div>
+-            <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Report View</label>
+-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+-              <TrendingUp className="h-3.5 w-3.5 text-blue-600" />
+-              <span className="flex-1">Summary</span>
+-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+-            </div>
+-          </div>
+-          <div>
+-            <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Group By</label>
+-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+-              <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
+-              <span className="flex-1">Date (Daily)</span>
+-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
++              <select
++                value={branchId || ''}
++                onChange={(e) => setBranchId(e.target.value || undefined)}
++                className="flex-1 bg-transparent outline-none"
++              >
++                <option value="">All Branches</option>
++              </select>
+             </div>
+           </div>
+-          <div className="row-span-2 hidden items-end justify-end gap-2 lg:flex">
+-            <button className="flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-5 text-[12px] font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500">
+-              <Filter className="h-3.5 w-3.5" />
+-              Apply Filters
+-            </button>
+-            <button className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 text-[12px] font-semibold text-slate-600 hover:bg-white">
++          <div className="row-span-2 hidden items-end justify-end gap-2 lg:flex col-start-5">
++            <button
++              onClick={handleReset}
++              className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 text-[12px] font-semibold text-slate-600 hover:bg-white"
++            >
+               <RotateCcw className="h-3.5 w-3.5" />
+               Reset
+             </button>
+           </div>
+-          <div>
+-            <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Customer</label>
+-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+-              <User className="h-3.5 w-3.5 text-blue-600" />
+-              <span className="flex-1">All Customers</span>
+-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+-            </div>
+-          </div>
+-          <div>
+-            <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Product Category</label>
+-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+-              <div className="h-3.5 w-3.5 rounded bg-sky-400" />
+-              <span className="flex-1">All Categories</span>
+-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+-            </div>
+-          </div>
+-          <div>
+-            <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Payment Method</label>
+-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+-              <div className="h-3.5 w-3.5 rounded bg-sky-400" />
+-              <span className="flex-1">All Payment Methods</span>
+-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+-            </div>
+-          </div>
+         </div>
+       </div>
+ 
+       {/* KPI Cards */}
+-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
++      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+         {[
+-          { title: 'Total Sales', val: 'Γé╣12,840.50', up: true, pct: '+12.5%', color: 'text-emerald-600', bg: 'bg-emerald-50', icon: TrendingUp },
+-          { title: 'Total Invoices', val: '28', up: false, pct: '-16.7%', color: 'text-purple-400', bg: 'bg-purple-500/10', icon: FileText },
+-          { title: 'Total Customers', val: '156', up: false, pct: '-8.2%', color: 'text-blue-600', bg: 'bg-blue-500/10', icon: User },
+-          { title: 'Avg. Order Value', val: 'Γé╣458.60', up: false, pct: '-2.4%', color: 'text-amber-400', bg: 'bg-amber-50', icon: CalendarDays },
++          {
++            title: 'Total Sales',
++            val: overview ? money.format(overview.totalSales) : 'Γé╣0.00',
++            color: 'text-emerald-600',
++            bg: 'bg-emerald-50',
++            icon: TrendingUp,
++          },
++          {
++            title: 'Total Invoices',
++            val: overview ? `${overview.invoiceCount}` : '0',
++            color: 'text-purple-400',
++            bg: 'bg-purple-500/10',
++            icon: FileText,
++          },
++          {
++            title: 'Avg. Order Value',
++            val: overview ? money.format(overview.averageOrderValue) : 'Γé╣0.00',
++            color: 'text-amber-400',
++            bg: 'bg-amber-50',
++            icon: ShoppingBag,
++          },
+         ].map((card, i) => (
+           <div key={i} className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+             <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${card.bg}`}>
+@@ -125,10 +200,14 @@ export const SalesReportPage = () => {
+             <div>
+               <p className="text-[12px] text-slate-500">{card.title}</p>
+               <div className="flex items-end gap-2">
+-                <span className="text-xl font-bold text-slate-900">{card.val}</span>
+-                <span className={`text-[10px] ${card.up ? 'text-emerald-600' : 'text-red-400'}`}>{card.pct}</span>
++                <span className="text-xl font-bold text-slate-900">
++                  {loadingOverview
++                    ? 'Loading...'
++                    : isErrorOverview
++                    ? <span className="text-red-400 text-sm">{getErrorMessage(overviewError)}</span>
++                    : card.val}
++                </span>
+               </div>
+-              <p className="text-[10px] text-slate-500">vs. previous period</p>
+             </div>
+           </div>
+         ))}
+@@ -136,113 +215,83 @@ export const SalesReportPage = () => {
+ 
+       {/* Charts Row */}
+       <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
++        {/* Sales Trend */}
+         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+           <div className="mb-6 flex items-center justify-between">
+             <div className="flex items-center gap-2">
+               <TrendingUp className="h-5 w-5 text-blue-600" />
+-              <h3 className="font-semibold text-slate-900">Daily Sales Trend</h3>
+-            </div>
+-            <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-600">
+-              Sales Amount
+-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
++              <h3 className="font-semibold text-slate-900">Sales Trend</h3>
+             </div>
+           </div>
+-          {/* Chart Placeholder */}
+-          <div className="relative h-[200px] w-full border-b border-l border-slate-200">
+-            <div className="absolute -left-8 flex h-full flex-col justify-between text-[10px] text-slate-500">
+-              <span>Γé╣20K</span>
+-              <span>Γé╣15K</span>
+-              <span>Γé╣10K</span>
+-              <span>Γé╣5K</span>
+-              <span>Γé╣0</span>
+-            </div>
+-            <div className="flex h-full items-end justify-between px-2">
+-              {Array.from({ length: 30 }).map((_, i) => (
+-                <div key={i} className="w-[2%] bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]" style={{ height: `${Math.random() * 80 + 20}%` }} />
+-              ))}
+-            </div>
+-            <div className="absolute -bottom-6 flex w-full justify-between px-2 text-[10px] text-slate-500">
+-              <span>Nov 1</span>
+-              <span>Nov 5</span>
+-              <span>Nov 10</span>
+-              <span>Nov 15</span>
+-              <span>Nov 20</span>
+-              <span>Nov 25</span>
+-              <span>Nov 30</span>
++          {loadingTrend ? (
++            <StateMessage type="empty" message="Loading chart data from SAP..." />
++          ) : isErrorTrend ? (
++            <StateMessage type="error" message={getErrorMessage(trendError)} />
++          ) : trendPoints.length === 0 ? (
++            <StateMessage type="empty" message="No sales data available for this period." />
++          ) : (
++            <div className="relative h-[200px] w-full border-b border-l border-slate-200">
++              <div className="flex h-full items-end justify-between px-2">
++                {trendPoints.map((point, i) => (
++                  <div key={i} className="w-8 flex flex-col items-center gap-1 group relative">
++                    <div className="hidden group-hover:block absolute -top-8 bg-slate-800 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap z-10">
++                      {money.format(point.total)} ┬╖ {point.billCount} inv
++                    </div>
++                    <div
++                      className="w-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-all duration-300"
++                      style={{ height: `${(point.total / chartMax) * 100}%` }}
++                    />
++                  </div>
++                ))}
++              </div>
++              <div className="absolute -bottom-6 flex w-full justify-between px-2 text-[10px] text-slate-500">
++                {trendPoints.map((p, i) => <span key={i}>{p.label.split(' ')[0]}</span>)}
++              </div>
+             </div>
+-          </div>
++          )}
+         </div>
+ 
++        {/* Sales by Payment Method */}
+         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+           <div className="mb-6 flex items-center justify-between">
+             <div className="flex items-center gap-2">
+               <PieChart className="h-5 w-5 text-blue-600" />
+               <h3 className="font-semibold text-slate-900">Sales by Payment Method</h3>
+             </div>
+-            <div className="flex items-center gap-1 text-[11px] text-slate-500">
+-              This Period
+-              <ChevronDown className="h-3.5 w-3.5" />
+-            </div>
+           </div>
+-          {/* Circular Chart Placeholder */}
+-          <div className="flex flex-col items-center gap-6 xl:flex-row">
+-            <div className="relative flex h-32 w-32 items-center justify-center rounded-full border-[12px] border-blue-500 border-l-purple-500 border-r-amber-500 border-t-emerald-500">
+-              <div className="text-center">
+-                <div className="text-[14px] font-bold text-slate-900">Γé╣12,840.50</div>
+-                <div className="text-[10px] text-slate-500">Total Sales</div>
+-              </div>
+-            </div>
+-            <div className="flex-1 space-y-3 text-[11px]">
+-              {[
+-                { label: 'Cash', val: '42%', amt: 'Γé╣5,393.01', color: 'bg-blue-500' },
+-                { label: 'Card (Visa/Mastercard)', val: '28%', amt: 'Γé╣3,594.94', color: 'bg-purple-500' },
+-                { label: 'UPI / Wallet', val: '20%', amt: 'Γé╣2,568.10', color: 'bg-amber-500' },
+-                { label: 'Credit', val: '8%', amt: 'Γé╣1,026.45', color: 'bg-emerald-500' },
+-                { label: 'Other', val: '2%', amt: 'Γé╣257.99', color: 'bg-slate-400' },
+-              ].map(item => (
+-                <div key={item.label} className="flex items-center justify-between">
+-                  <div className="flex items-center gap-2 text-slate-700">
+-                    <div className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
+-                    {item.label}
+-                  </div>
+-                  <div className="flex gap-4">
+-                    <span className="text-slate-500">{item.val}</span>
+-                    <span className="text-slate-900">{item.amt}</span>
++          {loadingOverview ? (
++            <StateMessage type="empty" message="Loading payment data from SAP..." />
++          ) : isErrorOverview ? (
++            <StateMessage type="error" message={getErrorMessage(overviewError)} />
++          ) : paymentBreakdown.length === 0 ? (
++            <StateMessage type="empty" message="Payment method data not available in SAP for this period." />
++          ) : (
++            <div className="flex flex-col items-center gap-6 xl:flex-row">
++              <div className="flex-1 space-y-3 text-[11px] w-full">
++                {paymentBreakdown.map((item: any) => (
++                  <div key={item.method} className="flex items-center justify-between">
++                    <div className="flex items-center gap-2 text-slate-700">
++                      <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
++                      {item.method}
++                    </div>
++                    <div className="flex gap-4">
++                      <span className="text-slate-500">{item.billCount} bills</span>
++                      <span className="text-slate-900 font-medium">{money.format(item.total)}</span>
++                    </div>
+                   </div>
+-                </div>
+-              ))}
++                ))}
++              </div>
+             </div>
+-          </div>
++          )}
+         </div>
+       </div>
+ 
+-      {/* Tabs & Table */}
++      {/* Sales Details Table */}
+       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+         <div className="mb-4 flex flex-col justify-between gap-4 border-b border-slate-200 sm:flex-row sm:items-center">
+           <div className="flex gap-4 text-[13px] font-semibold text-slate-500">
+-            {['Sales Details', 'Top Selling Items', 'Customer Wise Sales', 'Branch Wise Sales'].map(tab => (
+-              <button
+-                key={tab}
+-                onClick={() => setActiveTab(tab)}
+-                className={`border-b-2 pb-3 transition-colors ${
+-                  activeTab === tab
+-                    ? 'border-blue-500 text-blue-600'
+-                    : 'border-transparent hover:text-white'
+-                }`}
+-              >
+-                {tab}
+-              </button>
+-            ))}
+-          </div>
+-          <div className="flex gap-2 pb-2">
+-            <button className="flex items-center gap-2 rounded border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">
+-              <Download className="h-3 w-3" />
+-              Download
+-              <ChevronDown className="h-3 w-3" />
+-            </button>
+-            <button className="flex items-center gap-2 rounded border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">
+-              <Settings2 className="h-3 w-3" />
+-              Customize Columns
++            <button className="border-b-2 pb-3 transition-colors border-blue-500 text-blue-600">
++              Sales Details
+             </button>
+           </div>
+         </div>
+@@ -253,62 +302,46 @@ export const SalesReportPage = () => {
+               <tr>
+                 <th className="py-2">#</th>
+                 <th className="py-2">Invoice No.</th>
+-                <th className="py-2">Date & Time</th>
++                <th className="py-2">Date &amp; Time</th>
+                 <th className="py-2">Customer</th>
+                 <th className="py-2 text-center">Items</th>
+                 <th className="py-2 text-right">Amount</th>
+                 <th className="py-2">Payment Method</th>
+                 <th className="py-2 text-center">Status</th>
+-                <th className="py-2 text-center">Actions</th>
+               </tr>
+             </thead>
+             <tbody className="divide-y divide-sky-800/30">
+-              {[
+-                { no: 'INV-7843', dt: '30 Nov 2024 10:24 AM', name: 'Jane Smith', items: 3, amt: 'Γé╣234.00', pay: 'Cash', status: 'Completed' },
+-                { no: 'INV-7842', dt: '30 Nov 2024 10:12 AM', name: 'Mike Chen', items: 5, amt: 'Γé╣567.50', pay: 'Card (Visa)', status: 'Completed' },
+-                { no: 'INV-7841', dt: '29 Nov 2024 09:58 AM', name: 'Robert Davis', items: 2, amt: 'Γé╣123.00', pay: 'Cash', status: 'Completed' },
+-                { no: 'INV-7840', dt: '29 Nov 2024 09:45 AM', name: 'Sarah Wilson', items: 6, amt: 'Γé╣890.00', pay: 'Card (Mastercard)', status: 'Completed' },
+-                { no: 'INV-7839', dt: '29 Nov 2024 09:30 AM', name: 'David Kim', items: 1, amt: 'Γé╣456.00', pay: 'UPI', status: 'Completed' },
+-                { no: 'INV-7838', dt: '29 Nov 2024 09:12 AM', name: 'Emily Brown', items: 4, amt: 'Γé╣320.00', pay: 'Cash', status: 'Refunded', isRed: true },
+-                { no: 'INV-7837', dt: '28 Nov 2024 08:55 AM', name: 'Alex Johnson', items: 2, amt: 'Γé╣789.00', pay: 'Card (Visa)', status: 'Completed' },
+-                { no: 'INV-7836', dt: '28 Nov 2024 08:40 AM', name: 'Chris Lee', items: 3, amt: 'Γé╣345.00', pay: 'UPI', status: 'Completed' },
+-              ].map((r, i) => (
+-                <tr key={r.no} className="hover:bg-slate-50">
++              {loadingFeed ? (
++                <tr><td colSpan={8} className="py-8 text-center text-slate-500">Loading sales data from SAP...</td></tr>
++              ) : isErrorFeed ? (
++                <tr><td colSpan={8} className="py-8 text-center text-red-400">{getErrorMessage(feedError)}</td></tr>
++              ) : feedItems.length === 0 ? (
++                <tr><td colSpan={8} className="py-8 text-center text-slate-500">No sales data available for the selected filters.</td></tr>
++              ) : feedItems.map((r: any, i: number) => (
++                <tr key={r.saleId || r.docEntry || i} className="hover:bg-slate-50">
+                   <td className="py-2.5 text-slate-500">{i + 1}</td>
+-                  <td className="py-2.5 font-medium text-blue-600">{r.no}</td>
+-                  <td className="py-2.5 text-slate-500">{r.dt}</td>
+-                  <td className="py-2.5">{r.name}</td>
+-                  <td className="py-2.5 text-center">{r.items}</td>
+-                  <td className="py-2.5 text-right font-semibold">{r.amt}</td>
+-                  <td className="py-2.5 text-slate-500">{r.pay}</td>
++                  <td className="py-2.5 font-medium text-blue-600">{r.docNum ? `INV-${r.docNum}` : r.saleId}</td>
++                  <td className="py-2.5 text-slate-500">{r.docDate || 'N/A'}</td>
++                  <td className="py-2.5">{r.customerName || r.customerCode || 'Walk-in'}</td>
++                  <td className="py-2.5 text-center">{r.items?.length ?? 0}</td>
++                  <td className="py-2.5 text-right font-semibold">{money.format(r.total ?? 0)}</td>
++                  <td className="py-2.5 text-slate-500">{r.paymentMethod || 'Unknown'}</td>
+                   <td className="py-2.5 text-center">
+                     <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+-                      r.isRed ? 'bg-red-50 text-red-400' : 'bg-emerald-50 text-emerald-600'
++                      r.hasReturn ? 'bg-red-50 text-red-400' : 'bg-emerald-50 text-emerald-600'
+                     }`}>
+-                      {r.status}
++                      {r.hasReturn ? 'Refunded' : 'Completed'}
+                     </span>
+                   </td>
+-                  <td className="py-2.5 text-center text-slate-500">
+-                    <div className="flex items-center justify-center gap-2">
+-                      <Eye className="h-3.5 w-3.5 cursor-pointer hover:text-slate-900" />
+-                      <MoreVertical className="h-3.5 w-3.5 cursor-pointer hover:text-slate-900" />
+-                    </div>
+-                  </td>
+                 </tr>
+               ))}
+             </tbody>
+           </table>
+-          <div className="mt-4 flex items-center justify-between text-[11px] text-slate-500">
+-            <span>Showing 1 to 8 of 28 invoices</span>
+-            <div className="flex items-center gap-1">
+-              <button className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-slate-50 hover:text-slate-900">{'<'}</button>
+-              <button className="flex h-6 w-6 items-center justify-center rounded bg-blue-600 text-white">1</button>
+-              <button className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-slate-50 hover:text-slate-900">2</button>
+-              <button className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-slate-50 hover:text-slate-900">3</button>
+-              <button className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-slate-50 hover:text-slate-900">4</button>
+-              <button className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-slate-50 hover:text-slate-900">{'>'}</button>
++          {feedData && feedItems.length > 0 && (
++            <div className="mt-4 flex items-center justify-between text-[11px] text-slate-500">
++              <span>Showing {feedItems.length} of {feedData.total ?? feedItems.length} invoices</span>
+             </div>
+-          </div>
++          )}
+         </div>
+       </div>
+     </div>

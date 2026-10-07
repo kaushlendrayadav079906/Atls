@@ -27,6 +27,9 @@ export interface DashboardRecentSalesPage {
   items: DashboardRecentSale[];
   nextOffset?: number;
   total?: number;
+  grossSales?: number;
+  paidInvoices?: number;
+  pendingInvoices?: number;
 }
 
 export interface SaleDetailItem {
@@ -58,4 +61,8 @@ export interface SalesFeedParams {
   search?: string;
   limit?: number;
   offset?: number;
+  branch?: string;
+  customer?: string;
+  category?: string;
+  payment_method?: string;
 }

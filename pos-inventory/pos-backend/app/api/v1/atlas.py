@@ -9,11 +9,12 @@ from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.core.config import settings
-from app.core.security import require_manager_or_admin
+from app.core.security import get_current_user
 from app.core.cache import cache_get, cache_set
 from app.models.schemas import (
     AtlasOverview,
     AtlasSalesTrend,
+    DynamicSalesTrendResponse,
     AtlasInventorySummary,
     AtlasInventoryItem,
     AtlasBranchComparison,
@@ -32,6 +33,7 @@ from app.api.v1.admin import (
     _compute_branch_breakdown,
     _fetch_credit_notes_for_range,
 )
+from app.api.v1.trend_logic import _compute_dynamic_trend
 from app.services.sap.warehouses_service import SAPWarehousesService
 from app.services import approval_service
 
@@ -44,20 +46,72 @@ _ATLAS_CACHE_TTL = 300  # 5 minutes for analytics data
 
 def _get_permitted_branch(user: dict, requested_branch: Optional[str] = None) -> Optional[str]:
     """
-    Enforce branch access.
-    Admins can see all (None) or filter by a specific branch.
-    Managers can ONLY see their assigned branch, overriding any request.
+    Enforce branch access for analytics endpoints.
+    Admins can see all branches (None = no filter) or filter by a specific branch.
+    Managers are locked to their assigned branch.
+    Operators/users without a branch see data from SAP_DEFAULT_WAREHOUSE if set,
+    otherwise all branches (None).
     """
-    if user.get("role") == "admin":
-        return requested_branch or settings.SAP_DEFAULT_WAREHOUSE
-    
-    manager_branch = user.get("branch_id")
-    if not manager_branch:
-        raise HTTPException(status_code=403, detail="Manager has no assigned branch for analytics.")
-    
-    # Manager is forced to use their assigned branch
-    return manager_branch
+    role = str(user.get("role") or "user").lower()
 
+    if role == "admin":
+        # Admin: honour the requested branch or show all (no filter)
+        return requested_branch or None
+
+    if role == "manager":
+        manager_branch = user.get("branch_id")
+        if not manager_branch:
+            raise HTTPException(
+                status_code=403,
+                detail="Manager account has no branch assigned. Contact an administrator.",
+            )
+        # Manager is locked to their own branch; ignore any requested_branch
+        return manager_branch
+
+    # operator / user / any other role:
+    # use their assigned branch if set, otherwise fallback to requested or None
+    user_branch = str(user.get("branch_id") or "").strip()
+    if user_branch:
+        return user_branch
+    return requested_branch or None
+
+
+def _filter_invoices_advanced(
+    invoices: List[Dict[str, Any]],
+    branch: Optional[str],
+    customer: Optional[str] = None,
+    category: Optional[str] = None,
+    payment_method: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    # branch filter
+    filtered = _filter_invoices_by_branch(invoices, branch)
+    
+    # customer filter
+    if customer:
+        c_low = customer.strip().lower()
+        filtered = [inv for inv in filtered if c_low in str(inv.get("CardCode") or "").lower() or c_low in str(inv.get("CardName") or "").lower()]
+        
+    # payment method filter
+    if payment_method:
+        pm_low = payment_method.strip().lower()
+        filtered = [inv for inv in filtered if str(inv.get("U_P_Method") or "").strip().lower() == pm_low]
+        
+    # category filter
+    if category:
+        cat_low = category.strip().lower()
+        cat_filtered = []
+        for inv in filtered:
+            has_cat = False
+            for line in inv.get("DocumentLines") or []:
+                # Usually ItemGroup or UDF_CATEGORY. We check ItemDescription or ItemCode for simple fallback if not present
+                if cat_low in str(line.get("ItemCode") or "").lower() or cat_low in str(line.get("ItemDescription") or "").lower():
+                    has_cat = True
+                    break
+            if has_cat:
+                cat_filtered.append(inv)
+        filtered = cat_filtered
+
+    return filtered
 
 @router.get("/overview", response_model=AtlasOverview)
 async def get_overview(
@@ -65,12 +119,15 @@ async def get_overview(
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
-    current_user: dict = Depends(require_manager_or_admin),
+    customer: Optional[str] = Query(None, description="Filter by customer Code or Name"),
+    category: Optional[str] = Query(None, description="Filter by product category"),
+    payment_method: Optional[str] = Query(None, description="Filter by payment method"),
+    current_user: dict = Depends(get_current_user),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
     start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
     
-    cache_key = f"pos:atlas:overview:{range}:{start_date}:{end_date}:{target_branch or 'all'}"
+    cache_key = f"pos:atlas:overview:{range}:{start_date}:{end_date}:{target_branch or 'all'}:{customer or 'all'}:{category or 'all'}:{payment_method or 'all'}"
     cached = await cache_get(cache_key)
     if cached:
         return AtlasOverview(**cached)
@@ -80,10 +137,10 @@ async def get_overview(
         invoices = await loop.run_in_executor(
             _executor, lambda: SAPInvoicesService().get_invoices_by_date_with_lines(start_date, end_date)
         )
-        invoices = _filter_invoices_by_branch(invoices, target_branch)
+        invoices = _filter_invoices_advanced(invoices, target_branch, customer, category, payment_method)
     except Exception as e:
         logger.error(f"Atlas overview fetch failed: {e}")
-        raise HTTPException(status_code=502, detail="Could not retrieve sales data from SAP")
+        raise HTTPException(status_code=502, detail=f"SAP Error: {str(e)}")
 
     total_sales = sum(float(inv.get("DocTotal") or 0) for inv in invoices)
     invoice_count = len(invoices)
@@ -100,13 +157,16 @@ async def get_overview(
     return result
 
 
-@router.get("/sales-trends", response_model=AtlasSalesTrend)
+@router.get("/sales-trends", response_model=DynamicSalesTrendResponse)
 async def get_sales_trends(
     range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time)$"),
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
-    current_user: dict = Depends(require_manager_or_admin),
+    customer: Optional[str] = Query(None, description="Filter by customer Code or Name"),
+    category: Optional[str] = Query(None, description="Filter by product category"),
+    payment_method: Optional[str] = Query(None, description="Filter by payment method"),
+    current_user: dict = Depends(get_current_user),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
     start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
@@ -116,19 +176,19 @@ async def get_sales_trends(
         invoices = await loop.run_in_executor(
             _executor, lambda: SAPInvoicesService().get_invoices_by_date_with_lines(start_date, end_date)
         )
-        invoices = _filter_invoices_by_branch(invoices, target_branch)
+        invoices = _filter_invoices_advanced(invoices, target_branch, customer, category, payment_method)
     except Exception as e:
         logger.error(f"Atlas trend fetch failed: {e}")
-        raise HTTPException(status_code=502, detail="Could not retrieve trend data from SAP")
+        raise HTTPException(status_code=502, detail=f"SAP Error: {str(e)}")
 
-    trend = _compute_trend(invoices, range)
-    return AtlasSalesTrend(trend=trend)
+    trend_result = _compute_dynamic_trend(invoices, range, start_date, end_date)
+    return DynamicSalesTrendResponse(**trend_result)
 
 
 @router.get("/inventory-summary", response_model=AtlasInventorySummary)
 async def get_inventory_summary(
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
-    current_user: dict = Depends(require_manager_or_admin),
+    current_user: dict = Depends(get_current_user),
 ):
     if current_user.get("role") == "admin" and not branch:
         raise HTTPException(status_code=400, detail="Branch must be provided for inventory snapshot.")
@@ -162,15 +222,15 @@ async def get_inventory_summary(
             None,
         )
         if warehouse_stock is None:
-            raise HTTPException(status_code=502, detail="SAP returned incomplete warehouse inventory data.")
+            continue
         try:
             in_stock = float(warehouse_stock.get("InStock") or 0.0)
         except (TypeError, ValueError):
             raise HTTPException(status_code=502, detail="SAP returned invalid warehouse inventory data.")
         snapshot_items.append(
             AtlasInventoryItem(
-                itemCode=item.get("ItemCode", ""),
-                itemName=item.get("ItemName", ""),
+                itemCode=item.get("ItemCode") or "",
+                itemName=item.get("ItemName") or item.get("ItemCode") or "",
                 inStock=in_stock,
                 warehouse=target_branch,
             )
@@ -187,7 +247,7 @@ async def get_branch_comparison(
     range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time)$"),
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
-    current_user: dict = Depends(require_manager_or_admin),
+    current_user: dict = Depends(get_current_user),
 ):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Branch comparison is restricted to administrators.")
@@ -226,7 +286,7 @@ async def get_returns_summary(
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
-    current_user: dict = Depends(require_manager_or_admin),
+    current_user: dict = Depends(get_current_user),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
     start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
@@ -268,8 +328,11 @@ async def get_top_customers(
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
+    customer: Optional[str] = Query(None, description="Filter by customer Code or Name"),
+    category: Optional[str] = Query(None, description="Filter by product category"),
+    payment_method: Optional[str] = Query(None, description="Filter by payment method"),
     limit: int = Query(5, ge=1, le=50),
-    current_user: dict = Depends(require_manager_or_admin),
+    current_user: dict = Depends(get_current_user),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
     start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
@@ -279,7 +342,7 @@ async def get_top_customers(
         invoices = await loop.run_in_executor(
             _executor, lambda: SAPInvoicesService().get_invoices_by_date_with_lines(start_date, end_date)
         )
-        invoices = _filter_invoices_by_branch(invoices, target_branch)
+        invoices = _filter_invoices_advanced(invoices, target_branch, customer, category, payment_method)
     except Exception as e:
         logger.error(f"Atlas top customers fetch failed: {e}")
         raise HTTPException(status_code=502, detail="Could not retrieve sales data from SAP")
@@ -314,8 +377,11 @@ async def get_product_velocity(
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
+    customer: Optional[str] = Query(None, description="Filter by customer Code or Name"),
+    category: Optional[str] = Query(None, description="Filter by product category"),
+    payment_method: Optional[str] = Query(None, description="Filter by payment method"),
     limit: int = Query(10, ge=1, le=100),
-    current_user: dict = Depends(require_manager_or_admin),
+    current_user: dict = Depends(get_current_user),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
     start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
@@ -327,7 +393,7 @@ async def get_product_velocity(
                 start_date, end_date, max_line_rows=20000, page_size=1000
             )
         )
-        invoices = _filter_invoices_by_branch(invoices, target_branch)
+        invoices = _filter_invoices_advanced(invoices, target_branch, customer, category, payment_method)
     except Exception as e:
         logger.error(f"Atlas product velocity fetch failed: {e}")
         raise HTTPException(status_code=502, detail="Could not retrieve invoice lines from SAP")

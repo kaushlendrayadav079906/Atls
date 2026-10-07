@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
   ArrowDown,
-  ArrowUp,
   Building2,
   Calendar,
   ChevronLeft,
@@ -17,7 +16,7 @@ import {
   Loader2,
   MoreVertical,
   Printer,
-  
+  Package2,  
   Search,
   User,
   X
@@ -126,14 +125,14 @@ const InvoiceDetailPanel = ({ id, onClose }: { id: number; onClose: () => void }
             <div className="text-slate-500 mb-1">Payment Method</div>
             <div className="text-slate-900 font-medium flex items-center gap-1.5">
               <CreditCard size={14} className="text-blue-600" />
-              Online (Razorpay)
+              N/A
             </div>
           </div>
           <div>
             <div className="text-slate-500 mb-1">Customer</div>
             <div className="text-slate-900 font-medium flex items-center gap-1.5">
               <User size={14} className="text-blue-600" />
-              {invoice.customer || 'Walk-in Customer'}
+              {invoice.customer || 'N/A'}
             </div>
           </div>
           <div>
@@ -152,11 +151,11 @@ const InvoiceDetailPanel = ({ id, onClose }: { id: number; onClose: () => void }
           </div>
           <div>
             <div className="text-slate-500 mb-1">Sales Person</div>
-            <div className="text-slate-900 font-medium">Admin User</div>
+            <div className="text-slate-900 font-medium">N/A</div>
           </div>
           <div>
             <div className="text-slate-500 mb-1">Branch</div>
-            <div className="text-slate-900 font-medium truncate">Main Branch (WH-001)</div>
+            <div className="text-slate-900 font-medium truncate">N/A</div>
           </div>
           <div>
             <div className="text-slate-500 mb-1">Reference</div>
@@ -200,7 +199,8 @@ const InvoiceDetailPanel = ({ id, onClose }: { id: number; onClose: () => void }
                     <td className="py-2.5 text-blue-600/60">{idx + 1}</td>
                     <td className="py-2.5 pr-2 font-medium flex items-center gap-2">
                       <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center text-blue-600">
-                        <User size={12} /> {/* Mock icon */}
+                        <Package2 size={12} />
+
                       </div>
                       <span className="truncate max-w-[120px]">{item.ItemDescription || item.ItemCode}</span>
                     </td>
@@ -228,8 +228,8 @@ const InvoiceDetailPanel = ({ id, onClose }: { id: number; onClose: () => void }
             <span className="text-red-400">-{fmt(0)}</span>
           </div>
           <div className="flex justify-between text-slate-500">
-            <span>Tax (12%)</span>
-            <span>{fmt(100)}</span> {/* Mocking tax for visual match */}
+            <span>Tax</span>
+            <span>{fmt(0)}</span>
           </div>
           <div className="flex justify-between items-center pt-3 mt-1 border-t border-slate-200">
             <span className="text-base font-bold text-slate-900">Total</span>
@@ -252,7 +252,7 @@ const InvoiceDetailPanel = ({ id, onClose }: { id: number; onClose: () => void }
 export const SalesList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearch = useDebounce(searchTerm, 500);
-  const [dateRange] = useState<SalesFeedParams['range']>('monthly');
+  const [dateRange, setDateRange] = useState<SalesFeedParams['range']>('monthly');
   const [page, setPage] = useState(1);
   const limit = 10;
   const offset = (page - 1) * limit;
@@ -309,13 +309,7 @@ export const SalesList = () => {
             </div>
             <div>
               <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Gross Sales <span className="lowercase font-normal opacity-70">(Selected Period)</span></div>
-              <div className="text-xl font-bold text-slate-900">₹1,24,560.50</div>
-            </div>
-            <div className="absolute right-4 top-4 text-right">
-              <div className="flex items-center justify-end gap-1 text-emerald-600 text-xs font-bold">
-                <ArrowUp size={12} /> +12.5%
-              </div>
-              <div className="text-[9px] text-blue-600/50 mt-0.5">vs. previous period</div>
+              <div className="text-xl font-bold text-slate-900">{fmt(data?.grossSales || 0)}</div>
             </div>
           </div>
 
@@ -325,13 +319,7 @@ export const SalesList = () => {
             </div>
             <div>
               <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Invoices</div>
-              <div className="text-xl font-bold text-slate-900">156</div>
-            </div>
-            <div className="absolute right-4 top-4 text-right">
-              <div className="flex items-center justify-end gap-1 text-emerald-600 text-xs font-bold">
-                <ArrowUp size={12} /> +8.2%
-              </div>
-              <div className="text-[9px] text-blue-600/50 mt-0.5">vs. previous period</div>
+              <div className="text-xl font-bold text-slate-900">{data?.total || 0}</div>
             </div>
           </div>
 
@@ -341,13 +329,7 @@ export const SalesList = () => {
             </div>
             <div>
               <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Paid Invoices</div>
-              <div className="text-xl font-bold text-slate-900 flex items-baseline gap-1">138 <span className="text-xs text-slate-500 font-medium">(88.5%)</span></div>
-            </div>
-            <div className="absolute right-4 top-4 text-right">
-              <div className="flex items-center justify-end gap-1 text-emerald-600 text-xs font-bold">
-                <ArrowUp size={12} /> +10.4%
-              </div>
-              <div className="text-[9px] text-blue-600/50 mt-0.5">vs. previous period</div>
+              <div className="text-xl font-bold text-slate-900 flex items-baseline gap-1">{data?.paidInvoices || 0}</div>
             </div>
           </div>
 
@@ -357,13 +339,7 @@ export const SalesList = () => {
             </div>
             <div>
               <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Pending / Due</div>
-              <div className="text-xl font-bold text-slate-900 flex items-baseline gap-1">18 <span className="text-xs text-slate-500 font-medium">(11.5%)</span></div>
-            </div>
-            <div className="absolute right-4 top-4 text-right">
-              <div className="flex items-center justify-end gap-1 text-red-400 text-xs font-bold">
-                <ArrowDown size={12} /> -3.1%
-              </div>
-              <div className="text-[9px] text-blue-600/50 mt-0.5">vs. previous period</div>
+              <div className="text-xl font-bold text-slate-900 flex items-baseline gap-1">{data?.pendingInvoices || 0}</div>
             </div>
           </div>
         </div>
@@ -382,24 +358,32 @@ export const SalesList = () => {
           </div>
           <div className="relative w-[200px]">
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-600/60" size={16} />
-            <select className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-[13px] text-slate-700 appearance-none focus:outline-none focus:border-blue-500 transition-colors">
-              <option>Nov 1, 2024 - Nov 30, 2024</option>
+            <select 
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value as SalesFeedParams['range'])}
+              className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-[13px] text-slate-700 appearance-none focus:outline-none focus:border-blue-500 transition-colors"
+            >
+              <option value="daily">Today</option>
+              <option value="weekly">This Week</option>
+              <option value="monthly">This Month</option>
+              <option value="yearly">This Year</option>
+              <option value="all_time">All Time</option>
             </select>
           </div>
           <div className="relative w-[140px]">
             <select className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2 text-[13px] text-slate-700 appearance-none focus:outline-none focus:border-blue-500 transition-colors">
-              <option>All Status</option>
+              <option value="">All Status</option>
             </select>
           </div>
           <div className="relative w-[180px]">
             <select className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2 text-[13px] text-slate-700 appearance-none focus:outline-none focus:border-blue-500 transition-colors">
-              <option>All Payment Methods</option>
+              <option value="">All Payment Methods</option>
             </select>
           </div>
           <div className="relative w-[200px]">
             <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-600/60" size={16} />
             <select className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-[13px] text-slate-700 appearance-none focus:outline-none focus:border-blue-500 transition-colors">
-              <option>Main Branch (WH-001)</option>
+              <option value="">All Branches</option>
             </select>
           </div>
           <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-medium rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all">
@@ -439,9 +423,7 @@ export const SalesList = () => {
                     </td>
                   </tr>
                 ) : data?.items?.map((sale) => {
-                  // Determine visual status purely based on ID for mockup demonstration, or use actual logic
-                  let isPending = false;
-                  if(sale.saleId && (sale.saleId.includes('41') || sale.saleId.includes('34'))) isPending = true;
+                  const isPending = false; // Add real pending logic if added to API
 
                   const isSelected = selectedSaleId === sale.docEntry;
 
@@ -456,10 +438,10 @@ export const SalesList = () => {
                       <td className="px-4 py-3 text-center"><input type="checkbox" className="rounded border-slate-200 bg-white text-blue-500" /></td>
                       <td className="px-4 py-3 font-medium text-blue-600 hover:underline">{sale.saleId}</td>
                       <td className="px-4 py-3 text-slate-700">{sale.docDate}</td>
-                      <td className="px-4 py-3 text-slate-700">{sale.customerName || 'Walk-in'}</td>
-                      <td className="px-4 py-3 text-slate-500">Main Branch</td>
+                      <td className="px-4 py-3 text-slate-700">{sale.customerName || 'N/A'}</td>
+                      <td className="px-4 py-3 text-slate-500">N/A</td>
                       <td className="px-4 py-3 text-right font-medium text-slate-900">{fmt(sale.total)}</td>
-                      <td className="px-4 py-3 text-center text-slate-500 capitalize">{sale.paymentMethod || 'Online (Razorpay)'}</td>
+                      <td className="px-4 py-3 text-center text-slate-500 capitalize">{sale.paymentMethod || 'N/A'}</td>
                       <td className="px-4 py-3 text-center">
                         {getStatusBadge(sale.hasReturn, isPending)}
                       </td>

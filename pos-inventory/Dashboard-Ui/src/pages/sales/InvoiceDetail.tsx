@@ -132,7 +132,7 @@ export const InvoiceDetail = () => {
               <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Branch Details</h3>
             </div>
             <div>
-              <p className="font-medium text-slate-900 text-base">Main Branch</p>
+              <p className="font-medium text-slate-900 text-base">Branch</p>
               <p className="text-sm text-slate-500 mt-1">System default branch context</p>
             </div>
           </div>

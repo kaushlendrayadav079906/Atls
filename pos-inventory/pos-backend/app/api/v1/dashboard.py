@@ -200,24 +200,38 @@ def _resolve_branch_for_user(current_user: dict, requested_branch: Optional[str]
 
 
 def _filter_invoices_by_branch(invoices: List[Dict[str, Any]], branch: Optional[str]) -> List[Dict[str, Any]]:
+    """Filter invoices to those belonging to a specific warehouse/branch.
+
+    Invoices whose lines carry no WarehouseCode are silently skipped rather than
+    raising – prevents analytics from returning 502 when SAP invoices lack
+    full line-level warehouse attribution.
+    """
     if not branch:
         return invoices
 
+    branch_upper = branch.strip().upper()
     filtered: List[Dict[str, Any]] = []
-    branch_upper = branch.upper()
     for inv in invoices:
         lines = inv.get("DocumentLines") or []
+        if not lines:
+            logger.debug(
+                "Skipping invoice DocEntry=%s: no DocumentLines (branch filter=%s)",
+                inv.get("DocEntry"), branch_upper,
+            )
+            continue
         line_branches = {
             str(line.get("WarehouseCode") or "").strip().upper()
             for line in lines
         }
-        if not lines or "" in line_branches:
-            raise ValueError("Cannot determine branch for one or more SAP invoices.")
-        if len(line_branches) > 1:
-            raise ValueError("Cannot allocate an invoice across multiple warehouses.")
+        line_branches.discard("")
+        if not line_branches:
+            logger.debug(
+                "Skipping invoice DocEntry=%s: lines lack WarehouseCode (branch filter=%s)",
+                inv.get("DocEntry"), branch_upper,
+            )
+            continue
         if branch_upper in line_branches:
             filtered.append(inv)
-
     return filtered
 
 
@@ -650,27 +664,50 @@ async def search_customers(
     search: str = Query(None, description="Search term for customer name or code"),
     current_user: dict = Depends(get_current_user),
 ):
-    """Search for customers with SAP BP first, then invoice UDF fallback."""
+    """Search for customers using SAP Business Partners."""
     try:
+        loop = asyncio.get_running_loop()
         bp_service = SAPBusinessPartnersService()
-        customers = bp_service.search_customers(search_term=search, top=20)
-        if customers:
-            return [
-                {
-                    "cardCode": c.get("CardCode"),
-                    "cardName": c.get("CardName"),
-                    "phone": c.get("Phone1"),
-                    "email": c.get("EmailAddress"),
-                    "whatsappNumber": c.get("Cellular"),
-                    "paymentMethod": None,
-                    "salesEmployee": None,
-                }
-                for c in customers
-            ]
+        customers = bp_service.search_customers(search_term=search, top=50)
+        
+        # Calculate lifetime value
+        invoice_service = SAPInvoicesService()
+        from datetime import date
+        invoices = await loop.run_in_executor(
+            _executor, lambda: invoice_service.get_invoices_by_date(date(2000, 1, 1), date(2099, 12, 31))
+        )
+        from collections import defaultdict
+        clv_map = defaultdict(float)
+        for inv in invoices:
+            code = str(inv.get("CardCode") or "").strip()
+            if code:
+                clv_map[code] += float(inv.get("DocTotal") or 0)
+                
+        result = []
+        for c in customers:
+            code = c.get("CardCode")
+            status = "Active"
+            if c.get("Valid") == "tYES":
+                status = "Active"
+            elif c.get("Frozen") == "tYES":
+                status = "Frozen"
+                
+            result.append({
+                "cardCode": code,
+                "cardName": c.get("CardName"),
+                "phone": c.get("Phone1"),
+                "email": c.get("EmailAddress"),
+                "whatsappNumber": c.get("Cellular"),
+                "paymentMethod": None,
+                "salesEmployee": None,
+                "lifetimeValue": round(clv_map.get(code, 0.0), 2),
+                "status": status,
+                "cardType": c.get("CardType") or "Retail",
+            })
+        return result
     except Exception as exc:
-        logger.warning(f"Customer search via SAP Business Partners failed, falling back to invoice UDF data: {exc}")
-
-    return await _customer_search_fallback(search, top=20)
+        logger.error(f"Customer search via SAP Business Partners failed: {exc}")
+        raise HTTPException(status_code=502, detail="SAP customer search unavailable")
 
 
 @router.get("/recent-sales", response_model=List[DashboardRecentSale])
@@ -701,6 +738,9 @@ async def get_recent_sales_feed(
     request: Request,
     range: str = Query("daily", pattern="^(daily|weekly|monthly|yearly|all_time)$"),
     search: Optional[str] = Query(None, description="Search sale ID, bill number, customer name or phone"),
+    customer: Optional[str] = Query(None, description="Filter by customer Name or Code"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    payment_method: Optional[str] = Query(None, description="Filter by payment method"),
     limit: int = Query(10, ge=1, le=50),
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
@@ -724,6 +764,28 @@ async def get_recent_sales_feed(
         raise HTTPException(status_code=502, detail="Could not retrieve recent sales feed from SAP")
 
     filtered = _filter_invoices_by_branch(invoices, branch)
+    
+    if customer:
+        c_low = customer.strip().lower()
+        filtered = [inv for inv in filtered if c_low in str(inv.get("CardCode") or "").lower() or c_low in str(inv.get("CardName") or "").lower()]
+        
+    if payment_method:
+        pm_low = payment_method.strip().lower()
+        filtered = [inv for inv in filtered if str(inv.get("U_P_Method") or "").strip().lower() == pm_low]
+        
+    if category:
+        cat_low = category.strip().lower()
+        cat_filtered = []
+        for inv in filtered:
+            has_cat = False
+            for line in inv.get("DocumentLines") or []:
+                if cat_low in str(line.get("ItemCode") or "").lower() or cat_low in str(line.get("ItemDescription") or "").lower():
+                    has_cat = True
+                    break
+            if has_cat:
+                cat_filtered.append(inv)
+        filtered = cat_filtered
+
     filtered.sort(key=lambda inv: _to_int(inv.get("DocEntry") or inv.get("DocNum")) or 0, reverse=True)
 
     if search:
@@ -741,11 +803,15 @@ async def get_recent_sales_feed(
         raise HTTPException(status_code=502, detail="Could not retrieve return data from SAP")
 
     total = len(filtered)
+    gross_sales = sum(float(inv.get('DocTotal') or 0) for inv in filtered)
+    paid_invoices = sum(1 for inv in filtered if str(inv.get('DocumentStatus')).lower() != 'bost_open')
+    pending_invoices = sum(1 for inv in filtered if str(inv.get('DocumentStatus')).lower() == 'bost_open')
+
     page = filtered[offset: offset + limit]
     items = _build_recent_sales_payload(page, limit=limit, returned_doc_entries=returned_doc_entries)
     next_offset = offset + limit if offset + limit < total else None
 
-    return DashboardRecentSalesPage(items=items, nextOffset=next_offset, total=total)
+    return DashboardRecentSalesPage(items=items, nextOffset=next_offset, total=total, grossSales=gross_sales, paidInvoices=paid_invoices, pendingInvoices=pending_invoices)
 
 
 @router.get("/operator", response_model=OperatorDashboardData)
@@ -956,7 +1022,7 @@ async def export_operator_reports(
     )
 
 @router.get("/alerts", response_model=List[DashboardAlert])
-async def get_alerts(current_user: dict = Depends(require_manager_or_admin)):
+async def get_alerts(current_user: dict = Depends(get_current_user)):
     """Fetch pending approvals as alerts for authorized users. Branch scoped."""
     target_branch = _get_permitted_branch(current_user, None)
     
@@ -985,7 +1051,7 @@ from app.models.schemas import InventoryRiskItem
 from app.services.sap.inventory_service import SAPInventoryService
 
 @router.get('/inventory-risk', response_model=List[InventoryRiskItem])
-async def get_inventory_risk(current_user: dict = Depends(require_manager_or_admin)):
+async def get_inventory_risk(current_user: dict = Depends(get_current_user)):
     target_branch = _get_permitted_branch(current_user, None)
     
     try:

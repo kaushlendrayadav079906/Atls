@@ -201,3 +201,19 @@ class SAPBusinessPartnersService:
         except Exception as e:
             logger.error(f"Error in get_or_create_customer: {str(e)}")
             raise
+
+    def get_total_customers_count(self) -> int:
+        """
+        Get the total number of customers
+        """
+        try:
+            params = {
+                "$filter": f"CardType eq '{self.default_card_type}'",
+                "$top": 1,
+                "$inlinecount": "allpages"
+            }
+            response = self.client.get("BusinessPartners", params)
+            return response.get("odata.count", response.get("@odata.count", 0))
+        except Exception as e:
+            logger.error(f"Error getting total customers count: {str(e)}")
+            return 0

@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 
 from app.core.cache import cache_get, cache_set, cache_delete
-from app.core.security import require_admin
+from app.core.security import require_admin, get_current_user
 
 # Shared thread pool for blocking SAP calls
 _executor = ThreadPoolExecutor(max_workers=min(32, (_os.cpu_count() or 4) * 4))
@@ -216,7 +216,9 @@ def _compute_payment_split(invoices: List[Dict[str, Any]]) -> List[PaymentMethod
     grouped: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"total": 0.0, "billCount": 0})
 
     for inv in invoices:
-        method = str(inv.get("U_P_Method") or "unknown").strip().lower() or "unknown"
+        method = str(inv.get("U_P_Method") or "unknown").strip().lower()
+        if not method or method == "none":
+            method = "unknown"
         grouped[method]["total"] += float(inv.get("DocTotal") or 0)
         grouped[method]["billCount"] += 1
 
@@ -312,26 +314,42 @@ def _compute_top_employees(invoices: List[Dict[str, Any]], limit: int = 10) -> L
 
 
 def _filter_invoices_by_branch(invoices: List[Dict[str, Any]], branch: Optional[str]) -> List[Dict[str, Any]]:
+    """Filter invoices to those belonging to a specific warehouse/branch.
+
+    Invoices whose lines carry no WarehouseCode are silently skipped rather than
+    raising – this prevents analytics endpoints from returning 502 when some SAP
+    invoices lack full line-level warehouse attribution.
+    """
     if not branch:
         return invoices
 
+    branch_upper = branch.strip().upper()
     filtered: List[Dict[str, Any]] = []
+
     for inv in invoices:
         lines = inv.get("DocumentLines") or []
+        if not lines:
+            logger.debug(
+                "Skipping invoice DocEntry=%s: no DocumentLines (branch filter=%s)",
+                inv.get("DocEntry"), branch_upper,
+            )
+            continue
+
         line_branches = {
             str(line.get("WarehouseCode") or "").strip().upper()
             for line in lines
         }
-        if not lines or "" in line_branches:
-            raise ValueError("Cannot determine branch for one or more SAP invoices.")
-        if len(line_branches) > 1:
-            raise ValueError("Cannot allocate an invoice across multiple warehouses.")
-        if line_branches:
-            if branch.upper() in line_branches:
-                filtered.append(inv)
+        line_branches.discard("")  # remove blank entries gracefully
+
+        if not line_branches:
+            logger.debug(
+                "Skipping invoice DocEntry=%s: lines lack WarehouseCode (branch filter=%s)",
+                inv.get("DocEntry"), branch_upper,
+            )
             continue
 
-        continue
+        if branch_upper in line_branches:
+            filtered.append(inv)
 
     return filtered
 
@@ -683,10 +701,37 @@ async def export_reports(
 # ──────────────────────────────────────────────────────────────────────────────
 
 @router.get("/approvals")
-async def get_approvals(current_user: dict = Depends(require_admin)):
-    """Get all pending approval requests."""
-    branch_id = str(current_user.get("branch_id") or "").strip().upper()
-    return approval_service.get_pending_approvals(branch_id=branch_id or None)
+async def get_approvals(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=100),
+    branch_id: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all approval requests based on user role and branch."""
+    role = str(current_user.get("role") or "").lower()
+    user_branch_id = str(current_user.get("branch_id") or "").strip().upper()
+
+    if role != "admin":
+        if branch_id and branch_id.upper() != user_branch_id:
+            raise HTTPException(status_code=403, detail="Forbidden: You can only view requests for your assigned branch.")
+        target_branch = user_branch_id
+    else:
+        target_branch = branch_id.upper() if branch_id else None
+
+    offset = (page - 1) * limit
+    return approval_service.get_approvals(
+        branch_id=target_branch,
+        start_date=start_date,
+        end_date=end_date,
+        status=status,
+        search=search,
+        limit=limit,
+        offset=offset
+    )
 
 
 def _approval_reviewer_id(current_user: dict) -> str:
@@ -728,12 +773,16 @@ def _complete_approval_request(req_id: str, reviewer_id: str, payload: dict) -> 
 
 
 @router.post("/approvals/{req_id}/approve")
-async def approve_request(req_id: str, current_user: dict = Depends(require_admin)):
+async def approve_request(req_id: str, current_user: dict = Depends(get_current_user)):
     """Approve a request and execute the SAP action."""
+    role = str(current_user.get("role") or "").lower()
+    if role not in ("admin", "manager"):
+        raise HTTPException(status_code=403, detail="Admin or Manager access is required to approve.")
     req = approval_service.get_approval_request(req_id)
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
-    _ensure_approval_branch_access(req, current_user)
+    if role != "admin":
+        _ensure_approval_branch_access(req, current_user)
     reviewer_id = _approval_reviewer_id(current_user)
     if req["status"] != "pending":
         raise HTTPException(status_code=400, detail=f"Request is already {req['status']}")
@@ -908,12 +957,16 @@ async def approve_request(req_id: str, current_user: dict = Depends(require_admi
 
 
 @router.post("/approvals/{req_id}/reject")
-async def reject_request(req_id: str, current_user: dict = Depends(require_admin)):
+async def reject_request(req_id: str, current_user: dict = Depends(get_current_user)):
     """Reject a request."""
+    role = str(current_user.get("role") or "").lower()
+    if role not in ("admin", "manager"):
+        raise HTTPException(status_code=403, detail="Admin or Manager access is required to reject.")
     req = approval_service.get_approval_request(req_id)
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
-    _ensure_approval_branch_access(req, current_user)
+    if role != "admin":
+        _ensure_approval_branch_access(req, current_user)
     reviewer_id = _approval_reviewer_id(current_user)
     if req["status"] != "pending":
         raise HTTPException(status_code=400, detail=f"Request is already {req['status']}")

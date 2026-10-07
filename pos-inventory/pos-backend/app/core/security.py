@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 # HTTP Bearer token scheme - auto_error=False to handle missing tokens manually
-security = HTTPBearer(auto_error=True)
+security = HTTPBearer(auto_error=False)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

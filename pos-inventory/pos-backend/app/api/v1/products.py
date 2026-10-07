@@ -194,8 +194,8 @@ def _to_response(sap_item: dict, sap_service: SAPItemsService, branch: Optional[
         stock = float(sap_item.get("QuantityOnStock") or 0)
 
     return ProductResponse(
-        id=sap_item.get("ItemCode", ""),
-        name=sap_item.get("ItemName", ""),
+        id=sap_item.get("ItemCode") or "",
+        name=sap_item.get("ItemName") or "",
         price=sap_service.extract_price(sap_item),
         barcode=sap_item.get("BarCode") or "",  # Convert None to empty string
         stock=stock,

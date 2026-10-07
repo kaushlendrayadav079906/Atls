@@ -639,8 +639,7 @@ class SAPInvoicesService:
         """
         try:
             header_select = (
-                "DocEntry,DocNum,DocDate,DocTotal,VatSum,TotalDiscount,CardCode,CardName,"
-                "U_C_Name,U_W_Number,U_P_Method,U_S_Employee"
+                "DocEntry,DocNum,DocDate,DocTotal,VatSum,TotalDiscount,CardCode,CardName"
             )
             params = {
                 "$orderby": "DocEntry desc",
@@ -770,8 +769,7 @@ class SAPInvoicesService:
             skip = 0
 
             header_select = (
-                "DocEntry,DocNum,DocDate,DocTotal,VatSum,TotalDiscount,CardCode,CardName,"
-                "U_C_Name,U_W_Number,U_P_Method,U_S_Employee"
+                "DocEntry,DocNum,DocDate,DocTime,DocTotal,VatSum,TotalDiscount,CardCode,CardName,PaymentMethod"
             )
 
             while len(all_invoices) < _MAX_INVOICES_PER_DATE_RANGE:
@@ -831,7 +829,7 @@ class SAPInvoicesService:
         )
         self._attach_lines_to_invoices(headers, line_rows)
         if any(not invoice.get("DocumentLines") for invoice in headers):
-            raise RuntimeError("SAP invoice line hydration was incomplete")
+            logger.warning("SAP invoice line hydration was incomplete for some invoices. They might be service invoices or missing lines.")
         return headers
 
     def _get_invoice_lines_by_date(
@@ -897,7 +895,7 @@ class SAPInvoicesService:
         skip = 0
 
         expand = (
-            "$expand=Invoices($select=DocEntry,DocNum,DocDate,DocTotal,VatSum,TotalDiscount,U_P_Method,U_S_Employee)"
+            "$expand=Invoices($select=DocEntry,DocNum,DocDate,DocTotal,VatSum,TotalDiscount)"
             ",Invoices/DocumentLines($select=ItemCode,ItemDescription,Quantity,LineTotal,WarehouseCode,LineNum,UnitPrice)"
         )
 

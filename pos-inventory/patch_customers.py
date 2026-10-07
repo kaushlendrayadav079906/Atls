@@ -1,0 +1,22 @@
+content = open('Dashboard-Ui/src/pages/CustomersPage.tsx', encoding='utf-8').read()
+content = content.replace('{formatMoney(12450)}', '{formatMoney(0)}')
+content = content.replace('value="Customer Name"', 'value={selectedCustomer?.cardName || "-"}')
+content = content.replace('value="+91 98765 43210"', 'value={selectedCustomer?.phone || selectedCustomer?.whatsappNumber || "-"}')
+content = content.replace('value="jane.smith@gmail.com"', 'value={selectedCustomer?.email || "-"}')
+content = content.replace('value="123 MG Road, Bangalore 560001, Karnataka, India"', 'value={selectedCustomer?.address || "-"}')
+content = content.replace('{selectedCustomer?.cardName || \'Customer Name\'}', '{selectedCustomer?.cardName || "-"}')
+content = content.replace('{selectedCustomer?.cardCode || \'CUS-1001\'}', '{selectedCustomer?.cardCode || "-"}')
+content = content.replace('value="15 Jan 2024"', 'value="-"')
+content = content.replace('value="27 Sep 2024"', 'value="-"')
+content = content.replace('value="Branch (Unknown)"', 'value="-"')
+content = content.replace('value={String(customers.length || 0)}', 'value={String(insights?.totalCustomers || 0)}')
+
+# Also replace hardcoded profile defaults
+content = content.replace("selectedCustomer?.cardName || 'Jane Smith'", "selectedCustomer?.cardName || '-'")
+content = content.replace("selectedCustomer?.phone || '+91 98765 43210'", "selectedCustomer?.phone || '-'")
+content = content.replace("selectedCustomer?.email || 'jane.smith@gmail.com'", "selectedCustomer?.email || '-'")
+content = content.replace("selectedCustomer?.whatsappNumber || '123 MG Road, Bangalore 560001, Karnataka, India'", "selectedCustomer?.whatsappNumber || '-'")
+content = content.replace("selectedCustomer?.cardCode || 'CUS-1001'", "selectedCustomer?.cardCode || '-'")
+content = content.replace("selectedCustomer?.cardName || 'Unknown customer'", "selectedCustomer?.cardName || '-'")
+
+open('Dashboard-Ui/src/pages/CustomersPage.tsx', 'w', encoding='utf-8').write(content)

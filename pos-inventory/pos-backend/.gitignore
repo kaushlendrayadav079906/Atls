@@ -28,7 +28,11 @@ ENV/
 
 # Environment Variables
 .env
-.env.local
+.env.*
+*.env
+
+# SAP
+sap-cookies.txt
 
 # IDE
 .vscode/

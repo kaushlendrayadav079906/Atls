@@ -38,8 +38,16 @@ export interface ApprovalRequestRow {
 }
 
 export const returnsApi = {
-  getApprovalQueue: async (): Promise<ApprovalRequestRow[]> => {
-    const res = await apiClient.get('/admin/approvals');
+  getApprovalQueue: async (params?: {
+    page?: number;
+    limit?: number;
+    branch_id?: string;
+    start_date?: string;
+    end_date?: string;
+    status?: string;
+    search?: string;
+  }): Promise<{items: ApprovalRequestRow[], total: number, counts: Record<string, number>}> => {
+    const res = await apiClient.get('/admin/approvals', { params });
     return res.data;
   },
 

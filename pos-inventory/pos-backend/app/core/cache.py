@@ -80,6 +80,7 @@ async def cache_get(key: str) -> Optional[Any]:
 
 async def cache_set(key: str, value: Any, ttl: int = 300) -> None:
     """Store *value* under *key* with a TTL in seconds."""
+   
     expires_at = time.monotonic() + ttl
     async with _store_lock:
         _store[key] = (expires_at, value)

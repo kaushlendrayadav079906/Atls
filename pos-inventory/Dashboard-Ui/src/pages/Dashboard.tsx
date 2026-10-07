@@ -1,27 +1,17 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-    AlertCircle,
-    ArrowRight,
-    Bell,
-    Check,
-    ChevronDown,
-    CircleHelp,
-    Clock3,
-    CreditCard,
-    PackageSearch,
-    RefreshCcw,
-    ShoppingBag,
-    ShoppingCart,
-    Sparkles,
-    TrendingUp,
-    TriangleAlert,
-    Users,
-    MessageSquarePlus,
-    Package,
-    FileText
+    AlertCircle, ArrowRight, Bell, Check, ChevronDown, CircleHelp, Clock3,
+    PackageSearch, RefreshCcw, ShoppingBag, ShoppingCart, Sparkles,
+    TrendingUp, TriangleAlert, Users, MessageSquarePlus, Package, FileText
 } from 'lucide-react';
 import { atlasApi, dashboardApi } from '../api/endpoints';
 import { useAuth } from '../contexts/AuthContext';
+import { Link } from 'react-router-dom';
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+} from 'recharts';
+
 
 const money = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -31,50 +21,86 @@ const money = new Intl.NumberFormat('en-IN', {
 
 export const Dashboard = () => {
   const { user } = useAuth();
+  
 
-  const { data: summary } = useQuery({
-    queryKey: ['dashboardSummary', user?.branch_id],
-    queryFn: () => dashboardApi.getSummary(user?.branch_id),
+  const [period, setPeriod] = useState<string>('daily');
+  const [branchId, setBranchId] = useState<string>(user?.branch_id || '');
+
+  const { data: summary, isLoading: loadingSummary, isError: errorSummary, refetch: refetchSummary } = useQuery({
+    queryKey: ['atlasOverview', branchId, period],
+    queryFn: () => atlasApi.getOverview(branchId, period),
   });
 
-  const { data: recentSales, isLoading: loadingSales } = useQuery({
-    queryKey: ['recentSales', user?.branch_id],
-    queryFn: () => dashboardApi.getRecentSales(user?.branch_id),
+  const { data: recentSales, isLoading: loadingSales, refetch: refetchSales } = useQuery({
+    queryKey: ['recentSales', branchId, period],
+    queryFn: () => atlasApi.getRecentSalesFeed({ range: period, branch: branchId, limit: 10 }),
   });
 
-  const { data: alerts } = useQuery({
-    queryKey: ['dashboardAlerts'],
-    queryFn: () => dashboardApi.getAlerts(),
+  const { data: alerts, isLoading: loadingAlerts, isError: errorAlerts, refetch: refetchAlerts } = useQuery({
+    queryKey: ['dashboardAlerts', branchId],
+    queryFn: () => dashboardApi.getAlerts(), // assuming backend filters by branch inside
   });
 
-  const { data: topProducts } = useQuery({
-    queryKey: ['topProducts', user?.branch_id],
-    queryFn: () => atlasApi.getTopProducts(user?.branch_id),
+  const { data: topProducts, refetch: refetchProducts } = useQuery({
+    queryKey: ['topProducts', branchId, period],
+    queryFn: () => atlasApi.getTopProducts(branchId, period),
   });
 
-  const { data: trendData, isLoading: loadingTrend, isError: errorTrend } = useQuery({
-    queryKey: ['salesTrend', user?.branch_id],
-    queryFn: () => atlasApi.getSalesTrend(user?.branch_id),
+  const { data: trendData, isLoading: loadingTrend, isError: errorTrend, refetch: refetchTrend } = useQuery({
+    queryKey: ['salesTrend', branchId, period],
+    queryFn: () => atlasApi.getSalesTrend(branchId, period),
   });
+
+  const { data: inventoryRisk, isLoading: loadingRisk, isError: errorRisk, refetch: refetchRisk } = useQuery({
+    queryKey: ['inventoryRisk', branchId],
+    queryFn: () => dashboardApi.getInventoryRisk(),
+  });
+  
+  const { data: sapHealth } = useQuery({
+    queryKey: ['sapHealth'],
+    queryFn: async () => {
+        try {
+            const res = await fetch('/api/v1/health');
+            const data = await res.json();
+            return data.sap_connected;
+        } catch {
+            return false;
+        }
+    },
+    refetchInterval: 30000,
+  });
+
+  const handleRefresh = () => {
+    refetchSummary();
+    refetchSales();
+    refetchAlerts();
+    refetchProducts();
+    refetchTrend();
+    refetchRisk();
+  };
 
   const trendPoints = trendData?.trend ?? [];
-  const chartMax = Math.max(...trendPoints.map((point) => point.total), 1);
+  
+  
+
+  const pendingApprovals = (alerts ?? []).filter((item: any) => item.status === 'Pending').length;
+  const lowStockCount = inventoryRisk?.length ?? 0;
 
   const statCards = [
     {
-      title: 'Sales Today',
-      highlight: '+12.5%',
-      value: summary?.todayTotal ? money.format(summary.todayTotal) : '₹0.00',
-      meta: 'vs. yesterday',
+      title: 'Sales ' + (period === 'daily' ? 'Today' : period === 'weekly' ? 'This Week' : period === 'monthly' ? 'This Month' : period === 'yearly' ? 'This Year' : 'Total'),
+      highlight: loadingSummary ? '...' : errorSummary ? 'ERR' : '',
+      value: loadingSummary ? 'Loading...' : errorSummary ? 'Error' : (summary?.totalSales !== undefined ? money.format(summary.totalSales) : '₹0.00'),
+      meta: '',
       icon: ShoppingCart,
       accent: 'from-emerald-500 to-emerald-300',
       tint: 'bg-emerald-500/20 text-emerald-700',
     },
     {
       title: 'Completed Bills',
-      highlight: '+16.7%',
-      value: `${summary?.billCount ?? 0}`,
-      meta: 'vs. yesterday',
+      highlight: loadingSummary ? '...' : errorSummary ? 'ERR' : '',
+      value: loadingSummary ? 'Loading...' : errorSummary ? 'Error' : `${summary?.invoiceCount ?? 0}`,
+      meta: '',
       icon: Check,
       accent: 'from-blue-500 to-sky-300',
       tint: 'bg-blue-100 text-blue-300',
@@ -82,26 +108,26 @@ export const Dashboard = () => {
     {
       title: 'Active Shift',
       highlight: 'OPEN',
-      value: user?.name || 'Operator',
-      meta: user?.role || 'Shift Active',
+      value: user?.name || 'Unknown User',
+      meta: user?.role || 'Operator',
       icon: Clock3,
       accent: 'from-violet-500 to-violet-300',
       tint: 'bg-emerald-500/20 text-emerald-600 border border-emerald-200',
     },
     {
       title: 'Low-stock Items',
-      highlight: '-40%',
-      value: `${Math.max((topProducts?.length ?? 0), 7)}`,
-      meta: 'vs. last week',
+      highlight: loadingRisk ? '...' : errorRisk ? 'ERR' : '',
+      value: loadingRisk ? 'Loading...' : errorRisk ? 'Error' : `${lowStockCount}`,
+      meta: 'Requires attention',
       icon: TriangleAlert,
       accent: 'from-amber-500 to-orange-300',
       tint: 'bg-red-100 text-red-600',
     },
     {
       title: 'Pending Approvals',
-      highlight: '+8.2%',
-      value: `${Math.max((alerts?.filter((item) => item.status === 'Pending').length ?? 0), 3)}`,
-      meta: 'vs. last month',
+      highlight: loadingAlerts ? '...' : errorAlerts ? 'ERR' : '',
+      value: loadingAlerts ? 'Loading...' : errorAlerts ? 'Error' : `${pendingApprovals}`,
+      meta: 'Current',
       icon: Bell,
       accent: 'from-rose-500 to-pink-300',
       tint: 'bg-emerald-500/20 text-emerald-600',
@@ -109,6 +135,7 @@ export const Dashboard = () => {
   ];
 
   const alertRows = (alerts ?? []).slice(0, 4);
+  const recentSalesData = recentSales?.items ?? [];
 
   return (
     <div className="flex flex-col gap-5 text-slate-900">
@@ -120,19 +147,33 @@ export const Dashboard = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 transition hover:bg-slate-100">
-            <span className="text-[14px]">🏛️</span>
-            <span>{user?.store_name || user?.branch_id || 'Main Branch (WH-001)'}</span>
-            <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
-          </button>
+          <div className={`flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium transition ${sapHealth ? 'text-emerald-600' : 'text-red-600'}`}>
+             <div className={`h-2 w-2 rounded-full ${sapHealth ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+             {sapHealth ? 'SAP Connected' : 'SAP Disconnected'}
+          </div>
 
-          <button className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 transition hover:bg-slate-100">
-            <span className="text-[14px]">📅</span>
-            <span>Current Period</span>
-            <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
-          </button>
+          <select 
+            value={branchId} 
+            onChange={(e) => setBranchId(e.target.value)}
+            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 outline-none"
+          >
+            {user?.role === 'admin' && <option value="">All Branches</option>}
+            <option value={user?.branch_id || ''}>{user?.store_name || user?.branch_id || 'Branch (Unknown)'}</option>
+          </select>
 
-          <button className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[12px] font-medium text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500">
+          <select 
+            value={period} 
+            onChange={(e) => setPeriod(e.target.value)}
+            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 outline-none"
+          >
+            <option value="daily">TODAY</option>
+            <option value="weekly">WEEK</option>
+            <option value="monthly">MONTH</option>
+            <option value="yearly">YEAR</option>
+            <option value="all_time">TOTAL</option>
+          </select>
+
+          <button onClick={handleRefresh} className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[12px] font-medium text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500">
             <RefreshCcw className="h-3.5 w-3.5" />
             <span>Refresh</span>
           </button>
@@ -165,9 +206,7 @@ export const Dashboard = () => {
                 </div>
                 <div className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
                   {i === 3 ? <TriangleAlert className="h-3.5 w-3.5 text-amber-500" /> : i === 4 ? <FileText className="h-3.5 w-3.5 text-sky-400" /> : <ShoppingBag className="h-3.5 w-3.5 text-sky-400" />}
-                  <span>
-                    {i === 3 ? 'Requires attention' : i === 4 ? '2 Returns, 1 Stock Adj.' : i === 2 ? meta : `${parseInt(value) || 28} completed bills`}
-                  </span>
+                  <span>{meta || `${parseInt(value) || 0} completed bills`}</span>
                 </div>
               </div>
             ))}
@@ -175,116 +214,140 @@ export const Dashboard = () => {
 
           {/* Charts */}
           <div className="grid gap-5 xl:grid-cols-[1.6fr_1fr]">
+            {/* Sales Overview */}
             <div className="rounded-[16px] border border-slate-200 bg-white p-4">
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-sky-400" />
                   <span className="text-[14px] font-semibold">Sales Overview</span>
                 </div>
                 <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 text-[11px] font-medium text-slate-500">
-                  <button className="px-2 py-1">7D</button>
-                  <button className="rounded-md bg-blue-600 px-2 py-1 text-white shadow-sm">30D</button>
-                  <button className="px-2 py-1">90D</button>
-                  <button className="px-2 py-1">1Y</button>
-                  <button className="flex items-center gap-1 border-l border-slate-200 pl-2 pr-1 text-slate-700">
-                    All Branches <ChevronDown className="h-3 w-3" />
-                  </button>
+                  {['daily', 'weekly', 'monthly', 'yearly', 'all_time'].map((p) => (
+                    <button 
+                      key={p} 
+                      className={`px-3 py-1.5 rounded-md transition-colors ${period === p ? 'bg-blue-600 text-white font-semibold shadow-sm' : 'hover:text-slate-900'}`}
+                      onClick={() => setPeriod(p)}
+                    >
+                      {p === 'daily' ? 'Today' : p === 'weekly' ? 'Week' : p === 'monthly' ? 'Month' : p === 'yearly' ? 'Year' : 'Total'}
+                    </button>
+                  ))}
                 </div>
               </div>
 
               {loadingTrend ? (
-                <div className="flex h-[220px] items-center justify-center text-sm text-slate-500">Loading chart...</div>
+                <div className="flex h-[250px] items-center justify-center text-sm text-slate-500">Loading chart...</div>
               ) : errorTrend ? (
                 <StateMessage type="error" message="Failed to load trend" />
+              ) : (trendPoints.length === 0 ? (
+                <div className="flex h-[250px] items-center justify-center text-sm text-slate-500">No sales data for this period</div>
               ) : (
-                <div className="relative h-[220px] rounded-xl border border-slate-200 bg-white p-2">
-                  <div className="absolute left-2 top-2 flex flex-col justify-between h-[160px] text-[10px] text-slate-500">
-                    <span>₹20K</span>
-                    <span>₹15K</span>
-                    <span>₹10K</span>
-                    <span>₹5K</span>
-                    <span>₹0</span>
-                  </div>
-                  <div className="ml-8 flex h-[160px] items-end justify-between px-2 pb-2">
-                    {trendPoints.map((point, index) => {
-                      const h = Math.max((point.total / chartMax) * 100, 10);
-                      return (
-                        <div key={index} className="flex flex-col items-center gap-2 w-full">
-                          <div className="relative flex h-full w-full items-end justify-center group">
-                            <div className="w-[3px] bg-sky-500/20" style={{ height: `${h}%` }}>
-                              <div className="absolute -top-1.5 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rounded-full border-2 border-sky-400 bg-slate-50 shadow-[0_0_8px_rgba(56,189,248,0.8)]" />
-                            </div>
-                            {index === 3 && (
-                               <div className="absolute -top-10 whitespace-nowrap rounded border border-slate-200 bg-white px-2 py-1 text-center shadow-lg">
-                                 <div className="text-[9px] text-slate-500">Nov 15, 2024</div>
-                                 <div className="text-[12px] font-bold text-slate-900">₹8,420.50</div>
-                               </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="ml-8 flex justify-between px-2 text-[10px] text-slate-500">
-                    <span>Nov 1</span>
-                    <span>Nov 5</span>
-                    <span>Nov 10</span>
-                    <span>Nov 15</span>
-                    <span>Nov 20</span>
-                    <span>Nov 25</span>
-                    <span>Nov 30</span>
-                  </div>
-                  <div className="mt-3 flex items-center justify-center gap-4 text-[10px] text-slate-500">
-                    <span className="flex items-center gap-1.5"><span className="h-1.5 w-4 rounded-full bg-sky-400" /> Current Period</span>
-                    <span className="flex items-center gap-1.5"><span className="h-[1px] w-4 border-t border-dashed border-sky-400/50" /> Previous Period</span>
-                  </div>
+                <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={trendPoints} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis 
+                        dataKey={(d) => (d.label || d.date || '').split(' ')[0]} 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 10, fill: '#64748b' }} 
+                        dy={10} 
+                      />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 10, fill: '#64748b' }}
+                        tickFormatter={(value) => `₹${value >= 1000 ? (value/1000).toFixed(0) + 'K' : value}`}
+                        dx={-10}
+                      />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
+                        formatter={(value: any) => [`₹${value.toFixed(2)}`, 'Sales']}
+                        labelStyle={{ color: '#64748b', fontSize: '12px', marginBottom: '4px' }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="sales" 
+                        stroke="#0ea5e9" 
+                        strokeWidth={3}
+                        fillOpacity={1} 
+                        fill="url(#colorSales)" 
+                        activeDot={{ r: 6, strokeWidth: 0, fill: '#0ea5e9' }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
-              )}
+              ))}
+              <div className="mt-4 flex items-center justify-center gap-4 text-[11px] text-slate-500">
+                <span className="flex items-center gap-1.5 font-medium"><span className="h-1 w-4 rounded-full bg-sky-500" /> Current Period</span>
+              </div>
             </div>
 
+            {/* Orders Overview */}
             <div className="rounded-[16px] border border-slate-200 bg-white p-4">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ShoppingBag className="h-4 w-4 text-sky-400" />
-                  <span className="text-[14px] font-semibold">Orders This Week</span>
+                  <span className="text-[14px] font-semibold">Orders Overview</span>
                 </div>
-                <button className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
-                  This Week <ChevronDown className="h-3 w-3" />
-                </button>
               </div>
-              <div className="relative h-[220px]">
-                  <div className="absolute left-0 top-2 flex flex-col justify-between h-[170px] text-[10px] text-slate-500">
-                    <span>200</span>
-                    <span>150</span>
-                    <span>100</span>
-                    <span>50</span>
-                    <span>0</span>
-                  </div>
-                  <div className="ml-6 flex h-[170px] items-end justify-between gap-1.5 px-2">
-                    {trendPoints.slice(-7).map((point, idx) => {
-                      const val = point.billCount;
-                      const maxVal = Math.max(...trendPoints.slice(-7).map(p => p.billCount), 1);
-                      return (
-                        <div key={idx} className="flex flex-1 flex-col items-center gap-1.5 w-full">
-                          <div className="relative flex h-full w-full items-end justify-center">
-                            <div className="text-[9px] font-bold text-slate-900 absolute -top-4">{val}</div>
-                            <div
-                              className={`w-full max-w-[24px] rounded-t-sm ${idx % 2 === 0 ? 'bg-gradient-to-t from-orange-500 to-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.2)]' : 'bg-gradient-to-t from-orange-600 to-amber-500'}`}
-                              style={{ height: `${(val / maxVal) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="ml-6 mt-2 flex justify-between px-2 text-[10px] text-slate-500">
-                    {trendPoints.slice(-7).map((p, i) => <span key={i}>{p.label.split(' ')[0]}</span>)}
-                  </div>
-              </div>
+              
+              {loadingTrend ? (
+                <div className="flex h-[250px] items-center justify-center text-sm text-slate-500">Loading orders...</div>
+              ) : errorTrend ? (
+                <StateMessage type="error" message="Failed to load orders" />
+              ) : (trendPoints.length === 0 ? (
+                <div className="flex h-[250px] items-center justify-center text-sm text-slate-500">No orders for this period</div>
+              ) : (
+                <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={trendPoints} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorOrders" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#3b82f6" />
+                          <stop offset="100%" stopColor="#8b5cf6" />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis 
+                        dataKey={(d) => (d.label || d.date || '').split(' ')[0]} 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 10, fill: '#64748b' }} 
+                        dy={10} 
+                      />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 10, fill: '#64748b' }}
+                        allowDecimals={false}
+                        dx={-10}
+                      />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        formatter={(value: any) => [value, 'Orders']}
+                        labelStyle={{ color: '#64748b', fontSize: '12px', marginBottom: '4px' }}
+                        cursor={{ fill: '#f8fafc' }}
+                      />
+                      <Bar 
+                        dataKey="invoice_count" 
+                        fill="url(#colorOrders)" 
+                        radius={[4, 4, 0, 0]} 
+                        barSize={20}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Tables */}
+ {/* Tables */}
           <div className="grid gap-5 xl:grid-cols-[1.5fr_1fr]">
             <div className="rounded-[16px] border border-slate-200 bg-white p-4">
               <div className="mb-4 flex items-center justify-between">
@@ -292,9 +355,9 @@ export const Dashboard = () => {
                   <FileText className="h-4 w-4 text-sky-400" />
                   <span className="text-[14px] font-semibold">Recent Sales</span>
                 </div>
-                <button className="flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-blue-600">
+                <Link to="/sales" className="flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-blue-600">
                   View all <ChevronDown className="h-3 w-3 -rotate-90" />
-                </button>
+                </Link>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left text-[12px]">
@@ -305,28 +368,29 @@ export const Dashboard = () => {
                       <th className="pb-2">Amount</th>
                       <th className="pb-2">Payment Method</th>
                       <th className="pb-2">Status</th>
-                      <th className="pb-2">Time</th>
-                      <th className="pb-2"></th>
+                      <th className="pb-2">Date</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-sky-800/30 text-slate-700">
                     {loadingSales ? (
-                      <tr><td colSpan={7} className="py-4 text-center">Loading...</td></tr>
-                    ) : (recentSales || []).slice(0, 6).map((sale, i) => (
+                      <tr><td colSpan={6} className="py-4 text-center">Loading...</td></tr>
+                    ) : recentSalesData.slice(0, 6).map((sale: any, i: number) => (
                       <tr key={i} className="hover:bg-sky-800/20">
                         <td className="py-2.5 font-medium text-sky-400">{sale.docNum ? `INV-${sale.docNum}` : (sale.saleId || 'Unknown')}</td>
                         <td className="py-2.5">{sale.customerName || 'Walk-in Customer'}</td>
                         <td className="py-2.5 font-semibold text-slate-900">{money.format(sale.total || 0)}</td>
-                        <td className="py-2.5 text-slate-500">{sale.paymentMethod || 'Mixed'}</td>
+                        <td className="py-2.5 text-slate-500">{sale.paymentMethod || 'Unavailable'}</td>
                         <td className="py-2.5">
-                          <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${(sale as any).hasReturn ? 'bg-red-100 text-red-600' : 'bg-emerald-500/20 text-emerald-600'}`}>
-                            {(sale as any).hasReturn ? 'Refunded' : 'Completed'}
+                          <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${sale.hasReturn ? 'bg-red-100 text-red-600' : 'bg-emerald-500/20 text-emerald-600'}`}>
+                            {sale.hasReturn ? 'Refunded' : 'Completed'}
                           </span>
                         </td>
-                        <td className="py-2.5 text-slate-500">{sale.docDate ? sale.docDate : 'Today'}</td>
-                        <td className="py-2.5 text-right"><button className="text-slate-500 hover:text-slate-900">•••</button></td>
+                        <td className="py-2.5 text-slate-500">{sale.docDate || 'Unknown'}</td>
                       </tr>
                     ))}
+                    {!loadingSales && recentSalesData.length === 0 && (
+                      <tr><td colSpan={6} className="py-4 text-center text-slate-500">No recent sales found for this period.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -338,9 +402,9 @@ export const Dashboard = () => {
                   <PackageSearch className="h-4 w-4 text-sky-400" />
                   <span className="text-[14px] font-semibold">Top Products</span>
                 </div>
-                <button className="flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-blue-600">
+                <Link to="/products" className="flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-blue-600">
                   View all <ChevronDown className="h-3 w-3 -rotate-90" />
-                </button>
+                </Link>
               </div>
               <table className="min-w-full text-left text-[12px]">
                 <thead className="border-b border-slate-200 text-[10px] font-medium text-slate-500">
@@ -352,12 +416,12 @@ export const Dashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-sky-800/30 text-slate-700">
-                  {(topProducts || []).slice(0, 5).map((prod, idx) => (
+                  {(topProducts || []).slice(0, 5).map((prod: any, idx: number) => (
                     <tr key={idx} className="hover:bg-sky-800/20">
                       <td className="py-2.5 font-medium text-slate-500">{idx + 1}</td>
                       <td className="py-2.5 flex items-center gap-2">
-                        <div className="flex h-6 w-6 items-center justify-center rounded bg-slate-800">
-                          <Package className="h-3 w-3 text-slate-500" />
+                        <div className="flex h-6 w-6 items-center justify-center rounded bg-slate-800 text-slate-500">
+                          <Package className="h-3 w-3" />
                         </div>
                         {prod.itemName}
                       </td>
@@ -365,6 +429,9 @@ export const Dashboard = () => {
                       <td className="py-2.5 text-right font-semibold text-slate-900">{money.format(prod.salesAmount || 0)}</td>
                     </tr>
                   ))}
+                  {(!topProducts || topProducts.length === 0) && (
+                      <tr><td colSpan={4} className="py-4 text-center text-slate-500">No product data for this period.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -372,15 +439,12 @@ export const Dashboard = () => {
 
           {/* Risk and Quick Actions */}
           <div className="grid gap-5 xl:grid-cols-[1.5fr_1fr]">
-            <div className="rounded-[16px] border border-slate-200 bg-white p-4">
+            <div className="rounded-[16px] border border-slate-200 bg-white p-4 opacity-75">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-sky-400" />
                   <span className="text-[14px] font-semibold">AI Risk Analysis Summary</span>
                 </div>
-                <button className="flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-blue-600">
-                  View details <ChevronDown className="h-3 w-3 -rotate-90" />
-                </button>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-slate-200 bg-slate-50">
@@ -391,20 +455,17 @@ export const Dashboard = () => {
                   <div className="text-[13px] font-semibold text-sky-400">Not Available</div>
                 </div>
                 <div className="grid flex-1 grid-cols-3 gap-2">
-                  <div className="rounded-lg border border-slate-200 bg-sky-800/20 p-2">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
                     <div className="text-[16px] font-bold text-slate-900">-</div>
                     <div className="mt-1 text-[10px] leading-tight text-slate-500">Inventory Risks</div>
-                    <div className="text-[9px] font-semibold text-sky-400/60">Unavailable</div>
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-sky-800/20 p-2">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
                     <div className="text-[16px] font-bold text-slate-900">-</div>
                     <div className="mt-1 text-[10px] leading-tight text-slate-500">Sales Anomalies</div>
-                    <div className="text-[9px] font-semibold text-sky-400/60">Unavailable</div>
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-sky-800/20 p-2">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
                     <div className="text-[16px] font-bold text-slate-900">-</div>
                     <div className="mt-1 text-[10px] leading-tight text-slate-500">Integration Issue</div>
-                    <div className="text-[9px] font-semibold text-sky-400/60">Unavailable</div>
                   </div>
                 </div>
               </div>
@@ -416,18 +477,26 @@ export const Dashboard = () => {
                 <span className="text-[14px] font-semibold">Quick Actions</span>
               </div>
               <div className="grid grid-cols-5 gap-2">
-                {[
-                  { icon: ShoppingCart, label: 'New Sale' },
-                  { icon: PackageSearch, label: 'Add Product' },
-                  { icon: FileText, label: 'Generate Report' },
-                  { icon: Check, label: 'View Approvals' },
-                  { icon: CircleHelp, label: 'More' }
-                ].map((act, i) => (
-                  <button key={i} className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-2 hover:bg-sky-800/40 hover:border-slate-200">
-                    <act.icon className="h-4 w-4 text-blue-600" />
-                    <span className="text-center text-[9px] leading-tight text-slate-500">{act.label}</span>
-                  </button>
-                ))}
+                <Link to="/pos" className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-2 hover:bg-sky-800/40">
+                    <ShoppingCart className="h-4 w-4 text-blue-600" />
+                    <span className="text-center text-[9px] leading-tight text-slate-500">New Sale</span>
+                </Link>
+                <Link to="/products" className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-2 hover:bg-sky-800/40">
+                    <PackageSearch className="h-4 w-4 text-blue-600" />
+                    <span className="text-center text-[9px] leading-tight text-slate-500">Add Product</span>
+                </Link>
+                <Link to="/reports/sales" className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-2 hover:bg-sky-800/40">
+                    <FileText className="h-4 w-4 text-blue-600" />
+                    <span className="text-center text-[9px] leading-tight text-slate-500">Report</span>
+                </Link>
+                <Link to="/returns" className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-2 hover:bg-sky-800/40">
+                    <Check className="h-4 w-4 text-blue-600" />
+                    <span className="text-center text-[9px] leading-tight text-slate-500">Approvals</span>
+                </Link>
+                <button className="flex flex-col items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 p-2 hover:bg-sky-800/40">
+                    <CircleHelp className="h-4 w-4 text-blue-600" />
+                    <span className="text-center text-[9px] leading-tight text-slate-500">More</span>
+                </button>
               </div>
             </div>
           </div>
@@ -443,7 +512,7 @@ export const Dashboard = () => {
                 <Sparkles className="h-4 w-4 text-sky-400" />
                 <span className="text-[14px] font-semibold">AI Assistant</span>
               </div>
-              <button className="flex items-center gap-1 rounded border border-blue-600/50 bg-blue-600/20 px-2 py-1 text-[10px] font-medium text-blue-400">
+              <button className="flex items-center gap-1 rounded border border-blue-600/50 bg-blue-600/20 px-2 py-1 text-[10px] font-medium text-blue-600">
                 <MessageSquarePlus className="h-3 w-3" /> New Chat
               </button>
             </div>
@@ -459,25 +528,11 @@ export const Dashboard = () => {
                   <li>Generate reports (PDF)</li>
                   <li>Analyze business risks</li>
                   <li>Find data from SAP system</li>
-                  <li>Update dashboard insights</li>
                 </ul>
               </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              {[
-                'Show today\'s sales summary',
-                'Find low stock products',
-                'Generate customer wise sales report',
-                'What are the top 5 products this month?',
-                'Show pending approvals'
-              ].map((q, i) => (
-                <button key={i} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-[11px] text-slate-500 hover:bg-sky-800/40 hover:text-slate-900">
-                  {q}
-                </button>
-              ))}
-            </div>
             <div className="mt-4 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
-              <input type="text" placeholder="Ask anything about your business..." className="flex-1 bg-transparent px-2 text-[11px] text-white outline-none placeholder:text-slate-500" />
+              <input type="text" placeholder="Ask anything about your business..." className="flex-1 bg-transparent px-2 text-[11px] text-slate-900 outline-none placeholder:text-slate-500" />
               <button className="flex h-6 w-6 items-center justify-center rounded bg-blue-600 text-white">
                 <ArrowRight className="h-3 w-3" />
               </button>
@@ -490,26 +545,26 @@ export const Dashboard = () => {
                 <FileText className="h-4 w-4 text-sky-400" />
                 <span className="text-[14px] font-semibold">Alerts & Approvals</span>
               </div>
-              <button className="flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-blue-600">
+              <Link to="/returns" className="flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-blue-600">
                 View all <ChevronDown className="h-3 w-3 -rotate-90" />
-              </button>
+              </Link>
             </div>
             <div className="mb-3 flex items-center gap-2 text-[10px] font-medium">
               <button className="rounded bg-blue-600 px-2 py-1 text-white">All ({(alerts || []).length})</button>
               <button className="rounded px-2 py-1 text-slate-500 hover:text-slate-900">Approvals</button>
             </div>
             <div className="flex flex-col gap-2">
-              {alertRows.map((alert, i) => (
+              {alertRows.map((alert: any, i: number) => (
                 <div key={i} className="flex gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                  <div className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded ${i < 2 ? 'bg-red-100 text-red-600' : i < 4 ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-100 text-blue-400'}`}>
-                    {i < 2 ? <CreditCard className="h-3 w-3" /> : i < 4 ? <TriangleAlert className="h-3 w-3" /> : <Check className="h-3 w-3" />}
+                  <div className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded ${alert.status === 'Pending' ? 'bg-amber-500/20 text-amber-500' : 'bg-blue-100 text-blue-400'}`}>
+                    {alert.status === 'Pending' ? <TriangleAlert className="h-3 w-3" /> : <Check className="h-3 w-3" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-1">
-                      <div className="truncate text-[11px] font-semibold text-slate-900">{alert.request_type}</div>
-                      <div className="text-[9px] text-slate-500 whitespace-nowrap">{new Date(alert.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                      <div className="truncate text-[11px] font-semibold text-slate-900">{alert.request_type || 'Notification'}</div>
+                      <div className="text-[9px] text-slate-500 whitespace-nowrap">{new Date(alert.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                     </div>
-                    <div className="mt-0.5 truncate text-[10px] text-slate-500">{alert.reason}</div>
+                    <div className="mt-0.5 truncate text-[10px] text-slate-500">{alert.reason || 'Attention required'}</div>
                     {alert.status === 'Pending' && (
                       <div className="mt-1.5 inline-block rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-500">
                         Pending
@@ -522,11 +577,11 @@ export const Dashboard = () => {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center text-slate-500">
-                    <ChevronDown className="h-3 w-3 -rotate-90" />
-                  </div>
                 </div>
               ))}
+              {alertRows.length === 0 && (
+                  <div className="text-center text-[11px] text-slate-500 mt-4">No active alerts or approvals.</div>
+              )}
             </div>
           </div>
 

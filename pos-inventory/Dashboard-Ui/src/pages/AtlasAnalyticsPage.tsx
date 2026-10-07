@@ -103,51 +103,58 @@ export const AtlasAnalyticsPage = () => {
   const [toDate, setToDate] = useState('');
 
   const branchFilter = getBranchFilter(user);
+  const isManager = user?.role?.toLowerCase() === 'manager';
   const isAdmin = user?.role?.toLowerCase() === 'admin';
+  const canViewAnalytics = isAdmin || isManager;
   const hasDateValidationError = !!(fromDate && toDate && new Date(fromDate) > new Date(toDate));
 
   const overviewQuery = useQuery({
     queryKey: ['atlas-overview', range, fromDate, toDate, branchFilter],
     queryFn: () => atlasApi.getOverview(range, fromDate || undefined, toDate || undefined, branchFilter),
     retry: 1,
+    enabled: canViewAnalytics,
   });
 
   const trendQuery = useQuery({
     queryKey: ['atlas-trend', range, fromDate, toDate, branchFilter],
     queryFn: () => atlasApi.getSalesTrend(range, fromDate || undefined, toDate || undefined, branchFilter),
     retry: 1,
+    enabled: canViewAnalytics,
   });
 
   const productsQuery = useQuery({
     queryKey: ['atlas-products', range, fromDate, toDate, branchFilter],
     queryFn: () => atlasApi.getTopProducts(range, fromDate || undefined, toDate || undefined, branchFilter, 5),
     retry: 1,
+    enabled: canViewAnalytics,
   });
 
   const customersQuery = useQuery({
     queryKey: ['atlas-customers', range, fromDate, toDate, branchFilter],
     queryFn: () => atlasApi.getTopCustomers(range, fromDate || undefined, toDate || undefined, branchFilter, 5),
     retry: 1,
+    enabled: canViewAnalytics,
   });
 
   const inventoryQuery = useQuery({
     queryKey: ['atlas-inventory', branchFilter],
     queryFn: () => atlasApi.getInventorySummary(branchFilter),
     retry: 1,
-    enabled: !!branchFilter,
+    enabled: !!branchFilter && canViewAnalytics,
   });
 
   const comparisonQuery = useQuery({
     queryKey: ['atlas-branch-comparison', range, fromDate, toDate],
     queryFn: () => atlasApi.getBranchComparison(range, fromDate || undefined, toDate || undefined),
     retry: 1,
-    enabled: isAdmin,
+    enabled: isAdmin && canViewAnalytics,
   });
 
   const returnsQuery = useQuery({
     queryKey: ['atlas-returns', range, fromDate, toDate, branchFilter],
     queryFn: () => atlasApi.getReturnsSummary(range, fromDate || undefined, toDate || undefined, branchFilter),
     retry: 1,
+    enabled: canViewAnalytics,
   });
 
   const chartData = useMemo(() => {
@@ -164,6 +171,16 @@ export const AtlasAnalyticsPage = () => {
   const branchBreakdown = safeArray(comparisonQuery.data?.branches);
   const returnSummary = returnsQuery.data;
 
+  if (!canViewAnalytics) {
+    return (
+      <div className="flex min-h-[500px] flex-col items-center justify-center p-8 text-center text-slate-500">
+        <AlertCircle className="mb-4 h-12 w-12 text-slate-300" />
+        <h2 className="text-xl font-bold text-slate-900">Access Restricted</h2>
+        <p className="mt-2 text-sm">You do not have permission to view Atlas Analytics.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-full bg-slate-50">
       <div className="mx-auto max-w-[1500px] space-y-6 pb-10">
@@ -179,7 +196,7 @@ export const AtlasAnalyticsPage = () => {
             {/* Branch pill */}
             <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm">
               <Warehouse className="h-4 w-4 text-blue-600" />
-              <span className="font-medium">{branchFilter ? `Main Branch (WH-${branchFilter})` : 'All branches'}</span>
+              <span className="font-medium">{branchFilter ? (user?.store_name || `Branch ${branchFilter}`) : 'All branches'}</span>
             </div>
 
             {/* Date range */}

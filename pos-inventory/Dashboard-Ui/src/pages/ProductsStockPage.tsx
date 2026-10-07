@@ -14,18 +14,7 @@ import { posApi } from '../api/pos';
 import { useDebounce } from '../hooks/useDebounce';
 import type { Product } from '../types/pos';
 
-const fallbackProducts: Product[] = [
-  { id: 'P-1001', name: 'Wireless Headphones', category: 'Electronics', warehouse: 'WH-001', barcode: '8901234567890', stock: 245, price: 12990 },
-  { id: 'P-1002', name: 'Smart Watch', category: 'Electronics', warehouse: 'WH-001', barcode: '8901234567891', stock: 189, price: 8999 },
-  { id: 'P-1003', name: 'Laptop Stand', category: 'Accessories', warehouse: 'WH-001', barcode: '8901234567892', stock: 156, price: 1999 },
-  { id: 'P-1004', name: 'USB-C Cable', category: 'Accessories', warehouse: 'WH-002', barcode: '8901234567893', stock: 432, price: 1499 },
-  { id: 'P-1005', name: 'Bluetooth Speaker', category: 'Electronics', warehouse: 'WH-001', barcode: '8901234567894', stock: 128, price: 3499 },
-  { id: 'P-1006', name: 'Wireless Mouse', category: 'Accessories', warehouse: 'WH-002', barcode: '8901234567895', stock: 18, price: 1299 },
-  { id: 'P-1007', name: 'Mechanical Keyboard', category: 'Accessories', warehouse: 'WH-001', barcode: '8901234567896', stock: 8, price: 4999 },
-  { id: 'P-1008', name: 'Monitor', category: 'Electronics', warehouse: 'WH-001', barcode: '8901234567897', stock: 0, price: 12999 },
-  { id: 'P-1009', name: 'Office Chair', category: 'Furniture', warehouse: 'WH-002', barcode: '8901234567898', stock: 56, price: 10999 },
-  { id: 'P-1010', name: 'Table Top', category: 'Electronics', warehouse: 'WH-001', barcode: '8901234567899', stock: 22, price: 8999 },
-];
+const fallbackProducts: Product[] = [];
 
 const statusTone = (stock?: number | null) => {
   if (typeof stock !== 'number') return 'border border-slate-200 bg-sky-50 text-slate-600';
@@ -50,7 +39,7 @@ const money = new Intl.NumberFormat('en-IN', {
 export const ProductsStockPage = () => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'low' | 'healthy'>('all');
-  const [selectedId, setSelectedId] = useState<string>('P-1001');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const debouncedSearch = useDebounce(search, 300);
 
   const { data: products = fallbackProducts, isLoading, isError, error, refetch } = useQuery<Product[]>({
@@ -59,7 +48,7 @@ export const ProductsStockPage = () => {
     staleTime: 60_000,
   });
 
-  const baseProducts = Array.isArray(products) && products.length > 0 ? products : fallbackProducts;
+  const baseProducts = Array.isArray(products) ? products : [];
 
   const filteredProducts = useMemo(() => {
     return baseProducts.filter((product) => {
@@ -78,7 +67,7 @@ export const ProductsStockPage = () => {
     });
   }, [baseProducts, debouncedSearch, filter]);
 
-  const selectedProduct = filteredProducts.find((product) => product.id === selectedId) ?? filteredProducts[0] ?? baseProducts[0];
+  const selectedProduct = filteredProducts.find((product) => product.id === selectedId) ?? filteredProducts[0] ?? baseProducts[0] ?? null;
 
   const totalProducts = baseProducts.length;
   const lowStock = baseProducts.filter((product) => Number(product.stock ?? 0) <= 10).length;
@@ -203,7 +192,7 @@ export const ProductsStockPage = () => {
                         </div>
                       </td>
                       <td className="px-5 py-4 text-[13px] font-medium text-slate-500">{product.category || 'General'}</td>
-                      <td className="px-5 py-4 text-[13px] font-medium text-slate-500">{product.warehouse || 'WH-001'}</td>
+                      <td className="px-5 py-4 text-[13px] font-medium text-slate-500">{product.warehouse || ''}</td>
                       <td className="px-5 py-4 text-right text-[14px] font-extrabold text-slate-900">{Number(product.stock ?? 0).toLocaleString()}</td>
                       <td className="px-5 py-4 text-center">
                         <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold tracking-wide ${statusTone(Number(product.stock ?? 0))}`}>
@@ -238,7 +227,7 @@ export const ProductsStockPage = () => {
               </div>
               <div>
                 <div className="text-[12px] text-slate-500">Product</div>
-                <div className="text-[20px] font-semibold text-slate-900">{selectedProduct?.name || 'Wireless Headphones'}</div>
+                <div className="text-[20px] font-semibold text-slate-900">{selectedProduct?.name || 'N/A'}</div>
               </div>
             </div>
             <button className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700">×</button>
@@ -253,30 +242,30 @@ export const ProductsStockPage = () => {
           <div className="mt-4 grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">SKU</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">{selectedProduct?.id || 'P-1001'}</div>
+              <div className="mt-1 text-sm font-semibold text-slate-800">{selectedProduct?.id || 'N/A'}</div>
             </div>
             <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Barcode</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">{selectedProduct?.barcode || '8901234567890'}</div>
+              <div className="mt-1 text-sm font-semibold text-slate-800">{selectedProduct?.barcode || 'N/A'}</div>
             </div>
             <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Category</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">{selectedProduct?.category || 'Electronics'}</div>
+              <div className="mt-1 text-sm font-semibold text-slate-800">{selectedProduct?.category || 'N/A'}</div>
             </div>
             <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Brand</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">Sony</div>
+              <div className="mt-1 text-sm font-semibold text-slate-800">{selectedProduct?.brand || 'N/A'}</div>
             </div>
           </div>
 
           <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
             <span className="font-medium text-slate-600">Selling Price</span>
-            <span className="font-bold text-slate-900 text-base">{money.format(Number(selectedProduct?.price ?? 12990))}</span>
+            <span className="font-bold text-slate-900 text-base">{selectedProduct ? money.format(Number(selectedProduct.price)) : 'N/A'}</span>
           </div>
 
           <div className="mt-2 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
             <span className="font-medium text-slate-600">Cost Price</span>
-            <span className="font-bold text-slate-900 text-base">{money.format(Number(selectedProduct?.price ?? 12990) * 0.7)}</span>
+            <span className="font-bold text-slate-900 text-base">{selectedProduct ? money.format(Number(selectedProduct.price) * 0.7) : 'N/A'}</span>
           </div>
 
           <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-3">
@@ -289,15 +278,17 @@ export const ProductsStockPage = () => {
             </div>
 
             <div className="space-y-2 text-sm">
-              {['WH-001', 'WH-002', 'WH-003'].map((warehouse, index) => (
-                <div key={warehouse} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              {selectedProduct ? (
+                <div key={selectedProduct.warehouse || 'current'} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                   <div className="flex items-center gap-2 text-slate-500">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-700">{warehouse.replace('WH-', '')}</div>
-                    <span>{warehouse}</span>
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-700">{(selectedProduct.warehouse || 'WH').replace('WH-', '')}</div>
+                    <span>{selectedProduct.warehouse || 'Current Branch'}</span>
                   </div>
-                  <span className="font-semibold text-slate-900">{[245, 86, 0][index]}</span>
+                  <span className="font-semibold text-slate-900">{selectedProduct.stock || 0}</span>
                 </div>
-              ))}
+              ) : (
+                <div className="text-slate-500 text-center py-2">No product selected</div>
+              )}
             </div>
           </div>
 

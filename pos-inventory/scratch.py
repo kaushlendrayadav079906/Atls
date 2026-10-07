@@ -1,0 +1,1 @@
+import asyncio; import sys; sys.path.append("c:/Users/A/Documents/IB/Dashboard/New Dashboard/Atls/pos-inventory/pos-backend"); from app.services.sap.items_service import SAPItemsService; s = SAPItemsService(); print(s.get_items(top=10))

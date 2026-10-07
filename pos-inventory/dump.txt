@@ -1,0 +1,612 @@
+import { useState, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  CalendarDays,
+  Download,
+  FileText,
+  RotateCcw,
+  TrendingUp,
+  Warehouse,
+  PieChart,
+  AlertCircle,
+  ShoppingBag,
+  Users,
+  Box,
+  CreditCard,
+  BarChart2,
+  Filter
+} from 'lucide-react';
+import { atlasApi } from '../../api/endpoints';
+
+const money = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  maximumFractionDigits: 2,
+});
+
+const StateMessage = ({ type, message }: { type: 'error' | 'empty'; message: string }) => (
+  <div className="flex h-full min-h-[180px] flex-col items-center justify-center gap-2 px-4 text-center">
+    {type === 'error' ? <AlertCircle className="h-8 w-8 text-red-400" /> : <FileText className="h-8 w-8 text-slate-500" />}
+    <div className={type === 'error' ? 'text-red-300 text-sm' : 'text-slate-500 text-sm'}>{message}</div>
+  </div>
+);
+
+const DEFAULT_RANGE = 'daily';
+
+export const SalesReportPage = () => {
+  const [range, setRange] = useState(DEFAULT_RANGE);
+  const [branchId, setBranchId] = useState<string | undefined>(undefined);
+  const [customer, setCustomer] = useState<string>('');
+  const [category, setCategory] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<string>('');
+  const [reportView, setReportView] = useState<string>('Summary');
+  const [groupBy, setGroupBy] = useState<string>('Date (Daily)');
+  
+  const [appliedFilters, setAppliedFilters] = useState({
+    range: DEFAULT_RANGE,
+    branchId: undefined as string | undefined,
+    customer: '',
+    category: '',
+    paymentMethod: ''
+  });
+
+  const [activeTab, setActiveTab] = useState('Sales Details');
+
+
+
+  const { data: trendData, isLoading: loadingTrend, isError: isErrorTrend, error: trendError } = useQuery({
+    queryKey: ['salesTrend', appliedFilters],
+    queryFn: () => atlasApi.getSalesTrend(appliedFilters.branchId, appliedFilters.range, appliedFilters.customer, appliedFilters.category, appliedFilters.paymentMethod),
+    retry: 1,
+  });
+
+  const { data: feedData, isLoading: loadingFeed, isError: isErrorFeed, error: feedError } = useQuery({
+    queryKey: ['salesFeed', appliedFilters],
+    queryFn: () => atlasApi.getRecentSalesFeed({ 
+      range: appliedFilters.range, 
+      branch: appliedFilters.branchId, 
+      customer: appliedFilters.customer,
+      category: appliedFilters.category,
+      payment_method: appliedFilters.paymentMethod,
+      limit: 50, 
+      offset: 0 
+    }),
+    retry: 1,
+  });
+
+  const { data: topProducts, isLoading: loadingProducts } = useQuery({
+    queryKey: ['topProducts', appliedFilters],
+    queryFn: () => atlasApi.getTopProducts(appliedFilters.branchId, appliedFilters.range, appliedFilters.customer, appliedFilters.category, appliedFilters.paymentMethod),
+    retry: 1,
+  });
+
+  const { data: topCustomers, isLoading: loadingCustomers } = useQuery({
+    queryKey: ['topCustomers', appliedFilters],
+    queryFn: () => atlasApi.getTopCustomers(appliedFilters.branchId, appliedFilters.range, appliedFilters.customer, appliedFilters.category, appliedFilters.paymentMethod),
+    retry: 1,
+  });
+
+  const { data: branchComparison, isLoading: loadingBranchComparison } = useQuery({
+    queryKey: ['branchComparison', appliedFilters.range],
+    queryFn: () => atlasApi.getBranchComparison(appliedFilters.range),
+    retry: 1,
+  });
+
+  const handleApplyFilters = () => {
+    setAppliedFilters({
+      range,
+      branchId,
+      customer,
+      category,
+      paymentMethod
+    });
+  };
+
+  const handleReset = useCallback(() => {
+    setRange(DEFAULT_RANGE);
+    setBranchId(undefined);
+    setCustomer('');
+    setCategory('');
+    setPaymentMethod('');
+    setReportView('Summary');
+    setGroupBy('Date (Daily)');
+    setAppliedFilters({
+      range: DEFAULT_RANGE,
+      branchId: undefined,
+      customer: '',
+      category: '',
+      paymentMethod: ''
+    });
+  }, []);
+
+  const trendPoints = trendData?.trend ?? [];
+  const chartMax = Math.max(...trendPoints.map((point: any) => Number(point.sales) || 0), 1);
+  const paymentBreakdown = trendData?.payment_breakdown ?? [];
+  const feedItems = feedData?.items ?? [];
+
+  // Calculate SVG Pie Chart segments
+  const totalPaymentAmount = paymentBreakdown.reduce((sum: number, item: any) => sum + (Number(item.total) || 0), 0);
+  let currentOffset = 0;
+  const pieSegments = paymentBreakdown.map((item: any, i: number) => {
+    const val = Number(item.total) || 0;
+    const percentage = totalPaymentAmount > 0 ? (val / totalPaymentAmount) * 100 : 0;
+    const segment = {
+      ...item,
+      percentage,
+      offset: currentOffset,
+      color: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'][i % 5]
+    };
+    currentOffset += percentage;
+    return segment;
+  });
+
+  const getErrorMessage = (error: unknown): string => {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: { status?: number; data?: { detail?: string } } };
+      const status = axiosError.response?.status;
+      const detail = axiosError.response?.data?.detail;
+      if (status === 401) return 'Session expired. Please log in again.';
+      if (status === 403) return detail || 'Access denied for this branch or role.';
+      if (status === 404) return 'Report endpoint not found. Please contact support.';
+      if (status === 422) return `Invalid filter parameters: ${detail || 'check date range or branch.'}`;
+      if (status === 502) return `SAP data unavailable: ${detail || 'SAP Service Layer returned an error.'}`;
+      if (status === 503) return 'SAP Service Layer is offline. Please try again later.';
+      if (detail) return detail;
+    }
+    return 'Failed to load report data. Please try again.';
+  };
+
+
+  return (
+    <div className="mx-auto max-w-[1500px] space-y-5">
+      {/* Header */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+            <FileText className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              {appliedFilters.range === 'daily' ? "Today's Sales" :
+               appliedFilters.range === 'weekly' ? "This Week's Sales" :
+               appliedFilters.range === 'monthly' ? "This Month's Sales" :
+               appliedFilters.range === 'yearly' ? "This Year's Sales" : "Total Sales"}
+            </h1>
+            <p className="mt-0.5 text-[13px] text-slate-500">View and export sales summary, items, and customer wise reports.</p>
+          </div>
+        </div>
+        <button
+          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500 disabled:opacity-50"
+          disabled={loadingFeed || isErrorFeed || feedItems.length === 0}
+          onClick={() => {
+            if (!feedItems.length) return;
+            const headers = ['#', 'Invoice No.', 'Date', 'Customer', 'Items', 'Amount', 'Payment Method', 'Status'];
+            const rows = feedItems.map((r: any, i: number) => [
+              i + 1,
+              r.docNum ? `INV-${r.docNum}` : r.saleId,
+              r.docDate || '',
+              r.customerName || r.customerCode || 'Walk-in',
+              r.items?.length || 0,
+              r.total,
+              r.paymentMethod || 'Unknown',
+              r.hasReturn ? 'Refunded' : 'Completed',
+            ]);
+            const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sales-report-${appliedFilters.range}-${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+        >
+          <Download className="h-4 w-4" />
+          Quick Export
+        </button>
+      </div>
+
+      {/* Filters */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-4">
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Date Range</label>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+              <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
+              <select value={range} onChange={(e) => setRange(e.target.value)} className="flex-1 bg-transparent outline-none">
+                <option value="daily">Today</option>
+                <option value="weekly">This Week</option>
+                <option value="monthly">This Month</option>
+                <option value="yearly">This Year</option>
+                <option value="all_time">Total (All Time)</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Branch</label>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+              <Warehouse className="h-3.5 w-3.5 text-blue-600" />
+              <select value={branchId || ''} onChange={(e) => setBranchId(e.target.value || undefined)} className="flex-1 bg-transparent outline-none">
+                <option value="">All Branches</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Report View</label>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+              <BarChart2 className="h-3.5 w-3.5 text-blue-600" />
+              <select value={reportView} onChange={(e) => setReportView(e.target.value)} className="flex-1 bg-transparent outline-none">
+                <option value="Summary">Summary</option>
+                <option value="Detailed">Detailed</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Group By</label>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+              <Filter className="h-3.5 w-3.5 text-blue-600" />
+              <select value={groupBy} onChange={(e) => setGroupBy(e.target.value)} className="flex-1 bg-transparent outline-none">
+                <option value="Date (Daily)">Date (Daily)</option>
+                <option value="Customer">Customer</option>
+                <option value="Product">Product</option>
+                <option value="Branch">Branch</option>
+                <option value="Payment Method">Payment Method</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Customer</label>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+              <Users className="h-3.5 w-3.5 text-blue-600" />
+              <input type="text" placeholder="All Customers" value={customer} onChange={(e) => setCustomer(e.target.value)} className="flex-1 bg-transparent outline-none" />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Product Category</label>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+              <Box className="h-3.5 w-3.5 text-blue-600" />
+              <input type="text" placeholder="All Categories" value={category} onChange={(e) => setCategory(e.target.value)} className="flex-1 bg-transparent outline-none" />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Payment Method</label>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
+              <CreditCard className="h-3.5 w-3.5 text-blue-600" />
+              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="flex-1 bg-transparent outline-none">
+                <option value="">All Payment Methods</option>
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="upi">UPI</option>
+                <option value="wallet">Wallet</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex items-end gap-2">
+            <button
+              onClick={handleApplyFilters}
+              className="flex h-9 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-[12px] font-semibold text-white shadow-sm hover:bg-blue-500"
+            >
+              Apply Filters
+            </button>
+            <button
+              onClick={handleReset}
+              className="flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 text-[12px] font-semibold text-slate-600 hover:bg-white"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              Reset
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          {
+            title: 'Total Sales',
+            val: trendData ? money.format(trendData.total_sales) : '₹0.00',
+            color: 'text-emerald-600',
+            bg: 'bg-emerald-50',
+            icon: TrendingUp,
+          },
+          {
+            title: 'Total Invoices',
+            val: trendData ? `${trendData.total_invoices}` : '0',
+            color: 'text-purple-400',
+            bg: 'bg-purple-500/10',
+            icon: FileText,
+          },
+          {
+            title: 'Total Customers',
+            val: trendData ? `${trendData.total_customers}` : '0',
+            color: 'text-blue-500',
+            bg: 'bg-blue-50',
+            icon: Users,
+          },
+          {
+            title: 'Avg. Order Value',
+            val: trendData ? money.format(trendData.average_order_value) : '₹0.00',
+            color: 'text-amber-400',
+            bg: 'bg-amber-50',
+            icon: ShoppingBag,
+          },
+        ].map((card, i) => (
+          <div key={i} className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${card.bg}`}>
+              <card.icon className={`h-6 w-6 ${card.color}`} />
+            </div>
+            <div>
+              <p className="text-[12px] text-slate-500">{card.title}</p>
+              <div className="flex items-end gap-2">
+                <span className="text-xl font-bold text-slate-900">
+                  {loadingTrend
+                    ? 'Loading...'
+                    : isErrorTrend
+                    ? <span className="text-red-400 text-sm">Error</span>
+                    : card.val}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
+        {/* Sales Trend */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-blue-600" />
+              <h3 className="font-semibold text-slate-900">
+                {trendData?.group_by === 'hour' ? 'Hourly Sales Trend' : 
+                 trendData?.group_by === 'month' ? 'Monthly Sales Trend' :
+                 trendData?.group_by === 'year' ? 'Yearly Sales Trend' : 'Daily Sales Trend'}
+              </h3>
+            </div>
+            <select className="text-[11px] outline-none bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-600">
+              <option>Sales Amount</option>
+              <option>Invoice Count</option>
+            </select>
+          </div>
+          {loadingTrend ? (
+            <StateMessage type="empty" message="Loading chart data from SAP..." />
+          ) : isErrorTrend ? (
+            <StateMessage type="error" message={getErrorMessage(trendError)} />
+          ) : trendPoints.length === 0 ? (
+            <StateMessage type="empty" message="No sales data available for this period." />
+          ) : (
+            <div className="relative h-[200px] w-full border-b border-l border-slate-200">
+              <div className="flex h-full items-end justify-between px-2">
+                {trendPoints.map((point: any, i: number) => (
+                  <div key={i} className="w-8 h-full flex flex-col items-center justify-end gap-1 group relative">
+                    <div className="hidden group-hover:block absolute -top-8 bg-slate-800 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap z-10">
+                      {money.format(Number(point.sales) || 0)} · {point.invoice_count} inv
+                    </div>
+                    <div
+                      className="w-full bg-blue-500 rounded-t-sm shadow-[0_0_10px_rgba(59,130,246,0.3)] transition-all duration-300"
+                      style={{ height: `${((Number(point.sales) || 0) / chartMax) * 100}%` }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="absolute -bottom-6 flex w-full justify-between px-2 text-[10px] text-slate-500">
+                {trendPoints.map((p: any, i: number) => <span key={i} className="w-8 text-center truncate">{p.label}</span>)}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Sales by Payment Method */}
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <PieChart className="h-5 w-5 text-blue-600" />
+              <h3 className="font-semibold text-slate-900">Sales by Payment Method</h3>
+            </div>
+          </div>
+          {loadingTrend ? (
+            <StateMessage type="empty" message="Loading payment data from SAP..." />
+          ) : isErrorTrend ? (
+            <StateMessage type="error" message={getErrorMessage(trendError)} />
+          ) : paymentBreakdown.length === 0 ? (
+            <StateMessage type="empty" message="Payment method data not available in SAP for this period." />
+          ) : (
+            <div className="flex flex-col items-center gap-8 xl:flex-row">
+              <div className="relative flex h-32 w-32 items-center justify-center">
+                <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
+                  {pieSegments.map((seg: any) => (
+                    <circle
+                      key={seg.method}
+                      cx="18"
+                      cy="18"
+                      r="15.91549430918954"
+                      fill="transparent"
+                      stroke={seg.color}
+                      strokeWidth="4"
+                      strokeDasharray={`${seg.percentage} ${100 - seg.percentage}`}
+                      strokeDashoffset={100 - seg.offset}
+                      className="transition-all duration-500"
+                    />
+                  ))}
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <span className="text-[10px] text-slate-400">Total</span>
+                  <span className="text-[11px] font-bold text-slate-800">{money.format(totalPaymentAmount)}</span>
+                </div>
+              </div>
+              <div className="flex-1 space-y-3 text-[11px] w-full">
+                {pieSegments.map((item: any) => (
+                  <div key={item.method} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-slate-700 capitalize">
+                      <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                      {item.method}
+                    </div>
+                    <div className="flex gap-4">
+                      <span className="text-slate-500">{item.billCount} bills</span>
+                      <span className="text-slate-900 font-medium">{money.format(item.total)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs and Data Tables */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-4 flex flex-col justify-between gap-4 border-b border-slate-200 sm:flex-row sm:items-center">
+          <div className="flex gap-6 text-[13px] font-semibold text-slate-500">
+            {['Sales Details', 'Top Selling Items', 'Customer Wise Sales', 'Branch Wise Sales'].map((tab) => (
+              <button 
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`pb-3 transition-colors ${activeTab === tab ? 'border-b-2 border-blue-500 text-blue-600' : 'hover:text-slate-700'}`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          {activeTab === 'Sales Details' && (
+            <>
+              <table className="w-full text-left text-[12px] text-slate-700">
+                <thead className="text-[10px] text-slate-500">
+                  <tr>
+                    <th className="py-2">#</th>
+                    <th className="py-2">Invoice No.</th>
+                    <th className="py-2">Date &amp; Time</th>
+                    <th className="py-2">Customer</th>
+                    <th className="py-2 text-center">Items</th>
+                    <th className="py-2 text-right">Amount</th>
+                    <th className="py-2">Payment Method</th>
+                    <th className="py-2 text-center">Status</th>
+                    <th className="py-2 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-sky-800/30">
+                  {loadingFeed ? (
+                    <tr><td colSpan={9} className="py-8 text-center text-slate-500">Loading sales data from SAP...</td></tr>
+                  ) : isErrorFeed ? (
+                    <tr><td colSpan={9} className="py-8 text-center text-red-400">{getErrorMessage(feedError)}</td></tr>
+                  ) : feedItems.length === 0 ? (
+                    <tr><td colSpan={9} className="py-8 text-center text-slate-500">No sales data available for the selected filters.</td></tr>
+                  ) : feedItems.map((r: any, i: number) => (
+                    <tr key={r.saleId || r.docEntry || i} className="hover:bg-slate-50">
+                      <td className="py-2.5 text-slate-500">{i + 1}</td>
+                      <td className="py-2.5 font-medium text-blue-600">{r.docNum ? `INV-${r.docNum}` : r.saleId}</td>
+                      <td className="py-2.5 text-slate-500">{r.docDate || 'N/A'}</td>
+                      <td className="py-2.5">{r.customerName || r.customerCode || 'Walk-in'}</td>
+                      <td className="py-2.5 text-center">{r.items?.length ?? 0}</td>
+                      <td className="py-2.5 text-right font-semibold">{money.format(r.total ?? 0)}</td>
+                      <td className="py-2.5 text-slate-500 capitalize">{r.paymentMethod || 'Unknown'}</td>
+                      <td className="py-2.5 text-center">
+                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                          r.hasReturn ? 'bg-red-50 text-red-400' : 'bg-emerald-50 text-emerald-600'
+                        }`}>
+                          {r.hasReturn ? 'Refunded' : 'Completed'}
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-center">
+                        <button className="text-blue-500 hover:underline">View</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {feedData && feedItems.length > 0 && (
+                <div className="mt-4 flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Showing {feedItems.length} of {feedData.total ?? feedItems.length} invoices</span>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === 'Top Selling Items' && (
+            <table className="w-full text-left text-[12px] text-slate-700">
+              <thead className="text-[10px] text-slate-500">
+                <tr>
+                  <th className="py-2">Item Code</th>
+                  <th className="py-2">Item Name</th>
+                  <th className="py-2 text-right">Units Sold</th>
+                  <th className="py-2 text-right">Revenue</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-sky-800/30">
+                {loadingProducts ? (
+                   <tr><td colSpan={4} className="py-8 text-center text-slate-500">Loading top products from SAP...</td></tr>
+                ) : !topProducts || topProducts.length === 0 ? (
+                   <tr><td colSpan={4} className="py-8 text-center text-slate-500">No data available.</td></tr>
+                ) : topProducts.map((p: any, i: number) => (
+                   <tr key={i} className="hover:bg-slate-50">
+                     <td className="py-2.5 font-medium text-slate-700">{p.itemCode}</td>
+                     <td className="py-2.5 text-slate-500">{p.itemName}</td>
+                     <td className="py-2.5 text-right font-medium">{p.quantitySold}</td>
+                     <td className="py-2.5 text-right font-semibold text-emerald-600">{money.format(p.salesAmount)}</td>
+                   </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {activeTab === 'Customer Wise Sales' && (
+            <table className="w-full text-left text-[12px] text-slate-700">
+              <thead className="text-[10px] text-slate-500">
+                <tr>
+                  <th className="py-2">Customer Code</th>
+                  <th className="py-2">Customer Name</th>
+                  <th className="py-2 text-center">Invoice Count</th>
+                  <th className="py-2 text-right">Total Sales</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-sky-800/30">
+                {loadingCustomers ? (
+                   <tr><td colSpan={4} className="py-8 text-center text-slate-500">Loading customers from SAP...</td></tr>
+                ) : !topCustomers || topCustomers.length === 0 ? (
+                   <tr><td colSpan={4} className="py-8 text-center text-slate-500">No data available.</td></tr>
+                ) : topCustomers.map((c: any, i: number) => (
+                   <tr key={i} className="hover:bg-slate-50">
+                     <td className="py-2.5 font-medium text-slate-700">{c.customerCode}</td>
+                     <td className="py-2.5 text-slate-500">{c.customerName}</td>
+                     <td className="py-2.5 text-center font-medium">{c.invoiceCount}</td>
+                     <td className="py-2.5 text-right font-semibold text-emerald-600">{money.format(c.totalSales)}</td>
+                   </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {activeTab === 'Branch Wise Sales' && (
+            <table className="w-full text-left text-[12px] text-slate-700">
+              <thead className="text-[10px] text-slate-500">
+                <tr>
+                  <th className="py-2">Branch Code</th>
+                  <th className="py-2">Branch Name</th>
+                  <th className="py-2 text-center">Invoice Count</th>
+                  <th className="py-2 text-right">Total Sales</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-sky-800/30">
+                {loadingBranchComparison ? (
+                   <tr><td colSpan={4} className="py-8 text-center text-slate-500">Loading branch data from SAP...</td></tr>
+                ) : !branchComparison?.branches || branchComparison.branches.length === 0 ? (
+                   <tr><td colSpan={4} className="py-8 text-center text-slate-500">No data available.</td></tr>
+                ) : branchComparison.branches.map((b: any, i: number) => (
+                   <tr key={i} className="hover:bg-slate-50">
+                     <td className="py-2.5 font-medium text-slate-700">{b.branchId}</td>
+                     <td className="py-2.5 text-slate-500">{b.branchName}</td>
+                     <td className="py-2.5 text-center font-medium">{b.billCount}</td>
+                     <td className="py-2.5 text-right font-semibold text-emerald-600">{money.format(b.total)}</td>
+                   </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

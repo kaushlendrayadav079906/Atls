@@ -242,6 +242,9 @@ class DashboardRecentSalesPage(BaseModel):
     items: List[DashboardRecentSale] = Field(default_factory=list)
     nextOffset: Optional[int] = None
     total: Optional[int] = None
+    grossSales: Optional[float] = 0
+    paidInvoices: Optional[int] = 0
+    pendingInvoices: Optional[int] = 0
 
 
 # ============================================================
@@ -472,19 +475,14 @@ class ReturnResponse(BaseModel):
 # ============================================================
 
 class CustomerSearchResult(BaseModel):
-    """A customer suggestion from invoice UDF fields (U_C_Name, U_W_Number).
-
-    Customers in this POS are not SAP Business Partners — they are identified
-    solely by the name and mobile number stored on each AR Invoice as UDFs.
-    """
-    name: str
-    mobile: str
+    """A SAP Business Partner representing a customer."""
+    cardCode: Optional[str] = None
+    cardName: Optional[str] = None
+    phone: Optional[str] = None
     email: Optional[str] = None
+    whatsappNumber: Optional[str] = None
+    paymentMethod: Optional[str] = None
     salesEmployee: Optional[str] = None
-    address: Optional[str] = None
-    invoiceCount: Optional[int] = None
-    latestDocNum: Optional[int] = None
-    invoiceNums: Optional[List[int]] = None
 
 
 class TopCustomer(BaseModel):
@@ -496,9 +494,44 @@ class TopCustomer(BaseModel):
     averageOrderValue: float
 
 
+class CustomerProfile(BaseModel):
+    cardCode: str
+    cardName: str
+    cardType: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    whatsappNumber: Optional[str] = None
+    address: Optional[str] = None
+    status: str
+    registeredOn: Optional[str] = None
+    lastPurchase: Optional[str] = None
+    preferredBranch: Optional[str] = None
+    recentInvoicesCount: int = 0
+    recentReturnsCount: int = 0
+    lifetimeValue: float = 0.0
+
+class CustomerPurchase(BaseModel):
+    docEntry: int
+    docNum: int
+    docDate: str
+    docTotal: float
+    status: str
+    branch: str
+    itemCount: int
+
+class CustomerReturn(BaseModel):
+    docEntry: int
+    docNum: int
+    docDate: str
+    docTotal: float
+    status: str
+    branch: str
+    itemCount: int
+
 class CustomerInsightsData(BaseModel):
     """Customer insights aggregated from invoices."""
     topCustomers: List[TopCustomer] = Field(default_factory=list)
+    totalCustomers: int = 0
     repeatCustomerCount: int = 0
     newCustomerCount: int = 0
     repeatRate: float = 0.0
@@ -550,6 +583,24 @@ class AtlasOverview(BaseModel):
 
 class AtlasSalesTrend(BaseModel):
     trend: List[SalesTrendPoint] = Field(default_factory=list)
+
+class DynamicSalesTrendPoint(BaseModel):
+    period: str
+    label: str
+    sales: float
+    invoice_count: int
+
+class DynamicSalesTrendResponse(BaseModel):
+    range: str
+    group_by: str
+    start_date: str
+    end_date: str
+    total_sales: float
+    total_invoices: int
+    total_customers: int
+    average_order_value: float
+    payment_breakdown: List[PaymentMethodSummary] = Field(default_factory=list)
+    trend: List[DynamicSalesTrendPoint] = Field(default_factory=list)
 
 class AtlasInventoryItem(BaseModel):
     itemCode: str

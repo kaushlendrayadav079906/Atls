@@ -69,7 +69,6 @@ class SAPInventoryService:
         for page_num in range(MAX_PAGES):
             try:
                 params = {
-                    "$filter": f"ItemWarehouseInfoCollection/any(w: w/WarehouseCode eq '{warehouse}')",
                     "$select": "ItemCode,ItemName,QuantityOnStock,ItemWarehouseInfoCollection",
                     "$top": PAGE_SIZE,
                     "$skip": skip,

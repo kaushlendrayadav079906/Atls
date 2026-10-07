@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     AlertCircle,
+    Building2,
+    CalendarDays,
     ChevronLeft,
     ChevronRight,
     Clock3,
@@ -14,7 +16,7 @@ import {
     Ticket,
     X,
 } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { returnsApi, type ApprovalRequestRow } from '../../api/returns';
 import { useAuth } from '../../contexts/AuthContext';
@@ -92,53 +94,73 @@ export const ReturnsApprovalsPage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  
   const [tab, setTab] = useState<'all' | 'pending' | 'completed' | 'rejected' | 'failed'>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const { data: approvals = [], isLoading, isError, error, refetch } = useQuery<ApprovalRequestRow[]>({
-    queryKey: ['returns-approvals'],
-    queryFn: () => returnsApi.getApprovalQueue(),
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [branchId, setBranchId] = useState('');
+  const [dateRange, setDateRange] = useState('');
+  const [status, setStatus] = useState('all');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  const getStartEndDate = (range: string) => {
+    if (!range) return { start: undefined, end: undefined };
+    if (range.includes('_to_')) {
+      return { start: range.split('_to_')[0], end: range.split('_to_')[1] };
+    }
+    const today = new Date();
+    const end = today.toISOString().split('T')[0];
+    let start = end;
+    if (range === 'week') {
+      const lastWeek = new Date(today);
+      lastWeek.setDate(today.getDate() - 7);
+      start = lastWeek.toISOString().split('T')[0];
+    } else if (range === 'month') {
+      const lastMonth = new Date(today);
+      lastMonth.setMonth(today.getMonth() - 1);
+      start = lastMonth.toISOString().split('T')[0];
+    } else if (range === 'year') {
+      const lastYear = new Date(today);
+      lastYear.setFullYear(today.getFullYear() - 1);
+      start = lastYear.toISOString().split('T')[0];
+    }
+    return { start, end };
+  };
+
+  const { data = { items: [], total: 0, counts: { all: 0, pending: 0, completed: 0, rejected: 0, failed: 0 } }, isLoading, isError, error, refetch } = useQuery<{items: ApprovalRequestRow[], total: number, counts: Record<string, number>}>({
+    queryKey: ['returns-approvals', page, limit, branchId, dateRange, tab !== 'all' ? tab : status, debouncedSearch],
+    queryFn: () => {
+      const { start, end } = getStartEndDate(dateRange);
+      return returnsApi.getApprovalQueue({
+        page,
+        limit,
+        branch_id: branchId || undefined,
+        start_date: start,
+        end_date: end,
+        status: tab !== 'all' ? tab : (status !== 'all' ? status : undefined),
+        search: debouncedSearch || undefined,
+      });
+    },
     staleTime: 30_000,
   });
 
-  const rows = useMemo(() => {
-    const normalized = approvals.map((request) => ({
-      ...request,
-      __status: normalizeStatus(request.status),
-    }));
-
-    const filtered = normalized.filter((request) => {
-      const term = searchTerm.trim().toLowerCase();
-      if (!term) return true;
-      const haystack = [
-        getRequestNumber(request),
-        getCustomerName(request),
-        safeText(request.original_doc_num),
-        safeText(request.reason),
-        safeText(request.branch_id),
-      ]
-        .join(' ')
-        .toLowerCase();
-      return haystack.includes(term);
-    });
-
-    if (tab === 'all') return filtered;
-    if (tab === 'pending') return filtered.filter((item) => item.__status === 'pending' || item.__status === 'processing');
-    if (tab === 'completed') return filtered.filter((item) => item.__status === 'completed' || item.__status === 'approved');
-    if (tab === 'rejected') return filtered.filter((item) => item.__status === 'rejected');
-    return filtered.filter((item) => item.__status === 'failed' || item.__status === 'outcome-unknown');
-  }, [approvals, searchTerm, tab]);
+  const rows: ApprovalRequestRow[] = data.items;
+  const totalCount = data.total;
+  const totalCounts = data.counts;
+  const totalPages = Math.ceil(totalCount / limit);
 
   const selectedRequest = rows.find((request) => request.id === selectedId) || rows[0] || null;
-
-  const totalCounts = useMemo(() => ({
-    all: approvals.length,
-    pending: approvals.filter((item) => normalizeStatus(item.status) === 'pending' || normalizeStatus(item.status) === 'processing').length,
-    completed: approvals.filter((item) => normalizeStatus(item.status) === 'completed' || normalizeStatus(item.status) === 'approved').length,
-    rejected: approvals.filter((item) => normalizeStatus(item.status) === 'rejected').length,
-    failed: approvals.filter((item) => normalizeStatus(item.status) === 'failed' || normalizeStatus(item.status) === 'outcome-unknown').length,
-  }), [approvals]);
 
   const mutationConfig = {
     onSuccess: async () => {
@@ -161,7 +183,7 @@ export const ReturnsApprovalsPage = () => {
     ...mutationConfig,
   });
 
-  const isAdmin = user?.role?.toLowerCase() === 'admin';
+  const canApprove = user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'manager';
 
   const tabs = [
     { key: 'all', label: 'All Requests', count: totalCounts.all },
@@ -172,16 +194,16 @@ export const ReturnsApprovalsPage = () => {
   ] as const;
 
   const handleApprove = async (requestId: string) => {
-    if (!isAdmin) {
-      setActionError('Approval actions require admin access.');
+    if (!canApprove) {
+      setActionError('Approval actions require admin or manager access.');
       return;
     }
     await approveMutation.mutateAsync(requestId);
   };
 
   const handleReject = async (requestId: string) => {
-    if (!isAdmin) {
-      setActionError('Approval actions require admin access.');
+    if (!canApprove) {
+      setActionError('Approval actions require admin or manager access.');
       return;
     }
     await rejectMutation.mutateAsync(requestId);
@@ -224,44 +246,107 @@ export const ReturnsApprovalsPage = () => {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.85fr)_minmax(360px,0.8fr)]">
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2">
-                  <Search className="h-4 w-4 text-blue-600" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Search request, customer, invoice..."
-                    className="w-full bg-transparent text-sm text-slate-700 placeholder:text-slate-500 outline-none"
-                  />
-                </div>
-                <button type="button" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">
-                  <ListFilter className="h-4 w-4" />
-                  Filter
+          
+          <div className="flex flex-col gap-4">
+            {/* Quick Time Range Selector */}
+            <div className="flex items-center gap-2">
+              {['today', 'week', 'month', 'year'].map((r) => (
+                <button
+                  key={r}
+                  onClick={() => { setDateRange(r); setPage(1); }}
+                  className={`rounded-lg px-5 py-2 text-sm font-bold transition-colors ${
+                    dateRange === r ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {r === 'today' ? 'Today' : r === 'week' ? 'Week' : r === 'month' ? 'Month' : 'Year'}
                 </button>
-              </div>
+              ))}
             </div>
 
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-              <div className="flex flex-wrap gap-2">
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              
+              {/* Tabs */}
+              <div className="flex items-center overflow-x-auto border-b border-slate-200 px-2 bg-slate-50/50">
                 {tabs.map((item) => (
                   <button
                     key={item.key}
-                    type="button"
-                    onClick={() => setTab(item.key)}
-                    className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
-                      tab === item.key
-                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-900/20'
-                        : 'bg-transparent text-slate-600 hover:bg-[#123d65]'
+                    onClick={() => { setTab(item.key as any); setPage(1); }}
+                    className={`flex items-center whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-semibold transition-colors ${
+                      tab === item.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
                     }`}
                   >
-                    {item.label} {item.count > 0 ? `(${item.count})` : ''}
+                    {item.label}
+                    {item.count > 0 && (
+                      <span
+                        className={`ml-2 rounded-full px-2 py-0.5 text-[11px] ${
+                          tab === item.key ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {item.count}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
-            </div>
+
+              {/* Filter Bar */}
+              <div className="border-b border-slate-200 bg-white px-4 py-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 min-w-[140px]">
+                    <CalendarDays className="h-4 w-4 text-slate-400" />
+                    <select value={dateRange} onChange={(e) => {setDateRange(e.target.value); setPage(1);}} className="bg-transparent outline-none w-full">
+                      <option value="">All Time</option>
+                      <option value="today">Today</option>
+                      <option value="week">This Week</option>
+                      <option value="month">This Month</option>
+                      <option value="year">This Year</option>
+                      <option value={`${new Date().toISOString().split('T')[0]}_to_${new Date().toISOString().split('T')[0]}`}>Custom Range...</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 min-w-[160px]">
+                    <Building2 className="h-4 w-4 text-slate-400" />
+                    <select value={branchId} onChange={(e) => {setBranchId(e.target.value); setPage(1);}} className="bg-transparent outline-none w-full">
+                      <option value="">All Branches</option>
+                      <option value="WH-001">Main Branch (WH-001)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 min-w-[140px]">
+                    <ListFilter className="h-4 w-4 text-slate-400" />
+                    <select value={status} onChange={(e) => {setStatus(e.target.value); setTab('all'); setPage(1);}} className="bg-transparent outline-none w-full">
+                      <option value="all">All Status</option>
+                      <option value="pending">Pending</option>
+                      <option value="completed">Approved</option>
+                      <option value="rejected">Rejected</option>
+                      <option value="processing">Processing</option>
+                      <option value="failed">Failed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm min-w-[200px]">
+                    <Search className="h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(event) => setSearchTerm(event.target.value)}
+                      placeholder="Search request ID, invoice no, customer..."
+                      className="w-full bg-transparent text-slate-700 placeholder:text-slate-400 outline-none"
+                    />
+                  </div>
+                  
+                  <button type="button" className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition">
+                    <ListFilter className="h-4 w-4" />
+                    Filter
+                  </button>
+
+                  <button type="button" onClick={() => {setSearchTerm(''); setDateRange(''); setBranchId(''); setStatus('all'); setTab('all'); setPage(1);}} className="rounded-xl border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+                    Clear
+                  </button>
+                </div>
+              </div>
 
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-100 text-left">
@@ -356,17 +441,59 @@ export const ReturnsApprovalsPage = () => {
               </table>
             </div>
 
-            <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              <span>Showing {rows.length} requests</span>
+            <div className="flex flex-col sm:flex-row items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 gap-4">
+              <div className="flex items-center gap-4">
+                <span>Showing {Math.min((page - 1) * limit + 1, totalCount) || 0} to {Math.min(page * limit, totalCount)} of {totalCount} requests</span>
+                <div className="flex items-center gap-2 border-l border-slate-300 pl-4">
+                  <span>Entries per page:</span>
+                  <input 
+                    type="number" 
+                    min={1} 
+                    max={100} 
+                    value={limit} 
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (val > 0 && val <= 100) {
+                        setLimit(val);
+                        setPage(1);
+                      }
+                    }}
+                    className="w-16 rounded border border-slate-300 px-2 py-1 text-center outline-none focus:border-blue-500"
+                  />
+                  <select 
+                    value={limit} 
+                    onChange={(e) => {setLimit(Number(e.target.value)); setPage(1);}}
+                    className="rounded border border-slate-300 px-2 py-1 outline-none focus:border-blue-500"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
-                <button type="button" className="rounded-md border border-slate-200 bg-slate-100 p-2 text-slate-700 hover:bg-[#123d65] disabled:opacity-50" disabled>
+                <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="rounded-md border border-slate-200 bg-slate-100 p-1.5 text-slate-700 hover:bg-[#123d65] hover:text-white disabled:opacity-50 transition">
                   <ChevronLeft className="h-4 w-4" />
                 </button>
-                <button type="button" className="rounded-md border border-slate-200 bg-slate-100 p-2 text-slate-700 hover:bg-[#123d65] disabled:opacity-50" disabled>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1).map((p, i, arr) => (
+                  <div key={p} className="flex items-center">
+                    {i > 0 && arr[i - 1] !== p - 1 && <span className="px-1 text-slate-400">...</span>}
+                    <button 
+                      type="button" 
+                      onClick={() => setPage(p)}
+                      className={`h-7 min-w-[28px] rounded-md text-[13px] font-medium transition-colors ${p === page ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
+                    >
+                      {p}
+                    </button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages || totalPages === 0} className="rounded-md border border-slate-200 bg-slate-100 p-1.5 text-slate-700 hover:bg-[#123d65] hover:text-white disabled:opacity-50 transition">
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             </div>
+          </div>
           </div>
 
           <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -456,7 +583,7 @@ export const ReturnsApprovalsPage = () => {
                     <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Approval Workflow</h3>
                     <div className="mt-4 space-y-3 text-sm">
                       <WorkflowRow title="Request Submitted" time={selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} done />
-                      <WorkflowRow title="Pending Review" time={isAdmin ? 'Admin approval queue' : 'Access restricted'} done={normalizeStatus(selectedRequest.status) !== 'rejected' && normalizeStatus(selectedRequest.status) !== 'completed'} />
+                      <WorkflowRow title="Pending Review" time={canApprove ? 'Admin/Manager approval queue' : 'Access restricted'} done={normalizeStatus(selectedRequest.status) !== 'rejected' && normalizeStatus(selectedRequest.status) !== 'completed'} />
                       <WorkflowRow title="Approved / Rejected" time={selectedRequest.updated_at ? new Date(selectedRequest.updated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Awaiting decision'} done={['completed', 'rejected', 'failed'].includes(normalizeStatus(selectedRequest.status))} />
                     </div>
                   </div>
@@ -481,7 +608,7 @@ export const ReturnsApprovalsPage = () => {
                 <div className="mt-5 flex gap-3">
                   <button
                     type="button"
-                    disabled={!isAdmin || approveMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
+                    disabled={!canApprove || approveMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
                     onClick={() => handleApprove(selectedRequest.id)}
                     className="flex-1 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-900/20 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -489,7 +616,7 @@ export const ReturnsApprovalsPage = () => {
                   </button>
                   <button
                     type="button"
-                    disabled={!isAdmin || rejectMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
+                    disabled={!canApprove || rejectMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
                     onClick={() => handleReject(selectedRequest.id)}
                     className="flex-1 rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-rose-900/20 hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -497,9 +624,9 @@ export const ReturnsApprovalsPage = () => {
                   </button>
                 </div>
 
-                {!isAdmin && (
+                {!canApprove && (
                   <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                    Admin access is required to approve or reject return requests.
+                    Admin or Manager access is required to approve or reject return requests.
                   </div>
                 )}
               </>

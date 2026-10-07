@@ -12,12 +12,15 @@ import { PaymentReportPage } from './pages/reports/PaymentReportPage';
 
 import { AtlasAnalyticsPage } from './pages/AtlasAnalyticsPage';
 import { CustomersPage } from './pages/CustomersPage';
+import { InventoryReportPage } from './pages/InventoryReportPage';
 import { PosCheckoutPage } from './pages/pos/PosCheckoutPage';
 import { ProductsStockPage } from './pages/ProductsStockPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ReturnsApprovalsPage } from './pages/returns/ReturnsApprovalsPage';
 import { InvoiceDetail } from './pages/sales/InvoiceDetail';
 import { SalesList } from './pages/sales/SalesList';
+import SalesOrdersPage from './pages/SalesOrdersPage';
+import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
 import { SettingsUsersPage } from './pages/SettingsUsersPage';
 
 const queryClient = new QueryClient({
@@ -67,6 +70,8 @@ function App() {
               <Route path="customers" element={<CustomersPage />} />
               <Route path="pos" element={<PosCheckoutPage />} />
               <Route path="sales" element={<SalesList />} />
+              <Route path="sales-orders" element={<SalesOrdersPage />} />
+              <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
               <Route path="sales/:id" element={<InvoiceDetail />} />
               <Route path="returns" element={<ReturnsApprovalsPage />} />
               <Route path="analytics" element={<AtlasAnalyticsPage />} />
@@ -75,7 +80,7 @@ function App() {
                 <Route path="sales" element={<SalesReportPage />} />
                 <Route path="invoice" element={<InvoiceReportPage />} />
                 <Route path="payment" element={<PaymentReportPage />} />
-                <Route path="inventory" element={<div className="p-8 text-slate-900">Inventory Report - Building...</div>} />
+                <Route path="inventory" element={<InventoryReportPage />} />
                 <Route path="customer" element={<div className="p-8 text-slate-900">Customer Report - Building...</div>} />
                 <Route path="ai" element={<div className="p-8 text-slate-900">AI Report - Building...</div>} />
               </Route>

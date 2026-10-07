@@ -33,6 +33,9 @@ type CustomerListItem = {
   whatsappNumber?: string | null;
   paymentMethod?: string | null;
   salesEmployee?: string | null;
+  lifetimeValue?: number;
+  status?: string;
+  cardType?: string;
 };
 
 const formatMoney = (value: number) =>
@@ -67,7 +70,33 @@ export const CustomersPage = () => {
     });
   }, [customers, debouncedSearch]);
 
-  const selectedCustomer = filteredCustomers[0] ?? null;
+    const [selectedCardCode, setSelectedCardCode] = useState<string | null>(null);
+
+  const selectedCustomer = useMemo(
+    () => filteredCustomers.find((c) => c.cardCode === selectedCardCode) || filteredCustomers[0] || null,
+    [filteredCustomers, selectedCardCode]
+  );
+  
+  const currentCardCode = selectedCustomer?.cardCode;
+
+  const { data: profile } = useQuery({
+    queryKey: ['customer-profile', currentCardCode],
+    queryFn: () => currentCardCode ? customersApi.getCustomerProfile(currentCardCode) : null,
+    enabled: !!currentCardCode,
+  });
+
+  const { data: purchases } = useQuery({
+    queryKey: ['customer-purchases', currentCardCode],
+    queryFn: () => currentCardCode ? customersApi.getCustomerPurchases(currentCardCode) : null,
+    enabled: !!currentCardCode,
+  });
+
+  const { data: returns } = useQuery({
+    queryKey: ['customer-returns', currentCardCode],
+    queryFn: () => currentCardCode ? customersApi.getCustomerReturns(currentCardCode) : null,
+    enabled: !!currentCardCode,
+  });
+
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -97,7 +126,7 @@ export const CustomersPage = () => {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <StatCard title="Total Customers" value={String(customers.length || 0)} change="vs. last month" tone="blue" icon={<Users className="h-5 w-5" />} />
+          <StatCard title="Total Customers" value={String(insights?.totalCustomers || 0)} change="vs. last month" tone="blue" icon={<Users className="h-5 w-5" />} />
           <StatCard title="New Customers" value={String(insights?.newCustomerCount ?? 0)} change="vs. last month" tone="cyan" icon={<Sparkles className="h-5 w-5" />} loading={insightsLoading} />
           <StatCard title="Loyalty Customers" value={String(insights?.repeatCustomerCount ?? 0)} change="vs. last month" tone="purple" icon={<Users className="h-5 w-5" />} loading={insightsLoading} />
           <StatCard title="Total Sales (Customers)" value={formatMoney(insights?.totalCLV ?? 0)} change="vs. last month" tone="emerald" icon={<BadgeDollarSign className="h-5 w-5" />} loading={insightsLoading} />
@@ -174,7 +203,7 @@ export const CustomersPage = () => {
                     </tr>
                   ) : (
                     filteredCustomers.map((customer, index) => (
-                      <tr key={`${customer.cardCode ?? 'customer'}-${index}`} className={`transition ${selectedCustomer?.cardCode === customer.cardCode ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                      <tr onClick={() => setSelectedCardCode(customer.cardCode || null)} key={`${customer.cardCode ?? 'customer'}-${index}`} className={`transition ${currentCardCode === customer.cardCode ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
                         <td className="px-4 py-3 text-sm text-slate-600">{index + 1}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
@@ -189,10 +218,10 @@ export const CustomersPage = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-700">{customer.phone || '—'}</td>
                         <td className="px-4 py-3 text-sm text-slate-600">{customer.email || '—'}</td>
-                        <td className="px-4 py-3 text-sm text-slate-700">Retail</td>
-                        <td className="px-4 py-3 text-sm font-medium text-slate-700">{formatMoney(12450)}</td>
+                        <td className="px-4 py-3 text-sm text-slate-700">{customer.cardType || 'Retail'}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-slate-700">{formatMoney(customer.lifetimeValue || 0)}</td>
                         <td className="px-4 py-3">
-                          <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Active</span>
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${customer.status === 'Active' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{customer.status || 'Active'}</span>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button type="button" className="rounded-md border border-slate-200 bg-slate-50 p-2 text-slate-600 hover:bg-slate-100" aria-label="Row actions">
@@ -212,8 +241,8 @@ export const CustomersPage = () => {
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-white">JS</div>
                 <div>
-                  <div className="font-semibold text-slate-900">{selectedCustomer?.cardName || 'Jane Smith'}</div>
-                  <div className="text-xs text-blue-600">{selectedCustomer?.cardCode || 'CUS-1001'} · Retail Customer</div>
+                  <div className="font-semibold text-slate-900">{selectedCustomer?.cardName || '-'}</div>
+                  <div className="text-xs text-blue-600">{selectedCustomer?.cardCode || "-"} · Retail Customer</div>
                 </div>
               </div>
               <button type="button" className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm">Edit</button>
@@ -222,8 +251,8 @@ export const CustomersPage = () => {
             <div className="mt-5 border-b border-slate-200 pb-2">
               <div className="flex gap-3 text-sm font-medium">
                 <button type="button" className="border-b-2 border-sky-400 pb-2 text-slate-600">Profile</button>
-                <button type="button" className="pb-2 text-sky-400">Purchases (12)</button>
-                <button type="button" className="pb-2 text-sky-400">Returns (2)</button>
+                <button type="button" className="pb-2 text-sky-400">Purchases ({purchases?.length || 0})</button>
+                <button type="button" className="pb-2 text-sky-400">Returns ({returns?.length || 0})</button>
                 <button type="button" className="pb-2 text-sky-400">Activity</button>
               </div>
             </div>
@@ -235,10 +264,10 @@ export const CustomersPage = () => {
                   <button type="button" className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 text-xs px-2 shadow-sm">Edit</button>
                 </div>
                 <div className="space-y-3 text-sm text-slate-700">
-                  <InfoRow icon={<CircleUserRound className="h-4 w-4" />} label="Full Name" value={selectedCustomer?.cardName || 'Jane Smith'} />
-                  <InfoRow icon={<Phone className="h-4 w-4" />} label="Phone" value={selectedCustomer?.phone || '+91 98765 43210'} />
-                  <InfoRow icon={<Mail className="h-4 w-4" />} label="Email" value={selectedCustomer?.email || 'jane.smith@gmail.com'} />
-                  <InfoRow icon={<MapPin className="h-4 w-4" />} label="Address" value={selectedCustomer?.whatsappNumber || '123 MG Road, Bangalore 560001, Karnataka, India'} />
+                  <InfoRow icon={<CircleUserRound className="h-4 w-4" />} label="Full Name" value={selectedCustomer?.cardName || '-'} />
+                  <InfoRow icon={<Phone className="h-4 w-4" />} label="Phone" value={selectedCustomer?.phone || '-'} />
+                  <InfoRow icon={<Mail className="h-4 w-4" />} label="Email" value={selectedCustomer?.email || '-'} />
+                  <InfoRow icon={<MapPin className="h-4 w-4" />} label="Address" value={selectedCustomer?.whatsappNumber || '-'} />
                 </div>
               </div>
 
@@ -248,17 +277,17 @@ export const CustomersPage = () => {
                   <button type="button" className="rounded-md border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50 text-xs px-2 shadow-sm">Edit</button>
                 </div>
                 <div className="space-y-3 text-sm text-slate-700">
-                  <InfoRow icon={<Users className="h-4 w-4" />} label="Customer Type" value="Retail" />
-                  <InfoRow icon={<ShieldAlert className="h-4 w-4" />} label="Status" value="Active" />
-                  <InfoRow icon={<CalendarDays className="h-4 w-4" />} label="Registered On" value="15 Jan 2024" />
-                  <InfoRow icon={<BadgeDollarSign className="h-4 w-4" />} label="Last Purchase" value="27 Sep 2024" />
-                  <InfoRow icon={<Sparkles className="h-4 w-4" />} label="Preferred Branch" value="Main Branch (WH-001)" />
+                  <InfoRow icon={<Users className="h-4 w-4" />} label="Customer Type" value={profile?.cardType || "Retail"} />
+                  <InfoRow icon={<ShieldAlert className="h-4 w-4" />} label="Status" value={profile?.status || "Active"} />
+                  <InfoRow icon={<CalendarDays className="h-4 w-4" />} label="Registered On" value={profile?.registeredOn ? new Date(profile.registeredOn).toLocaleDateString() : "-"} />
+                  <InfoRow icon={<BadgeDollarSign className="h-4 w-4" />} label="Last Purchase" value={profile?.lastPurchase ? new Date(profile.lastPurchase).toLocaleDateString() : "-"} />
+                  <InfoRow icon={<Sparkles className="h-4 w-4" />} label="Preferred Branch" value={profile?.preferredBranch || "-"} />
                 </div>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <MiniStat label="Recent Invoices" value="4" accent="emerald" />
-                <MiniStat label="Recent Returns" value="2" accent="amber" />
+                <MiniStat label="Recent Invoices" value={profile?.recentInvoicesCount?.toString() || "0"} accent="emerald" />
+                <MiniStat label="Recent Returns" value={profile?.recentReturnsCount?.toString() || "0"} accent="amber" />
               </div>
             </div>
           </aside>

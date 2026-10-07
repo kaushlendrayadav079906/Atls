@@ -128,30 +128,89 @@ def update_approval_status(req_id: str, status: str, approver_id: str = None, fr
                 )
             return cur.rowcount > 0
 
-def get_pending_approvals(branch_id: Optional[str] = None) -> List[Dict[str, Any]]:
+def get_approvals(
+    branch_id: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0
+) -> Dict[str, Any]:
     with _get_connection() as conn:
         with conn.cursor() as cur:
+            query = """
+                SELECT id, request_type, status, requester_id, approver_id, branch_id, original_doc_entry, original_doc_num, amount, payload, reason, created_at, updated_at, count(*) OVER() AS full_count
+                FROM approval_requests
+                WHERE 1=1
+            """
+            params = []
+            
             if branch_id:
-                cur.execute(
-                    """
-                    SELECT id, request_type, status, requester_id, approver_id, branch_id, original_doc_entry, original_doc_num, amount, payload, reason, created_at, updated_at
-                    FROM approval_requests
-                    WHERE status IN ('pending', 'failed', 'outcome-unknown') AND branch_id = %s
-                    ORDER BY created_at ASC
-                    """,
-                    (branch_id,)
-                )
-            else:
-                cur.execute(
-                    """
-                    SELECT id, request_type, status, requester_id, approver_id, branch_id, original_doc_entry, original_doc_num, amount, payload, reason, created_at, updated_at
-                    FROM approval_requests
-                    WHERE status IN ('pending', 'failed', 'outcome-unknown')
-                    ORDER BY created_at ASC
-                    """
-                )
+                query += " AND branch_id = %s"
+                params.append(branch_id)
+                
+            if start_date:
+                query += " AND created_at >= %s"
+                params.append(start_date + " 00:00:00")
+                
+            if end_date:
+                query += " AND created_at <= %s"
+                params.append(end_date + " 23:59:59")
+                
+            if status and status != 'all':
+                if status == 'completed':
+                    query += " AND status IN ('approved', 'completed')"
+                elif status == 'failed':
+                    query += " AND status IN ('failed', 'outcome-unknown')"
+                elif status == 'pending':
+                    query += " AND status IN ('pending', 'processing')"
+                else:
+                    query += " AND status = %s"
+                    params.append(status)
+                    
+            if search:
+                search_term = f"%{search}%"
+                query += " AND (id ILIKE %s OR original_doc_num ILIKE %s OR payload->>'cardName' ILIKE %s OR payload->>'cardCode' ILIKE %s OR payload->>'customerName' ILIKE %s)"
+                params.extend([search_term, search_term, search_term, search_term, search_term])
+                
+            query += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
+            params.extend([limit, offset])
+            
+            cur.execute(query, tuple(params))
             rows = cur.fetchall()
-            return [
+            
+            total = rows[0][13] if rows else 0
+            
+            # Get counts for tabs
+            count_query = """
+                SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status IN ('pending', 'processing') THEN 1 ELSE 0 END) as pending,
+                    SUM(CASE WHEN status IN ('approved', 'completed') THEN 1 ELSE 0 END) as completed,
+                    SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected,
+                    SUM(CASE WHEN status IN ('failed', 'outcome-unknown') THEN 1 ELSE 0 END) as failed
+                FROM approval_requests
+                WHERE 1=1
+            """
+            count_params = []
+            if branch_id:
+                count_query += " AND branch_id = %s"
+                count_params.append(branch_id)
+            if start_date:
+                count_query += " AND created_at >= %s"
+                count_params.append(start_date + " 00:00:00")
+            if end_date:
+                count_query += " AND created_at <= %s"
+                count_params.append(end_date + " 23:59:59")
+            if search:
+                count_query += " AND (id ILIKE %s OR original_doc_num ILIKE %s OR payload->>'cardName' ILIKE %s OR payload->>'cardCode' ILIKE %s OR payload->>'customerName' ILIKE %s)"
+                count_params.extend([search_term, search_term, search_term, search_term, search_term])
+                
+            cur.execute(count_query, tuple(count_params))
+            counts_row = cur.fetchone()
+            
+            items = [
                 {
                     "id": row[0],
                     "request_type": row[1],
@@ -169,3 +228,15 @@ def get_pending_approvals(branch_id: Optional[str] = None) -> List[Dict[str, Any
                 }
                 for row in rows
             ]
+            
+            return {
+                "items": items,
+                "total": total,
+                "counts": {
+                    "all": counts_row[0] if counts_row[0] else 0,
+                    "pending": counts_row[1] if counts_row[1] else 0,
+                    "completed": counts_row[2] if counts_row[2] else 0,
+                    "rejected": counts_row[3] if counts_row[3] else 0,
+                    "failed": counts_row[4] if counts_row[4] else 0,
+                }
+            }

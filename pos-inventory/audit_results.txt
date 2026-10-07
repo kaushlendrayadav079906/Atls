@@ -1,0 +1,290 @@
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\AUDIT_REPORT.md:10: Code = SH
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\AUDIT_REPORT.md:15: Warehouse data is retrieved directly from SAP using `SAPWarehousesService`. Hardcoded fallbacks to `WH-001` or `SAHIBABAD` do not exist in the backend services.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\AUDIT_REPORT.md:19: - `Dashboard-Ui/src/components/Layout.tsx`: Removed the hardcoded fallback `WH-001`.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\AUDIT_REPORT.md:20: - `Dashboard-Ui/src/pages/ReportsPage.tsx`: Removed hardcoded mock warehouse selector (`WH-001`, `WH-002`, `WH-003`). Now uses authorized branch.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\AUDIT_REPORT.md:20: - `Dashboard-Ui/src/pages/ReportsPage.tsx`: Removed hardcoded mock warehouse selector (`WH-001`, `WH-002`, `WH-003`). Now uses authorized branch.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\AUDIT_REPORT.md:21: - `Dashboard-Ui/src/pages/ProductsStockPage.tsx`: Removed the `fallbackProducts` array that contained mock product and warehouse data. Removed hardcoded stock warehouse rendering.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\AUDIT_REPORT.md:22: - `Dashboard-Ui/src/pages/AtlasAnalyticsPage.tsx`: Removed hardcoded `Main Branch` label.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\AUDIT_REPORT.md:25: No hardcoded instances of `SH` or `SAHIBABAD` production data were found in the API endpoints or services.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\AUDIT_REPORT.md:50: No mocked business values or unhandled exceptions masquerading as valid fallbacks were found remaining in production code.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\AUDIT_REPORT.md:51: Live read-only SAP tenant validation for `SH / SAHIBABAD` stock details requires the actual `.env` configuration, which the application gracefully demands.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\patch_customers_react.py:64: content = content.replace('value="Main Branch (WH-001)"', 'value={profile?.preferredBranch || "-"}')
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\patch_customers_react.py:64: content = content.replace('value="Main Branch (WH-001)"', 'value={profile?.preferredBranch || "-"}')
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\PROJECT_FEATURE_AUDIT.md:89: un_tests.py) was created. This wrapper injects required mock environment variables (SECRET_KEY, SAP_SERVICE_LAYER_URL, SAP_COMPANY_DB, etc.) directly into os.environ immediately before invoking pytest.main(). This approach bypasses pydantic_core.ValidationError without creating an insecure .env.test file or modifying production configuration paths.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\PROJECT_FEATURE_AUDIT.md:90: Crucially, all test modules (	est_api.py, 	est_approvals.py, 	est_atlas.py, 	est_alerts.py, 	est_cancellation.py) use @patch decorators to aggressively mock get_sap_client() and SAPInvoicesService, guaranteeing zero real network traversal to SAP.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\PROJECT_FEATURE_AUDIT.md:102: - 	est_alerts.py was implemented to assert 401/403 Unauthorized access and to verify manager branch isolation via the mock_get_pending assertion boundary.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\PROJECT_FEATURE_AUDIT.md:135: A comprehensive audit of the `Dashboard-Ui` frontend and `pos-backend` backend revealed that several dashboard UI elements were hardcoded or fetching from mocked backend routes. The audit was conducted to verify actual SAP Business One integration and ensure complete data binding. All mocked endpoints have been removed, and the frontend has been re-bound to the dynamic production backend services, accurately resolving branch scopes and user roles without hardcoded placeholders.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\PROJECT_FEATURE_AUDIT.md:155: | **Pending Approvals**| `alerts?.length` | `/dashboard/alerts` | PostgreSQL (Approvals) | Was polling a mock endpoint. Now correctly hitting Postgres. |
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\PROJECT_FEATURE_AUDIT.md:160: | **Alerts & Approvals**| `alerts` | `/dashboard/alerts` | PostgreSQL (Approvals) | Real alerts mapped successfully after mock removal. |
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\PROJECT_FEATURE_AUDIT.md:164: 2. **Hardcoded UI Bypasses:** The frontend hardcoded "John Doe", "Main Branch", the entire weekly bar chart, and certain Recent Sales table cells to present a polished look. **Fix:** All fixed string fallbacks were removed in `Dashboard.tsx` and dynamically wired to `endpoints.ts` API responses.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:22: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:602: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:778: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:1358: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:1534: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:2395: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:2571: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:3432: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:3608: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:4469: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:4645: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:5506: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:5682: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:5953: "U_W_Number": "1234567890",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:6543: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:6719: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:6990: "U_W_Number": "0123456678",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:7299: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:7475: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:7746: "U_W_Number": "0123456789",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:8336: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:8512: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:8783: "U_W_Number": "0123456789",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:9373: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:9549: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:9820: "U_W_Number": "0123456789",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:10410: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:10586: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:10857: "U_W_Number": "0123456789",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:11447: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:11623: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:12484: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:12660: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:13521: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:13697: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:14558: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:14734: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:15314: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:15490: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:16070: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:16246: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:17107: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:17283: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:17554: "U_W_Number": "0123456789",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:17863: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:18039: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:18619: "BillToName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:58125: "CardName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:58391: "U_W_Number": "0123456678",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\sapData.json:58696: "BillFromName": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\package-lock.json:997: "integrity": "sha512-JCTigedEksZk3tHTTthnMdVfGf61Fky8Ji2E4YjUTEQX14xiy/lTzXnu1vwiZe3bYe0q+SpsSH/CTeDXK6WHig==",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\package-lock.json:1993: "integrity": "sha512-qN+QNNBr93TCmFrmte0bBCjSDMuRvt78VlHT99qIGPszm4QsqCX8lnyWUFkHi8B7ZBAPq8SH+UqyXNy/odMdng==",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\package-lock.json:2043: "integrity": "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\PHASE1_COMPLETION_REPORT.md:12: - **`src/pages/Dashboard.tsx`**: Structured the dashboard using a modern grid layout matching the reference. Added styled KPI cards, a recent sales table, a mock visual chart driven by actual API trend data (if available), top products list, and quick links. Built comprehensive skeleton loaders, empty states, and error states for each widget to ensure seamless asynchronous loading without breaking the UI.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\PHASE1_COMPLETION_REPORT.md:41: - **SAP Connection Status**: Currently mocked visually as "Connected" on the Dashboard header. The `/health` endpoint is available, but continuous status polling wasn't implemented strictly to avoid unnecessary backend load unless prioritized in a later phase.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\PHASE1_SHELL_REPORT.md:7: - **Mock Context:** Added a mock user visual context (e.g., "Demo User (Mock)", "Main Branch (DEV)") inside `Layout.tsx` for layout previewing when unauthenticated in development mode. No fake tokens are issued, nor are fake API calls made.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\PHASE1_SHELL_REPORT.md:7: - **Mock Context:** Added a mock user visual context (e.g., "Demo User (Mock)", "Main Branch (DEV)") inside `Layout.tsx` for layout previewing when unauthenticated in development mode. No fake tokens are issued, nor are fake API calls made.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\PHASE1_SHELL_REPORT.md:13: - `Dashboard-Ui/src/components/Layout.tsx`: Injected a prominent `⚠️ DEV PREVIEW — NOT AUTHENTICATED` top banner to comply with development preview rules. Integrated `displayUser` logic to render mock data safely.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\Dashboard.tsx:72: value: loadingSummary ? 'Loading...' : errorSummary ? 'Error' : (summary?.todayTotal !== undefined ? money.format(summary.todayTotal) : '₹0.00'),
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\Dashboard.tsx:207: <span>₹20K</span>
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\Dashboard.tsx:208: <span>₹15K</span>
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\Dashboard.tsx:209: <span>₹10K</span>
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\Dashboard.tsx:210: <span>₹5K</span>
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\Dashboard.tsx:211: <span>₹0</span>
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\Dashboard.tsx:225: <div className="text-[12px] font-bold text-slate-900">₹8,420.50</div>
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\pos\PosCheckoutPage.tsx:208: const [walkinPhone] = useState('0000000000');
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\pos\PosCheckoutPage.tsx:500: <button onClick={() => setDiscountMode('amount')} className={`border-l border-slate-200 px-3 py-1.5 text-[11px] font-medium ${discountMode === 'amount' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>₹</button>
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\pos\PosCheckoutPage.tsx:552: <span className="text-blue-600/60">₹</span>
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\pos\PosCheckoutPage.tsx:559: ₹ {(changeAmount && changeAmount > 0) ? changeAmount.toFixed(2) : '0.00'}
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\reports\InvoiceReportPage.tsx:77: val: overview ? fmt(overview.totalSales) : '₹0.00',
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\reports\InvoiceReportPage.tsx:85: val: overview ? fmt(overview.averageOrderValue) : '₹0.00',
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\reports\PaymentReportPage.tsx:79: { title: 'Total Payments', val: overview ? fmt(overview.totalSales) : '₹0.00', icon: Wallet, pct: null, isUp: true, color: 'text-blue-600', bg: 'bg-blue-100 text-blue-700' },
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\reports\PaymentReportPage.tsx:81: { title: 'Avg. Payment Value', val: overview ? fmt(overview.averageOrderValue) : '₹0.00', icon: TrendingUp, pct: null, isUp: true, color: 'text-purple-400', bg: 'bg-violet-100 text-violet-700' },
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\reports\SalesReportPage.tsx:307: val: trendData ? money.format(trendData.total_sales) : '₹0.00',
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\reports\SalesReportPage.tsx:328: val: trendData ? money.format(trendData.average_order_value) : '₹0.00',
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\sales\SalesList.tsx:192: <th className="pb-2 font-medium text-right">Price (₹)</th>
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\sales\SalesList.tsx:193: <th className="pb-2 font-medium text-right">Total (₹)</th>
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\sales\SalesList.tsx:308: <span className="text-xl font-bold">₹</span>
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\Dashboard-Ui\src\pages\sales\SalesList.tsx:411: <th className="px-4 py-3 text-right">Total (₹) <ArrowDown size={12} className="inline ml-1 opacity-50" /></th>
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\BACKEND_AUDIT_AND_DASHBOARD_GAP_ANALYSIS.md:38: 2. Proceed to write `docs/DASHBOARD_API_CONTRACTS.md` based on existing API signatures.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\DASHBOARD_API_CONTRACTS.md:132: "customerPhone": "1234567890",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\FINAL_REPORT.md:9: - Created `docs/BACKEND_AUDIT_AND_DASHBOARD_GAP_ANALYSIS.md`.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\FINAL_REPORT.md:10: - Documented the API contracts in `docs/DASHBOARD_API_CONTRACTS.md`, including data sources and authorization requirements.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\FINAL_SAP_REPORT_VERIFICATION.md:14: | Warehouse Data | **PASS** | `SH`/`SAHIBABAD` discovered via SAP `Warehouses` API. |
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\FINAL_SAP_REPORT_VERIFICATION.md:42: 3. **Hardcoded Mock Data**: Evaluated `SalesReportPage.tsx`, `InvoiceReportPage.tsx`, and `PaymentReportPage.tsx`. All fake arrays and `.map()` iterations utilizing mock variables have been deleted and replaced with React Query dynamic data hooks (`data?.data.map`).
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\FULL_PROJECT_BUG_AUDIT.md:20: | HIGH | Hardcoded Data | `audit_script.py:33` | 33 | Found 'AMIK KR' hardcoded |
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\FULL_PROJECT_BUG_AUDIT.md:21: | HIGH | Hardcoded Data | `audit_script.py:34` | 34 | Found 'AMIK KR' hardcoded |
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\FULL_PROJECT_BUG_AUDIT.md:22: | HIGH | Hardcoded Data | `audit_script.py:35` | 35 | Found 'Kaushal' hardcoded |
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\FULL_PROJECT_BUG_AUDIT.md:23: | HIGH | Hardcoded Data | `audit_script.py:36` | 36 | Found 'Kaushal' hardcoded |
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\PHASE1_FRONTEND_IMPLEMENTATION_REPORT.md:20: - Included a sidebar with role-aware (mocked visually but ready for context) and branch context displaying user's store name.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\PHASE1_FRONTEND_IMPLEMENTATION_REPORT.md:37: - The actual SAP status/sync connection indicators are currently mocked or left out since there is no concrete API endpoint identified for real-time SAP health checks in the provided schemas without deeper integration.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\PHASE2_BACKEND_FOUNDATION_REPORT.md:46: **Confirmed**: No live SAP business-data requests were made. No SAP writes were executed or enabled. All testing and assertions target safe mocked states.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\PHASE6_ANALYTICS_REPORTING_IMPLEMENTATION_REPORT.md:5: Reviewed the current returns routes, schemas, SAP service, approval service/table DDL, authorization dependencies, branch checks, and mocked workflow tests.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\PHASE6_ANALYTICS_REPORTING_IMPLEMENTATION_REPORT.md:10: - `pytest tests/test_approvals.py -q`: **20 passed**. Phase 5 tests mock SAP interactions; the test fixtures do not issue SAP business writes.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\PHASE6_ANALYTICS_REPORTING_IMPLEMENTATION_REPORT.md:72: Analytics and approval tests use mocked SAP responses. The lifespan-entering API/product test fixtures mock `SAPItemsService.get_items` as well as SAP login, preventing startup cache warming from reaching SAP. No live SAP business-data request or write was made.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\PHASE_1_POS_DASHBOARD_UI_REDESIGN.md:1: # PHASE 1: POS DASHBOARD UI REDESIGN
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\PHASE_1_POS_DASHBOARD_UI_REDESIGN.md:17: - All original values and mappings were preserved; no mock data or unsupported KPIs were introduced.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\PHASE_1_POS_DASHBOARD_UI_REDESIGN.md:54: - **Status:** Modified `pos-frontend/src/pages/Dashboard.tsx` and created `docs/PHASE_1_POS_DASHBOARD_UI_REDESIGN.md`.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\PHASE_1_POS_DASHBOARD_UI_REDESIGN.md:71: **Future Enhancements:** When new dashboard metrics are required, do not mock them in the frontend. Ensure the backend `/dashboard` API is expanded first, then map the newly available data properties into this existing UI framework.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\REPORTS_SAP_DATA_FLOW_AUDIT.md:21: - Hardcoded KPI values (e.g., `₹12,48,650` for Sales).
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\REPORTS_SAP_DATA_FLOW_AUDIT.md:27: All three report pages were completely rewritten to eliminate dependency on mock data:
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\REPORTS_SAP_DATA_FLOW_AUDIT.md:38: 1. Resolve the SSH tunnel / Proxy connection to `http://localhost:50001/b1s/v1`.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\SAP_AR_INVOICE_FIELD_MAPPING.md:159: **Note**: The live SAP connection on `localhost:50001` actively refused the connection (`[WinError 10061]`) preventing runtime data validation of the specific invoice from the screenshot. As per the strict instructions, since actual live SAP response payloads could not be pulled into memory, I have marked the actual SAP values as **NOT VERIFIED**. The frontend code has been strictly audited and contains no mock values (such as `1248`, `992`, `CUS011`, `GZB`, `SH`, `FY2627`), ensuring it fully relies on backend responses.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\SAP_AR_INVOICE_FIELD_MAPPING.md:159: **Note**: The live SAP connection on `localhost:50001` actively refused the connection (`[WinError 10061]`) preventing runtime data validation of the specific invoice from the screenshot. As per the strict instructions, since actual live SAP response payloads could not be pulled into memory, I have marked the actual SAP values as **NOT VERIFIED**. The frontend code has been strictly audited and contains no mock values (such as `1248`, `992`, `CUS011`, `GZB`, `SH`, `FY2627`), ensuring it fully relies on backend responses.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\SAP_AR_INVOICE_FIELD_MAPPING.md:159: **Note**: The live SAP connection on `localhost:50001` actively refused the connection (`[WinError 10061]`) preventing runtime data validation of the specific invoice from the screenshot. As per the strict instructions, since actual live SAP response payloads could not be pulled into memory, I have marked the actual SAP values as **NOT VERIFIED**. The frontend code has been strictly audited and contains no mock values (such as `1248`, `992`, `CUS011`, `GZB`, `SH`, `FY2627`), ensuring it fully relies on backend responses.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\SAP_AR_INVOICE_FIELD_MAPPING.md:159: **Note**: The live SAP connection on `localhost:50001` actively refused the connection (`[WinError 10061]`) preventing runtime data validation of the specific invoice from the screenshot. As per the strict instructions, since actual live SAP response payloads could not be pulled into memory, I have marked the actual SAP values as **NOT VERIFIED**. The frontend code has been strictly audited and contains no mock values (such as `1248`, `992`, `CUS011`, `GZB`, `SH`, `FY2627`), ensuring it fully relies on backend responses.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\SAP_REPORT_DATA_FLOW_AUDIT.md:21: SAP `$select=WarehouseCode,WarehouseName,Location,Inactive` -> FastAPI service -> Filtering logic where `SH` / `SAHIBABAD` is discovered and validated -> Passed to inventory logic.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\SAP_REPORT_DATA_FLOW_AUDIT.md:90: - **Fake KPIs**: `₹12,48,650`, `1,248 invoices`, `156 customers`, `₹56,350 due` were removed from `InvoiceReportPage.tsx`, `PaymentReportPage.tsx`, and `SalesReportPage.tsx`.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\SAP_REPORT_DATA_FLOW_AUDIT.md:92: - **Fake Rows**: Hardcoded customer names, array `.map()` with static data, and mock pagination were replaced with real React hooks (`data?.data.map()`).
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\SAP_REPORT_DATA_FLOW_AUDIT.md:93: - **Fake Branch**: "Branch (Unknown)" and hardcoded "Main Branch" filters were replaced by dynamic branch inputs flowing down to `SalesFeedParams`.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\SAP_WAREHOUSE_DATA_SOURCE_MAP.md:9: - **Warehouse SH/SAHIBABAD verification**: FAILED
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\SAP_WAREHOUSE_DATA_SOURCE_MAP.md:24: - **Current hardcoded/mock data found**: The frontend currently expects specific warehouse data which is not verifiable.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\docs\SAP_WAREHOUSE_DATA_SOURCE_MAP.md:28: - The correct host and port for the SAP Service Layer SSH tunnel.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\patch.py:62: # Simple mock logic for payment status based on our UI mock
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\scratch_final.py:37: "/atlas/inventory-summary?branch=SH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\scratch_sap_inv.py:10: items = service.get_warehouse_stock("SH")
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\test_sales_api.py:6: r_login = httpx.post('http://127.0.0.1:3001/api/v1/auth/token', data={'username': 'Admin', 'password': 'rj123456'}, timeout=10)
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\test_sales_report.py:50: r_reg = httpx.post('http://127.0.0.1:3001/api/v1/auth/login', json={'username': 'Admin', 'password': 'rj123456'}, timeout=10)
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\warehouses.json:388: "WarehouseCode": "SH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\_users.json:22: "store_name": "Main Branch",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\admin.py:24: _ADMIN_DASHBOARD_TTL = 120
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\admin.py:598: await cache_set(cache_key, result.model_dump(), ttl=_ADMIN_DASHBOARD_TTL)
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\admin.py:887: "name": "CASH",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\admin.py:888: "phone": "0000000000",
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\dashboard.py:17: from app.core.cache import cache_get, cache_set, cache_delete, cache_delete_prefix, DASHBOARD_SUMMARY_KEY
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\dashboard.py:53: _DASHBOARD_TTL = 30
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\dashboard.py:54: _OPERATOR_DASHBOARD_TTL = 45
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\dashboard.py:55: _LOW_STOCK_THRESHOLD = 10
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\dashboard.py:391: elif in_stock <= _LOW_STOCK_THRESHOLD:
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\dashboard.py:542: cache_key = f"{DASHBOARD_SUMMARY_KEY}:{branch or 'all'}"
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\dashboard.py:580: await cache_set(cache_key, summary, ttl=_DASHBOARD_TTL)
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\dashboard.py:834: cache_key = f"{DASHBOARD_SUMMARY_KEY}:operator:{effective_branch or 'all'}:{user_scope}:{range}"
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\dashboard.py:927: await cache_set(cache_key, payload.model_dump(), ttl=_OPERATOR_DASHBOARD_TTL)
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\returns.py:11: from app.core.cache import cache_delete, cache_delete_prefix, DASHBOARD_SUMMARY_KEY, PRODUCTS_LIST_KEY
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\sales.py:13: from app.core.cache import cache_delete, cache_delete_prefix, DASHBOARD_SUMMARY_KEY, PRODUCTS_LIST_KEY
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\sales.py:126: background_tasks.add_task(cache_delete, DASHBOARD_SUMMARY_KEY)
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\sales.py:127: background_tasks.add_task(cache_delete_prefix, f"{DASHBOARD_SUMMARY_KEY}:operator:{branch}")
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\sales.py:360: background_tasks.add_task(cache_delete, DASHBOARD_SUMMARY_KEY)
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\api\v1\sales.py:361: background_tasks.add_task(cache_delete_prefix, f"{DASHBOARD_SUMMARY_KEY}:operator:{inv_branch}")
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\core\cache.py:121: DASHBOARD_SUMMARY_KEY = "pos:dashboard:today"
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\core\config.py:40: SAP_CB_THRESHOLD: int = 5
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\services\sap\invoices_service.py:20: DEFAULT_CUSTOMER_NAME = "CASH"
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\services\sap\invoices_service.py:124: 1. Always use default customer (CASH / C001)
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\utils\helpers.py:29: return f"₹{amount:,.2f}"
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\app\utils\helpers.py:42: SAP dates are typically in format: /Date(1234567890000)/
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_alerts.py:2: from unittest.mock import patch, MagicMock
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_alerts.py:13: def test_get_alerts_success_manager(mock_get_pending):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_alerts.py:14: mock_get_pending.return_value = [
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_alerts.py:26: # Manager token setup (mocked via test header or security bypass)
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_alerts.py:27: # We will mock get_current_user
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_alerts.py:38: mock_get_pending.assert_called_once_with(branch_id="BRANCH_A")
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_alerts.py:42: def test_get_alerts_operator_forbidden(mock_get_pending):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_alerts.py:50: mock_get_pending.assert_not_called()
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_api.py:6: from unittest.mock import patch, MagicMock, AsyncMock
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_api.py:15: """Test client with SAP mocked out."""
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_api.py:263: app.dependency_overrides[get_current_user] = lambda: {"sub": "admin-1", "role": "admin", "user_id": "admin-1", "branch_id": "WH-001"}
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:2: from unittest.mock import patch, MagicMock
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:13: def mock_invoice():
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:14: with patch("app.api.v1.returns.SAPInvoicesService") as mock:
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:15: instance = mock.return_value
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:27: def mock_returns_service():
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:28: with patch("app.api.v1.admin.SAPReturnsService") as mock:
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:29: instance = mock.return_value
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:34: def mock_admin_invoice():
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:35: with patch("app.api.v1.admin.SAPInvoicesService") as mock:
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:36: instance = mock.return_value
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:60: def test_create_return_requires_approval(mock_invoice, override_get_current_user):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:85: def test_admin_can_approve_request(mock_invoice, override_get_current_user, override_admin_user, mock_returns_service, mock_admin_invoice):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:104: def test_self_approval_prevented(mock_invoice):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:128: def test_duplicate_approval_prevented(mock_invoice, override_get_current_user, override_admin_user, mock_returns_service, mock_admin_invoice):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:148: def test_revalidation_failure(mock_invoice, override_get_current_user, override_admin_user, mock_returns_service, mock_admin_invoice):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:161: mock_admin_invoice.get_invoice.return_value = None
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:167: def test_exchange_success(mock_invoice, override_get_current_user, override_admin_user, mock_returns_service, mock_admin_invoice):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:189: def test_exchange_credit_note_failure(mock_invoice, override_get_current_user, override_admin_user, mock_returns_service, mock_admin_invoice):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:202: mock_returns_service.create_credit_note_from_invoice.side_effect = Exception("SAP Error")
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:209: assert mock_admin_invoice.create_invoice.called is False
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:211: def test_exchange_invoice_failure_partial_state(mock_invoice, override_get_current_user, override_admin_user, mock_returns_service, mock_admin_invoice):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:224: mock_admin_invoice.create_invoice.side_effect = Exception("SAP Timeout")
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:234: def test_return_rejects_original_invoice_from_another_branch(mock_invoice, override_get_current_user):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:235: mock_invoice.get_invoice.return_value["U_Branch"] = "BR2"
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:251: def test_lookup_rejects_invoice_from_another_branch(mock_invoice, override_get_current_user):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:252: mock_invoice.get_invoice.return_value["U_Branch"] = "BR2"
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:259: def test_return_request_uses_authenticated_branch_for_warehouse(mock_invoice, override_get_current_user):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:280: def test_return_rejects_quantity_above_original_invoice(mock_invoice, override_get_current_user):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:294: def test_return_sap_timeout_is_recorded_as_unknown(mock_invoice, override_get_current_user, override_admin_user, mock_returns_service, mock_admin_invoice):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:304: mock_returns_service.create_credit_note_from_invoice.side_effect = SAPConnectionError("timeout")
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:312: def test_approval_rejects_admin_from_another_branch(mock_invoice, override_get_current_user, mock_admin_invoice):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:337: def test_non_admin_cannot_reject_approval(mock_invoice, override_get_current_user):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:365: client_mock = MagicMock()
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:366: client_mock.post.return_value = {"DocEntry": 9, "DocNum": 999}
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:367: with patch("app.services.sap.returns_service.get_sap_client", return_value=client_mock):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:378: payload = client_mock.post.call_args.args[1]
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:386: client_mock = MagicMock()
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:387: client_mock.post.side_effect = SAPDocumentClosedError("closed")
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:388: with patch("app.services.sap.returns_service.get_sap_client", return_value=client_mock):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:397: client_mock.post.assert_called_once()
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:398: client_mock.get.assert_not_called()
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:402: client_mock = MagicMock()
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:403: client_mock.post.return_value = {"DocNum": 999}
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:404: with patch("app.services.sap.returns_service.get_sap_client", return_value=client_mock):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_approvals.py:415: mock_invoice, override_get_current_user, override_admin_user, mock_returns_service, mock_admin_invoice
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_atlas.py:2: from unittest.mock import patch, MagicMock, AsyncMock
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_atlas.py:10: def mock_invoices():
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_atlas.py:41: def test_atlas_overview_manager_access(manager_token, monkeypatch, mock_invoices):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_atlas.py:42: monkeypatch.setattr("app.api.v1.atlas.SAPInvoicesService.get_invoices_by_date_with_lines", lambda self, s, e: mock_invoices)
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_atlas.py:49: def test_atlas_overview_operator_allowed(operator_token, monkeypatch, mock_invoices):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_atlas.py:50: monkeypatch.setattr("app.api.v1.atlas.SAPInvoicesService.get_invoices_by_date_with_lines", lambda self, s, e: mock_invoices)
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_atlas.py:54: def test_atlas_overview_operator_branch_constrained(operator_token, monkeypatch, mock_invoices):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_atlas.py:56: monkeypatch.setattr("app.api.v1.atlas.SAPInvoicesService.get_invoices_by_date_with_lines", lambda self, s, e: mock_invoices)
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_atlas.py:62: def test_atlas_sales_trend_aggregates_mocked_invoice(manager_token, monkeypatch, mock_invoices):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_atlas.py:65: lambda self, start, end: mock_invoices,
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_atlas.py:77: def test_atlas_branch_comparison_admin_allowed(admin_token, monkeypatch, mock_invoices):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_atlas.py:78: monkeypatch.setattr("app.api.v1.atlas.SAPInvoicesService.get_invoices_by_date_with_lines", lambda self, s, e: mock_invoices)
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_atlas.py:87: def test_atlas_product_velocity_aggregates_mocked_lines(manager_token, monkeypatch):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:2: from unittest.mock import patch, MagicMock
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:10: def mock_get_current_user_operator():
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:13: def mock_get_current_user_manager():
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:16: def mock_get_current_user_admin():
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:20: def mock_invoice_service():
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:21: with patch("app.api.v1.sales._invoice_service") as mock_service:
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:22: yield mock_service
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:25: def test_cancel_sale_success(mock_invoice_service):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:26: app.dependency_overrides[get_current_user] = mock_get_current_user_manager
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:28: mock_invoice_service.get_invoice.return_value = {
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:35: mock_invoice_service.cancel_invoice.return_value = True
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:42: def test_cancel_sale_unauthorized_branch_operator(mock_invoice_service):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:43: app.dependency_overrides[get_current_user] = mock_get_current_user_operator
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:46: mock_invoice_service.get_invoice.return_value = {
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:58: def test_cancel_sale_unauthorized_branch_manager(mock_invoice_service):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:59: app.dependency_overrides[get_current_user] = mock_get_current_user_manager
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:62: mock_invoice_service.get_invoice.return_value = {
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:74: def test_cancel_sale_already_cancelled(mock_invoice_service):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:75: app.dependency_overrides[get_current_user] = mock_get_current_user_admin
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:77: mock_invoice_service.get_invoice.return_value = {
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:89: def test_cancel_sale_linked_payment(mock_invoice_service):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:90: app.dependency_overrides[get_current_user] = mock_get_current_user_admin
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:92: mock_invoice_service.get_invoice.return_value = {
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:98: mock_invoice_service.cancel_invoice.side_effect = SAPValidationError(
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:107: def test_cancel_sale_not_found(mock_invoice_service):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:108: app.dependency_overrides[get_current_user] = mock_get_current_user_admin
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_cancellation.py:109: mock_invoice_service.get_invoice.return_value = None
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_inventory_risk.py:2: from unittest.mock import patch
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_inventory_risk.py:9: def test_get_inventory_risk_success_manager(mock_service_class):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_inventory_risk.py:10: mock_instance = mock_service_class.return_value
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_inventory_risk.py:11: mock_instance.get_warehouse_stock.return_value = [
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_inventory_risk.py:37: mock_instance.get_warehouse_stock.assert_called_once_with("BRANCH_A")
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_inventory_risk.py:41: def test_get_inventory_risk_operator_forbidden(mock_service_class):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_inventory_risk.py:42: mock_instance = mock_service_class.return_value
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_inventory_risk.py:49: mock_instance.get_warehouse_stock.assert_not_called()
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_inventory_risk.py:54: def test_get_inventory_risk_rejects_incomplete_snapshot(mock_service_class):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_inventory_risk.py:55: mock_service_class.return_value.get_warehouse_stock.return_value = [{"_truncated": True}]
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_products.py:4: All SAP interactions are mocked; no live requests or writes are made.
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_products.py:7: from unittest.mock import patch, MagicMock, AsyncMock
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:2: from unittest.mock import patch, MagicMock
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:9: def mock_get_current_user_operator():
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:12: def mock_get_current_user_admin():
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:16: def mock_invoice_service():
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:17: with patch("app.api.v1.sales._invoice_service") as mock_service:
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:18: yield mock_service
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:20: def test_get_sales_filters_by_branch(mock_invoice_service):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:21: app.dependency_overrides[get_current_user] = mock_get_current_user_operator
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:24: mock_invoice_service.get_recent_invoices_with_lines.return_value = [
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:36: def test_get_sales_admin_sees_all(mock_invoice_service):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:37: app.dependency_overrides[get_current_user] = mock_get_current_user_admin
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:39: mock_invoice_service.get_recent_invoices_with_lines.return_value = [
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:49: def test_get_sale_unauthorized_branch(mock_invoice_service):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:50: app.dependency_overrides[get_current_user] = mock_get_current_user_operator
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:52: mock_invoice_service.get_invoice.return_value = {
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:60: def test_get_sale_authorized_branch(mock_invoice_service):
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:61: app.dependency_overrides[get_current_user] = mock_get_current_user_operator
+c:\Users\A\Documents\IB\Dashboard\New Dashboard\Atls\pos-inventory\pos-backend\tests\test_sales.py:63: mock_invoice_service.get_invoice.return_value = {

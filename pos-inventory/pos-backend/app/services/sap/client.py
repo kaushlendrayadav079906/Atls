@@ -83,12 +83,15 @@ class SAPServiceLayerClient:
             response = self.client.post(login_url, json=payload)
             response.raise_for_status()
 
-            # Extract session cookie (B1SESSION)
+            # Extract session cookies
             session_cookie = response.cookies.get("B1SESSION")
+            route_id_cookie = response.cookies.get("ROUTEID")
+            
             if not session_cookie:
                 raise SAPConnectionError("No session cookie received from SAP")
 
             self.session_id = session_cookie
+            self.route_id = route_id_cookie
             # SAP sessions typically last 30 minutes
             self.session_timeout = datetime.utcnow() + timedelta(minutes=25)
 
@@ -149,7 +152,10 @@ class SAPServiceLayerClient:
         """Get session cookies"""
         if not self.session_id:
             raise SAPConnectionError("No active session")
-        return {"B1SESSION": self.session_id}
+        cookies = {"B1SESSION": self.session_id}
+        if getattr(self, "route_id", None):
+            cookies["ROUTEID"] = self.route_id
+        return cookies
 
     def get(
         self, endpoint: str, params: Optional[Dict[str, Any]] = None
@@ -164,9 +170,9 @@ class SAPServiceLayerClient:
         Returns:
             Response data as dictionary
         """
-        self._ensure_session()
 
         def _inner():
+            self._ensure_session()
             url = f"{self.base_url}/{endpoint}"
             try:
                 response = self.client.get(
@@ -187,10 +193,16 @@ class SAPServiceLayerClient:
                 logger.error(f"SAP GET error: {str(e)}")
                 raise SAPConnectionError(f"SAP request error: {str(e)}")
 
-        try:
-            return sap_breaker.call(_inner)
-        except CircuitBreakerOpen as exc:
-            raise SAPConnectionError(str(exc))
+        for attempt in range(2):
+            try:
+                return sap_breaker.call(_inner)
+            except SAPConnectionError as exc:
+                if attempt == 0 and "Authentication failed" in str(exc):
+                    logger.info("SAP authentication failed. Retrying request...")
+                    continue
+                raise
+            except CircuitBreakerOpen as exc:
+                raise SAPConnectionError(str(exc))
 
     def get_binary(
         self,
@@ -203,9 +215,9 @@ class SAPServiceLayerClient:
 
         This is used for downloading attachment/image binary content.
         """
-        self._ensure_session()
 
         def _inner():
+            self._ensure_session()
             url = f"{self.base_url}/{endpoint}"
             try:
                 headers = dict(self._get_headers())
@@ -236,10 +248,16 @@ class SAPServiceLayerClient:
                 logger.error(f"SAP GET(binary) error: {str(e)}")
                 raise SAPConnectionError(f"SAP request error: {str(e)}")
 
-        try:
-            return sap_breaker.call(_inner)
-        except CircuitBreakerOpen as exc:
-            raise SAPConnectionError(str(exc))
+        for attempt in range(2):
+            try:
+                return sap_breaker.call(_inner)
+            except SAPConnectionError as exc:
+                if attempt == 0 and "Authentication failed" in str(exc):
+                    logger.info("SAP authentication failed. Retrying binary request...")
+                    continue
+                raise
+            except CircuitBreakerOpen as exc:
+                raise SAPConnectionError(str(exc))
 
     def post(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -252,9 +270,9 @@ class SAPServiceLayerClient:
         Returns:
             Response data as dictionary
         """
-        self._ensure_session()
 
         def _inner():
+            self._ensure_session()
             url = f"{self.base_url}/{endpoint}"
             try:
                 response = self.client.post(
@@ -274,10 +292,16 @@ class SAPServiceLayerClient:
                 logger.error(f"SAP POST error: {str(e)}")
                 raise SAPConnectionError(f"SAP request error: {str(e)}")
 
-        try:
-            return sap_breaker.call(_inner)
-        except CircuitBreakerOpen as exc:
-            raise SAPConnectionError(str(exc))
+        for attempt in range(2):
+            try:
+                return sap_breaker.call(_inner)
+            except SAPConnectionError as exc:
+                if attempt == 0 and "Authentication failed" in str(exc):
+                    logger.info("SAP authentication failed. Retrying POST request...")
+                    continue
+                raise
+            except CircuitBreakerOpen as exc:
+                raise SAPConnectionError(str(exc))
 
     def patch(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -290,9 +314,9 @@ class SAPServiceLayerClient:
         Returns:
             Response data as dictionary
         """
-        self._ensure_session()
 
         def _inner():
+            self._ensure_session()
             url = f"{self.base_url}/{endpoint}"
             try:
                 response = self.client.patch(
@@ -314,10 +338,16 @@ class SAPServiceLayerClient:
                 logger.error(f"SAP PATCH error: {str(e)}")
                 raise SAPConnectionError(f"SAP request error: {str(e)}")
 
-        try:
-            return sap_breaker.call(_inner)
-        except CircuitBreakerOpen as exc:
-            raise SAPConnectionError(str(exc))
+        for attempt in range(2):
+            try:
+                return sap_breaker.call(_inner)
+            except SAPConnectionError as exc:
+                if attempt == 0 and "Authentication failed" in str(exc):
+                    logger.info("SAP authentication failed. Retrying PATCH request...")
+                    continue
+                raise
+            except CircuitBreakerOpen as exc:
+                raise SAPConnectionError(str(exc))
 
     def delete(self, endpoint: str) -> bool:
         """
@@ -329,9 +359,9 @@ class SAPServiceLayerClient:
         Returns:
             True if successful
         """
-        self._ensure_session()
 
         def _inner():
+            self._ensure_session()
             url = f"{self.base_url}/{endpoint}"
             try:
                 response = self.client.delete(
@@ -350,10 +380,16 @@ class SAPServiceLayerClient:
                 logger.error(f"SAP DELETE error: {str(e)}")
                 raise SAPConnectionError(f"SAP request error: {str(e)}")
 
-        try:
-            return sap_breaker.call(_inner)
-        except CircuitBreakerOpen as exc:
-            raise SAPConnectionError(str(exc))
+        for attempt in range(2):
+            try:
+                return sap_breaker.call(_inner)
+            except SAPConnectionError as exc:
+                if attempt == 0 and "Authentication failed" in str(exc):
+                    logger.info("SAP authentication failed. Retrying DELETE request...")
+                    continue
+                raise
+            except CircuitBreakerOpen as exc:
+                raise SAPConnectionError(str(exc))
 
     def _handle_http_error(self, error: httpx.HTTPStatusError):
         """Handle HTTP errors from SAP Service Layer"""
@@ -370,7 +406,7 @@ class SAPServiceLayerClient:
             error_message = error.response.text
 
         # Map SAP error codes to exceptions
-        if status_code == 401:
+        if status_code == 401 or sap_code == 301:
             self.session_id = None  # Force re-login
             raise SAPConnectionError(f"Authentication failed: {error_message}")
         elif status_code == 404:

@@ -109,7 +109,7 @@ export const ReportsPage = () => {
   const { user } = useAuth();
   const [selectedReport, setSelectedReport] = useState<ReportType>('sales');
   const [range, setRange] = useState<RangeKey>('monthly');
-  const [branch, setBranch] = useState(user?.branch_id || 'WH-001');
+  const [branch, setBranch] = useState(user?.branch_id || '');
   const [outputFormat, setOutputFormat] = useState<'csv' | 'xlsx'>('csv');
   const [groupBy, setGroupBy] = useState('Date (Daily)');
   const [salesType, setSalesType] = useState('All Sales');
@@ -279,9 +279,7 @@ export const ReportsPage = () => {
               disabled={!isAdmin}
               className="w-full bg-transparent text-sm text-slate-100 outline-none disabled:cursor-not-allowed"
             >
-              <option value="WH-001" className="bg-slate-50">Main Branch (WH-001)</option>
-              <option value="WH-002" className="bg-slate-50">North Branch (WH-002)</option>
-              <option value="WH-003" className="bg-slate-50">South Branch (WH-003)</option>
+              <option value={user?.branch_id || ''} className="bg-slate-50">{user?.store_name || user?.branch_id || 'Current Branch'}</option>
             </select>
           </div>
         </div>
