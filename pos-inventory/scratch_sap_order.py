@@ -3,7 +3,7 @@ import sys
 import json
 
 sys.path.append(os.path.abspath('pos-backend'))
-from app.services.sap.client import get_sap_client
+from app.services.sap.client import get_sap_client  # type: ignore
 
 client = get_sap_client()
 try:

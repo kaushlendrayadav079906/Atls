@@ -1,3 +1,6 @@
 {
-  "css.lint.unknownAtRules": "ignore"
+  "css.lint.unknownAtRules": "ignore",
+  "python.analysis.extraPaths": [
+    "./pos-inventory/pos-backend"
+  ]
 }
