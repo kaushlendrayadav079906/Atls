@@ -57,7 +57,9 @@ export interface SaleDetail {
 }
 
 export interface SalesFeedParams {
-  range?: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all_time';
+  range?: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all_time' | 'custom';
+  date_from?: string;
+  date_to?: string;
   search?: string;
   limit?: number;
   offset?: number;

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { paymentsReportApi } from '../../api/endpoints';
+import { InvoiceDetailPanel } from '../sales/SalesList';
 import { useDebounce } from '../../hooks/useDebounce';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -100,6 +101,8 @@ export const PaymentReportPage = () => {
     paymentMethod: undefined as string | undefined,
     paymentStatus: undefined as string | undefined
   });
+  
+  const [selectedTxnId, setSelectedTxnId] = useState<number | null>(null);
   
   const [trendGranularity, setTrendGranularity] = useState('daily');
 
@@ -568,10 +571,10 @@ export const PaymentReportPage = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-center">
-                        <div className="flex items-center justify-center gap-3 text-[#0052cc]">
-                          <button className="hover:text-blue-800 transition-colors" title="View Details"><Eye size={16} /></button>
-                          <button className="hover:text-blue-800 transition-colors" title="Download Receipt"><Download size={16} /></button>
-                          <button className="hover:text-blue-800 transition-colors" title="More Actions"><MoreVertical size={16} /></button>
+                        <div className="flex items-center justify-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
+                          <button onClick={(e) => { e.stopPropagation(); setSelectedTxnId(txn.docEntry); }} className="p-1 text-[#0052cc] hover:bg-blue-50 rounded transition-colors"><Eye className="w-4 h-4" /></button>
+                          <button className="p-1 text-slate-400 hover:text-[#0052cc] hover:bg-blue-50 rounded transition-colors"><Download className="w-4 h-4" /></button>
+                          <button className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded transition-colors"><MoreVertical className="w-4 h-4" /></button>
                         </div>
                       </td>
                     </tr>
@@ -634,8 +637,15 @@ export const PaymentReportPage = () => {
             </div>
           )}
         </div>
-
       </div>
+      
+      {/* Right Details Panel (Popup) */}
+      {selectedTxnId !== null && (
+        <InvoiceDetailPanel 
+          id={selectedTxnId} 
+          onClose={() => setSelectedTxnId(null)} 
+        />
+      )}
     </div>
   );
 };

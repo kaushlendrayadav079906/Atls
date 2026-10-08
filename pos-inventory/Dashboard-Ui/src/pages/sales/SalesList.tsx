@@ -19,12 +19,14 @@ import {
   Package2,  
   Search,
   User,
-  X
+  X,
+  Eye,
+  Edit
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { salesApi } from '../../api/sales';
 import { useDebounce } from '../../hooks/useDebounce';
-import type { DashboardRecentSalesPage, SalesFeedParams } from '../../types/sales';
+import type { DashboardRecentSalesPage, SaleDetail, DashboardRecentSale } from '../../types/sales';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -36,25 +38,45 @@ const fmt = (n: number) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(n);
 
 // Component for the Right Panel (Invoice Details)
-const InvoiceDetailPanel = ({ id, onClose }: { id: number; onClose: () => void }) => {
+export const InvoiceDetailPanel = ({ id, onClose, initialSale }: { id: number; onClose: () => void, initialSale?: DashboardRecentSale }) => {
+  const mappedInitialData: SaleDetail | undefined = initialSale ? {
+    saleId: initialSale.saleId || '',
+    total: initialSale.total,
+    customer: initialSale.customerName,
+    syncStatus: 'synced',
+    createdAt: initialSale.docDate,
+    sapDocEntry: initialSale.docEntry,
+    sapDocNum: initialSale.docNum,
+    items: initialSale.items?.map(i => ({
+      ItemCode: i.itemCode,
+      ItemDescription: i.itemName,
+      Quantity: i.quantity,
+      Price: i.unitPrice,
+      LineTotal: i.lineTotal,
+    })) || []
+  } : undefined;
+
   const { data: invoice, isLoading, isError } = useQuery({
     queryKey: ['saleDetail', id],
     queryFn: () => salesApi.getSaleDetail(id.toString()),
     enabled: !!id,
+    initialData: mappedInitialData,
   });
 
   const [activeTab, setActiveTab] = useState<'items' | 'payments' | 'notes' | 'history'>('items');
 
   if (isLoading) {
     return (
-      <div className="w-[450px] bg-slate-50 border-l border-slate-200 flex flex-col h-full animate-pulse">
-        <div className="p-5 border-b border-slate-200 flex items-center justify-between">
-          <div className="h-6 w-32 bg-slate-100 rounded"></div>
-          <div className="h-6 w-6 bg-slate-100 rounded"></div>
-        </div>
-        <div className="p-6 flex flex-col gap-4">
-          <div className="h-20 bg-slate-100 rounded"></div>
-          <div className="h-40 bg-slate-100 rounded"></div>
+      <div className="fixed inset-0 bg-slate-900/35 backdrop-blur-[3px] z-[100] flex items-center justify-center p-4 sm:p-6">
+        <div className="w-full max-w-[550px] bg-slate-50 border border-slate-200 rounded-xl flex flex-col h-[600px] animate-pulse overflow-hidden shadow-2xl">
+          <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-white">
+            <div className="h-6 w-32 bg-slate-100 rounded"></div>
+            <div className="h-6 w-6 bg-slate-100 rounded"></div>
+          </div>
+          <div className="p-6 flex flex-col gap-4 flex-1">
+            <div className="h-20 bg-slate-100 rounded"></div>
+            <div className="h-40 bg-slate-100 rounded"></div>
+          </div>
         </div>
       </div>
     );
@@ -62,10 +84,12 @@ const InvoiceDetailPanel = ({ id, onClose }: { id: number; onClose: () => void }
 
   if (isError || !invoice) {
     return (
-      <div className="w-[450px] bg-slate-50 border-l border-slate-200 flex flex-col h-full items-center justify-center p-6 text-center">
-        <AlertCircle className="w-12 h-12 text-red-500 mb-3" />
-        <p className="text-red-400 font-medium">Failed to load invoice details.</p>
-        <button onClick={onClose} className="mt-4 text-blue-600 hover:text-blue-600 underline text-sm">Close Panel</button>
+      <div className="fixed inset-0 bg-slate-900/35 backdrop-blur-[3px] z-[100] flex items-center justify-center p-4 sm:p-6" onClick={onClose}>
+        <div className="w-full max-w-[550px] bg-slate-50 border border-slate-200 rounded-xl flex flex-col h-[300px] items-center justify-center p-6 text-center shadow-2xl" onClick={e => e.stopPropagation()}>
+          <AlertCircle className="w-12 h-12 text-red-500 mb-3" />
+          <p className="text-red-400 font-medium">Failed to load invoice details.</p>
+          <button onClick={onClose} className="mt-4 text-blue-600 hover:text-blue-600 underline text-sm">Close Panel</button>
+        </div>
       </div>
     );
   }
@@ -73,7 +97,20 @@ const InvoiceDetailPanel = ({ id, onClose }: { id: number; onClose: () => void }
   const isPending = invoice.syncStatus !== 'synced';
 
   return (
-    <div className="w-[450px] bg-slate-50 border-l border-slate-200 flex flex-col h-full flex-shrink-0 shadow-lg z-10 transition-all">
+    <div 
+      className="fixed inset-0 bg-slate-900/35 backdrop-blur-[3px] z-[100] flex items-center justify-center p-4 sm:p-6"
+      onClick={onClose}
+      style={{ animation: 'fadeIn 0.2s ease-out' }}
+    >
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+      `}</style>
+      <div 
+        className="w-full max-w-[550px] h-full max-h-[90vh] bg-slate-50 border border-slate-200 rounded-xl flex flex-col shadow-2xl z-[101] overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+        style={{ animation: 'scaleIn 0.2s ease-out' }}
+      >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white">
         <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -246,23 +283,85 @@ const InvoiceDetailPanel = ({ id, onClose }: { id: number; onClose: () => void }
         </div>
       </div>
     </div>
+    </div>
   );
 };
 
 export const SalesList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearch = useDebounce(searchTerm, 500);
-  const [dateRange, setDateRange] = useState<SalesFeedParams['range']>('monthly');
+
+  type QuickFilter = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom' | 'all_time';
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('monthly');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+
   const [page, setPage] = useState(1);
   const limit = 10;
   const offset = (page - 1) * limit;
 
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
 
+  const applyQuickFilter = (filter: QuickFilter) => {
+    setQuickFilter(filter);
+    setPage(1);
+    
+    if (filter === 'all_time') {
+      setDateFrom('');
+      setDateTo('');
+      setCustomFrom('');
+      setCustomTo('');
+      return;
+    }
+    
+    if (filter === 'custom') {
+      setDateFrom(customFrom);
+      setDateTo(customTo);
+      return;
+    }
+    
+    const now = new Date();
+    const to = new Date();
+    let from = new Date(now);
+    
+    if (filter === 'daily') {
+      from = new Date(now);
+    } else if (filter === 'weekly') {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      from = new Date(now.setDate(diff));
+    } else if (filter === 'monthly') {
+      from = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (filter === 'yearly') {
+      from = new Date(now.getFullYear(), 0, 1);
+    }
+    
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    setDateFrom(`${from.getFullYear()}-${pad(from.getMonth() + 1)}-${pad(from.getDate())}`);
+    setDateTo(`${to.getFullYear()}-${pad(to.getMonth() + 1)}-${pad(to.getDate())}`);
+  };
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (!(e.target as Element).closest('.date-dropdown-container')) {
+        setIsDateDropdownOpen(false);
+      }
+    };
+    if (isDateDropdownOpen) {
+      document.addEventListener('click', handleOutsideClick);
+    }
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, [isDateDropdownOpen]);
+
   const { data, isLoading } = useQuery<DashboardRecentSalesPage>({
-    queryKey: ['sales', dateRange, debouncedSearch, offset, limit],
+    queryKey: ['sales', quickFilter, dateFrom, dateTo, debouncedSearch, offset, limit],
     queryFn: () => salesApi.getSalesFeed({
-      range: dateRange,
+      range: quickFilter,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
       search: debouncedSearch || undefined,
       limit,
       offset
@@ -295,6 +394,65 @@ export const SalesList = () => {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-slate-500 hidden sm:block">Dashboard {'>'} Sales & Invoices</span>
+            <div className="relative date-dropdown-container z-50">
+              <button 
+                onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+                className="flex items-center gap-2 px-4 py-2 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors font-medium text-sm"
+              >
+                <Calendar className="w-4 h-4 text-slate-500" />
+                {quickFilter === 'all_time' ? 'All Dates (Total)' :
+                 quickFilter === 'daily' ? 'Today' : 
+                 quickFilter === 'custom' ? 'Custom Range' :
+                 `This ${quickFilter.charAt(0).toUpperCase() + quickFilter.slice(1).replace('ly', '')}`}
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isDateDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {isDateDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 shadow-lg rounded-lg py-1">
+                  <button
+                    onClick={() => { applyQuickFilter('all_time'); setIsDateDropdownOpen(false); }}
+                    className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                      quickFilter === 'all_time' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    All Dates (Total)
+                  </button>
+                  <div className="px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50">Quick Filters</div>
+                  {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(f => {
+                    const label = f === 'daily' ? 'Today' : `This ${f.charAt(0).toUpperCase() + f.slice(1).replace('ly', '')}`;
+                    return (
+                      <button
+                        key={f}
+                        onClick={() => { applyQuickFilter(f); setIsDateDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                          quickFilter === f ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                  <div className="px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50 mt-1">Custom Range</div>
+                  <div className="p-3 flex flex-col gap-2">
+                    <div>
+                      <label className="text-[11px] text-slate-500 mb-1 block">From</label>
+                      <input type="date" className="w-full text-sm border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-slate-500 mb-1 block">To</label>
+                      <input type="date" className="w-full text-sm border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={customTo} onChange={e => setCustomTo(e.target.value)} />
+                    </div>
+                    <button 
+                      disabled={!customFrom || !customTo}
+                      onClick={() => { applyQuickFilter('custom'); setIsDateDropdownOpen(false); }}
+                      className="w-full mt-2 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded font-medium text-sm transition-colors"
+                    >
+                      Apply Custom
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all">
               <Download size={16} /> Export
             </button>
@@ -356,20 +514,7 @@ export const SalesList = () => {
               className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-[13px] text-slate-900 placeholder:text-blue-600/50 focus:outline-none focus:border-blue-500 transition-colors"
             />
           </div>
-          <div className="relative w-[200px]">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-600/60" size={16} />
-            <select 
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value as SalesFeedParams['range'])}
-              className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-[13px] text-slate-700 appearance-none focus:outline-none focus:border-blue-500 transition-colors"
-            >
-              <option value="daily">Today</option>
-              <option value="weekly">This Week</option>
-              <option value="monthly">This Month</option>
-              <option value="yearly">This Year</option>
-              <option value="all_time">All Time</option>
-            </select>
-          </div>
+
           <div className="relative w-[140px]">
             <select className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2 text-[13px] text-slate-700 appearance-none focus:outline-none focus:border-blue-500 transition-colors">
               <option value="">All Status</option>
@@ -448,13 +593,16 @@ export const SalesList = () => {
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-2">
                           <button 
-                            className="px-2.5 py-1 bg-blue-600/20 text-blue-600 hover:bg-blue-600/40 border border-blue-200 rounded text-xs font-medium transition-colors"
                             onClick={(e) => { e.stopPropagation(); setSelectedSaleId(sale.docEntry!); }}
+                            className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                           >
-                            View
+                            <Eye className="w-4 h-4" />
                           </button>
-                          <button className="p-1 text-blue-600/60 hover:text-slate-900 transition-colors">
-                            <MoreVertical size={16} />
+                          <button title="Sales Invoice editing is not currently available" className="p-1 text-slate-400 hover:bg-slate-50 rounded cursor-not-allowed transition-colors">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded transition-colors">
+                            <MoreVertical className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -510,6 +658,7 @@ export const SalesList = () => {
         <InvoiceDetailPanel 
           id={selectedSaleId} 
           onClose={() => setSelectedSaleId(null)} 
+          initialSale={data?.items?.find(s => s.docEntry === selectedSaleId)}
         />
       )}
 

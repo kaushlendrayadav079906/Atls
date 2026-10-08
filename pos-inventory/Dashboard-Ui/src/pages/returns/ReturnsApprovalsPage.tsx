@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     AlertCircle,
     Building2,
-    CalendarDays,
     ChevronLeft,
     ChevronRight,
     Clock3,
@@ -15,6 +14,9 @@ import {
     Sparkles,
     Ticket,
     X,
+    Eye,
+    Calendar,
+    ChevronDown,
 } from 'lucide-react';
 import { useState, useEffect, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -98,13 +100,29 @@ export const ReturnsApprovalsPage = () => {
   
   const [tab, setTab] = useState<'all' | 'pending' | 'completed' | 'rejected' | 'failed'>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [branchId, setBranchId] = useState('');
   const [dateRange, setDateRange] = useState('');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [status, setStatus] = useState('all');
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (!(e.target as Element).closest('.date-dropdown-container')) {
+        setIsDateDropdownOpen(false);
+      }
+    };
+    if (isDateDropdownOpen) {
+      document.addEventListener('click', handleOutsideClick);
+    }
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, [isDateDropdownOpen]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -221,6 +239,66 @@ export const ReturnsApprovalsPage = () => {
             <p className="mt-1 text-sm text-slate-600">Manage return requests, review approvals, and track workflow status.</p>
           </div>
           <div className="flex items-center gap-3">
+            <div className="relative date-dropdown-container z-50 hidden sm:block">
+              <button 
+                onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+                className="flex items-center gap-2 px-4 py-2 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors font-medium text-sm"
+              >
+                <Calendar className="w-4 h-4 text-slate-500" />
+                {dateRange === '' ? 'All Dates (Total)' :
+                 dateRange === 'today' ? 'Today' : 
+                 dateRange.includes('_to_') ? 'Custom Range' :
+                 `This ${dateRange.charAt(0).toUpperCase() + dateRange.slice(1)}`}
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isDateDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {isDateDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 shadow-lg rounded-lg py-1">
+                  <button
+                    onClick={() => { setDateRange(''); setPage(1); setIsDateDropdownOpen(false); }}
+                    className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                      dateRange === '' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    All Dates (Total)
+                  </button>
+                  <div className="px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50">Quick Filters</div>
+                  {(['today', 'week', 'month', 'year'] as const).map(f => {
+                    const label = f === 'today' ? 'Today' : `This ${f.charAt(0).toUpperCase() + f.slice(1)}`;
+                    return (
+                      <button
+                        key={f}
+                        onClick={() => { setDateRange(f); setPage(1); setIsDateDropdownOpen(false); }}
+                        className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                          dateRange === f ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                  <div className="px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50 mt-1">Custom Range</div>
+                  <div className="p-3 flex flex-col gap-2">
+                    <div>
+                      <label className="text-[11px] text-slate-500 mb-1 block">From</label>
+                      <input type="date" className="w-full text-sm border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-slate-500 mb-1 block">To</label>
+                      <input type="date" className="w-full text-sm border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={customTo} onChange={e => setCustomTo(e.target.value)} />
+                    </div>
+                    <button 
+                      disabled={!customFrom || !customTo}
+                      onClick={() => { setDateRange(`${customFrom}_to_${customTo}`); setPage(1); setIsDateDropdownOpen(false); }}
+                      className="w-full mt-2 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded font-medium text-sm transition-colors"
+                    >
+                      Apply Custom
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
@@ -245,23 +323,10 @@ export const ReturnsApprovalsPage = () => {
           <MetricTile title="Awaiting Review" value={String(totalCounts.failed)} change="needs attention" tone="violet" icon={<ShieldAlert className="h-5 w-5" />} />
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.85fr)_minmax(360px,0.8fr)]">
+        <div className="flex flex-col gap-6">
           
           <div className="flex flex-col gap-4">
-            {/* Quick Time Range Selector */}
-            <div className="flex items-center gap-2">
-              {['today', 'week', 'month', 'year'].map((r) => (
-                <button
-                  key={r}
-                  onClick={() => { setDateRange(r); setPage(1); }}
-                  className={`rounded-lg px-5 py-2 text-sm font-bold transition-colors ${
-                    dateRange === r ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  {r === 'today' ? 'Today' : r === 'week' ? 'Week' : r === 'month' ? 'Month' : 'Year'}
-                </button>
-              ))}
-            </div>
+
 
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
               
@@ -293,18 +358,6 @@ export const ReturnsApprovalsPage = () => {
               <div className="border-b border-slate-200 bg-white px-4 py-3">
                 <div className="flex flex-wrap items-center gap-3">
                   
-                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 min-w-[140px]">
-                    <CalendarDays className="h-4 w-4 text-slate-400" />
-                    <select value={dateRange} onChange={(e) => {setDateRange(e.target.value); setPage(1);}} className="bg-transparent outline-none w-full">
-                      <option value="">All Time</option>
-                      <option value="today">Today</option>
-                      <option value="week">This Week</option>
-                      <option value="month">This Month</option>
-                      <option value="year">This Year</option>
-                      <option value={`${new Date().toISOString().split('T')[0]}_to_${new Date().toISOString().split('T')[0]}`}>Custom Range...</option>
-                    </select>
-                  </div>
-
                   <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 min-w-[160px]">
                     <Building2 className="h-4 w-4 text-slate-400" />
                     <select value={branchId} onChange={(e) => {setBranchId(e.target.value); setPage(1);}} className="bg-transparent outline-none w-full">
@@ -426,11 +479,12 @@ export const ReturnsApprovalsPage = () => {
                               onClick={(event) => {
                                 event.stopPropagation();
                                 setSelectedId(request.id);
+                                setIsModalOpen(true);
                               }}
-                              className="rounded-lg border border-slate-200 bg-slate-100 p-2 text-slate-700 hover:bg-[#123d65]"
+                              className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                               aria-label="Review request"
                             >
-                              <ChevronRight className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                             </button>
                           </td>
                         </tr>
@@ -496,10 +550,19 @@ export const ReturnsApprovalsPage = () => {
           </div>
           </div>
 
-          <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          {isModalOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/35 p-4 sm:p-6 backdrop-blur-[3px]" onClick={() => setIsModalOpen(false)}>
+              <aside className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-lg w-full max-w-5xl relative max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="absolute right-4 top-4 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+                
             {selectedRequest ? (
               <>
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-4 mt-2">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">Return Request Details</p>
                     <h2 className="mt-2 text-2xl font-bold text-slate-900">{getRequestNumber(selectedRequest)}</h2>
@@ -524,118 +587,128 @@ export const ReturnsApprovalsPage = () => {
                   </span>
                 </div>
 
-                <div className="mt-5 space-y-4">
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Invoice Information</h3>
-                    <div className="mt-3 grid gap-3 text-sm text-slate-700">
-                      <InfoRow label="Invoice No." value={getInvoiceNumber(selectedRequest)} />
-                      <InfoRow label="Customer" value={getCustomerName(selectedRequest)} />
-                      <InfoRow label="Payment Method" value={safeText(selectedRequest.payload?.paymentMethod || selectedRequest.payload?.payment_method || 'Cash')} />
+                <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left Column */}
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Invoice Information</h3>
+                      <div className="mt-3 grid gap-3 text-sm text-slate-700">
+                        <InfoRow label="Invoice No." value={getInvoiceNumber(selectedRequest)} />
+                        <InfoRow label="Customer" value={getCustomerName(selectedRequest)} />
+                        <InfoRow label="Payment Method" value={safeText(selectedRequest.payload?.paymentMethod || selectedRequest.payload?.payment_method || 'Cash')} />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Return Items</h3>
-                    <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
-                      <table className="min-w-full divide-y divide-sky-800 text-left text-sm">
-                        <thead className="bg-slate-100 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
-                          <tr>
-                            <th className="px-3 py-2">#</th>
-                            <th className="px-3 py-2">Product</th>
-                            <th className="px-3 py-2 text-center">Qty</th>
-                            <th className="px-3 py-2 text-right">Price</th>
-                            <th className="px-3 py-2 text-right">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-sky-800 bg-slate-50">
-                          {selectedItems.length === 0 ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Return Items</h3>
+                      <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
+                        <table className="min-w-full divide-y divide-sky-800 text-left text-sm">
+                          <thead className="bg-slate-100 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
                             <tr>
-                              <td colSpan={5} className="px-3 py-4 text-center text-slate-600">No item data returned by the backend.</td>
+                              <th className="px-3 py-2">#</th>
+                              <th className="px-3 py-2">Product</th>
+                              <th className="px-3 py-2 text-center">Qty</th>
+                              <th className="px-3 py-2 text-right">Price</th>
+                              <th className="px-3 py-2 text-right">Total</th>
                             </tr>
-                          ) : (
-                            selectedItems.map((item, index) => (
-                              <tr key={`${item.itemCode || 'line'}-${index}`}>
-                                <td className="px-3 py-2 text-slate-600">{index + 1}</td>
-                                <td className="px-3 py-2 text-slate-800">{item.itemName || item.itemCode || 'Item'}</td>
-                                <td className="px-3 py-2 text-center text-slate-700">{item.quantity || 0}</td>
-                                <td className="px-3 py-2 text-right text-slate-700">{formatMoney(item.unitPrice || 0)}</td>
-                                <td className="px-3 py-2 text-right text-slate-800">{formatMoney(getLineTotalFromItem(item))}</td>
+                          </thead>
+                          <tbody className="divide-y divide-sky-800 bg-slate-50">
+                            {selectedItems.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="px-3 py-4 text-center text-slate-600">No item data returned by the backend.</td>
                               </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
+                            ) : (
+                              selectedItems.map((item, index) => (
+                                <tr key={`${item.itemCode || 'line'}-${index}`}>
+                                  <td className="px-3 py-2 text-slate-600">{index + 1}</td>
+                                  <td className="px-3 py-2 text-slate-800">{item.itemName || item.itemCode || 'Item'}</td>
+                                  <td className="px-3 py-2 text-center text-slate-700">{item.quantity || 0}</td>
+                                  <td className="px-3 py-2 text-right text-slate-700">{formatMoney(item.unitPrice || 0)}</td>
+                                  <td className="px-3 py-2 text-right text-slate-800">{formatMoney(getLineTotalFromItem(item))}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Requested Amount</h3>
+                        <span className="text-xl font-bold text-slate-900">{formatMoney(selectedAmount)}</span>
+                      </div>
+                      <div className="mt-3 text-sm text-slate-700">
+                        <p className="mb-2 font-medium text-slate-600">Reason for Return</p>
+                        <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-700">{selectedRequest.reason || 'No reason was provided by the backend.'}</p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Requested Amount</h3>
-                      <span className="text-xl font-bold text-slate-900">{formatMoney(selectedAmount)}</span>
+                  {/* Right Column */}
+                  <div className="space-y-4">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Approval Workflow</h3>
+                      <div className="mt-4 space-y-3 text-sm">
+                        <WorkflowRow title="Request Submitted" time={selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} done />
+                        <WorkflowRow title="Pending Review" time={canApprove ? 'Admin/Manager approval queue' : 'Access restricted'} done={normalizeStatus(selectedRequest.status) !== 'rejected' && normalizeStatus(selectedRequest.status) !== 'completed'} />
+                        <WorkflowRow title="Approved / Rejected" time={selectedRequest.updated_at ? new Date(selectedRequest.updated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Awaiting decision'} done={['completed', 'rejected', 'failed'].includes(normalizeStatus(selectedRequest.status))} />
+                      </div>
                     </div>
-                    <div className="mt-3 text-sm text-slate-700">
-                      <p className="mb-2 font-medium text-slate-600">Reason for Return</p>
-                      <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-700">{selectedRequest.reason || 'No reason was provided by the backend.'}</p>
-                    </div>
-                  </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Approval Workflow</h3>
-                    <div className="mt-4 space-y-3 text-sm">
-                      <WorkflowRow title="Request Submitted" time={selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} done />
-                      <WorkflowRow title="Pending Review" time={canApprove ? 'Admin/Manager approval queue' : 'Access restricted'} done={normalizeStatus(selectedRequest.status) !== 'rejected' && normalizeStatus(selectedRequest.status) !== 'completed'} />
-                      <WorkflowRow title="Approved / Rejected" time={selectedRequest.updated_at ? new Date(selectedRequest.updated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Awaiting decision'} done={['completed', 'rejected', 'failed'].includes(normalizeStatus(selectedRequest.status))} />
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
+                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Reviewer Notes</h3>
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                        {selectedRequest.payload?.reviewerComment || 'No reviewer comment was returned by the backend yet.'}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
-                    <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Reviewer Notes</h3>
-                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                      {selectedRequest.payload?.reviewerComment || 'No reviewer comment was returned by the backend yet.'}
+                    <div className="pt-2">
+                      {actionError && (
+                        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="mt-0.5 h-4 w-4" />
+                            <span>{actionError}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          disabled={!canApprove || approveMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
+                          onClick={() => handleApprove(selectedRequest.id)}
+                          className="flex-1 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-900/20 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 transition"
+                        >
+                          {approveMutation.isPending ? 'Approving...' : 'Approve'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!canApprove || rejectMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
+                          onClick={() => handleReject(selectedRequest.id)}
+                          className="flex-1 rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-rose-900/20 hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50 transition"
+                        >
+                          {rejectMutation.isPending ? 'Rejecting...' : 'Reject'}
+                        </button>
+                      </div>
+
+                      {!canApprove && (
+                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                          Admin or Manager access is required to approve or reject return requests.
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
-
-                {actionError && (
-                  <div className="mt-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="mt-0.5 h-4 w-4" />
-                      <span>{actionError}</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="mt-5 flex gap-3">
-                  <button
-                    type="button"
-                    disabled={!canApprove || approveMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
-                    onClick={() => handleApprove(selectedRequest.id)}
-                    className="flex-1 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-900/20 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {approveMutation.isPending ? 'Approving...' : 'Approve'}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canApprove || rejectMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
-                    onClick={() => handleReject(selectedRequest.id)}
-                    className="flex-1 rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-rose-900/20 hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {rejectMutation.isPending ? 'Rejecting...' : 'Reject'}
-                  </button>
-                </div>
-
-                {!canApprove && (
-                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                    Admin or Manager access is required to approve or reject return requests.
-                  </div>
-                )}
               </>
             ) : (
               <div className="flex h-full min-h-[320px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-600">
                 Select a return request to review its details.
               </div>
             )}
-          </aside>
+              </aside>
+            </div>
+          )}
         </div>
       </div>
     </div>

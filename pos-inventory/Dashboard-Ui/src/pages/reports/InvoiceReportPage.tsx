@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { salesApi } from '../../api/sales';
+import { InvoiceDetailPanel } from '../sales/SalesList';
 import { useDebounce } from '../../hooks/useDebounce';
 import type { DashboardRecentSalesPage, SalesFeedParams } from '../../types/sales';
 import { clsx, type ClassValue } from 'clsx';
@@ -38,6 +39,7 @@ export const InvoiceReportPage = () => {
   const [page, setPage] = useState(1);
   const limit = 7;
   const offset = (page - 1) * limit;
+  const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
 
   const { data, isLoading } = useQuery<DashboardRecentSalesPage>({
     queryKey: ['invoice-report', dateRange, debouncedSearch, offset, limit],
@@ -317,10 +319,10 @@ export const InvoiceReportPage = () => {
                       </span>
                     </td>
                     <td className="px-5 py-4 text-center">
-                      <div className="flex items-center justify-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                        <button className="p-2 rounded-lg text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition-colors"><Eye size={16} /></button>
-                        <button className="p-2 rounded-lg text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition-colors"><Download size={16} /></button>
-                        <button className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"><MoreVertical size={16} /></button>
+                      <div className="flex items-center justify-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                        <button onClick={(e) => { e.stopPropagation(); setSelectedSaleId(sale.docEntry!); }} className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"><Eye className="w-4 h-4" /></button>
+                        <button className="p-1 text-slate-400 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"><Download className="w-4 h-4" /></button>
+                        <button className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded transition-colors"><MoreVertical className="w-4 h-4" /></button>
                       </div>
                     </td>
                   </tr>
@@ -373,6 +375,14 @@ export const InvoiceReportPage = () => {
           </div>
         </div>
       </div>
+      {/* Right Details Panel */}
+      {selectedSaleId !== null && (
+        <InvoiceDetailPanel 
+          id={selectedSaleId} 
+          onClose={() => setSelectedSaleId(null)} 
+          initialSale={data?.items?.find(s => s.docEntry === selectedSaleId)}
+        />
+      )}
     </div>
   );
 };

@@ -68,7 +68,7 @@ export interface CustomerReturn {
 }
 
 export const customersApi = {
-  getInsights: async (range: 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all_time' = 'monthly'): Promise<CustomerInsightsResponse> => {
+  getInsights: async (range: string = 'monthly'): Promise<CustomerInsightsResponse> => {
     const res = await apiClient.get<CustomerInsightsResponse>('/customers/insights', {
       params: { range },
     });

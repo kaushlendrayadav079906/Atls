@@ -13,6 +13,7 @@ import {
     ShoppingCart,
     Users,
     X,
+    Factory,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -35,6 +36,19 @@ const navItems = [
   },
   { name: 'Customers',          path: '/customers', icon: Users },
   { name: 'Returns & Approvals',path: '/returns',   icon: RotateCcw, badge: '5' },
+  { 
+    name: 'Production',
+    path: '/production',
+    icon: Factory,
+    subItems: [
+      { name: 'Overview', path: '/production' },
+      { name: 'Production Orders', path: '/production/orders' },
+      { name: 'Item-wise Production', path: '/production/item-wise' },
+      { name: 'Production Rejection', path: '/production/rejection' },
+      { name: 'Date-wise Production', path: '/production/date-wise' },
+      { name: 'Reports', path: '/production/reports' },
+    ]
+  },
   { name: 'Atlas Analytics',    path: '/analytics', icon: BarChart3 },
   {
     name: 'Reports',
@@ -73,6 +87,9 @@ export const Layout = () => {
   );
   const [salesExpanded, setSalesExpanded] = useState(
     location.pathname.startsWith('/sales')
+  );
+  const [productionExpanded, setProductionExpanded] = useState(
+    location.pathname.startsWith('/production')
   );
   const [sapConnected, setSapConnected] = useState<boolean | null>(null);
 
@@ -155,8 +172,14 @@ export const Layout = () => {
             return true;
           }).map((item) => {
             const hasSubItems = !!item.subItems;
-            const isActiveParent = hasSubItems && (item.name === 'Reports' ? location.pathname.startsWith('/reports') : location.pathname.startsWith('/sales'));
-            const isExpanded = item.name === 'Reports' ? reportsExpanded : (item.name === 'Sales & Invoices' ? salesExpanded : false);
+            const isActiveParent = hasSubItems && (
+              (item.name === 'Reports' && location.pathname.startsWith('/reports')) || 
+              (item.name === 'Sales & Invoices' && location.pathname.startsWith('/sales')) ||
+              (item.name === 'Production' && location.pathname.startsWith('/production'))
+            );
+            const isExpanded = item.name === 'Reports' ? reportsExpanded : 
+                              (item.name === 'Sales & Invoices' ? salesExpanded : 
+                              (item.name === 'Production' ? productionExpanded : false));
 
             return (
               <div key={item.name}>
@@ -167,6 +190,7 @@ export const Layout = () => {
                       if (sidebarCollapsed) setSidebarCollapsed(false);
                       if (item.name === 'Reports') setReportsExpanded(!reportsExpanded);
                       if (item.name === 'Sales & Invoices') setSalesExpanded(!salesExpanded);
+                      if (item.name === 'Production') setProductionExpanded(!productionExpanded);
                     }}
                     style={{
                       backgroundColor: isActiveParent ? SIDEBAR_ACTIVE_BG : undefined,

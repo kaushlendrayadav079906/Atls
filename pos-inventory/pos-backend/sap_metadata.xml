@@ -1,0 +1,1710 @@
+{
+   "odata.metadata" : "https://ebony-renovator-elevation.ngrok-free.dev/b1s/v1/$metadata",
+   "value" : [
+      {
+         "name" : "ChartOfAccounts",
+         "kind" : "EntitySet",
+         "url" : "ChartOfAccounts"
+      },
+      {
+         "name" : "BusinessPartnerGroups",
+         "kind" : "EntitySet",
+         "url" : "BusinessPartnerGroups"
+      },
+      {
+         "name" : "SalesOpportunitySourcesSetup",
+         "kind" : "EntitySet",
+         "url" : "SalesOpportunitySourcesSetup"
+      },
+      {
+         "name" : "BankStatements",
+         "kind" : "EntitySet",
+         "url" : "BankStatements"
+      },
+      {
+         "name" : "BatchNumberDetails",
+         "kind" : "EntitySet",
+         "url" : "BatchNumberDetails"
+      },
+      {
+         "name" : "SerialNumberDetails",
+         "kind" : "EntitySet",
+         "url" : "SerialNumberDetails"
+      },
+      {
+         "name" : "InventoryPostings",
+         "kind" : "EntitySet",
+         "url" : "InventoryPostings"
+      },
+      {
+         "name" : "FinancialYears",
+         "kind" : "EntitySet",
+         "url" : "FinancialYears"
+      },
+      {
+         "name" : "Sections",
+         "kind" : "EntitySet",
+         "url" : "Sections"
+      },
+      {
+         "name" : "CertificateSeries",
+         "kind" : "EntitySet",
+         "url" : "CertificateSeries"
+      },
+      {
+         "name" : "NatureOfAssessees",
+         "kind" : "EntitySet",
+         "url" : "NatureOfAssessees"
+      },
+      {
+         "name" : "ReportTypes",
+         "kind" : "EntitySet",
+         "url" : "ReportTypes"
+      },
+      {
+         "name" : "UnitOfMeasurementGroups",
+         "kind" : "EntitySet",
+         "url" : "UnitOfMeasurementGroups"
+      },
+      {
+         "name" : "UnitOfMeasurements",
+         "kind" : "EntitySet",
+         "url" : "UnitOfMeasurements"
+      },
+      {
+         "name" : "BinLocationFields",
+         "kind" : "EntitySet",
+         "url" : "BinLocationFields"
+      },
+      {
+         "name" : "BinLocationAttributes",
+         "kind" : "EntitySet",
+         "url" : "BinLocationAttributes"
+      },
+      {
+         "name" : "WarehouseSublevelCodes",
+         "kind" : "EntitySet",
+         "url" : "WarehouseSublevelCodes"
+      },
+      {
+         "name" : "BinLocations",
+         "kind" : "EntitySet",
+         "url" : "BinLocations"
+      },
+      {
+         "name" : "InternalReconciliations",
+         "kind" : "EntitySet",
+         "url" : "InternalReconciliations"
+      },
+      {
+         "name" : "Activities",
+         "kind" : "EntitySet",
+         "url" : "Activities"
+      },
+      {
+         "name" : "SalesStages",
+         "kind" : "EntitySet",
+         "url" : "SalesStages"
+      },
+      {
+         "name" : "SalesOpportunityReasonsSetup",
+         "kind" : "EntitySet",
+         "url" : "SalesOpportunityReasonsSetup"
+      },
+      {
+         "name" : "ActivityTypes",
+         "kind" : "EntitySet",
+         "url" : "ActivityTypes"
+      },
+      {
+         "name" : "ActivityLocations",
+         "kind" : "EntitySet",
+         "url" : "ActivityLocations"
+      },
+      {
+         "name" : "PartnersSetups",
+         "kind" : "EntitySet",
+         "url" : "PartnersSetups"
+      },
+      {
+         "name" : "SalesOpportunityCompetitorsSetup",
+         "kind" : "EntitySet",
+         "url" : "SalesOpportunityCompetitorsSetup"
+      },
+      {
+         "name" : "Drafts",
+         "kind" : "EntitySet",
+         "url" : "Drafts"
+      },
+      {
+         "name" : "DeductionTaxHierarchies",
+         "kind" : "EntitySet",
+         "url" : "DeductionTaxHierarchies"
+      },
+      {
+         "name" : "TaxWebSites",
+         "kind" : "EntitySet",
+         "url" : "TaxWebSites"
+      },
+      {
+         "name" : "DeductionTaxGroups",
+         "kind" : "EntitySet",
+         "url" : "DeductionTaxGroups"
+      },
+      {
+         "name" : "StockTransferDrafts",
+         "kind" : "EntitySet",
+         "url" : "StockTransferDrafts"
+      },
+      {
+         "name" : "Branches",
+         "kind" : "EntitySet",
+         "url" : "Branches"
+      },
+      {
+         "name" : "Departments",
+         "kind" : "EntitySet",
+         "url" : "Departments"
+      },
+      {
+         "name" : "Users",
+         "kind" : "EntitySet",
+         "url" : "Users"
+      },
+      {
+         "name" : "ApprovalStages",
+         "kind" : "EntitySet",
+         "url" : "ApprovalStages"
+      },
+      {
+         "name" : "ApprovalTemplates",
+         "kind" : "EntitySet",
+         "url" : "ApprovalTemplates"
+      },
+      {
+         "name" : "Cockpits",
+         "kind" : "EntitySet",
+         "url" : "Cockpits"
+      },
+      {
+         "name" : "ApprovalRequests",
+         "kind" : "EntitySet",
+         "url" : "ApprovalRequests"
+      },
+      {
+         "name" : "AdditionalExpenses",
+         "kind" : "EntitySet",
+         "url" : "AdditionalExpenses"
+      },
+      {
+         "name" : "InventoryTransferRequests",
+         "kind" : "EntitySet",
+         "url" : "InventoryTransferRequests"
+      },
+      {
+         "name" : "BlanketAgreements",
+         "kind" : "EntitySet",
+         "url" : "BlanketAgreements"
+      },
+      {
+         "name" : "SalesTaxAuthorities",
+         "kind" : "EntitySet",
+         "url" : "SalesTaxAuthorities"
+      },
+      {
+         "name" : "SalesTaxAuthoritiesTypes",
+         "kind" : "EntitySet",
+         "url" : "SalesTaxAuthoritiesTypes"
+      },
+      {
+         "name" : "SalesTaxCodes",
+         "kind" : "EntitySet",
+         "url" : "SalesTaxCodes"
+      },
+      {
+         "name" : "Countries",
+         "kind" : "EntitySet",
+         "url" : "Countries"
+      },
+      {
+         "name" : "Invoices",
+         "kind" : "EntitySet",
+         "url" : "Invoices"
+      },
+      {
+         "name" : "States",
+         "kind" : "EntitySet",
+         "url" : "States"
+      },
+      {
+         "name" : "KPIs",
+         "kind" : "EntitySet",
+         "url" : "KPIs"
+      },
+      {
+         "name" : "TargetGroups",
+         "kind" : "EntitySet",
+         "url" : "TargetGroups"
+      },
+      {
+         "name" : "ExtendedTranslations",
+         "kind" : "EntitySet",
+         "url" : "ExtendedTranslations"
+      },
+      {
+         "name" : "Campaigns",
+         "kind" : "EntitySet",
+         "url" : "Campaigns"
+      },
+      {
+         "name" : "RetornoCodes",
+         "kind" : "EntitySet",
+         "url" : "RetornoCodes"
+      },
+      {
+         "name" : "OccurrenceCodes",
+         "kind" : "EntitySet",
+         "url" : "OccurrenceCodes"
+      },
+      {
+         "name" : "CashDiscounts",
+         "kind" : "EntitySet",
+         "url" : "CashDiscounts"
+      },
+      {
+         "name" : "QueryCategories",
+         "kind" : "EntitySet",
+         "url" : "QueryCategories"
+      },
+      {
+         "name" : "ResourceCapacities",
+         "kind" : "EntitySet",
+         "url" : "ResourceCapacities"
+      },
+      {
+         "name" : "FactoringIndicators",
+         "kind" : "EntitySet",
+         "url" : "FactoringIndicators"
+      },
+      {
+         "name" : "CreditNotes",
+         "kind" : "EntitySet",
+         "url" : "CreditNotes"
+      },
+      {
+         "name" : "PaymentDrafts",
+         "kind" : "EntitySet",
+         "url" : "PaymentDrafts"
+      },
+      {
+         "name" : "IndiaHsn",
+         "kind" : "EntitySet",
+         "url" : "IndiaHsn"
+      },
+      {
+         "name" : "DNFCodeSetup",
+         "kind" : "EntitySet",
+         "url" : "DNFCodeSetup"
+      },
+      {
+         "name" : "AccountSegmentations",
+         "kind" : "EntitySet",
+         "url" : "AccountSegmentations"
+      },
+      {
+         "name" : "AccountSegmentationCategories",
+         "kind" : "EntitySet",
+         "url" : "AccountSegmentationCategories"
+      },
+      {
+         "name" : "WarehouseLocations",
+         "kind" : "EntitySet",
+         "url" : "WarehouseLocations"
+      },
+      {
+         "name" : "Forms1099",
+         "kind" : "EntitySet",
+         "url" : "Forms1099"
+      },
+      {
+         "name" : "InventoryCycles",
+         "kind" : "EntitySet",
+         "url" : "InventoryCycles"
+      },
+      {
+         "name" : "WizardPaymentMethods",
+         "kind" : "EntitySet",
+         "url" : "WizardPaymentMethods"
+      },
+      {
+         "name" : "DepreciationTypes",
+         "kind" : "EntitySet",
+         "url" : "DepreciationTypes"
+      },
+      {
+         "name" : "FAAccountDeterminations",
+         "kind" : "EntitySet",
+         "url" : "FAAccountDeterminations"
+      },
+      {
+         "name" : "DepreciationAreas",
+         "kind" : "EntitySet",
+         "url" : "DepreciationAreas"
+      },
+      {
+         "name" : "DepreciationTypePools",
+         "kind" : "EntitySet",
+         "url" : "DepreciationTypePools"
+      },
+      {
+         "name" : "AssetClasses",
+         "kind" : "EntitySet",
+         "url" : "AssetClasses"
+      },
+      {
+         "name" : "IntrastatConfiguration",
+         "kind" : "EntitySet",
+         "url" : "IntrastatConfiguration"
+      },
+      {
+         "name" : "AssetGroups",
+         "kind" : "EntitySet",
+         "url" : "AssetGroups"
+      },
+      {
+         "name" : "DeterminationCriterias",
+         "kind" : "EntitySet",
+         "url" : "DeterminationCriterias"
+      },
+      {
+         "name" : "AssetCapitalization",
+         "kind" : "EntitySet",
+         "url" : "AssetCapitalization"
+      },
+      {
+         "name" : "GLAccountAdvancedRules",
+         "kind" : "EntitySet",
+         "url" : "GLAccountAdvancedRules"
+      },
+      {
+         "name" : "AssetCapitalizationCreditMemo",
+         "kind" : "EntitySet",
+         "url" : "AssetCapitalizationCreditMemo"
+      },
+      {
+         "name" : "BarCodes",
+         "kind" : "EntitySet",
+         "url" : "BarCodes"
+      },
+      {
+         "name" : "InventoryCountings",
+         "kind" : "EntitySet",
+         "url" : "InventoryCountings"
+      },
+      {
+         "name" : "AssetManualDepreciation",
+         "kind" : "EntitySet",
+         "url" : "AssetManualDepreciation"
+      },
+      {
+         "name" : "EnhancedDiscountGroups",
+         "kind" : "EntitySet",
+         "url" : "EnhancedDiscountGroups"
+      },
+      {
+         "name" : "AssetRevaluations",
+         "kind" : "EntitySet",
+         "url" : "AssetRevaluations"
+      },
+      {
+         "name" : "AssetTransfer",
+         "kind" : "EntitySet",
+         "url" : "AssetTransfer"
+      },
+      {
+         "name" : "CycleCountDeterminations",
+         "kind" : "EntitySet",
+         "url" : "CycleCountDeterminations"
+      },
+      {
+         "name" : "AssetRetirement",
+         "kind" : "EntitySet",
+         "url" : "AssetRetirement"
+      },
+      {
+         "name" : "PurchaseRequests",
+         "kind" : "EntitySet",
+         "url" : "PurchaseRequests"
+      },
+      {
+         "name" : "AssetDepreciationGroups",
+         "kind" : "EntitySet",
+         "url" : "AssetDepreciationGroups"
+      },
+      {
+         "name" : "AttributeGroups",
+         "kind" : "EntitySet",
+         "url" : "AttributeGroups"
+      },
+      {
+         "name" : "IntegrationPackagesConfigure",
+         "kind" : "EntitySet",
+         "url" : "IntegrationPackagesConfigure"
+      },
+      {
+         "name" : "DeliveryNotes",
+         "kind" : "EntitySet",
+         "url" : "DeliveryNotes"
+      },
+      {
+         "name" : "BPPriorities",
+         "kind" : "EntitySet",
+         "url" : "BPPriorities"
+      },
+      {
+         "name" : "DunningLetters",
+         "kind" : "EntitySet",
+         "url" : "DunningLetters"
+      },
+      {
+         "name" : "UserFieldsMD",
+         "kind" : "EntitySet",
+         "url" : "UserFieldsMD"
+      },
+      {
+         "name" : "UserTablesMD",
+         "kind" : "EntitySet",
+         "url" : "UserTablesMD"
+      },
+      {
+         "name" : "PickLists",
+         "kind" : "EntitySet",
+         "url" : "PickLists"
+      },
+      {
+         "name" : "EmployeeIDType",
+         "kind" : "EntitySet",
+         "url" : "EmployeeIDType"
+      },
+      {
+         "name" : "JournalEntryDocumentTypes",
+         "kind" : "EntitySet",
+         "url" : "JournalEntryDocumentTypes"
+      },
+      {
+         "name" : "PaymentRunExport",
+         "kind" : "EntitySet",
+         "url" : "PaymentRunExport"
+      },
+      {
+         "name" : "PaymentBlocks",
+         "kind" : "EntitySet",
+         "url" : "PaymentBlocks"
+      },
+      {
+         "name" : "Returns",
+         "kind" : "EntitySet",
+         "url" : "Returns"
+      },
+      {
+         "name" : "UserQueries",
+         "kind" : "EntitySet",
+         "url" : "UserQueries"
+      },
+      {
+         "name" : "MaterialRevaluation",
+         "kind" : "EntitySet",
+         "url" : "MaterialRevaluation"
+      },
+      {
+         "name" : "CorrectionPurchaseInvoice",
+         "kind" : "EntitySet",
+         "url" : "CorrectionPurchaseInvoice"
+      },
+      {
+         "name" : "CorrectionPurchaseInvoiceReversal",
+         "kind" : "EntitySet",
+         "url" : "CorrectionPurchaseInvoiceReversal"
+      },
+      {
+         "name" : "CorrectionInvoice",
+         "kind" : "EntitySet",
+         "url" : "CorrectionInvoice"
+      },
+      {
+         "name" : "CorrectionInvoiceReversal",
+         "kind" : "EntitySet",
+         "url" : "CorrectionInvoiceReversal"
+      },
+      {
+         "name" : "ServiceCallStatus",
+         "kind" : "EntitySet",
+         "url" : "ServiceCallStatus"
+      },
+      {
+         "name" : "ServiceCallTypes",
+         "kind" : "EntitySet",
+         "url" : "ServiceCallTypes"
+      },
+      {
+         "name" : "ServiceCallProblemTypes",
+         "kind" : "EntitySet",
+         "url" : "ServiceCallProblemTypes"
+      },
+      {
+         "name" : "Orders",
+         "kind" : "EntitySet",
+         "url" : "Orders"
+      },
+      {
+         "name" : "ContractTemplates",
+         "kind" : "EntitySet",
+         "url" : "ContractTemplates"
+      },
+      {
+         "name" : "EmployeesInfo",
+         "kind" : "EntitySet",
+         "url" : "EmployeesInfo"
+      },
+      {
+         "name" : "EmployeeRolesSetup",
+         "kind" : "EntitySet",
+         "url" : "EmployeeRolesSetup"
+      },
+      {
+         "name" : "BrazilMultiIndexers",
+         "kind" : "EntitySet",
+         "url" : "BrazilMultiIndexers"
+      },
+      {
+         "name" : "EmployeeStatus",
+         "kind" : "EntitySet",
+         "url" : "EmployeeStatus"
+      },
+      {
+         "name" : "ElectronicDocuments",
+         "kind" : "EntitySet",
+         "url" : "ElectronicDocuments"
+      },
+      {
+         "name" : "ExportDeterminations",
+         "kind" : "EntitySet",
+         "url" : "ExportDeterminations"
+      },
+      {
+         "name" : "ImportDeterminations",
+         "kind" : "EntitySet",
+         "url" : "ImportDeterminations"
+      },
+      {
+         "name" : "TerminationReason",
+         "kind" : "EntitySet",
+         "url" : "TerminationReason"
+      },
+      {
+         "name" : "CustomerEquipmentCards",
+         "kind" : "EntitySet",
+         "url" : "CustomerEquipmentCards"
+      },
+      {
+         "name" : "WithholdingTaxCodes",
+         "kind" : "EntitySet",
+         "url" : "WithholdingTaxCodes"
+      },
+      {
+         "name" : "PurchaseInvoices",
+         "kind" : "EntitySet",
+         "url" : "PurchaseInvoices"
+      },
+      {
+         "name" : "ReportFilter",
+         "kind" : "EntitySet",
+         "url" : "ReportFilter"
+      },
+      {
+         "name" : "BillOfExchangeTransactions",
+         "kind" : "EntitySet",
+         "url" : "BillOfExchangeTransactions"
+      },
+      {
+         "name" : "Holidays",
+         "kind" : "EntitySet",
+         "url" : "Holidays"
+      },
+      {
+         "name" : "ServiceCallSolutionStatus",
+         "kind" : "EntitySet",
+         "url" : "ServiceCallSolutionStatus"
+      },
+      {
+         "name" : "KnowledgeBaseSolutions",
+         "kind" : "EntitySet",
+         "url" : "KnowledgeBaseSolutions"
+      },
+      {
+         "name" : "PurchaseCreditNotes",
+         "kind" : "EntitySet",
+         "url" : "PurchaseCreditNotes"
+      },
+      {
+         "name" : "ServiceContracts",
+         "kind" : "EntitySet",
+         "url" : "ServiceContracts"
+      },
+      {
+         "name" : "ServiceCalls",
+         "kind" : "EntitySet",
+         "url" : "ServiceCalls"
+      },
+      {
+         "name" : "ServiceCallOrigins",
+         "kind" : "EntitySet",
+         "url" : "ServiceCallOrigins"
+      },
+      {
+         "name" : "UserKeysMD",
+         "kind" : "EntitySet",
+         "url" : "UserKeysMD"
+      },
+      {
+         "name" : "Queue",
+         "kind" : "EntitySet",
+         "url" : "Queue"
+      },
+      {
+         "name" : "DunningTerms",
+         "kind" : "EntitySet",
+         "url" : "DunningTerms"
+      },
+      {
+         "name" : "SalesForecast",
+         "kind" : "EntitySet",
+         "url" : "SalesForecast"
+      },
+      {
+         "name" : "TrackingNotes",
+         "kind" : "EntitySet",
+         "url" : "TrackingNotes"
+      },
+      {
+         "name" : "BusinessPartners",
+         "kind" : "EntitySet",
+         "url" : "BusinessPartners"
+      },
+      {
+         "name" : "PurchaseDeliveryNotes",
+         "kind" : "EntitySet",
+         "url" : "PurchaseDeliveryNotes"
+      },
+      {
+         "name" : "Territories",
+         "kind" : "EntitySet",
+         "url" : "Territories"
+      },
+      {
+         "name" : "Industries",
+         "kind" : "EntitySet",
+         "url" : "Industries"
+      },
+      {
+         "name" : "ProductionOrders",
+         "kind" : "EntitySet",
+         "url" : "ProductionOrders"
+      },
+      {
+         "name" : "DownPayments",
+         "kind" : "EntitySet",
+         "url" : "DownPayments"
+      },
+      {
+         "name" : "PurchaseDownPayments",
+         "kind" : "EntitySet",
+         "url" : "PurchaseDownPayments"
+      },
+      {
+         "name" : "PackagesTypes",
+         "kind" : "EntitySet",
+         "url" : "PackagesTypes"
+      },
+      {
+         "name" : "UserObjectsMD",
+         "kind" : "EntitySet",
+         "url" : "UserObjectsMD"
+      },
+      {
+         "name" : "PurchaseReturns",
+         "kind" : "EntitySet",
+         "url" : "PurchaseReturns"
+      },
+      {
+         "name" : "EmployeePosition",
+         "kind" : "EntitySet",
+         "url" : "EmployeePosition"
+      },
+      {
+         "name" : "Teams",
+         "kind" : "EntitySet",
+         "url" : "Teams"
+      },
+      {
+         "name" : "Relationships",
+         "kind" : "EntitySet",
+         "url" : "Relationships"
+      },
+      {
+         "name" : "UserPermissionTree",
+         "kind" : "EntitySet",
+         "url" : "UserPermissionTree"
+      },
+      {
+         "name" : "PredefinedTexts",
+         "kind" : "EntitySet",
+         "url" : "PredefinedTexts"
+      },
+      {
+         "name" : "ActivityStatuses",
+         "kind" : "EntitySet",
+         "url" : "ActivityStatuses"
+      },
+      {
+         "name" : "ChooseFromList",
+         "kind" : "EntitySet",
+         "url" : "ChooseFromList"
+      },
+      {
+         "name" : "FormattedSearches",
+         "kind" : "EntitySet",
+         "url" : "FormattedSearches"
+      },
+      {
+         "name" : "PurchaseOrders",
+         "kind" : "EntitySet",
+         "url" : "PurchaseOrders"
+      },
+      {
+         "name" : "Attachments2",
+         "kind" : "EntitySet",
+         "url" : "Attachments2"
+      },
+      {
+         "name" : "UserLanguages",
+         "kind" : "EntitySet",
+         "url" : "UserLanguages"
+      },
+      {
+         "name" : "MultiLanguageTranslations",
+         "kind" : "EntitySet",
+         "url" : "MultiLanguageTranslations"
+      },
+      {
+         "name" : "DynamicSystemStrings",
+         "kind" : "EntitySet",
+         "url" : "DynamicSystemStrings"
+      },
+      {
+         "name" : "Quotations",
+         "kind" : "EntitySet",
+         "url" : "Quotations"
+      },
+      {
+         "name" : "HouseBankAccounts",
+         "kind" : "EntitySet",
+         "url" : "HouseBankAccounts"
+      },
+      {
+         "name" : "UserGroups",
+         "kind" : "EntitySet",
+         "url" : "UserGroups"
+      },
+      {
+         "name" : "POSDailySummary",
+         "kind" : "EntitySet",
+         "url" : "POSDailySummary"
+      },
+      {
+         "name" : "EmailGroups",
+         "kind" : "EntitySet",
+         "url" : "EmailGroups"
+      },
+      {
+         "name" : "ServiceCallProblemSubTypes",
+         "kind" : "EntitySet",
+         "url" : "ServiceCallProblemSubTypes"
+      },
+      {
+         "name" : "WitholdingTaxDefinition",
+         "kind" : "EntitySet",
+         "url" : "WitholdingTaxDefinition"
+      },
+      {
+         "name" : "ProjectManagements",
+         "kind" : "EntitySet",
+         "url" : "ProjectManagements"
+      },
+      {
+         "name" : "ProjectManagementTimeSheet",
+         "kind" : "EntitySet",
+         "url" : "ProjectManagementTimeSheet"
+      },
+      {
+         "name" : "ReturnRequest",
+         "kind" : "EntitySet",
+         "url" : "ReturnRequest"
+      },
+      {
+         "name" : "GoodsReturnRequest",
+         "kind" : "EntitySet",
+         "url" : "GoodsReturnRequest"
+      },
+      {
+         "name" : "ActivityRecipientLists",
+         "kind" : "EntitySet",
+         "url" : "ActivityRecipientLists"
+      },
+      {
+         "name" : "WebClientLaunchpads",
+         "kind" : "EntitySet",
+         "url" : "WebClientLaunchpads"
+      },
+      {
+         "name" : "WebClientBookmarkTiles",
+         "kind" : "EntitySet",
+         "url" : "WebClientBookmarkTiles"
+      },
+      {
+         "name" : "WebClientListviewFilters",
+         "kind" : "EntitySet",
+         "url" : "WebClientListviewFilters"
+      },
+      {
+         "name" : "IdentificationCodes",
+         "kind" : "EntitySet",
+         "url" : "IdentificationCodes"
+      },
+      {
+         "name" : "WebClientFormSettings",
+         "kind" : "EntitySet",
+         "url" : "WebClientFormSettings"
+      },
+      {
+         "name" : "WebClientNotifications",
+         "kind" : "EntitySet",
+         "url" : "WebClientNotifications"
+      },
+      {
+         "name" : "WebClientDashboards",
+         "kind" : "EntitySet",
+         "url" : "WebClientDashboards"
+      },
+      {
+         "name" : "WebClientRecentActivities",
+         "kind" : "EntitySet",
+         "url" : "WebClientRecentActivities"
+      },
+      {
+         "name" : "WebClientPreferences",
+         "kind" : "EntitySet",
+         "url" : "WebClientPreferences"
+      },
+      {
+         "name" : "WebClientVariants",
+         "kind" : "EntitySet",
+         "url" : "WebClientVariants"
+      },
+      {
+         "name" : "WebClientVariantGroups",
+         "kind" : "EntitySet",
+         "url" : "WebClientVariantGroups"
+      },
+      {
+         "name" : "CESTCodes",
+         "kind" : "EntitySet",
+         "url" : "CESTCodes"
+      },
+      {
+         "name" : "TaxReplStateSubs",
+         "kind" : "EntitySet",
+         "url" : "TaxReplStateSubs"
+      },
+      {
+         "name" : "BPVatExemptions",
+         "kind" : "EntitySet",
+         "url" : "BPVatExemptions"
+      },
+      {
+         "name" : "SQLQueries",
+         "kind" : "EntitySet",
+         "url" : "SQLQueries"
+      },
+      {
+         "name" : "WTaxTypeCodes",
+         "kind" : "EntitySet",
+         "url" : "WTaxTypeCodes"
+      },
+      {
+         "name" : "EBooks",
+         "kind" : "EntitySet",
+         "url" : "EBooks"
+      },
+      {
+         "name" : "PaymentReasonCodes",
+         "kind" : "EntitySet",
+         "url" : "PaymentReasonCodes"
+      },
+      {
+         "name" : "ExceptionalEvents",
+         "kind" : "EntitySet",
+         "url" : "ExceptionalEvents"
+      },
+      {
+         "name" : "EmploymentCategorys",
+         "kind" : "EntitySet",
+         "url" : "EmploymentCategorys"
+      },
+      {
+         "name" : "AccountCategory",
+         "kind" : "EntitySet",
+         "url" : "AccountCategory"
+      },
+      {
+         "name" : "BankChargesAllocationCodes",
+         "kind" : "EntitySet",
+         "url" : "BankChargesAllocationCodes"
+      },
+      {
+         "name" : "IncomingPayments",
+         "kind" : "EntitySet",
+         "url" : "IncomingPayments"
+      },
+      {
+         "name" : "CashFlowLineItems",
+         "kind" : "EntitySet",
+         "url" : "CashFlowLineItems"
+      },
+      {
+         "name" : "CampaignResponseType",
+         "kind" : "EntitySet",
+         "url" : "CampaignResponseType"
+      },
+      {
+         "name" : "ExpenseTypes",
+         "kind" : "EntitySet",
+         "url" : "ExpenseTypes"
+      },
+      {
+         "name" : "GovPayCodes",
+         "kind" : "EntitySet",
+         "url" : "GovPayCodes"
+      },
+      {
+         "name" : "TaxInvoiceReport",
+         "kind" : "EntitySet",
+         "url" : "TaxInvoiceReport"
+      },
+      {
+         "name" : "BusinessPlaces",
+         "kind" : "EntitySet",
+         "url" : "BusinessPlaces"
+      },
+      {
+         "name" : "Deposits",
+         "kind" : "EntitySet",
+         "url" : "Deposits"
+      },
+      {
+         "name" : "LocalEra",
+         "kind" : "EntitySet",
+         "url" : "LocalEra"
+      },
+      {
+         "name" : "Dimensions",
+         "kind" : "EntitySet",
+         "url" : "Dimensions"
+      },
+      {
+         "name" : "ValueMapping",
+         "kind" : "EntitySet",
+         "url" : "ValueMapping"
+      },
+      {
+         "name" : "ValueMappingCommunication",
+         "kind" : "EntitySet",
+         "url" : "ValueMappingCommunication"
+      },
+      {
+         "name" : "IndiaSacCode",
+         "kind" : "EntitySet",
+         "url" : "IndiaSacCode"
+      },
+      {
+         "name" : "TransportationDocument",
+         "kind" : "EntitySet",
+         "url" : "TransportationDocument"
+      },
+      {
+         "name" : "ServiceGroups",
+         "kind" : "EntitySet",
+         "url" : "ServiceGroups"
+      },
+      {
+         "name" : "MaterialGroups",
+         "kind" : "EntitySet",
+         "url" : "MaterialGroups"
+      },
+      {
+         "name" : "CostElements",
+         "kind" : "EntitySet",
+         "url" : "CostElements"
+      },
+      {
+         "name" : "EWBTransporters",
+         "kind" : "EntitySet",
+         "url" : "EWBTransporters"
+      },
+      {
+         "name" : "DefaultElementsforCR",
+         "kind" : "EntitySet",
+         "url" : "DefaultElementsforCR"
+      },
+      {
+         "name" : "SingleUserConnections",
+         "kind" : "EntitySet",
+         "url" : "SingleUserConnections"
+      },
+      {
+         "name" : "SQLViews",
+         "kind" : "EntitySet",
+         "url" : "SQLViews"
+      },
+      {
+         "name" : "NCMCodesSetup",
+         "kind" : "EntitySet",
+         "url" : "NCMCodesSetup"
+      },
+      {
+         "name" : "NotaFiscalCFOP",
+         "kind" : "EntitySet",
+         "url" : "NotaFiscalCFOP"
+      },
+      {
+         "name" : "NotaFiscalCST",
+         "kind" : "EntitySet",
+         "url" : "NotaFiscalCST"
+      },
+      {
+         "name" : "NotaFiscalUsage",
+         "kind" : "EntitySet",
+         "url" : "NotaFiscalUsage"
+      },
+      {
+         "name" : "ClosingDateProcedure",
+         "kind" : "EntitySet",
+         "url" : "ClosingDateProcedure"
+      },
+      {
+         "name" : "NFTaxCategories",
+         "kind" : "EntitySet",
+         "url" : "NFTaxCategories"
+      },
+      {
+         "name" : "TaxCodeDeterminationsTCD",
+         "kind" : "EntitySet",
+         "url" : "TaxCodeDeterminationsTCD"
+      },
+      {
+         "name" : "BOEDocumentTypes",
+         "kind" : "EntitySet",
+         "url" : "BOEDocumentTypes"
+      },
+      {
+         "name" : "BOEPortfolios",
+         "kind" : "EntitySet",
+         "url" : "BOEPortfolios"
+      },
+      {
+         "name" : "BOEInstructions",
+         "kind" : "EntitySet",
+         "url" : "BOEInstructions"
+      },
+      {
+         "name" : "BPFiscalRegistryID",
+         "kind" : "EntitySet",
+         "url" : "BPFiscalRegistryID"
+      },
+      {
+         "name" : "SalesTaxInvoices",
+         "kind" : "EntitySet",
+         "url" : "SalesTaxInvoices"
+      },
+      {
+         "name" : "PurchaseTaxInvoices",
+         "kind" : "EntitySet",
+         "url" : "PurchaseTaxInvoices"
+      },
+      {
+         "name" : "CustomsDeclaration",
+         "kind" : "EntitySet",
+         "url" : "CustomsDeclaration"
+      },
+      {
+         "name" : "Resources",
+         "kind" : "EntitySet",
+         "url" : "Resources"
+      },
+      {
+         "name" : "ResourceProperties",
+         "kind" : "EntitySet",
+         "url" : "ResourceProperties"
+      },
+      {
+         "name" : "ResourceGroups",
+         "kind" : "EntitySet",
+         "url" : "ResourceGroups"
+      },
+      {
+         "name" : "RouteStages",
+         "kind" : "EntitySet",
+         "url" : "RouteStages"
+      },
+      {
+         "name" : "Banks",
+         "kind" : "EntitySet",
+         "url" : "Banks"
+      },
+      {
+         "name" : "JournalEntries",
+         "kind" : "EntitySet",
+         "url" : "JournalEntries"
+      },
+      {
+         "name" : "StockTakings",
+         "kind" : "EntitySet",
+         "url" : "StockTakings"
+      },
+      {
+         "name" : "InventoryOpeningBalances",
+         "kind" : "EntitySet",
+         "url" : "InventoryOpeningBalances"
+      },
+      {
+         "name" : "Contacts",
+         "kind" : "EntitySet",
+         "url" : "Contacts"
+      },
+      {
+         "name" : "RecurringPostings",
+         "kind" : "EntitySet",
+         "url" : "RecurringPostings"
+      },
+      {
+         "name" : "CreditCards",
+         "kind" : "EntitySet",
+         "url" : "CreditCards"
+      },
+      {
+         "name" : "Currencies",
+         "kind" : "EntitySet",
+         "url" : "Currencies"
+      },
+      {
+         "name" : "Items",
+         "kind" : "EntitySet",
+         "url" : "Items"
+      },
+      {
+         "name" : "PaymentTermsTypes",
+         "kind" : "EntitySet",
+         "url" : "PaymentTermsTypes"
+      },
+      {
+         "name" : "FormPreferences",
+         "kind" : "EntitySet",
+         "url" : "FormPreferences"
+      },
+      {
+         "name" : "ElectronicFileFormats",
+         "kind" : "EntitySet",
+         "url" : "ElectronicFileFormats"
+      },
+      {
+         "name" : "QueryAuthGroups",
+         "kind" : "EntitySet",
+         "url" : "QueryAuthGroups"
+      },
+      {
+         "name" : "BankPages",
+         "kind" : "EntitySet",
+         "url" : "BankPages"
+      },
+      {
+         "name" : "Manufacturers",
+         "kind" : "EntitySet",
+         "url" : "Manufacturers"
+      },
+      {
+         "name" : "BusinessPartnerProperties",
+         "kind" : "EntitySet",
+         "url" : "BusinessPartnerProperties"
+      },
+      {
+         "name" : "TransactionCodes",
+         "kind" : "EntitySet",
+         "url" : "TransactionCodes"
+      },
+      {
+         "name" : "VendorPayments",
+         "kind" : "EntitySet",
+         "url" : "VendorPayments"
+      },
+      {
+         "name" : "LandedCostsCodes",
+         "kind" : "EntitySet",
+         "url" : "LandedCostsCodes"
+      },
+      {
+         "name" : "EmployeeTransfers",
+         "kind" : "EntitySet",
+         "url" : "EmployeeTransfers"
+      },
+      {
+         "name" : "MobileAddOnSetting",
+         "kind" : "EntitySet",
+         "url" : "MobileAddOnSetting"
+      },
+      {
+         "name" : "ShippingTypes",
+         "kind" : "EntitySet",
+         "url" : "ShippingTypes"
+      },
+      {
+         "name" : "VatGroups",
+         "kind" : "EntitySet",
+         "url" : "VatGroups"
+      },
+      {
+         "name" : "LengthMeasures",
+         "kind" : "EntitySet",
+         "url" : "LengthMeasures"
+      },
+      {
+         "name" : "WeightMeasures",
+         "kind" : "EntitySet",
+         "url" : "WeightMeasures"
+      },
+      {
+         "name" : "ItemGroups",
+         "kind" : "EntitySet",
+         "url" : "ItemGroups"
+      },
+      {
+         "name" : "SalesPersons",
+         "kind" : "EntitySet",
+         "url" : "SalesPersons"
+      },
+      {
+         "name" : "DeductionTaxSubGroups",
+         "kind" : "EntitySet",
+         "url" : "DeductionTaxSubGroups"
+      },
+      {
+         "name" : "TaxCodeDeterminations",
+         "kind" : "EntitySet",
+         "url" : "TaxCodeDeterminations"
+      },
+      {
+         "name" : "PurchaseQuotations",
+         "kind" : "EntitySet",
+         "url" : "PurchaseQuotations"
+      },
+      {
+         "name" : "CostCenterTypes",
+         "kind" : "EntitySet",
+         "url" : "CostCenterTypes"
+      },
+      {
+         "name" : "AccrualTypes",
+         "kind" : "EntitySet",
+         "url" : "AccrualTypes"
+      },
+      {
+         "name" : "NFModels",
+         "kind" : "EntitySet",
+         "url" : "NFModels"
+      },
+      {
+         "name" : "BrazilStringIndexers",
+         "kind" : "EntitySet",
+         "url" : "BrazilStringIndexers"
+      },
+      {
+         "name" : "BrazilNumericIndexers",
+         "kind" : "EntitySet",
+         "url" : "BrazilNumericIndexers"
+      },
+      {
+         "name" : "BrazilFuelIndexers",
+         "kind" : "EntitySet",
+         "url" : "BrazilFuelIndexers"
+      },
+      {
+         "name" : "BrazilBeverageIndexers",
+         "kind" : "EntitySet",
+         "url" : "BrazilBeverageIndexers"
+      },
+      {
+         "name" : "LegalData",
+         "kind" : "EntitySet",
+         "url" : "LegalData"
+      },
+      {
+         "name" : "FiscalPrinter",
+         "kind" : "EntitySet",
+         "url" : "FiscalPrinter"
+      },
+      {
+         "name" : "PostingTemplates",
+         "kind" : "EntitySet",
+         "url" : "PostingTemplates"
+      },
+      {
+         "name" : "CustomsGroups",
+         "kind" : "EntitySet",
+         "url" : "CustomsGroups"
+      },
+      {
+         "name" : "ChecksforPayment",
+         "kind" : "EntitySet",
+         "url" : "ChecksforPayment"
+      },
+      {
+         "name" : "InventoryGenEntries",
+         "kind" : "EntitySet",
+         "url" : "InventoryGenEntries"
+      },
+      {
+         "name" : "PriceLists",
+         "kind" : "EntitySet",
+         "url" : "PriceLists"
+      },
+      {
+         "name" : "InventoryGenExits",
+         "kind" : "EntitySet",
+         "url" : "InventoryGenExits"
+      },
+      {
+         "name" : "ProfitCenters",
+         "kind" : "EntitySet",
+         "url" : "ProfitCenters"
+      },
+      {
+         "name" : "DistributionRules",
+         "kind" : "EntitySet",
+         "url" : "DistributionRules"
+      },
+      {
+         "name" : "Projects",
+         "kind" : "EntitySet",
+         "url" : "Projects"
+      },
+      {
+         "name" : "Warehouses",
+         "kind" : "EntitySet",
+         "url" : "Warehouses"
+      },
+      {
+         "name" : "CommissionGroups",
+         "kind" : "EntitySet",
+         "url" : "CommissionGroups"
+      },
+      {
+         "name" : "ProductTrees",
+         "kind" : "EntitySet",
+         "url" : "ProductTrees"
+      },
+      {
+         "name" : "StockTransfers",
+         "kind" : "EntitySet",
+         "url" : "StockTransfers"
+      },
+      {
+         "name" : "LandedCosts",
+         "kind" : "EntitySet",
+         "url" : "LandedCosts"
+      },
+      {
+         "name" : "SpecialPrices",
+         "kind" : "EntitySet",
+         "url" : "SpecialPrices"
+      },
+      {
+         "name" : "CreditPaymentMethods",
+         "kind" : "EntitySet",
+         "url" : "CreditPaymentMethods"
+      },
+      {
+         "name" : "CreditCardPayments",
+         "kind" : "EntitySet",
+         "url" : "CreditCardPayments"
+      },
+      {
+         "name" : "AlternateCatNum",
+         "kind" : "EntitySet",
+         "url" : "AlternateCatNum"
+      },
+      {
+         "name" : "Budgets",
+         "kind" : "EntitySet",
+         "url" : "Budgets"
+      },
+      {
+         "name" : "BudgetDistributions",
+         "kind" : "EntitySet",
+         "url" : "BudgetDistributions"
+      },
+      {
+         "name" : "ItemProperties",
+         "kind" : "EntitySet",
+         "url" : "ItemProperties"
+      },
+      {
+         "name" : "AlertManagements",
+         "kind" : "EntitySet",
+         "url" : "AlertManagements"
+      },
+      {
+         "name" : "Messages",
+         "kind" : "EntitySet",
+         "url" : "Messages"
+      },
+      {
+         "name" : "ActivitySubjects",
+         "kind" : "EntitySet",
+         "url" : "ActivitySubjects"
+      },
+      {
+         "name" : "BudgetScenarios",
+         "kind" : "EntitySet",
+         "url" : "BudgetScenarios"
+      },
+      {
+         "name" : "UserDefaultGroups",
+         "kind" : "EntitySet",
+         "url" : "UserDefaultGroups"
+      },
+      {
+         "name" : "SalesOpportunities",
+         "kind" : "EntitySet",
+         "url" : "SalesOpportunities"
+      },
+      {
+         "name" : "SalesOpportunityInterestsSetup",
+         "kind" : "EntitySet",
+         "url" : "SalesOpportunityInterestsSetup"
+      },
+      {
+         "name" : "ACTMAP",
+         "kind" : "EntitySet",
+         "url" : "ACTMAP"
+      },
+      {
+         "name" : "AMIT_TEST",
+         "kind" : "EntitySet",
+         "url" : "AMIT_TEST"
+      },
+      {
+         "name" : "C1",
+         "kind" : "EntitySet",
+         "url" : "C1"
+      },
+      {
+         "name" : "CHLH",
+         "kind" : "EntitySet",
+         "url" : "CHLH"
+      },
+      {
+         "name" : "CINN_BATH_UDO",
+         "kind" : "EntitySet",
+         "url" : "CINN_BATH_UDO"
+      },
+      {
+         "name" : "CIN_QRSTDRD_UDO",
+         "kind" : "EntitySet",
+         "url" : "CIN_QRSTDRD_UDO"
+      },
+      {
+         "name" : "CW_UDO_OAPR",
+         "kind" : "EntitySet",
+         "url" : "CW_UDO_OAPR"
+      },
+      {
+         "name" : "C_ALD",
+         "kind" : "EntitySet",
+         "url" : "C_ALD"
+      },
+      {
+         "name" : "C_DB",
+         "kind" : "EntitySet",
+         "url" : "C_DB"
+      },
+      {
+         "name" : "DCM",
+         "kind" : "EntitySet",
+         "url" : "DCM"
+      },
+      {
+         "name" : "Expiry",
+         "kind" : "EntitySet",
+         "url" : "Expiry"
+      },
+      {
+         "name" : "GAUGE",
+         "kind" : "EntitySet",
+         "url" : "GAUGE"
+      },
+      {
+         "name" : "GRN",
+         "kind" : "EntitySet",
+         "url" : "GRN"
+      },
+      {
+         "name" : "IINPRCH",
+         "kind" : "EntitySet",
+         "url" : "IINPRCH"
+      },
+      {
+         "name" : "ITMAPH",
+         "kind" : "EntitySet",
+         "url" : "ITMAPH"
+      },
+      {
+         "name" : "ITOSS_UDO",
+         "kind" : "EntitySet",
+         "url" : "ITOSS_UDO"
+      },
+      {
+         "name" : "IT_BATCHUDO",
+         "kind" : "EntitySet",
+         "url" : "IT_BATCHUDO"
+      },
+      {
+         "name" : "IT_KTEST",
+         "kind" : "EntitySet",
+         "url" : "IT_KTEST"
+      },
+      {
+         "name" : "Issue",
+         "kind" : "EntitySet",
+         "url" : "Issue"
+      },
+      {
+         "name" : "JBWRKH",
+         "kind" : "EntitySet",
+         "url" : "JBWRKH"
+      },
+      {
+         "name" : "JWBOMH",
+         "kind" : "EntitySet",
+         "url" : "JWBOMH"
+      },
+      {
+         "name" : "New1",
+         "kind" : "EntitySet",
+         "url" : "New1"
+      },
+      {
+         "name" : "OPH",
+         "kind" : "EntitySet",
+         "url" : "OPH"
+      },
+      {
+         "name" : "OPMSTR",
+         "kind" : "EntitySet",
+         "url" : "OPMSTR"
+      },
+      {
+         "name" : "QCHSCH",
+         "kind" : "EntitySet",
+         "url" : "QCHSCH"
+      },
+      {
+         "name" : "QCMSRH",
+         "kind" : "EntitySet",
+         "url" : "QCMSRH"
+      },
+      {
+         "name" : "QFSPCH",
+         "kind" : "EntitySet",
+         "url" : "QFSPCH"
+      },
+      {
+         "name" : "QINCLH",
+         "kind" : "EntitySet",
+         "url" : "QINCLH"
+      },
+      {
+         "name" : "QPMTRH",
+         "kind" : "EntitySet",
+         "url" : "QPMTRH"
+      },
+      {
+         "name" : "RCTH",
+         "kind" : "EntitySet",
+         "url" : "RCTH"
+      },
+      {
+         "name" : "RINPRCH",
+         "kind" : "EntitySet",
+         "url" : "RINPRCH"
+      },
+      {
+         "name" : "Sale_Order_UDO",
+         "kind" : "EntitySet",
+         "url" : "Sale_Order_UDO"
+      },
+      {
+         "name" : "UDO_BATCH",
+         "kind" : "EntitySet",
+         "url" : "UDO_BATCH"
+      },
+      {
+         "name" : "UDO_CINN_ADMN",
+         "kind" : "EntitySet",
+         "url" : "UDO_CINN_ADMN"
+      },
+      {
+         "name" : "U_CBS_CONF",
+         "kind" : "EntitySet",
+         "url" : "U_CBS_CONF"
+      },
+      {
+         "name" : "U_SUBGROUPN",
+         "kind" : "EntitySet",
+         "url" : "U_SUBGROUPN"
+      },
+      {
+         "name" : "VIL_INWQC",
+         "kind" : "EntitySet",
+         "url" : "VIL_INWQC"
+      },
+      {
+         "name" : "WHSSEL",
+         "kind" : "EntitySet",
+         "url" : "WHSSEL"
+      },
+      {
+         "name" : "WMS",
+         "kind" : "EntitySet",
+         "url" : "WMS"
+      },
+      {
+         "name" : "gr",
+         "kind" : "EntitySet",
+         "url" : "gr"
+      },
+      {
+         "name" : "new",
+         "kind" : "EntitySet",
+         "url" : "new"
+      }
+   ]
+}

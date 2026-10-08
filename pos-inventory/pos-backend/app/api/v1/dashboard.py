@@ -736,7 +736,9 @@ async def get_recent_sales(
 @limiter.limit(settings.RATE_LIMIT_GENERAL)
 async def get_recent_sales_feed(
     request: Request,
-    range: str = Query("daily", pattern="^(daily|weekly|monthly|yearly|all_time)$"),
+    range: str = Query("daily", pattern="^(daily|weekly|monthly|yearly|all_time|custom)$"),
+    date_from: Optional[str] = Query(None, description="Custom start date YYYY-MM-DD"),
+    date_to: Optional[str] = Query(None, description="Custom end date YYYY-MM-DD"),
     search: Optional[str] = Query(None, description="Search sale ID, bill number, customer name or phone"),
     customer: Optional[str] = Query(None, description="Filter by customer Name or Code"),
     category: Optional[str] = Query(None, description="Filter by category"),
@@ -746,7 +748,7 @@ async def get_recent_sales_feed(
     current_user: dict = Depends(get_current_user),
 ):
     """Paginated recent sales feed for the operator dashboard."""
-    start_date, end_date = _get_date_range(range)
+    start_date, end_date = _get_date_range_with_custom(range, date_from, date_to)
     try:
         invoice_service = SAPInvoicesService()
         branch = _resolve_branch_for_user(current_user)

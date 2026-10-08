@@ -22,6 +22,12 @@ import { SalesList } from './pages/sales/SalesList';
 import SalesOrdersPage from './pages/SalesOrdersPage';
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
 import { SettingsUsersPage } from './pages/SettingsUsersPage';
+import { ProductionOverviewPage } from './pages/production/ProductionOverviewPage';
+import { ProductionOrdersPage } from './pages/production/ProductionOrdersPage';
+import { ProductionItemWisePage } from './pages/production/ProductionItemWisePage';
+import { ProductionRejectionPage } from './pages/production/ProductionRejectionPage';
+import { ProductionDateWisePage } from './pages/production/ProductionDateWisePage';
+import { ProductionReportsPage } from './pages/production/ProductionReportsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,6 +81,14 @@ function App() {
               <Route path="sales/:id" element={<InvoiceDetail />} />
               <Route path="returns" element={<ReturnsApprovalsPage />} />
               <Route path="analytics" element={<AtlasAnalyticsPage />} />
+              <Route path="production">
+                <Route index element={<ProductionOverviewPage />} />
+                <Route path="orders" element={<ProductionOrdersPage />} />
+                <Route path="item-wise" element={<ProductionItemWisePage />} />
+                <Route path="rejection" element={<ProductionRejectionPage />} />
+                <Route path="date-wise" element={<ProductionDateWisePage />} />
+                <Route path="reports" element={<ProductionReportsPage />} />
+              </Route>
               <Route path="reports">
                 <Route index element={<ReportsPage />} />
                 <Route path="sales" element={<SalesReportPage />} />

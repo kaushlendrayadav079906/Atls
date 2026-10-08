@@ -84,8 +84,16 @@ def _get_date_range(range_str: str):
         return today.replace(day=1), today
     elif range_str == "yearly":
         return today.replace(month=1, day=1), today
-    else:
-        return date(2000, 1, 1), today
+    elif "_" in range_str:
+        parts = range_str.split("_")
+        if len(parts) == 2:
+            try:
+                start = date.fromisoformat(parts[0])
+                end = date.fromisoformat(parts[1])
+                return start, end
+            except ValueError:
+                pass
+    return date(2000, 1, 1), today
 
 
 def _compute_customer_insights(
@@ -164,7 +172,7 @@ def _extract_invoice_branch(invoice: Dict[str, Any]) -> Optional[str]:
 @limiter.limit(settings.RATE_LIMIT_GENERAL)
 async def get_customer_insights(
     request: Request,
-    range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time)$"),
+    range: str = Query("monthly"),
     branch: Optional[str] = Query(None),
     force_refresh: bool = Query(False, description="Bypass and evict the server-side cache"),
     current_user: dict = {"sub": "test", "role": "admin"},
