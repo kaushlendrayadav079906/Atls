@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { getLocalISODate } from '../../utils/date';
 import { useQuery } from '@tanstack/react-query';
 import {
   Factory,
@@ -16,13 +17,13 @@ import {
 import { getDateWiseProduction } from '../../api/production';
 import { useAuth } from '../../contexts/AuthContext';
 
+type DateRange = 'today' | 'week' | 'month' | 'year' | 'total';
+
 export const ProductionDateWisePage = () => {
   const { user } = useAuth();
 
   // States
-  const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'year' | 'custom'>('month');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+  const [dateRange, setDateRange] = useState<DateRange>('total');
 
   const [warehouseFilter, setWarehouseFilter] = useState('');
   const [granularity, setGranularity] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('daily');
@@ -36,28 +37,33 @@ export const ProductionDateWisePage = () => {
   const branchId = user?.branch_id || '';
 
   const { date_from, date_to } = useMemo(() => {
+    if (dateRange === 'total') return { date_from: undefined, date_to: undefined };
     const today = new Date();
     let from = '';
-    const to = today.toISOString().split('T')[0];
-
+    let to = '';
     if (dateRange === 'today') {
-      from = to;
+      from = getLocalISODate(today);
+      to = from;
     } else if (dateRange === 'week') {
       const startOfWeek = new Date(today);
       startOfWeek.setDate(today.getDate() - today.getDay());
-      from = startOfWeek.toISOString().split('T')[0];
+      from = getLocalISODate(startOfWeek);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      to = getLocalISODate(endOfWeek);
     } else if (dateRange === 'month') {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      from = startOfMonth.toISOString().split('T')[0];
+      from = getLocalISODate(startOfMonth);
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      to = getLocalISODate(endOfMonth);
     } else if (dateRange === 'year') {
       const startOfYear = new Date(today.getFullYear(), 0, 1);
-      from = startOfYear.toISOString().split('T')[0];
-    } else if (dateRange === 'custom') {
-      return { date_from: customFrom, date_to: customTo };
+      from = getLocalISODate(startOfYear);
+      const endOfYear = new Date(today.getFullYear(), 11, 31);
+      to = getLocalISODate(endOfYear);
     }
-
     return { date_from: from, date_to: to };
-  }, [dateRange, customFrom, customTo]);
+  }, [dateRange]);
 
   // Handle filter changes (reset page)
   const handleDateChange = (range: any) => {
@@ -68,8 +74,8 @@ export const ProductionDateWisePage = () => {
   const handleResetFilters = () => {
     setWarehouseFilter('');
     setDateRange('month');
-    setCustomFrom('');
-    setCustomTo('');
+    undefined;
+    undefined;
     setGranularity('daily');
     setPage(1);
   };
@@ -85,7 +91,7 @@ export const ProductionDateWisePage = () => {
   const { data: dateData, isLoading, isError, refetch } = useQuery({
     queryKey: ['production', 'date-wise', queryFilters],
     queryFn: () => getDateWiseProduction(queryFilters),
-    enabled: !!date_from && !!date_to,
+    enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
 
   const handleRefresh = () => {
@@ -194,7 +200,7 @@ export const ProductionDateWisePage = () => {
           </div>
 
           <div className="flex bg-white rounded-lg border border-slate-200 overflow-hidden text-[13px] font-medium">
-            {(['today', 'week', 'month', 'year', 'custom'] as const).map((r) => (
+            {(['today', 'week', 'month', 'year', 'total'] as const).map((r) => (
               <button
                 key={r}
                 onClick={() => handleDateChange(r)}
@@ -206,23 +212,6 @@ export const ProductionDateWisePage = () => {
             ))}
           </div>
 
-          {dateRange === 'custom' && (
-            <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-2 py-1">
-              <input
-                type="date"
-                value={customFrom}
-                onChange={(e) => { setCustomFrom(e.target.value); setPage(1); }}
-                className="text-[13px] border-none outline-none text-slate-700 bg-transparent"
-              />
-              <span className="text-slate-400">-</span>
-              <input
-                type="date"
-                value={customTo}
-                onChange={(e) => { setCustomTo(e.target.value); setPage(1); }}
-                className="text-[13px] border-none outline-none text-slate-700 bg-transparent"
-              />
-            </div>
-          )}
 
           <button
             onClick={handleRefresh}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
     AlertCircle, ArrowRight, Bell, Check, ChevronDown, CircleHelp, Clock3,
@@ -6,11 +6,13 @@ import {
     TrendingUp, TriangleAlert, Users, MessageSquarePlus, Package, FileText
 } from 'lucide-react';
 import { atlasApi, dashboardApi } from '../api/endpoints';
+import { apiClient } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
+import { AIChatRenderer } from '../components/AIChatRenderer';
 
 
 const money = new Intl.NumberFormat('en-IN', {
@@ -25,6 +27,56 @@ export const Dashboard = () => {
 
   const [period, setPeriod] = useState<string>('daily');
   const [branchId, setBranchId] = useState<string>(user?.branch_id || '');
+
+  // AI Chat State
+  const [chatInput, setChatInput] = useState('');
+  const [chatHistory, setChatHistory] = useState<Array<{role: string, content: string, structured_data?: any}>>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [loadingChat, setLoadingChat] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [chatHistory]);
+
+  const handleSendChat = async () => {
+    if (!chatInput.trim() || loadingChat) return;
+    
+    const userMsg = chatInput.trim();
+    setChatInput('');
+    setChatHistory(prev => [...prev, { role: 'user', content: userMsg }]);
+    setLoadingChat(true);
+
+    try {
+      const res = await apiClient.post('/ai-assistant/chat', {
+        message: userMsg,
+        branch_id: branchId || 'WH-01',
+        conversation_id: conversationId,
+        history: chatHistory.map(m => ({role: m.role, content: m.content}))
+      });
+      
+      if (res.data.conversation_id) {
+        setConversationId(res.data.conversation_id);
+      }
+      
+      setChatHistory(prev => [...prev, { 
+        role: 'assistant', 
+        content: res.data.answer,
+        structured_data: res.data.structured_data
+      }]);
+    } catch (err: any) {
+      setChatHistory(prev => [...prev, { role: 'assistant', content: err?.response?.data?.detail || 'Failed to communicate with AI provider' }]);
+    } finally {
+      setLoadingChat(false);
+    }
+  };
+
+  const startNewChat = () => {
+    setChatHistory([]);
+    setConversationId(null);
+  };
 
   const { data: summary, isLoading: loadingSummary, isError: errorSummary, refetch: refetchSummary } = useQuery({
     queryKey: ['atlasOverview', branchId, period],
@@ -505,36 +557,78 @@ export const Dashboard = () => {
         </div>
 
         {/* RIGHT SIDEBAR (AI & Alerts) */}
+        {/* RIGHT SIDEBAR (AI & Alerts) */}
         <div className="flex w-full flex-col gap-5 xl:w-[280px]">
           
-          <div className="rounded-[16px] border border-slate-200 bg-white p-4">
-            <div className="mb-4 flex items-center justify-between">
+          <div className="flex flex-col rounded-[16px] border border-slate-200 bg-white p-4 h-[400px]">
+            <div className="mb-4 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-sky-400" />
                 <span className="text-[14px] font-semibold">AI Assistant</span>
               </div>
-              <button className="flex items-center gap-1 rounded border border-blue-600/50 bg-blue-600/20 px-2 py-1 text-[10px] font-medium text-blue-600">
+              <button onClick={startNewChat} className="flex items-center gap-1 rounded border border-blue-600/50 bg-blue-600/20 px-2 py-1 text-[10px] font-medium text-blue-600 transition hover:bg-blue-600/30">
                 <MessageSquarePlus className="h-3 w-3" /> New Chat
               </button>
             </div>
-            <div className="mb-4 flex items-start gap-2">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
-                <Sparkles className="h-3 w-3" />
-              </div>
-              <div className="rounded-xl rounded-tl-sm bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-700">
-                <span className="font-semibold text-slate-900">Hello! I'm your Atls AI Assistant.</span><br/>
-                <span className="text-slate-500">I can help you with:</span>
-                <ul className="mt-1 list-inside list-disc text-slate-500">
-                  <li>Check sales, inventory, customers</li>
-                  <li>Generate reports (PDF)</li>
-                  <li>Analyze business risks</li>
-                  <li>Find data from SAP system</li>
-                </ul>
-              </div>
+            
+            <div ref={chatScrollRef} className="flex-1 overflow-y-auto pr-2 flex flex-col gap-3 scrollbar-thin">
+              {chatHistory.length === 0 ? (
+                <div className="flex items-start gap-2">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                    <Sparkles className="h-3 w-3" />
+                  </div>
+                  <div className="rounded-xl rounded-tl-sm bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-700">
+                    <span className="font-semibold text-slate-900">Hello! I'm your Atls AI Assistant.</span><br/>
+                    <span className="text-slate-500">I can help you with:</span>
+                    <ul className="mt-1 list-inside list-disc text-slate-500">
+                      <li>Check sales, inventory, customers</li>
+                      <li>Find data from SAP system</li>
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                chatHistory.map((msg, i) => (
+                  <div key={i} className={`flex items-start gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white ${msg.role === 'user' ? 'bg-slate-800' : 'bg-blue-600'}`}>
+                      {msg.role === 'user' ? (user?.name?.charAt(0) || 'U') : <Sparkles className="h-3 w-3" />}
+                    </div>
+                    <div className={`rounded-xl p-3 text-[11px] leading-relaxed max-w-[85%] ${
+                      msg.role === 'user' 
+                        ? 'bg-slate-800 text-white rounded-tr-sm' 
+                        : 'bg-slate-50 text-slate-700 border border-slate-100 rounded-tl-sm'
+                    }`}>
+                      {msg.content}
+                      <AIChatRenderer structuredData={msg.structured_data} />
+                    </div>
+                  </div>
+                ))
+              )}
+              {loadingChat && (
+                 <div className="flex items-start gap-2">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                      <Sparkles className="h-3 w-3" />
+                    </div>
+                    <div className="rounded-xl rounded-tl-sm bg-slate-50 p-3 text-[11px] text-slate-500 italic">
+                       Thinking...
+                    </div>
+                 </div>
+              )}
             </div>
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
-              <input type="text" placeholder="Ask anything about your business..." className="flex-1 bg-transparent px-2 text-[11px] text-slate-900 outline-none placeholder:text-slate-500" />
-              <button className="flex h-6 w-6 items-center justify-center rounded bg-blue-600 text-white">
+
+            <div className="mt-4 shrink-0 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
+              <input 
+                type="text" 
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
+                placeholder="Ask anything about your business..." 
+                className="flex-1 bg-transparent px-2 text-[11px] text-slate-900 outline-none placeholder:text-slate-500" 
+              />
+              <button 
+                onClick={handleSendChat}
+                disabled={loadingChat || !chatInput.trim()}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-blue-600 text-white disabled:opacity-50"
+              >
                 <ArrowRight className="h-3 w-3" />
               </button>
             </div>

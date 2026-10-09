@@ -35,7 +35,7 @@ def test_get_production_summary():
     mock_service = MagicMock()
     mock_service.get_production_summary.return_value = {
         "total_production": 1000.0,
-        "open_orders": 5,
+        "planned_orders": 5,
         "released_orders": 3,
         "completed_orders": 2,
         "cancelled_orders": 0,
@@ -50,7 +50,7 @@ def test_get_production_summary():
     assert response.status_code == 200
     data = response.json()
     assert data["total_production"] == 1000.0
-    assert data["open_orders"] == 5
+    assert data["planned_orders"] == 5
 
 def test_get_production_orders():
     app.dependency_overrides[get_current_user] = lambda: {"role": "admin", "branch_id": "WH-001"}
@@ -74,3 +74,46 @@ def test_invalid_date_range():
     response = client.get("/api/v1/production/orders?date_from=2026-05-01&date_to=2026-04-01")
     assert response.status_code == 400
     assert "cannot be after" in response.json()["detail"]
+
+def test_historical_custom_date_range():
+    app.dependency_overrides[get_current_user] = lambda: {"role": "admin", "branch_id": "WH-001"}
+    
+    mock_service = MagicMock()
+    mock_service.get_production_orders.return_value = (
+        [{"production_order_no": 123, "item_code": "ITEM01", "posting_date": "2023-01-01T00:00:00Z", "start_date": "2023-01-01T00:00:00Z", "planned_qty": 100.0, "produced_qty": 50.0, "rejected_qty": 0.0, "pending_qty": 50.0, "production_percentage": 50.0, "rejection_percentage": 0.0}],
+        1
+    )
+    app.dependency_overrides[get_production_service] = lambda: mock_service
+    
+    response = client.get("/api/v1/production/orders?date_from=2020-01-01&date_to=2024-12-31&page=1&page_size=50")
+    assert response.status_code == 200
+    mock_service.get_production_orders.assert_called_once()
+    kwargs = mock_service.get_production_orders.call_args.kwargs
+    assert kwargs["date_from"] == "2020-01-01"
+    assert kwargs["date_to"] == "2024-12-31"
+    assert kwargs["skip"] == 0
+    assert kwargs["top"] == 50
+    assert kwargs["warehouse"] is None
+
+def test_empty_historical_range():
+    app.dependency_overrides[get_current_user] = lambda: {"role": "admin", "branch_id": "WH-001"}
+    
+    mock_service = MagicMock()
+    mock_service.get_production_orders.return_value = ([], 0)
+    app.dependency_overrides[get_production_service] = lambda: mock_service
+    
+    response = client.get("/api/v1/production/orders?date_from=2010-01-01&date_to=2010-12-31")
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+    assert len(response.json()["items"]) == 0
+
+def test_sap_error_handling():
+    app.dependency_overrides[get_current_user] = lambda: {"role": "admin"}
+    
+    mock_service = MagicMock()
+    mock_service.get_production_orders.side_effect = Exception("SAP Service Layer unreachable")
+    app.dependency_overrides[get_production_service] = lambda: mock_service
+    
+    response = client.get("/api/v1/production/orders?date_from=2020-01-01")
+    assert response.status_code == 500
+    assert "Failed to fetch" in response.json()["detail"]

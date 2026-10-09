@@ -78,12 +78,40 @@ class SAPProductionService:
             filters.append(f"Priority eq {priority}")
             
         if date_from:
-            filters.append(f"PostingDate ge '{date_from}'")
+            filters.append(f"StartDate ge '{date_from}'")
             
         if date_to:
-            filters.append(f"PostingDate le '{date_to}'")
+            filters.append(f"StartDate le '{date_to}'")
             
         return " and ".join(filters) if filters else ""
+
+
+    def _fetch_all(self, endpoint: str, max_records: int = 5000) -> list:
+        """Fetches all pages from SAP Service Layer up to max_records limit."""
+        results = []
+        next_link = endpoint
+        
+        while next_link and len(results) < max_records:
+            # Service layer nextLink might be relative or include /b1s/v1/
+            if next_link.startswith('/b1s/v1/'):
+                next_link = next_link[8:]
+            
+            response = self.client.get(next_link)
+            chunk = response.get("value", [])
+            if not chunk:
+                break
+                
+            results.extend(chunk)
+            
+            # Check for next page
+            next_link = response.get("odata.nextLink")
+            
+            # If we hit max_records, we stop
+            if len(results) >= max_records:
+                logger.warning(f"Hit max_records limit ({max_records}) fetching {endpoint}")
+                break
+                
+        return results
 
     def get_production_summary(
         self,
@@ -100,9 +128,7 @@ class SAPProductionService:
             query += f"&$filter={filter_str}"
             
         endpoint = f"/ProductionOrders?{query}"
-        response = self.client.get(endpoint)
-        
-        orders = response.get("value", [])
+        orders = self._fetch_all(endpoint)
         
         total_prod = 0.0
         planned = 0
@@ -274,8 +300,7 @@ class SAPProductionService:
         if filter_str:
             query += f"&$filter={filter_str}"
             
-        response = self.client.get(f"/ProductionOrders?{query}")
-        orders = response.get("value", [])
+        orders = self._fetch_all(f"/ProductionOrders?{query}")
         
         agg = defaultdict(lambda: {"planned": 0.0, "produced": 0.0, "rejected": 0.0, "name": "", "warehouse": None})
         
@@ -326,8 +351,7 @@ class SAPProductionService:
             
         query += f"&$filter={filter_str}"
         
-        response = self.client.get(f"/ProductionOrders?{query}")
-        orders = response.get("value", [])
+        orders = self._fetch_all(f"/ProductionOrders?{query}")
         
         agg = defaultdict(lambda: {"produced": 0.0, "rejected": 0.0, "name": "", "warehouse": None})
         total_rej = 0.0
@@ -377,17 +401,16 @@ class SAPProductionService:
         granularity: str = "daily"
     ) -> List[Dict[str, Any]]:
         filter_str = self._build_filter_str(date_from=date_from, date_to=date_to, warehouse=warehouse)
-        query = "$select=PostingDate,PlannedQuantity,CompletedQuantity,RejectedQuantity"
+        query = "$select=StartDate,PlannedQuantity,CompletedQuantity,RejectedQuantity"
         if filter_str:
             query += f"&$filter={filter_str}"
             
-        response = self.client.get(f"/ProductionOrders?{query}")
-        orders = response.get("value", [])
+        orders = self._fetch_all(f"/ProductionOrders?{query}")
         
         agg = defaultdict(lambda: {"planned": 0.0, "produced": 0.0, "rejected": 0.0})
         
         for po in orders:
-            d = po.get("PostingDate")
+            d = po.get("StartDate")
             if not d:
                 continue
                 
@@ -427,8 +450,7 @@ class SAPProductionService:
         if filter_str:
             query += f"&$filter={filter_str}"
             
-        response = self.client.get(f"/ProductionOrders?{query}")
-        orders = response.get("value", [])
+        orders = self._fetch_all(f"/ProductionOrders?{query}")
         
         counts = defaultdict(int)
         total = len(orders)
@@ -459,8 +481,7 @@ class SAPProductionService:
         if filter_str:
             query += f"&$filter={filter_str}"
             
-        response = self.client.get(f"/ProductionOrders?{query}")
-        orders = response.get("value", [])
+        orders = self._fetch_all(f"/ProductionOrders?{query}")
         
         agg = defaultdict(lambda: {"planned": 0.0, "produced": 0.0, "rejected": 0.0})
         

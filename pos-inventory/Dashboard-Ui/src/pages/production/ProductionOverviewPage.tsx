@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { getLocalISODate } from '../../utils/date';
 import { useQuery } from '@tanstack/react-query';
 import {
   Factory,
@@ -10,7 +11,7 @@ import {
   TrendingDown,
   BarChart2,
   Package,
-} from 'lucide-react';
+ } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   Legend
@@ -33,76 +34,89 @@ const PIE_COLORS = {
   'default': '#94a3b8' // slate
 };
 
+type DateRange = 'today' | 'week' | 'month' | 'year' | 'total';
+
 export const ProductionOverviewPage = () => {
   const { user } = useAuth();
-  const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'year' | 'custom'>('today');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+  const [dateRange, setDateRange] = useState<DateRange>('total');
 
   // Use user's branch for the branch filter
   const branchId = user?.branch_id || '';
 
   const { date_from, date_to } = useMemo(() => {
+    if (dateRange === 'total') return { date_from: undefined, date_to: undefined };
     const today = new Date();
     let from = '';
-    const to = today.toISOString().split('T')[0];
-
+    let to = '';
     if (dateRange === 'today') {
-      from = to;
+      from = getLocalISODate(today);
+      to = from;
     } else if (dateRange === 'week') {
       const startOfWeek = new Date(today);
       startOfWeek.setDate(today.getDate() - today.getDay());
-      from = startOfWeek.toISOString().split('T')[0];
+      from = getLocalISODate(startOfWeek);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      to = getLocalISODate(endOfWeek);
     } else if (dateRange === 'month') {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      from = startOfMonth.toISOString().split('T')[0];
+      from = getLocalISODate(startOfMonth);
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      to = getLocalISODate(endOfMonth);
     } else if (dateRange === 'year') {
       const startOfYear = new Date(today.getFullYear(), 0, 1);
-      from = startOfYear.toISOString().split('T')[0];
-    } else if (dateRange === 'custom') {
-      return { date_from: customFrom, date_to: customTo };
+      from = getLocalISODate(startOfYear);
+      const endOfYear = new Date(today.getFullYear(), 11, 31);
+      to = getLocalISODate(endOfYear);
     }
-
     return { date_from: from, date_to: to };
-  }, [dateRange, customFrom, customTo]);
+  }, [dateRange]);
 
   const queryFilters = { date_from, date_to, warehouse: branchId };
+
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersPageSize, setOrdersPageSize] = useState(5);
+  
+
+  useEffect(() => {
+    setOrdersPage(1);
+  }, [dateRange, branchId]);
 
   // Queries
   const { data: summary, isLoading: loadingSummary, isError: errorSummary, refetch: refetchSummary } = useQuery({
     queryKey: ['production', 'summary', branchId, date_from, date_to],
     queryFn: () => getProductionSummary(queryFilters),
-    enabled: !!date_from && !!date_to,
+    enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
 
   const { data: statusDist, isLoading: loadingStatus, refetch: refetchStatus } = useQuery({
     queryKey: ['production', 'status-distribution', branchId, date_from, date_to],
     queryFn: () => getStatusDistribution(queryFilters),
-    enabled: !!date_from && !!date_to,
+    enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
 
   const { data: trendData, isLoading: loadingTrend, refetch: refetchTrend } = useQuery({
     queryKey: ['production', 'date-wise', branchId, date_from, date_to],
     queryFn: () => getDateWiseProduction({ ...queryFilters, granularity: 'daily' }),
-    enabled: !!date_from && !!date_to,
+    enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
 
   const { data: recentOrders, isLoading: loadingOrders, refetch: refetchOrders } = useQuery({
-    queryKey: ['production', 'orders', branchId, date_from, date_to],
-    queryFn: () => getProductionOrders({ ...queryFilters, page: 1, page_size: 5 }),
-    enabled: !!date_from && !!date_to,
+    queryKey: ['production', 'orders', branchId, date_from, date_to, ordersPage, ordersPageSize],
+    queryFn: () => getProductionOrders({ ...queryFilters, page: ordersPage, page_size: ordersPageSize }),
+    enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
 
   const { data: warehouseData, isLoading: loadingWarehouse, refetch: refetchWarehouse } = useQuery({
     queryKey: ['production', 'warehouses', branchId, date_from, date_to],
     queryFn: () => getWarehouseSummary(queryFilters),
-    enabled: !!date_from && !!date_to,
+    enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
 
   const { data: topItems, isLoading: loadingItems, refetch: refetchItems } = useQuery({
     queryKey: ['production', 'item-wise', branchId, date_from, date_to],
     queryFn: () => getItemWiseProduction(queryFilters),
-    enabled: !!date_from && !!date_to,
+    enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
 
   const handleRefresh = () => {
@@ -140,7 +154,7 @@ export const ProductionOverviewPage = () => {
 
           {/* Date Selector */}
           <div className="flex bg-white rounded-lg border border-slate-200 overflow-hidden text-[13px] font-medium">
-            {(['today', 'week', 'month', 'year', 'custom'] as const).map((r) => (
+            {(['today', 'week', 'month', 'year', 'total'] as const).map((r) => (
               <button
                 key={r}
                 onClick={() => setDateRange(r)}
@@ -152,23 +166,6 @@ export const ProductionOverviewPage = () => {
             ))}
           </div>
 
-          {dateRange === 'custom' && (
-            <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-2 py-1">
-              <input
-                type="date"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="text-[13px] border-none outline-none text-slate-700 bg-transparent"
-              />
-              <span className="text-slate-400">-</span>
-              <input
-                type="date"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="text-[13px] border-none outline-none text-slate-700 bg-transparent"
-              />
-            </div>
-          )}
 
           <button
             onClick={handleRefresh}
@@ -395,8 +392,8 @@ export const ProductionOverviewPage = () => {
                         </tr>
                       ))
                     ) : recentOrders?.items?.length ? (
-                      recentOrders.items.map(order => (
-                        <tr key={order.production_order_no} className="hover:bg-slate-50/50">
+                      recentOrders.items.slice(recentOrders.items.length > ordersPageSize ? (ordersPage - 1) * ordersPageSize : 0, recentOrders.items.length > ordersPageSize ? ordersPage * ordersPageSize : ordersPageSize).map((order, index) => (
+                        <tr key={`${order.production_order_no}-${index}`} className="hover:bg-slate-50/50">
                           <td className="px-5 py-3 font-medium text-blue-600">#{order.production_order_no}</td>
                           <td className="px-5 py-3">
                             <div className="font-medium text-slate-800">{order.item_code}</div>
@@ -422,6 +419,43 @@ export const ProductionOverviewPage = () => {
                     )}
                   </tbody>
                 </table>
+              </div>
+              <div className="p-4 border-t border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-500">Show</span>
+                  <select 
+                    value={ordersPageSize}
+                    onChange={(e) => {
+                      setOrdersPageSize(Number(e.target.value));
+                      setOrdersPage(1);
+                    }}
+                    className="border border-slate-200 rounded px-2 py-1 text-sm bg-white text-slate-700 outline-none focus:border-blue-500"
+                  >
+                    {[5, 10, 20, 50].map(size => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
+                  <span className="text-sm text-slate-500">entries</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setOrdersPage(p => Math.max(1, p - 1))}
+                    disabled={ordersPage === 1}
+                    className="px-3 py-1.5 rounded bg-white border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <div className="px-4 py-1.5 text-sm font-medium text-slate-700">
+                    Page {ordersPage} of {recentOrders?.total_pages || 1}
+                  </div>
+                  <button
+                    onClick={() => setOrdersPage(p => Math.min(recentOrders?.total_pages || 1, p + 1))}
+                    disabled={ordersPage >= (recentOrders?.total_pages || 1)}
+                    className="px-3 py-1.5 rounded bg-white border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             </div>
 

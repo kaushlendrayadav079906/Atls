@@ -93,6 +93,10 @@ class Settings(BaseSettings):
     # (e.g., product image proxy URLs). If empty, code falls back to
     # http://localhost:<PORT>.
     PUBLIC_BASE_URL: str = ""
+
+    # AI Provider (OpenAI)
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o"
     
     class Config:
         env_file = ".env"
