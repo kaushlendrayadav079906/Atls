@@ -1,6 +1,6 @@
 export interface ProductionSummaryResponse {
   total_production: number;
-  open_orders: number;
+  planned_orders: number;
   released_orders: number;
   completed_orders: number;
   cancelled_orders: number;

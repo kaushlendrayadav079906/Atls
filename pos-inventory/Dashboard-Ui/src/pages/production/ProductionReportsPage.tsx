@@ -9,6 +9,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { apiClient } from '../../api/client';
 
 interface ReportDefinition {
   id: string;
@@ -26,7 +27,7 @@ const REPORTS: ReportDefinition[] = [
     description: 'High-level overview of production KPIs including planned vs produced quantities and efficiency metrics.',
     dataSource: 'SAP Production Orders',
     route: '/production',
-    supportsExport: false,
+    supportsExport: true,
   },
   {
     id: 'orders',
@@ -34,7 +35,7 @@ const REPORTS: ReportDefinition[] = [
     description: 'Detailed list of production orders with their current statuses, planned, produced, and pending quantities.',
     dataSource: 'SAP Production Orders',
     route: '/production/orders',
-    supportsExport: false,
+    supportsExport: true,
   },
   {
     id: 'item-wise',
@@ -42,7 +43,7 @@ const REPORTS: ReportDefinition[] = [
     description: 'Aggregated production metrics grouped by item code, showing performance and rejection rates per product.',
     dataSource: 'SAP Production Orders',
     route: '/production/item-wise',
-    supportsExport: false,
+    supportsExport: true,
   },
   {
     id: 'rejection',
@@ -50,7 +51,7 @@ const REPORTS: ReportDefinition[] = [
     description: 'Analysis of rejected quantities and rejection percentages across items to identify quality issues.',
     dataSource: 'SAP Production Orders & Receipts',
     route: '/production/rejection',
-    supportsExport: false,
+    supportsExport: true,
   },
   {
     id: 'date-wise',
@@ -58,7 +59,7 @@ const REPORTS: ReportDefinition[] = [
     description: 'Chronological breakdown of production output, allowing for daily, weekly, or monthly trend analysis.',
     dataSource: 'SAP Production Receipts',
     route: '/production/date-wise',
-    supportsExport: false,
+    supportsExport: true,
   }
 ];
 
@@ -117,8 +118,41 @@ export const ProductionReportsPage = () => {
 
   const handlePreview = (route: string) => {
     // Navigate to the respective page to "preview" the report data using the current filters.
-    // In a fully implemented app, we might pass the dates as URL search params.
-    navigate(route);
+    const searchParams = new URLSearchParams();
+    if (date_from) searchParams.set('date_from', date_from);
+    if (date_to) searchParams.set('date_to', date_to);
+    if (warehouseFilter) searchParams.set('warehouse', warehouseFilter);
+    navigate(`${route}?${searchParams.toString()}`);
+  };
+
+  const [exportingId, setExportingId] = useState<string | null>(null);
+
+  const handleExport = async (reportId: string) => {
+    try {
+      setExportingId(reportId);
+      const params = new URLSearchParams();
+      if (date_from) params.set('date_from', date_from);
+      if (date_to) params.set('date_to', date_to);
+      if (warehouseFilter) params.set('warehouse', warehouseFilter);
+      if (branchId) params.set('warehouse', branchId); // override if strict branch
+
+      const response = await apiClient.get(`/production/export/${reportId}?${params.toString()}`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `production-${reportId}-${date_from || 'all'}-to-${date_to || 'all'}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+    } catch (error) {
+      console.error("Export failed", error);
+      alert("Failed to export report. Please try again.");
+    } finally {
+      setExportingId(null);
+    }
   };
 
   return (
@@ -235,16 +269,17 @@ export const ProductionReportsPage = () => {
                 </button>
                 
                 <button
-                  disabled={!report.supportsExport}
-                  title={report.supportsExport ? "Export to Excel" : "Export is not currently supported by backend"}
+                  onClick={() => handleExport(report.id)}
+                  disabled={!report.supportsExport || exportingId === report.id}
+                  title={report.supportsExport ? "Export to CSV" : "Export is not currently supported"}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
-                    report.supportsExport 
+                    report.supportsExport && exportingId !== report.id
                       ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" 
                       : "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
                   }`}
                 >
-                  <Download size={14} />
-                  Export
+                  <Download size={14} className={exportingId === report.id ? "animate-bounce" : ""} />
+                  {exportingId === report.id ? 'Exporting...' : 'Export'}
                 </button>
               </div>
               

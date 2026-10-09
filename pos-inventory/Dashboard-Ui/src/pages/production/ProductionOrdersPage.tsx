@@ -190,14 +190,14 @@ export const ProductionOrdersPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <KpiCard
             title="Total Orders"
-            value={(summary?.open_orders || 0) + (summary?.released_orders || 0) + (summary?.completed_orders || 0) + (summary?.cancelled_orders || 0)}
+            value={(summary?.planned_orders || 0) + (summary?.released_orders || 0) + (summary?.completed_orders || 0) + (summary?.cancelled_orders || 0)}
             loading={loadingSummary}
             icon={<Factory className="text-blue-500" size={24} />}
             bgColor="bg-blue-50"
           />
           <KpiCard
             title="Planned Orders"
-            value={summary?.open_orders ?? 0}
+            value={summary?.planned_orders ?? 0}
             loading={loadingSummary}
             icon={<Clock className="text-amber-500" size={24} />}
             bgColor="bg-amber-50"

@@ -10,9 +10,10 @@ import {
   Filter,
   TrendingDown,
   AlertTriangle,
+  TrendingUp,
 } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+  BarChart, Bar, Cell, LabelList, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   Legend
 } from 'recharts';
 import { getItemWiseProduction } from '../../api/production';
@@ -290,23 +291,54 @@ export const ProductionItemWisePage = () => {
 
       {/* GRAPHS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Graph 1: Top Produced Items (Horizontal Bar) */}
+        {/* Graph 1: Top Produced Items (Area Chart) */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
-          <h2 className="text-base font-semibold mb-4">Top Produced Items</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="text-[#0ea5e9]" size={22} />
+              <h2 className="text-[17px] font-bold text-slate-800">Top Produced Items</h2>
+            </div>
+            <div className="flex bg-slate-50/80 rounded-lg border border-slate-100 overflow-hidden text-[13px] font-medium p-1">
+              {(['today', 'week', 'month', 'year', 'custom'] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => handleDateChange(r)}
+                  className={`px-4 py-1.5 rounded-md transition-all ${dateRange === r ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  {r.charAt(0).toUpperCase() + r.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex-1 min-h-[350px]">
             {isLoading ? (
               <Skeleton className="w-full h-full rounded-md" />
             ) : topProduced.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topProduced} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={true} stroke="#e2e8f0" />
-                  <XAxis type="number" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="item_code" width={80} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <BarChart data={topProduced} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="item_code" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} dy={10} />
+                  <YAxis 
+                    tick={{ fontSize: 12, fill: '#64748b' }} 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tickFormatter={(value) => value >= 1000 ? `${value / 1000}K` : value}
+                  />
                   <RechartsTooltip
                     cursor={{ fill: '#f8fafc' }}
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: any, name: any, props: any) => {
+                      const itemName = props.payload.item_name ? ` (${props.payload.item_name})` : '';
+                      return [value, `${name}${itemName}`];
+                    }}
                   />
-                  <Bar dataKey="produced_qty" name="Produced" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                  <Bar dataKey="produced_qty" name="Produced Quantity" radius={[4, 4, 0, 0]} maxBarSize={60}>
+                    {topProduced.map((_, index) => {
+                      const colors = ['#3b82f6', '#8b5cf6', '#14b8a6', '#f59e0b', '#ec4899', '#6366f1', '#10b981', '#f43f5e', '#84cc16', '#0ea5e9'];
+                      return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                    })}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -317,23 +349,70 @@ export const ProductionItemWisePage = () => {
 
         {/* Graph 2: Planned vs Produced */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
-          <h2 className="text-base font-semibold mb-4">Planned vs Produced (Top Items)</h2>
+          <div className="mb-4">
+            <h2 className="text-base font-semibold">Planned vs Produced by Item</h2>
+            <p className="text-[13px] text-slate-500 mt-0.5">Comparison of planned and produced quantity for each item</p>
+          </div>
           <div className="flex-1 min-h-[350px]">
             {isLoading ? (
               <Skeleton className="w-full h-full rounded-md" />
             ) : topProduced.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topProduced} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="item_code" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <BarChart data={topProduced} layout="vertical" margin={{ top: 10, right: 20, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={true} stroke="#e2e8f0" />
+                  <XAxis type="number" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left" type="category" dataKey="item_code" width={80} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+
+                  {/* Custom Right Y-Axis for Production % */}
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    type="category"
+                    dataKey="item_code"
+                    width={110}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={(props: any) => {
+                      const { x, y, payload } = props;
+                      const item = topProduced.find(d => d.item_code === payload.value);
+                      if (!item) return null;
+                      const pct = item.planned_qty ? (item.produced_qty / item.planned_qty) * 100 : null;
+                      const formattedPct = pct !== null ? `${pct.toFixed(1)}%` : 'N/A';
+
+                      // If it's the very first tick, we can render a column header above it (a bit hacky but works)
+                      const isFirst = topProduced[0]?.item_code === payload.value;
+
+                      return (
+                        <g transform={`translate(${x},${y})`}>
+                          {isFirst && <text x={85} y={-30} textAnchor="end" fill="#64748b" fontSize={11} fontWeight={600}>Production %</text>}
+                          <text x={45} y={0} dy={4} textAnchor="end" fill="#64748b" fontSize={11} fontWeight={500}>{formattedPct}</text>
+                          {pct !== null && <rect x={55} y={-4} width={40} height={8} fill="#f1f5f9" rx={4} />}
+                          {pct !== null && <rect x={55} y={-4} width={Math.min(pct, 100) * 0.4} height={8} fill="#22c55e" rx={4} />}
+                        </g>
+                      );
+                    }}
+                  />
+
                   <RechartsTooltip
                     cursor={{ fill: '#f8fafc' }}
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: any, name: any) => {
+                      if (name === 'Planned Qty') return [value, `Planned Qty`];
+                      if (name === 'Produced Qty') return [value, `Produced Qty`];
+                      return [value, name];
+                    }}
+                    labelFormatter={(label: any) => {
+                      const item = topProduced.find(d => d.item_code === label);
+                      return item?.item_name ? `${label} - ${item.item_name}` : label;
+                    }}
                   />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="planned_qty" name="Planned" fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={16} />
-                  <Bar dataKey="produced_qty" name="Produced" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={16} />
+                  <Legend wrapperStyle={{ fontSize: '12px', top: -30, right: 0 }} verticalAlign="top" align="right" iconType="circle" />
+                  <Bar yAxisId="left" dataKey="planned_qty" name="Planned Qty" fill="#94a3b8" radius={[0, 4, 4, 0]} barSize={12}>
+                    <LabelList dataKey="planned_qty" position="right" fill="#64748b" fontSize={11} />
+                  </Bar>
+                  <Bar yAxisId="left" dataKey="produced_qty" name="Produced Qty" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={12}>
+                    <LabelList dataKey="produced_qty" position="right" fill="#1e293b" fontSize={11} fontWeight={500} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (

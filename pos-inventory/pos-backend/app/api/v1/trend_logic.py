@@ -71,15 +71,12 @@ def _compute_dynamic_trend(invoices: List[Dict[str, Any]], range_str: str, start
             
     elif group_by == "day":
         if range_str == "weekly":
-            # get monday to sunday of the start_date week
-            # start_date might already be monday
+            # weekly range is 7 days from start_date to end_date
             curr = start_date
-            while curr.weekday() > 0:
-                curr -= timedelta(days=1)
-            for i in range(7):
-                d = curr + timedelta(days=i)
-                key = d.strftime("%Y-%m-%d")
-                buckets[key] = {"label": d.strftime("%a"), "sales": 0.0, "invoice_count": 0}
+            while curr <= end_date:
+                key = curr.strftime("%Y-%m-%d")
+                buckets[key] = {"label": curr.strftime("%a"), "sales": 0.0, "invoice_count": 0}
+                curr += timedelta(days=1)
         elif range_str == "monthly":
             # get 1st to last day of month
             curr = start_date.replace(day=1)

@@ -12,8 +12,8 @@ import {
   Package,
 } from 'lucide-react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+  Legend
 } from 'recharts';
 import {
   getProductionSummary,
@@ -222,8 +222,8 @@ export const ProductionOverviewPage = () => {
               tooltip="Production efficiency is not currently provided because no approved business formula is defined."
             />
             <KpiCard
-              title="Open Orders"
-              value={summary?.open_orders ?? 0}
+              title="Planned Orders"
+              value={summary?.planned_orders ?? 0}
               loading={loadingSummary}
               icon={<AlertTriangle className="text-amber-500" size={24} />}
               bgColor="bg-amber-50"
@@ -254,76 +254,115 @@ export const ProductionOverviewPage = () => {
           {/* GRAPHS ROW */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Graph 1: Production Trend */}
-            <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
-              <h2 className="text-base font-semibold mb-4">Production Trend</h2>
+            <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col relative">
+              <div className="mb-4">
+                <h2 className="text-base font-semibold">Production Trend</h2>
+                <p className="text-[13px] text-slate-500 mt-0.5">Planned vs Produced vs Rejected Quantity</p>
+              </div>
               <div className="flex-1 min-h-[300px]">
                 {loadingTrend ? (
                   <Skeleton className="w-full h-full rounded-md" />
                 ) : (trendData?.length || 0) > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorProduced" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="colorPlanned" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#94a3b8" stopOpacity={0.2} />
-                          <stop offset="95%" stopColor="#94a3b8" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
-                      <RechartsTooltip
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                      />
-                      <Area type="monotone" dataKey="planned_qty" name="Planned" stroke="#94a3b8" fillOpacity={1} fill="url(#colorPlanned)" strokeDasharray="5 5" />
-                      <Area type="monotone" dataKey="produced_qty" name="Produced" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorProduced)" />
-                      <Area type="monotone" dataKey="rejected_qty" name="Rejected" stroke="#ef4444" strokeWidth={2} fill="none" />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  <div className="w-full h-full relative">
+                    {trendData?.length === 1 && (
+                      <div className="absolute top-0 right-4 text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded">
+                        Trend needs multiple dates. Showing single point.
+                      </div>
+                    )}
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={trendData} margin={{ top: 10, right: 20, left: -20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis 
+                          dataKey="date" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{ fontSize: 12, fill: '#64748b' }} 
+                          dy={10} 
+                          tickFormatter={(val) => {
+                            const d = new Date(val);
+                            if (isNaN(d.getTime())) return val;
+                            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined });
+                          }}
+                        />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                        <RechartsTooltip
+                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                          labelFormatter={(label) => {
+                            const d = new Date(label as string);
+                            if (isNaN(d.getTime())) return label;
+                            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                          }}
+                        />
+                        <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                        <Line type="monotone" dataKey="planned_qty" name="Planned Qty" stroke="#94a3b8" strokeWidth={2} dot={{ fill: '#94a3b8', r: 4 }} activeDot={{ r: 6 }} />
+                        <Line type="monotone" dataKey="produced_qty" name="Produced Qty" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 4 }} activeDot={{ r: 6 }} />
+                        <Line type="monotone" dataKey="rejected_qty" name="Rejected Qty" stroke="#ef4444" strokeWidth={2} dot={{ fill: '#ef4444', r: 4 }} activeDot={{ r: 6 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-sm text-slate-400">No trend data</div>
+                  <div className="w-full h-full flex items-center justify-center text-sm text-slate-400">No trend data found for the selected period</div>
                 )}
               </div>
             </div>
 
             {/* Graph 2: Status Distribution */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
-              <h2 className="text-base font-semibold mb-4">Production Order Status</h2>
-              <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center relative">
+              <div className="mb-6">
+                <h2 className="text-base font-semibold">Production Order Status</h2>
+                <p className="text-[13px] text-slate-500 mt-0.5">Distribution of production orders by status</p>
+              </div>
+              <div className="flex-1 flex flex-col justify-center">
                 {loadingStatus ? (
-                  <Skeleton className="w-48 h-48 rounded-full" />
+                  <div className="space-y-4 w-full">
+                    <Skeleton className="w-full h-8 rounded-full" />
+                    <Skeleton className="w-full h-6 rounded" />
+                    <Skeleton className="w-full h-6 rounded" />
+                    <Skeleton className="w-full h-6 rounded" />
+                  </div>
                 ) : (statusDist?.length || 0) > 0 ? (
-                  <>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={statusDist}
-                          innerRadius={70}
-                          outerRadius={100}
-                          paddingAngle={2}
-                          dataKey="count"
-                          nameKey="label"
-                        >
-                          {statusDist?.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={PIE_COLORS[entry.status as keyof typeof PIE_COLORS] || PIE_COLORS.default} />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                        <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
-                      <span className="text-2xl font-bold text-slate-800">
-                        {statusDist?.reduce((acc, curr) => acc + curr.count, 0)}
-                      </span>
-                      <span className="text-xs text-slate-500">Orders</span>
+                  <div className="w-full">
+                    {/* Stacked Bar */}
+                    <div className="h-6 w-full flex rounded-sm overflow-hidden mb-8">
+                      {statusDist?.map(entry => {
+                        const total = statusDist.reduce((acc, curr) => acc + curr.count, 0) || 1;
+                        return (
+                          <div 
+                            key={entry.status} 
+                            style={{ 
+                              width: `${(entry.count / total) * 100}%`,
+                              backgroundColor: PIE_COLORS[entry.status as keyof typeof PIE_COLORS] || PIE_COLORS.default
+                            }} 
+                            className="h-full"
+                            title={`${entry.label}: ${entry.count}`}
+                          />
+                        );
+                      })}
                     </div>
-                  </>
+                    
+                    {/* Status List */}
+                    <div className="flex flex-col gap-4">
+                      {statusDist?.map(entry => {
+                        const total = statusDist.reduce((acc, curr) => acc + curr.count, 0) || 1;
+                        const percentage = ((entry.count / total) * 100).toFixed(1);
+                        const color = PIE_COLORS[entry.status as keyof typeof PIE_COLORS] || PIE_COLORS.default;
+                        
+                        return (
+                          <div key={entry.status} className="flex items-center text-[13px]">
+                            <div className="w-3 h-3 rounded-full mr-3" style={{ backgroundColor: color }} />
+                            <div className="flex-1 font-semibold text-slate-800">{entry.label}</div>
+                            <div className="w-10 text-right font-bold text-slate-800">{entry.count}</div>
+                            <div className="w-14 text-right text-slate-600">{percentage}%</div>
+                            <div className="w-20 ml-4 h-2.5 bg-slate-100 rounded-sm overflow-hidden hidden sm:block">
+                               <div className="h-full rounded-sm" style={{ width: `${percentage}%`, backgroundColor: color }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-sm text-slate-400">No status data</div>
+                  <div className="w-full h-full flex items-center justify-center text-sm text-slate-400">No status data found for the selected period</div>
                 )}
               </div>
             </div>

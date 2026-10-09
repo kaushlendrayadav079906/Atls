@@ -131,13 +131,12 @@ class SAPProductionService:
             elif status == "Cancelled":
                 cancelled += 1
                 
-        open_orders = planned + released
         pending = max(total_planned_qty - total_prod, 0.0)
         rej_pct = (total_rej / total_prod * 100) if total_prod > 0 else 0.0
         
         return {
             "total_production": total_prod,
-            "open_orders": open_orders,
+            "planned_orders": planned,
             "released_orders": released,
             "completed_orders": completed,
             "cancelled_orders": cancelled,

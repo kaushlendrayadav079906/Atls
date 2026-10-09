@@ -3,13 +3,17 @@ import {
     AlertTriangle,
     Boxes,
     ChevronDown,
+    ChevronLeft,
+    ChevronRight,
     Package2,
     Search,
     ShieldAlert,
     TrendingUp,
     Warehouse,
+    Eye,
+    XCircle
 } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, useEffect, type ReactNode } from 'react';
 import { posApi } from '../api/pos';
 import { useDebounce } from '../hooks/useDebounce';
 import type { Product } from '../types/pos';
@@ -40,7 +44,28 @@ export const ProductsStockPage = () => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'low' | 'healthy'>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const debouncedSearch = useDebounce(search, 300);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, filter]);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = 'hidden';
+      const handleEsc = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setIsModalOpen(false);
+      };
+      window.addEventListener('keydown', handleEsc);
+      return () => {
+        document.body.style.overflow = '';
+        window.removeEventListener('keydown', handleEsc);
+      };
+    }
+  }, [isModalOpen]);
 
   const { data: products = fallbackProducts, isLoading, isError, error, refetch } = useQuery<Product[]>({
     queryKey: ['products-stock', debouncedSearch],
@@ -70,8 +95,17 @@ export const ProductsStockPage = () => {
   const selectedProduct = filteredProducts.find((product) => product.id === selectedId) ?? filteredProducts[0] ?? baseProducts[0] ?? null;
 
   const totalProducts = baseProducts.length;
-  const lowStock = baseProducts.filter((product) => Number(product.stock ?? 0) <= 10).length;
   const outOfStock = baseProducts.filter((product) => Number(product.stock ?? 0) <= 0).length;
+  const lowStock = baseProducts.filter((product) => {
+    const s = Number(product.stock ?? 0);
+    return s > 0 && s <= 10;
+  }).length;
+  const inStock = baseProducts.filter((product) => Number(product.stock ?? 0) > 10).length;
+
+  const paginatedProducts = useMemo(() => {
+    const start = (page - 1) * limit;
+    return filteredProducts.slice(start, start + limit);
+  }, [filteredProducts, page, limit]);
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-6 pb-8 text-slate-900">
@@ -99,12 +133,12 @@ export const ProductsStockPage = () => {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Total Products" value={`${totalProducts}`} change="vs. last month" trend="positive" icon={<Package2 className="h-5 w-5" />} tone="blue" metadata="1,248" />
-        <StatCard title="In Stock" value={`${Math.max(totalProducts - lowStock - outOfStock, 0)}`} change="vs. last month" trend="positive" icon={<Boxes className="h-5 w-5" />} tone="emerald" metadata="892" />
+        <StatCard title="In Stock" value={`${inStock}`} change="vs. last month" trend="positive" icon={<Boxes className="h-5 w-5" />} tone="emerald" metadata="892" />
         <StatCard title="Low Stock" value={`${lowStock}`} change="vs. last month" trend="warning" icon={<AlertTriangle className="h-5 w-5" />} tone="amber" metadata="47" />
         <StatCard title="Out of Stock" value={`${outOfStock}`} change="vs. last month" trend="negative" icon={<ShieldAlert className="h-5 w-5" />} tone="red" metadata="12" />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_360px]">
+      <div className="flex flex-col gap-6">
         <div className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)] overflow-hidden flex flex-col">
           <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="relative w-full max-w-md">
@@ -174,7 +208,7 @@ export const ProductsStockPage = () => {
                     <td colSpan={8} className="px-4 py-10 text-center text-slate-500">No products match your current search or filter.</td>
                   </tr>
                 ) : (
-                  filteredProducts.map((product) => (
+                  paginatedProducts.map((product) => (
                     <tr key={product.id} className={`cursor-pointer border-t border-slate-100 transition-colors hover:bg-slate-50/60 group ${selectedProduct?.id === product.id ? 'bg-blue-50/50' : ''}`} onClick={() => setSelectedId(String(product.id))}>
                       <td className="px-5 py-4 text-center text-slate-500">
                         <input type="checkbox" className="h-4 w-4 rounded border-slate-200 bg-white accent-blue-500" />
@@ -200,7 +234,7 @@ export const ProductsStockPage = () => {
                         </span>
                       </td>
                       <td className="px-5 py-4 text-center opacity-60 group-hover:opacity-100 transition-opacity">
-                        <button className="rounded-lg p-2 text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition-colors">•••</button>
+                        <button onClick={(e) => { e.stopPropagation(); setSelectedId(String(product.id)); setIsModalOpen(true); }} className="rounded-lg p-2 text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition-colors"><Eye className="h-4 w-4" /></button>
                       </td>
                     </tr>
                   ))
@@ -209,122 +243,185 @@ export const ProductsStockPage = () => {
             </table>
           </div>
 
-          <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm text-slate-500">
-            <span>Showing 1 to 10 of {filteredProducts.length} products</span>
-            <div className="flex items-center gap-2">
-              <button className="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-700">1</button>
-              <button className="h-8 w-8 rounded-lg border border-slate-200 bg-transparent text-slate-500">2</button>
-              <button className="h-8 w-8 rounded-lg border border-slate-200 bg-transparent text-slate-500">3</button>
+          {/* Pagination */}
+          <div className="flex items-center justify-between p-4 border-t border-slate-200 text-sm">
+            <div className="text-slate-500 text-[13px]">
+               Showing {filteredProducts.length ? (page - 1) * limit + 1 : 0} to {Math.min(page * limit, filteredProducts.length)} of {filteredProducts.length} products
+            </div>
+            <div className="flex items-center gap-4">
+               <div className="flex items-center gap-2">
+                  <span className="text-slate-500 text-[13px]">Rows per page</span>
+                  <select 
+                     className="border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-700 bg-white"
+                     value={limit}
+                     onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                  >
+                     <option value={10}>10</option>
+                     <option value={20}>20</option>
+                     <option value={50}>50</option>
+                  </select>
+               </div>
+               <div className="flex items-center gap-1">
+                  <button 
+                     disabled={page === 1}
+                     onClick={() => setPage(p => p - 1)}
+                     className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                     <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 text-white font-medium text-[13px]">
+                     {page}
+                  </button>
+                  <button 
+                     disabled={page >= Math.ceil(filteredProducts.length / limit) || filteredProducts.length === 0}
+                     onClick={() => setPage(p => p + 1)}
+                     className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                     <ChevronRight className="w-4 h-4" />
+                  </button>
+               </div>
             </div>
           </div>
         </div>
 
-        <aside className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)]">
-          <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
-            <div className="flex items-center gap-2 text-slate-900">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-700 shadow-inner shadow-slate-100">
-                <Package2 className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="text-[12px] text-slate-500">Product</div>
-                <div className="text-[20px] font-semibold text-slate-900">{selectedProduct?.name || 'N/A'}</div>
-              </div>
-            </div>
-            <button className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700">×</button>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
-            <div className="flex h-32 items-center justify-center rounded-xl bg-white">
-              <Package2 className="h-16 w-16 text-slate-700" />
-            </div>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">SKU</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">{selectedProduct?.id || 'N/A'}</div>
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Barcode</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">{selectedProduct?.barcode || 'N/A'}</div>
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Category</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">{selectedProduct?.category || 'N/A'}</div>
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Brand</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">{selectedProduct?.brand || 'N/A'}</div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
-            <span className="font-medium text-slate-600">Selling Price</span>
-            <span className="font-bold text-slate-900 text-base">{selectedProduct ? money.format(Number(selectedProduct.price)) : 'N/A'}</span>
-          </div>
-
-          <div className="mt-2 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
-            <span className="font-medium text-slate-600">Cost Price</span>
-            <span className="font-bold text-slate-900 text-base">{selectedProduct ? money.format(Number(selectedProduct.price) * 0.7) : 'N/A'}</span>
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-3">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-slate-900">
-                <Warehouse className="h-4 w-4 text-blue-600" />
-                <span className="text-[16px] font-semibold">Stock by Warehouse</span>
-              </div>
-              <button className="text-[11px] font-medium text-blue-600">View All</button>
-            </div>
-
-            <div className="space-y-2 text-sm">
-              {selectedProduct ? (
-                <div key={selectedProduct.warehouse || 'current'} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-xs font-semibold text-slate-700">{(selectedProduct.warehouse || 'WH').replace('WH-', '')}</div>
-                    <span>{selectedProduct.warehouse || 'Current Branch'}</span>
+        {isModalOpen && (
+          <div 
+            className="fixed inset-0 bg-slate-900/35 backdrop-blur-[3px] z-[100] flex items-center justify-center p-4 sm:p-6"
+            onClick={() => setIsModalOpen(false)}
+            style={{ animation: 'fadeIn 0.2s ease-out' }}
+          >
+            <style>{`
+              @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+              @keyframes scaleIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+            `}</style>
+            
+            <div 
+              className="w-full max-w-[800px] max-h-[90vh] bg-slate-50 rounded-2xl shadow-2xl z-[101] flex flex-col overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+              style={{ animation: 'scaleIn 0.2s ease-out' }}
+            >
+              <div className="flex items-center justify-between border-b border-slate-200 bg-white p-5">
+                <div className="flex items-center gap-3 text-slate-900">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-50 border border-slate-100 text-slate-700 shadow-sm">
+                    <Package2 className="h-6 w-6" />
                   </div>
-                  <span className="font-semibold text-slate-900">{selectedProduct.stock || 0}</span>
+                  <div>
+                    <div className="text-[12px] font-semibold uppercase tracking-wider text-slate-500">Product Detail</div>
+                    <div className="text-[20px] font-bold text-slate-900 leading-tight">{selectedProduct?.name || 'N/A'}</div>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-slate-500 text-center py-2">No product selected</div>
-              )}
+                <button 
+                  onClick={() => setIsModalOpen(false)}
+                  className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                >
+                  <XCircle className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-5">
+                {/* Top Section: Image & Info Side-by-Side */}
+                <div className="flex flex-col md:flex-row gap-5">
+                  <div className="w-full md:w-[220px] shrink-0 rounded-2xl border border-slate-200 bg-white shadow-sm flex items-center justify-center min-h-[160px] p-4">
+                    <Package2 className="h-16 w-16 text-slate-300" />
+                  </div>
+                  
+                  <div className="flex-1 flex flex-col gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">SKU</div>
+                        <div className="mt-0.5 text-[13px] font-bold text-slate-800">{selectedProduct?.id || 'N/A'}</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Barcode</div>
+                        <div className="mt-0.5 text-[13px] font-bold text-slate-800">{selectedProduct?.barcode || 'N/A'}</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Category</div>
+                        <div className="mt-0.5 text-[13px] font-bold text-slate-800">{selectedProduct?.category || 'N/A'}</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Brand</div>
+                        <div className="mt-0.5 text-[13px] font-bold text-slate-800">{selectedProduct?.brand || 'N/A'}</div>
+                      </div>
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-3 h-full">
+                      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-sm h-full">
+                        <span className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider">Selling Price</span>
+                        <span className="font-bold text-slate-900 text-[15px]">{selectedProduct ? money.format(Number(selectedProduct.price)) : 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-sm h-full">
+                        <span className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider">Cost Price</span>
+                        <span className="font-bold text-slate-900 text-[15px]">{selectedProduct ? money.format(Number(selectedProduct.price) * 0.7) : 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Section: Stock details */}
+                <div className="grid md:grid-cols-2 gap-5">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-slate-900">
+                        <Warehouse className="h-4 w-4 text-blue-600" />
+                        <span className="text-[14px] font-bold">Stock by Warehouse</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 flex-1">
+                      {selectedProduct ? (
+                        <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                          <div className="flex items-center gap-2 text-slate-600 font-medium">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white shadow-sm text-[11px] font-bold text-slate-700">
+                              {(selectedProduct.warehouse || 'WH').replace('WH-', '')}
+                            </div>
+                            <span className="text-[13px]">{selectedProduct.warehouse || 'Current Branch'}</span>
+                          </div>
+                          <span className="font-bold text-slate-900 text-[15px]">{selectedProduct.stock || 0}</span>
+                        </div>
+                      ) : (
+                        <div className="text-slate-500 text-center py-2 text-[13px]">No product selected</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-blue-600" />
+                        <span className="text-[14px] font-bold text-slate-900">Stock Movement</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                        <span className="text-slate-500 text-[11px] font-semibold">27 Nov 2024</span>
+                        <span className="text-slate-700 font-medium text-[12px]">Sale</span>
+                        <span className="font-bold text-red-500 text-[13px]">-2</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                        <span className="text-slate-500 text-[11px] font-semibold">26 Nov 2024</span>
+                        <span className="text-slate-700 font-medium text-[12px]">Sale</span>
+                        <span className="font-bold text-red-500 text-[13px]">-1</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                        <span className="text-slate-500 text-[11px] font-semibold">25 Nov 2024</span>
+                        <span className="text-slate-700 font-medium text-[12px]">Purchase</span>
+                        <span className="font-bold text-emerald-600 text-[13px]">+50</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-200 bg-white p-5 flex justify-end">
+                <button className="rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors">
+                  Adjust Stock
+                </button>
+              </div>
             </div>
           </div>
-
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-semibold text-slate-900">Stock Movement</span>
-              </div>
-              <button className="text-xs font-medium text-blue-600 hover:text-blue-800">View All</button>
-            </div>
-
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                <span className="text-slate-500 text-xs">27 Nov 2024</span>
-                <span className="text-slate-700">Sale</span>
-                <span className="font-semibold text-red-500">-2</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                <span className="text-slate-500 text-xs">26 Nov 2024</span>
-                <span className="text-slate-700">Sale</span>
-                <span className="font-semibold text-red-500">-1</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                <span className="text-slate-500 text-xs">25 Nov 2024</span>
-                <span className="text-slate-700">Purchase</span>
-                <span className="font-semibold text-emerald-600">+50</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <button className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700">Adjust Stock</button>
-            <button className="rounded-xl bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm">Create Purchase Order</button>
-          </div>
-        </aside>
+        )}
       </div>
     </div>
   );

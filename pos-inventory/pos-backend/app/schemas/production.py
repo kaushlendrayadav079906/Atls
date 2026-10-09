@@ -42,7 +42,7 @@ class ProductionOrderDetail(ProductionOrderSummary):
 
 class ProductionSummaryResponse(BaseModel):
     total_production: float
-    open_orders: int
+    planned_orders: int
     released_orders: int
     completed_orders: int
     cancelled_orders: int

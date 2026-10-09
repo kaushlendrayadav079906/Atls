@@ -278,6 +278,7 @@ export const Dashboard = () => {
                         fillOpacity={1} 
                         fill="url(#colorSales)" 
                         activeDot={{ r: 6, strokeWidth: 0, fill: '#0ea5e9' }}
+                        dot={trendPoints.length === 1 ? { r: 4, fill: '#0ea5e9', strokeWidth: 2, stroke: '#fff' } : false}
                       />
                     </AreaChart>
                   </ResponsiveContainer>

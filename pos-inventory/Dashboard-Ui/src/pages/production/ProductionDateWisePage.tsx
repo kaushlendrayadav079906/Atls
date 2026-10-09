@@ -10,8 +10,8 @@ import {
   Filter,
 } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  Legend, AreaChart, Area
+  ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
+  Legend, Area
 } from 'recharts';
 import { getDateWiseProduction } from '../../api/production';
 import { useAuth } from '../../contexts/AuthContext';
@@ -134,10 +134,39 @@ export const ProductionDateWisePage = () => {
     };
   }, [items]);
 
+  const [cumulativeToggle, setCumulativeToggle] = useState<'planned_vs_produced' | 'produced_vs_rejected'>('planned_vs_produced');
+
   // Graph Data (Chronological for graphs)
   const chartData = useMemo(() => {
-    return [...items].sort((a, b) => a.date.localeCompare(b.date));
+    return [...items].sort((a, b) => a.date.localeCompare(b.date)).map(item => {
+      let prodPercent = null;
+      if (item.planned_qty > 0) {
+        prodPercent = (item.produced_qty / item.planned_qty) * 100;
+      }
+      return {
+        ...item,
+        production_percent: prodPercent
+      };
+    });
   }, [items]);
+
+  const cumulativeData = useMemo(() => {
+    let cumPlanned = 0;
+    let cumProduced = 0;
+    let cumRejected = 0;
+
+    return chartData.map(item => {
+      cumPlanned += item.planned_qty || 0;
+      cumProduced += item.produced_qty || 0;
+      cumRejected += item.rejected_qty || 0;
+      return {
+        ...item,
+        cum_planned: cumPlanned,
+        cum_produced: cumProduced,
+        cum_rejected: cumRejected,
+      };
+    });
+  }, [chartData]);
 
   const handleSort = (field: typeof sortBy) => {
     if (sortBy === field) {
@@ -280,29 +309,48 @@ export const ProductionDateWisePage = () => {
 
       {/* GRAPHS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Graph 1: Production Heatmap (represented as an Area Chart of production over time) */}
+        {/* Graph 1: Daily Production Volume */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
-          <h2 className="text-base font-semibold mb-4">Production Intensity (Produced Qty)</h2>
-          <div className="flex-1 min-h-[300px]">
+          <div className="mb-4">
+            <h2 className="text-base font-semibold">Daily Production Volume</h2>
+            <p className="text-[13px] text-slate-500 mt-0.5">Produced quantity for each day in the selected period</p>
+          </div>
+          <div className="flex-1 min-h-[350px]">
             {isLoading ? (
               <Skeleton className="w-full h-full rounded-md" />
             ) : chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorProd" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                  <RechartsTooltip
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} dy={10} 
+                    tickFormatter={(val) => {
+                      const d = new Date(val);
+                      return isNaN(d.getTime()) ? val : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    }}
                   />
-                  <Area type="monotone" dataKey="produced_qty" name="Produced Qty" stroke="#3b82f6" fillOpacity={1} fill="url(#colorProd)" />
-                </AreaChart>
+                  <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(val) => `${val}%`} />
+                  <RechartsTooltip
+                    cursor={{ fill: '#f8fafc' }}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: any, name: any) => {
+                      if (name === 'Production %') {
+                        return [value !== null ? `${value.toFixed(1)}%` : 'N/A', name];
+                      }
+                      return [value, name];
+                    }}
+                    labelFormatter={(label: any) => {
+                      if (!label) return label;
+                      const d = new Date(label);
+                      return isNaN(d.getTime()) ? label : d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
+                    }}
+                  />
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                  <Bar yAxisId="left" dataKey="planned_qty" name="Planned Qty" fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={12} />
+                  <Bar yAxisId="left" dataKey="produced_qty" name="Produced Qty" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={12} />
+                  <Bar yAxisId="left" dataKey="rejected_qty" name="Rejected Qty" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={12} />
+                  <Line yAxisId="right" type="monotone" dataKey="production_percent" name="Production %" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: '#fff', stroke: '#3b82f6', strokeWidth: 2 }} activeDot={{ r: 5 }} />
+                </ComposedChart>
               </ResponsiveContainer>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-sm text-slate-400">No production data</div>
@@ -310,27 +358,74 @@ export const ProductionDateWisePage = () => {
           </div>
         </div>
 
-        {/* Graph 2: Production by Date (Bar Chart) */}
+        {/* Graph 2: Cumulative Production Trend */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
-          <h2 className="text-base font-semibold mb-4">Production by Date</h2>
-          <div className="flex-1 min-h-[300px]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+            <div>
+              <h2 className="text-base font-semibold">Cumulative Production Trend</h2>
+              <p className="text-[13px] text-slate-500 mt-0.5">Cumulative planned vs produced quantity</p>
+            </div>
+            <div className="flex bg-slate-50 rounded-lg border border-slate-100 overflow-hidden text-[12px] font-medium p-1">
+              <button
+                onClick={() => setCumulativeToggle('planned_vs_produced')}
+                className={`px-3 py-1.5 rounded-md transition-all ${cumulativeToggle === 'planned_vs_produced' ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Planned vs Produced
+              </button>
+              <button
+                onClick={() => setCumulativeToggle('produced_vs_rejected')}
+                className={`px-3 py-1.5 rounded-md transition-all ${cumulativeToggle === 'produced_vs_rejected' ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                Produced vs Rejected
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 min-h-[350px]">
             {isLoading ? (
               <Skeleton className="w-full h-full rounded-md" />
-            ) : chartData.length > 0 ? (
+            ) : cumulativeData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <ComposedChart data={cumulativeData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="colorCumProd" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorCumRej" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} dy={10} 
+                    tickFormatter={(val) => {
+                      const d = new Date(val);
+                      return isNaN(d.getTime()) ? val : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    }}
+                  />
                   <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
                   <RechartsTooltip
-                    cursor={{ fill: '#f8fafc' }}
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    labelFormatter={(label: any) => {
+                      if (!label) return label;
+                      const d = new Date(label);
+                      return isNaN(d.getTime()) ? label : d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
+                    }}
                   />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="planned_qty" name="Planned" fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={16} />
-                  <Bar dataKey="produced_qty" name="Produced" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={16} />
-                  <Bar dataKey="rejected_qty" name="Rejected" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={16} />
-                </BarChart>
+                  <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                  
+                  {cumulativeToggle === 'planned_vs_produced' ? (
+                    <>
+                      <Line type="monotone" dataKey="cum_planned" name="Planned (Cumulative)" stroke="#94a3b8" strokeWidth={2} dot={{ r: 3, fill: '#94a3b8' }} activeDot={{ r: 5 }} />
+                      <Area type="monotone" dataKey="cum_produced" name="Produced (Cumulative)" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorCumProd)" dot={{ r: 3, fill: '#3b82f6' }} activeDot={{ r: 5 }} />
+                    </>
+                  ) : (
+                    <>
+                      <Area type="monotone" dataKey="cum_produced" name="Produced (Cumulative)" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorCumProd)" dot={{ r: 3, fill: '#3b82f6' }} activeDot={{ r: 5 }} />
+                      <Area type="monotone" dataKey="cum_rejected" name="Rejected (Cumulative)" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorCumRej)" dot={{ r: 3, fill: '#ef4444' }} activeDot={{ r: 5 }} />
+                    </>
+                  )}
+                </ComposedChart>
               </ResponsiveContainer>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-sm text-slate-400">No production data</div>
