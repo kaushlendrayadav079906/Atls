@@ -171,6 +171,11 @@ async def get_sales_trends(
     target_branch = _get_permitted_branch(current_user, branch)
     start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
     
+    cache_key = f"pos:atlas:trends:{range}:{start_date}:{end_date}:{target_branch or 'all'}:{customer or 'all'}:{category or 'all'}:{payment_method or 'all'}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return DynamicSalesTrendResponse(**cached)
+
     try:
         loop = asyncio.get_running_loop()
         invoices = await loop.run_in_executor(
@@ -182,6 +187,7 @@ async def get_sales_trends(
         raise HTTPException(status_code=502, detail=f"SAP Error: {str(e)}")
 
     trend_result = _compute_dynamic_trend(invoices, range, start_date, end_date)
+    await cache_set(cache_key, trend_result, ttl=_ATLAS_CACHE_TTL)
     return DynamicSalesTrendResponse(**trend_result)
 
 

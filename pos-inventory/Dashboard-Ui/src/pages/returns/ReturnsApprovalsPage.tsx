@@ -1,22 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-    AlertCircle,
-    Building2,
-    ChevronLeft,
-    ChevronRight,
-    Clock3,
-    ListFilter,
-    Loader2,
-    Plus,
-    RotateCcw,
-    Search,
-    ShieldAlert,
-    Sparkles,
-    Ticket,
-    X,
-    Eye,
-    Calendar,
-    ChevronDown,
+  AlertCircle,
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  ListFilter,
+  Loader2,
+  Plus,
+  RotateCcw,
+  Search,
+  ShieldAlert,
+  Sparkles,
+  Ticket,
+  X,
+  Eye,
+  Calendar,
+  ChevronDown,
 } from 'lucide-react';
 import { useState, useEffect, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -97,7 +97,7 @@ export const ReturnsApprovalsPage = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  
+
   const [tab, setTab] = useState<'all' | 'pending' | 'completed' | 'rejected' | 'failed'>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -156,7 +156,7 @@ export const ReturnsApprovalsPage = () => {
     return { start, end };
   };
 
-  const { data = { items: [], total: 0, counts: { all: 0, pending: 0, completed: 0, rejected: 0, failed: 0 } }, isLoading, isError, error, refetch } = useQuery<{items: ApprovalRequestRow[], total: number, counts: Record<string, number>}>({
+  const { data = { items: [], total: 0, counts: { all: 0, pending: 0, completed: 0, rejected: 0, failed: 0 } }, isLoading, isError, error, refetch } = useQuery<{ items: ApprovalRequestRow[], total: number, counts: Record<string, number> }>({
     queryKey: ['returns-approvals', page, limit, branchId, dateRange, tab !== 'all' ? tab : status, debouncedSearch],
     queryFn: () => {
       const { start, end } = getStartEndDate(dateRange);
@@ -240,25 +240,24 @@ export const ReturnsApprovalsPage = () => {
           </div>
           <div className="flex items-center gap-3">
             <div className="relative date-dropdown-container z-50 hidden sm:block">
-              <button 
+              <button
                 onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
                 className="flex items-center gap-2 px-4 py-2 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors font-medium text-sm"
               >
                 <Calendar className="w-4 h-4 text-slate-500" />
                 {dateRange === '' ? 'All Dates (Total)' :
-                 dateRange === 'today' ? 'Today' : 
-                 dateRange.includes('_to_') ? 'Custom Range' :
-                 `This ${dateRange.charAt(0).toUpperCase() + dateRange.slice(1)}`}
+                  dateRange === 'today' ? 'Today' :
+                    dateRange.includes('_to_') ? 'Custom Range' :
+                      `This ${dateRange.charAt(0).toUpperCase() + dateRange.slice(1)}`}
                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isDateDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-              
+
               {isDateDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 shadow-lg rounded-lg py-1">
                   <button
                     onClick={() => { setDateRange(''); setPage(1); setIsDateDropdownOpen(false); }}
-                    className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                      dateRange === '' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
-                    }`}
+                    className={`w-full text-left px-4 py-2 text-sm transition-colors ${dateRange === '' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
                   >
                     All Dates (Total)
                   </button>
@@ -269,9 +268,8 @@ export const ReturnsApprovalsPage = () => {
                       <button
                         key={f}
                         onClick={() => { setDateRange(f); setPage(1); setIsDateDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                          dateRange === f ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
-                        }`}
+                        className={`w-full text-left px-4 py-2 text-sm transition-colors ${dateRange === f ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
+                          }`}
                       >
                         {label}
                       </button>
@@ -287,7 +285,7 @@ export const ReturnsApprovalsPage = () => {
                       <label className="text-[11px] text-slate-500 mb-1 block">To</label>
                       <input type="date" className="w-full text-sm border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={customTo} onChange={e => setCustomTo(e.target.value)} />
                     </div>
-                    <button 
+                    <button
                       disabled={!customFrom || !customTo}
                       onClick={() => { setDateRange(`${customFrom}_to_${customTo}`); setPage(1); setIsDateDropdownOpen(false); }}
                       className="w-full mt-2 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded font-medium text-sm transition-colors"
@@ -324,28 +322,26 @@ export const ReturnsApprovalsPage = () => {
         </div>
 
         <div className="flex flex-col gap-6">
-          
+
           <div className="flex flex-col gap-4">
 
 
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              
+
               {/* Tabs */}
               <div className="flex items-center overflow-x-auto border-b border-slate-200 px-2 bg-slate-50/50">
                 {tabs.map((item) => (
                   <button
                     key={item.key}
                     onClick={() => { setTab(item.key as any); setPage(1); }}
-                    className={`flex items-center whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-semibold transition-colors ${
-                      tab === item.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
-                    }`}
+                    className={`flex items-center whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-semibold transition-colors ${tab === item.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+                      }`}
                   >
                     {item.label}
                     {item.count > 0 && (
                       <span
-                        className={`ml-2 rounded-full px-2 py-0.5 text-[11px] ${
-                          tab === item.key ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
-                        }`}
+                        className={`ml-2 rounded-full px-2 py-0.5 text-[11px] ${tab === item.key ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
+                          }`}
                       >
                         {item.count}
                       </span>
@@ -357,10 +353,10 @@ export const ReturnsApprovalsPage = () => {
               {/* Filter Bar */}
               <div className="border-b border-slate-200 bg-white px-4 py-3">
                 <div className="flex flex-wrap items-center gap-3">
-                  
+
                   <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 min-w-[160px]">
                     <Building2 className="h-4 w-4 text-slate-400" />
-                    <select value={branchId} onChange={(e) => {setBranchId(e.target.value); setPage(1);}} className="bg-transparent outline-none w-full">
+                    <select value={branchId} onChange={(e) => { setBranchId(e.target.value); setPage(1); }} className="bg-transparent outline-none w-full">
                       <option value="">All Branches</option>
                       <option value="WH-001">Main Branch (WH-001)</option>
                     </select>
@@ -368,7 +364,7 @@ export const ReturnsApprovalsPage = () => {
 
                   <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 min-w-[140px]">
                     <ListFilter className="h-4 w-4 text-slate-400" />
-                    <select value={status} onChange={(e) => {setStatus(e.target.value); setTab('all'); setPage(1);}} className="bg-transparent outline-none w-full">
+                    <select value={status} onChange={(e) => { setStatus(e.target.value); setTab('all'); setPage(1); }} className="bg-transparent outline-none w-full">
                       <option value="all">All Status</option>
                       <option value="pending">Pending</option>
                       <option value="completed">Approved</option>
@@ -389,165 +385,165 @@ export const ReturnsApprovalsPage = () => {
                       className="w-full bg-transparent text-slate-700 placeholder:text-slate-400 outline-none"
                     />
                   </div>
-                  
+
                   <button type="button" className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition">
                     <ListFilter className="h-4 w-4" />
                     Filter
                   </button>
 
-                  <button type="button" onClick={() => {setSearchTerm(''); setDateRange(''); setBranchId(''); setStatus('all'); setTab('all'); setPage(1);}} className="rounded-xl border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+                  <button type="button" onClick={() => { setSearchTerm(''); setDateRange(''); setBranchId(''); setStatus('all'); setTab('all'); setPage(1); }} className="rounded-xl border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
                     Clear
                   </button>
                 </div>
               </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-100 text-left">
-                <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3">#</th>
-                    <th className="px-4 py-3">Request ID</th>
-                    <th className="px-4 py-3">Invoice No.</th>
-                    <th className="px-4 py-3">Customer</th>
-                    <th className="px-4 py-3">Items</th>
-                    <th className="px-4 py-3">Reason</th>
-                    <th className="px-4 py-3">Amount</th>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {isLoading ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-100 text-left">
+                  <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-slate-600">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                          Loading returns...
-                        </div>
-                      </td>
+                      <th className="px-4 py-3">#</th>
+                      <th className="px-4 py-3">Request ID</th>
+                      <th className="px-4 py-3">Invoice No.</th>
+                      <th className="px-4 py-3">Customer</th>
+                      <th className="px-4 py-3">Items</th>
+                      <th className="px-4 py-3">Reason</th>
+                      <th className="px-4 py-3">Amount</th>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Action</th>
                     </tr>
-                  ) : isError ? (
-                    <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center">
-                        <div className="space-y-2 text-slate-700">
-                          <p className="font-medium text-red-700">Unable to load return requests</p>
-                          <p className="text-sm text-slate-600">{(error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'The approval service is unavailable.'}</p>
-                          <button type="button" onClick={() => refetch()} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50">Retry</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-slate-600">
-                        <div className="space-y-2">
-                          <RotateCcw className="mx-auto h-8 w-8 text-blue-600" />
-                          <p className="font-medium">No return requests found</p>
-                          <p className="text-sm text-slate-500">Try adjusting your search or filters.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    rows.map((request, index) => {
-                      const status = normalizeStatus(request.status);
-                      const rowItems = getRequestItems(request);
-                      const rowAmount = Number(request.amount || rowItems.reduce((sum, item) => sum + getLineTotalFromItem(item), 0));
-                      const isSelected = selectedRequest?.id === request.id;
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {isLoading ? (
+                      <tr>
+                        <td colSpan={10} className="px-4 py-12 text-center text-slate-600">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                            Loading returns...
+                          </div>
+                        </td>
+                      </tr>
+                    ) : isError ? (
+                      <tr>
+                        <td colSpan={10} className="px-4 py-12 text-center">
+                          <div className="space-y-2 text-slate-700">
+                            <p className="font-medium text-red-700">Unable to load return requests</p>
+                            <p className="text-sm text-slate-600">{(error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'The approval service is unavailable.'}</p>
+                            <button type="button" onClick={() => refetch()} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50">Retry</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="px-4 py-12 text-center text-slate-600">
+                          <div className="space-y-2">
+                            <RotateCcw className="mx-auto h-8 w-8 text-blue-600" />
+                            <p className="font-medium">No return requests found</p>
+                            <p className="text-sm text-slate-500">Try adjusting your search or filters.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      rows.map((request, index) => {
+                        const status = normalizeStatus(request.status);
+                        const rowItems = getRequestItems(request);
+                        const rowAmount = Number(request.amount || rowItems.reduce((sum, item) => sum + getLineTotalFromItem(item), 0));
+                        const isSelected = selectedRequest?.id === request.id;
 
-                      return (
-                        <tr
-                          key={request.id}
-                          className={`cursor-pointer transition ${isSelected ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
-                          onClick={() => setSelectedId(request.id)}
-                        >
-                          <td className="px-4 py-3 text-sm text-slate-600">{index + 1}</td>
-                          <td className="px-4 py-3 text-sm font-semibold text-slate-700">{getRequestNumber(request)}</td>
-                          <td className="px-4 py-3 text-sm text-slate-700">{getInvoiceNumber(request)}</td>
-                          <td className="px-4 py-3 text-sm text-slate-700">{getCustomerName(request)}</td>
-                          <td className="px-4 py-3 text-sm text-slate-600">{rowItems.length}</td>
-                          <td className="px-4 py-3 text-sm text-slate-600">{request.reason || 'Return'}</td>
-                          <td className="px-4 py-3 text-sm font-medium text-slate-700">{formatMoney(rowAmount)}</td>
-                          <td className="px-4 py-3 text-sm text-slate-600">{request.created_at ? new Date(request.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${badgePalette[status] || badgePalette.pending}`}>
-                              {status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setSelectedId(request.id);
-                                setIsModalOpen(true);
-                              }}
-                              className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                              aria-label="Review request"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+                        return (
+                          <tr
+                            key={request.id}
+                            className={`cursor-pointer transition ${isSelected ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
+                            onClick={() => setSelectedId(request.id)}
+                          >
+                            <td className="px-4 py-3 text-sm text-slate-600">{index + 1}</td>
+                            <td className="px-4 py-3 text-sm font-semibold text-slate-700">{getRequestNumber(request)}</td>
+                            <td className="px-4 py-3 text-sm text-slate-700">{getInvoiceNumber(request)}</td>
+                            <td className="px-4 py-3 text-sm text-slate-700">{getCustomerName(request)}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{rowItems.length}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{request.reason || 'Return'}</td>
+                            <td className="px-4 py-3 text-sm font-medium text-slate-700">{formatMoney(rowAmount)}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{request.created_at ? new Date(request.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${badgePalette[status] || badgePalette.pending}`}>
+                                {status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setSelectedId(request.id);
+                                  setIsModalOpen(true);
+                                }}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                aria-label="Review request"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 gap-4">
-              <div className="flex items-center gap-4">
-                <span>Showing {Math.min((page - 1) * limit + 1, totalCount) || 0} to {Math.min(page * limit, totalCount)} of {totalCount} requests</span>
-                <div className="flex items-center gap-2 border-l border-slate-300 pl-4">
-                  <span>Entries per page:</span>
-                  <input 
-                    type="number" 
-                    min={1} 
-                    max={100} 
-                    value={limit} 
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      if (val > 0 && val <= 100) {
-                        setLimit(val);
-                        setPage(1);
-                      }
-                    }}
-                    className="w-16 rounded border border-slate-300 px-2 py-1 text-center outline-none focus:border-blue-500"
-                  />
-                  <select 
-                    value={limit} 
-                    onChange={(e) => {setLimit(Number(e.target.value)); setPage(1);}}
-                    className="rounded border border-slate-300 px-2 py-1 outline-none focus:border-blue-500"
-                  >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
+              <div className="flex flex-col sm:flex-row items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 gap-4">
+                <div className="flex items-center gap-4">
+                  <span>Showing {Math.min((page - 1) * limit + 1, totalCount) || 0} to {Math.min(page * limit, totalCount)} of {totalCount} requests</span>
+                  <div className="flex items-center gap-2 border-l border-slate-300 pl-4">
+                    <span>Entries per page:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={limit}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (val > 0 && val <= 100) {
+                          setLimit(val);
+                          setPage(1);
+                        }
+                      }}
+                      className="w-16 rounded border border-slate-300 px-2 py-1 text-center outline-none focus:border-blue-500"
+                    />
+                    <select
+                      value={limit}
+                      onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                      className="rounded border border-slate-300 px-2 py-1 outline-none focus:border-blue-500"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="rounded-md border border-slate-200 bg-slate-100 p-1.5 text-slate-700 hover:bg-[#123d65] hover:text-white disabled:opacity-50 transition">
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1).map((p, i, arr) => (
+                    <div key={p} className="flex items-center">
+                      {i > 0 && arr[i - 1] !== p - 1 && <span className="px-1 text-slate-400">...</span>}
+                      <button
+                        type="button"
+                        onClick={() => setPage(p)}
+                        className={`h-7 min-w-[28px] rounded-md text-[13px] font-medium transition-colors ${p === page ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
+                      >
+                        {p}
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages || totalPages === 0} className="rounded-md border border-slate-200 bg-slate-100 p-1.5 text-slate-700 hover:bg-[#123d65] hover:text-white disabled:opacity-50 transition">
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="rounded-md border border-slate-200 bg-slate-100 p-1.5 text-slate-700 hover:bg-[#123d65] hover:text-white disabled:opacity-50 transition">
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1).map((p, i, arr) => (
-                  <div key={p} className="flex items-center">
-                    {i > 0 && arr[i - 1] !== p - 1 && <span className="px-1 text-slate-400">...</span>}
-                    <button 
-                      type="button" 
-                      onClick={() => setPage(p)}
-                      className={`h-7 min-w-[28px] rounded-md text-[13px] font-medium transition-colors ${p === page ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
-                    >
-                      {p}
-                    </button>
-                  </div>
-                ))}
-                <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages || totalPages === 0} className="rounded-md border border-slate-200 bg-slate-100 p-1.5 text-slate-700 hover:bg-[#123d65] hover:text-white disabled:opacity-50 transition">
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
             </div>
-          </div>
           </div>
 
           {isModalOpen && (
@@ -559,153 +555,153 @@ export const ReturnsApprovalsPage = () => {
                 >
                   <X className="h-5 w-5" />
                 </button>
-                
-            {selectedRequest ? (
-              <>
-                <div className="flex items-center justify-between gap-4 mt-2">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">Return Request Details</p>
-                    <h2 className="mt-2 text-2xl font-bold text-slate-900">{getRequestNumber(selectedRequest)}</h2>
-                  </div>
-                  <button type="button" onClick={() => navigate('/sales')} className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[#123d65]">
-                    View Invoice
-                  </button>
-                </div>
 
-                <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-100">
-                      <Ticket className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">{getRequestNumber(selectedRequest)}</div>
-                      <div className="text-xs text-blue-600">Submitted on {selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</div>
-                    </div>
-                  </div>
-                  <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${badgePalette[normalizeStatus(selectedRequest.status)] || badgePalette.pending}`}>
-                    {normalizeStatus(selectedRequest.status)}
-                  </span>
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Left Column */}
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Invoice Information</h3>
-                      <div className="mt-3 grid gap-3 text-sm text-slate-700">
-                        <InfoRow label="Invoice No." value={getInvoiceNumber(selectedRequest)} />
-                        <InfoRow label="Customer" value={getCustomerName(selectedRequest)} />
-                        <InfoRow label="Payment Method" value={safeText(selectedRequest.payload?.paymentMethod || selectedRequest.payload?.payment_method || 'Cash')} />
+                {selectedRequest ? (
+                  <>
+                    <div className="flex items-center justify-between gap-4 mt-2">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-600">Return Request Details</p>
+                        <h2 className="mt-2 text-2xl font-bold text-slate-900">{getRequestNumber(selectedRequest)}</h2>
                       </div>
+                      <button type="button" onClick={() => navigate('/sales')} className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-[#123d65]">
+                        View Invoice
+                      </button>
                     </div>
 
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Return Items</h3>
-                      <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
-                        <table className="min-w-full divide-y divide-sky-800 text-left text-sm">
-                          <thead className="bg-slate-100 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
-                            <tr>
-                              <th className="px-3 py-2">#</th>
-                              <th className="px-3 py-2">Product</th>
-                              <th className="px-3 py-2 text-center">Qty</th>
-                              <th className="px-3 py-2 text-right">Price</th>
-                              <th className="px-3 py-2 text-right">Total</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-sky-800 bg-slate-50">
-                            {selectedItems.length === 0 ? (
-                              <tr>
-                                <td colSpan={5} className="px-3 py-4 text-center text-slate-600">No item data returned by the backend.</td>
-                              </tr>
-                            ) : (
-                              selectedItems.map((item, index) => (
-                                <tr key={`${item.itemCode || 'line'}-${index}`}>
-                                  <td className="px-3 py-2 text-slate-600">{index + 1}</td>
-                                  <td className="px-3 py-2 text-slate-800">{item.itemName || item.itemCode || 'Item'}</td>
-                                  <td className="px-3 py-2 text-center text-slate-700">{item.quantity || 0}</td>
-                                  <td className="px-3 py-2 text-right text-slate-700">{formatMoney(item.unitPrice || 0)}</td>
-                                  <td className="px-3 py-2 text-right text-slate-800">{formatMoney(getLineTotalFromItem(item))}</td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
+                    <div className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-100">
+                          <Ticket className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">{getRequestNumber(selectedRequest)}</div>
+                          <div className="text-xs text-blue-600">Submitted on {selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</div>
+                        </div>
                       </div>
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${badgePalette[normalizeStatus(selectedRequest.status)] || badgePalette.pending}`}>
+                        {normalizeStatus(selectedRequest.status)}
+                      </span>
                     </div>
 
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Requested Amount</h3>
-                        <span className="text-xl font-bold text-slate-900">{formatMoney(selectedAmount)}</span>
-                      </div>
-                      <div className="mt-3 text-sm text-slate-700">
-                        <p className="mb-2 font-medium text-slate-600">Reason for Return</p>
-                        <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-700">{selectedRequest.reason || 'No reason was provided by the backend.'}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column */}
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Approval Workflow</h3>
-                      <div className="mt-4 space-y-3 text-sm">
-                        <WorkflowRow title="Request Submitted" time={selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} done />
-                        <WorkflowRow title="Pending Review" time={canApprove ? 'Admin/Manager approval queue' : 'Access restricted'} done={normalizeStatus(selectedRequest.status) !== 'rejected' && normalizeStatus(selectedRequest.status) !== 'completed'} />
-                        <WorkflowRow title="Approved / Rejected" time={selectedRequest.updated_at ? new Date(selectedRequest.updated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Awaiting decision'} done={['completed', 'rejected', 'failed'].includes(normalizeStatus(selectedRequest.status))} />
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
-                      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Reviewer Notes</h3>
-                      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                        {selectedRequest.payload?.reviewerComment || 'No reviewer comment was returned by the backend yet.'}
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      {actionError && (
-                        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                          <div className="flex items-start gap-2">
-                            <AlertCircle className="mt-0.5 h-4 w-4" />
-                            <span>{actionError}</span>
+                    <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Left Column */}
+                      <div className="space-y-4">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Invoice Information</h3>
+                          <div className="mt-3 grid gap-3 text-sm text-slate-700">
+                            <InfoRow label="Invoice No." value={getInvoiceNumber(selectedRequest)} />
+                            <InfoRow label="Customer" value={getCustomerName(selectedRequest)} />
+                            <InfoRow label="Payment Method" value={safeText(selectedRequest.payload?.paymentMethod || selectedRequest.payload?.payment_method || 'Cash')} />
                           </div>
                         </div>
-                      )}
 
-                      <div className="flex gap-3">
-                        <button
-                          type="button"
-                          disabled={!canApprove || approveMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
-                          onClick={() => handleApprove(selectedRequest.id)}
-                          className="flex-1 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-900/20 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 transition"
-                        >
-                          {approveMutation.isPending ? 'Approving...' : 'Approve'}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!canApprove || rejectMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
-                          onClick={() => handleReject(selectedRequest.id)}
-                          className="flex-1 rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-rose-900/20 hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50 transition"
-                        >
-                          {rejectMutation.isPending ? 'Rejecting...' : 'Reject'}
-                        </button>
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Return Items</h3>
+                          <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
+                            <table className="min-w-full divide-y divide-sky-800 text-left text-sm">
+                              <thead className="bg-slate-100 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                                <tr>
+                                  <th className="px-3 py-2">#</th>
+                                  <th className="px-3 py-2">Product</th>
+                                  <th className="px-3 py-2 text-center">Qty</th>
+                                  <th className="px-3 py-2 text-right">Price</th>
+                                  <th className="px-3 py-2 text-right">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-sky-800 bg-slate-50">
+                                {selectedItems.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={5} className="px-3 py-4 text-center text-slate-600">No item data returned by the backend.</td>
+                                  </tr>
+                                ) : (
+                                  selectedItems.map((item, index) => (
+                                    <tr key={`${item.itemCode || 'line'}-${index}`}>
+                                      <td className="px-3 py-2 text-slate-600">{index + 1}</td>
+                                      <td className="px-3 py-2 text-slate-800">{item.itemName || item.itemCode || 'Item'}</td>
+                                      <td className="px-3 py-2 text-center text-slate-700">{item.quantity || 0}</td>
+                                      <td className="px-3 py-2 text-right text-slate-700">{formatMoney(item.unitPrice || 0)}</td>
+                                      <td className="px-3 py-2 text-right text-slate-800">{formatMoney(getLineTotalFromItem(item))}</td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Requested Amount</h3>
+                            <span className="text-xl font-bold text-slate-900">{formatMoney(selectedAmount)}</span>
+                          </div>
+                          <div className="mt-3 text-sm text-slate-700">
+                            <p className="mb-2 font-medium text-slate-600">Reason for Return</p>
+                            <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-700">{selectedRequest.reason || 'No reason was provided by the backend.'}</p>
+                          </div>
+                        </div>
                       </div>
 
-                      {!canApprove && (
-                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                          Admin or Manager access is required to approve or reject return requests.
+                      {/* Right Column */}
+                      <div className="space-y-4">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Approval Workflow</h3>
+                          <div className="mt-4 space-y-3 text-sm">
+                            <WorkflowRow title="Request Submitted" time={selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} done />
+                            <WorkflowRow title="Pending Review" time={canApprove ? 'Admin/Manager approval queue' : 'Access restricted'} done={normalizeStatus(selectedRequest.status) !== 'rejected' && normalizeStatus(selectedRequest.status) !== 'completed'} />
+                            <WorkflowRow title="Approved / Rejected" time={selectedRequest.updated_at ? new Date(selectedRequest.updated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Awaiting decision'} done={['completed', 'rejected', 'failed'].includes(normalizeStatus(selectedRequest.status))} />
+                          </div>
                         </div>
-                      )}
+
+                        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
+                          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Reviewer Notes</h3>
+                          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                            {selectedRequest.payload?.reviewerComment || 'No reviewer comment was returned by the backend yet.'}
+                          </div>
+                        </div>
+
+                        <div className="pt-2">
+                          {actionError && (
+                            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                              <div className="flex items-start gap-2">
+                                <AlertCircle className="mt-0.5 h-4 w-4" />
+                                <span>{actionError}</span>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex gap-3">
+                            <button
+                              type="button"
+                              disabled={!canApprove || approveMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
+                              onClick={() => handleApprove(selectedRequest.id)}
+                              className="flex-1 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-900/20 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 transition"
+                            >
+                              {approveMutation.isPending ? 'Approving...' : 'Approve'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!canApprove || rejectMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
+                              onClick={() => handleReject(selectedRequest.id)}
+                              className="flex-1 rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-rose-900/20 hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50 transition"
+                            >
+                              {rejectMutation.isPending ? 'Rejecting...' : 'Reject'}
+                            </button>
+                          </div>
+
+                          {!canApprove && (
+                            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                              Admin or Manager access is required to approve or reject return requests.
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
+                  </>
+                ) : (
+                  <div className="flex h-full min-h-[320px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-600">
+                    Select a return request to review its details.
                   </div>
-                </div>
-              </>
-            ) : (
-              <div className="flex h-full min-h-[320px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-600">
-                Select a return request to review its details.
-              </div>
-            )}
+                )}
               </aside>
             </div>
           )}

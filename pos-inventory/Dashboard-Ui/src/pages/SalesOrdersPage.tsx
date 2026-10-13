@@ -5,8 +5,9 @@ import { useDebounce } from '../hooks/useDebounce';
 import {
   FileText, Clock, CheckCircle2, XCircle, Search, Filter, RotateCcw, 
   MoreVertical, Download, Plus, Eye, Edit, ChevronLeft, ChevronRight,
-  Calendar, ChevronDown
+  Calendar, ChevronDown, Sparkles
 } from 'lucide-react';
+import { AIAssistantPanel } from '../components/AIAssistantPanel';
 
 export default function SalesOrdersPage() {
   const [page, setPage] = useState(1);
@@ -24,6 +25,20 @@ export default function SalesOrdersPage() {
   
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+
+  const [aiOpen, setAiOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.open !== undefined) {
+        setAiOpen(e.detail.open);
+      } else {
+        setAiOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('atls-toggle-ai', handler);
+    return () => window.removeEventListener('atls-toggle-ai', handler);
+  }, []);
   
   const applyQuickFilter = (filter: QuickFilter) => {
     setQuickFilter(filter);
@@ -156,8 +171,10 @@ export default function SalesOrdersPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-full overflow-hidden p-6">
-      {/* Header */}
+    <div className="p-6 w-full min-w-0 transition-all duration-300">
+      <div className="flex flex-col lg:flex-row gap-6 items-start w-full min-w-0">
+        <div className="flex-1 min-w-0 w-full space-y-6">
+          {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Sales Orders</h1>
@@ -479,6 +496,35 @@ export default function SalesOrdersPage() {
             </div>
          </div>
       </div>
+    </div>
+
+    {/* AI Assistant Right Panel */}
+    <AIAssistantPanel
+        pageContext="sales_orders"
+        pageFilters={{
+          search: debouncedSearch,
+          status: statusFilter,
+          customer: customerFilter,
+          quickFilter,
+          dateFrom,
+          dateTo
+        }}
+        isOpen={aiOpen}
+        onClose={() => setAiOpen(false)}
+      />
+    </div>
+
+    {/* Floating AI Button when panel is closed */}
+    {!aiOpen && (
+      <button
+        onClick={() => setAiOpen(true)}
+        className="fixed right-5 bottom-6 z-40 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 px-4 py-2.5 text-[12px] font-semibold text-white shadow-[0_4px_20px_rgba(99,102,241,0.35)] transition-all cursor-pointer hover:shadow-[0_6px_25px_rgba(99,102,241,0.5)] hover:scale-[1.02] active:scale-[0.98]"
+        title="Open ATLAS AI Assistant"
+      >
+        <Sparkles size={16} />
+        <span>Open ATLAS AI Assistant</span>
+      </button>
+    )}
 
       {/* Detail Modal Overlay */}
       {isDrawerOpen && (

@@ -1,74 +1,247 @@
 import json
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, date, timedelta
 import openai
+
 from app.core.config import settings
+from app.models.schemas import StructuredTableResponse, TableColumn, TableFilters, TableChartConfig
 from app.services.sap.production_service import SAPProductionService
 from app.services.sap.invoices_service import SAPInvoicesService
+from app.services.sap.sales_orders_service import SAPSalesOrdersService
+from app.services.sap.purchase_orders_service import SAPPurchaseOrdersService
 from app.services.sap.inventory_service import SAPInventoryService
+from app.services.sap.items_service import SAPItemsService
 from app.services.sap.business_partners_service import SAPBusinessPartnersService
 from app.services.sap.returns_service import SAPReturnsService
-from app.api.v1.atlas import _get_permitted_branch
-from app.api.v1.sales import _extract_branch_from_invoice, _normalize_branch
-from datetime import datetime
+from app.services.sap.payments_report_service import SAPPaymentsReportService
+from app.services.sap.warehouses_service import SAPWarehousesService
+from app.services import approval_service
+from app.services.sap.client import SAPConnectionError
 
 logger = logging.getLogger(__name__)
+
+# Trusted Route Registry Mapping for navigation suggestions
+INTERNAL_ROUTE_MAP = {
+    "dashboard": {"name": "Dashboard", "path": "/"},
+    "pos": {"name": "Point of Sale", "path": "/pos"},
+    "products": {"name": "Products & Stock", "path": "/products"},
+    "sales": {"name": "Invoices", "path": "/sales"},
+    "sales_orders": {"name": "Sales Orders", "path": "/sales-orders"},
+    "purchase_orders": {"name": "Purchase Orders", "path": "/purchase-orders"},
+    "customers": {"name": "Customers", "path": "/customers"},
+    "returns": {"name": "Returns & Approvals", "path": "/returns"},
+    "analytics": {"name": "Atlas Analytics", "path": "/analytics"},
+    "production_overview": {"name": "Production Overview", "path": "/production"},
+    "production_orders": {"name": "Production Orders", "path": "/production/orders"},
+    "production_item_wise": {"name": "Item-wise Production", "path": "/production/item-wise"},
+    "production_rejection": {"name": "Production Rejection", "path": "/production/rejection"},
+    "production_date_wise": {"name": "Date-wise Production", "path": "/production/date-wise"},
+    "production_reports": {"name": "Production Reports", "path": "/production/reports"},
+    "reports_sales": {"name": "Sales Reports", "path": "/reports/sales"},
+    "reports_invoice": {"name": "Invoice Reports", "path": "/reports/invoice"},
+    "reports_payment": {"name": "Payment Reports", "path": "/reports/payment"},
+    "reports_inventory": {"name": "Inventory Reports", "path": "/reports/inventory"},
+    "settings": {"name": "Settings", "path": "/settings"}
+}
+
+def _get_permitted_branch(user: dict, requested_branch: Optional[str] = None) -> Optional[str]:
+    """
+    Enforce branch/warehouse access.
+    Admins can see all branches or filter by requested.
+    Managers are locked to their assigned branch.
+    Users use assigned branch if set, otherwise requested branch or default warehouse.
+    """
+    role = str(user.get("role") or "user").lower()
+    default_wh = str(getattr(settings, "SAP_DEFAULT_WAREHOUSE", "SH") or "SH").strip().upper()
+
+    if role == "admin":
+        if requested_branch and requested_branch.strip():
+            b = requested_branch.strip().upper()
+            return b if b not in ("ALL", "TOTAL", "*", "UNKNOWN", "WH-01", "WH-001") else None
+        return None
+
+    if role == "manager":
+        assigned = str(user.get("branch_id") or "").strip().upper()
+        return assigned or default_wh
+
+    user_branch = str(user.get("branch_id") or "").strip().upper()
+    if user_branch and user_branch not in ("UNKNOWN", "WH-01", "WH-001"):
+        return user_branch
+    if requested_branch and requested_branch.strip():
+        req = requested_branch.strip().upper()
+        if req not in ("UNKNOWN", "WH-01", "WH-001", "ALL", "TOTAL"):
+            return req
+    return default_wh
+
+def _normalize_branch(value: Optional[str]) -> str:
+    branch = str(value or "").strip().upper()
+    if branch and branch not in ("UNKNOWN", "WH-01", "WH-001"):
+        return branch
+    return str(getattr(settings, "SAP_DEFAULT_WAREHOUSE", "SH") or "SH").strip().upper()
+
+def _extract_branch_from_invoice(invoice: Dict[str, Any]) -> Optional[str]:
+    for key in (
+        "U_Branch", "U_BranchId", "U_Branch_ID", "U_BranchCode",
+        "U_Warehouse", "U_WarehouseCode", "U_Warehouse_Code"
+    ):
+        value = str(invoice.get(key) or "").strip()
+        if value:
+            return value
+
+    for line in invoice.get("DocumentLines") or []:
+        candidate = str(line.get("WarehouseCode") or "").strip()
+        if candidate:
+            return candidate
+    return None
+
+def _resolve_date_range(
+    range_str: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None
+) -> Tuple[Optional[date], Optional[date], str]:
+    """
+    Resolves standard business dates against current anchor 2026-10-13 (Asia/Kolkata).
+    """
+    today = date(2026, 10, 13)
+
+    if from_date:
+        try:
+            d_from = datetime.strptime(from_date, "%Y-%m-%d").date()
+            d_to = datetime.strptime(to_date, "%Y-%m-%d").date() if to_date else d_from
+            return d_from, d_to, f"{d_from} to {d_to}"
+        except ValueError:
+            pass
+
+    r = (range_str or "monthly").lower().strip()
+
+    if r in ("today", "daily"):
+        return today, today, "Today (2026-10-13)"
+    elif r == "yesterday":
+        y = today - timedelta(days=1)
+        return y, y, "Yesterday (2026-10-12)"
+    elif r in ("week", "weekly", "this_week"):
+        d_from = today - timedelta(days=6)
+        return d_from, today, f"2026-10-07 to 2026-10-13"
+    elif r in ("month", "monthly", "this_month"):
+        d_from = date(today.year, today.month, 1)
+        return d_from, today, f"This Month (2026-10-01 to 2026-10-13)"
+    elif r in ("last_month", "previous_month"):
+        return date(2026, 9, 1), date(2026, 9, 30), "Last Month (Sep 2026)"
+    elif r in ("past_6_months", "6_months", "last_6_months", "past_six_months"):
+        # Past 6 calendar months: May 2026 to October 2026 (2026-05-01 to 2026-10-13)
+        return date(2026, 5, 1), today, "Past 6 months (May 2026 to Oct 2026)"
+    elif r in ("year", "yearly", "this_year", "2026"):
+        return date(2026, 1, 1), today, f"Year 2026 ({date(2026, 1, 1)} to {today})"
+    elif r in ("2025", "last_year"):
+        return date(2025, 1, 1), date(2025, 12, 31), "Year 2025 (2025-01-01 to 2025-12-31)"
+    elif r in ("same_month_last_year", "oct_2025"):
+        return date(2025, 10, 1), date(2025, 10, 31), "Same Month Last Year (Oct 2025)"
+    elif r in ("compare_last_month", "this_month_vs_last_month"):
+        return date(2026, 10, 1), today, "This Month (Oct 2026) vs Last Month (Sep 2026)"
+    elif r in ("compare_last_year", "this_month_vs_last_year"):
+        return date(2026, 10, 1), today, "This Month (Oct 2026) vs Last Year (Full Year 2025)"
+    elif r in ("total", "all_time", "all"):
+        return None, None, "Total (All Time)"
+    else:
+        return date(today.year, today.month, 1), today, "Current Period"
+
 
 class AIAssistantService:
     def __init__(self):
         if not settings.OPENAI_API_KEY:
-            raise ValueError("OPENAI_API_KEY is not configured on the server")
-        self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-        self.model = settings.OPENAI_MODEL
+            raise ValueError(
+                "OPENAI_API_KEY is not configured on the server. Please configure OPENAI_API_KEY in your environment."
+            )
+        self.timeout = getattr(settings, "OPENAI_TIMEOUT", 35.0)
+        client_kwargs = {
+            "api_key": settings.OPENAI_API_KEY,
+            "timeout": self.timeout,
+        }
+        if getattr(settings, "OPENAI_BASE_URL", None):
+            client_kwargs["base_url"] = settings.OPENAI_BASE_URL
+
+        self.client = openai.OpenAI(**client_kwargs)
+        self.model = getattr(settings, "OPENAI_MODEL", "gpt-4o-mini") or "gpt-4o-mini"
+
+        # Initialize existing SAP business services
         self.production_service = SAPProductionService()
         self.invoices_service = SAPInvoicesService()
+        self.sales_orders_service = SAPSalesOrdersService()
+        self.purchase_orders_service = SAPPurchaseOrdersService()
         self.inventory_service = SAPInventoryService()
+        self.items_service = SAPItemsService()
         self.business_partners_service = SAPBusinessPartnersService()
         self.returns_service = SAPReturnsService()
+        self.payments_service = SAPPaymentsReportService()
+        self.warehouses_service = SAPWarehousesService()
 
-    def process_chat(
-        self,
-        message: str,
-        branch_id: str,
-        current_user: Dict[str, Any],
-        conversation_id: Optional[str] = None,
-        history: Optional[List[Dict[str, str]]] = None
-    ) -> Dict[str, Any]:
-        # Validate authorization
-        permitted_warehouse = _get_permitted_branch(current_user, branch_id)
-
-        # Prepare messages
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    f"You are the Atls AI Business Assistant. You help users analyze their POS, Inventory, and Production data from SAP Business One.\n"
-                    f"The authenticated user is {current_user.get('name', 'User')} ({current_user.get('role', 'user')}).\n"
-                    f"The selected warehouse context is '{permitted_warehouse}'.\n"
-                    "Use tools to fetch authorized data. Answer concisely using the data provided. "
-                    "If a tool returns no data, explain that there are no records matching the criteria."
-                )
-            }
-        ]
-
-        if history:
-            messages.extend(history)
-
-        messages.append({"role": "user", "content": message})
-
-        # Define tools
-        tools = [
+    def _get_tools_schema(self) -> List[Dict[str, Any]]:
+        return [
             {
                 "type": "function",
                 "function": {
-                    "name": "get_production_orders",
-                    "description": "Fetch production orders with optional date filtering",
+                    "name": "get_analytical_table",
+                    "description": "Fetch a structured analytical data table and optional chart comparing business metrics across dimensions. Supports grouping monthly revenue (e.g. past 6 months), weekly sales by branch, payment methods, customer sales, period comparisons (this month vs last month, this month vs same month last year), recent invoices, and product sales. Use this whenever the user asks for breakdowns, tables, trends, or comparisons.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)"},
-                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)"}
+                            "metric": {
+                                "type": "string",
+                                "enum": ["sales", "payments", "products"],
+                                "description": "Metric to analyze (default: sales)."
+                            },
+                            "group_by": {
+                                "type": "string",
+                                "enum": ["month", "branch", "payment_method", "customer", "product", "comparison", "invoice", "date"],
+                                "description": "Dimension to group by: 'month' for monthly revenue (e.g. past 6 months), 'branch' for warehouse breakdown, 'payment_method' for cash/card/UPI split, 'customer' for customer-wise sales, 'product' for top selling products, 'comparison' for period-over-period comparisons (this month vs last month, etc.), 'invoice' for recent invoices table, 'date' for daily period trend."
+                            },
+                            "range": {
+                                "type": "string",
+                                "enum": ["past_6_months", "6_months", "week", "month", "last_month", "compare_last_month", "same_month_last_year", "compare_last_year", "year", "2025", "today", "total"],
+                                "description": "Time range: 'past_6_months' for past 6 months monthly breakdown, 'week' for weekly sales, 'compare_last_month' for this month vs last month, 'same_month_last_year' for this month vs same month last year, 'month', 'year', 'total'."
+                            },
+                            "date_from": {"type": "string", "description": "Custom start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "Custom end date (YYYY-MM-DD)."},
+                            "branch": {"type": "string", "description": "Optional branch filter (e.g. SH, 01, DEL)."},
+                            "limit": {"type": "integer", "description": "Maximum rows to return (default 20, max 100)."}
+                        },
+                        "required": ["group_by"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_dashboard_summary",
+                    "description": "Fetch overall high-level KPIs including total sales revenue, invoice count, average bill value, growth %, low-stock items count, and pending approvals count.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "range": {"type": "string", "enum": ["today", "week", "month", "last_month", "year", "2025", "total"], "description": "Time period to summarize."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD) for custom range."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD) for custom range."},
+                            "branch": {"type": "string", "description": "Warehouse/branch code (e.g. SH, 01, DEL)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_sales_orders",
+                    "description": "Fetch customer sales orders from SAP with status counts (total, pending, completed, cancelled) and recent order details.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "status": {"type": "string", "enum": ["all", "pending", "completed", "cancelled"], "description": "Filter by order status."},
+                            "search": {"type": "string", "description": "Search term for customer name, card code, or document number."},
+                            "customer": {"type": "string", "description": "Specific customer CardCode."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "limit": {"type": "integer", "description": "Number of sample orders to return (default 10)."}
                         }
                     }
                 }
@@ -77,12 +250,32 @@ class AIAssistantService:
                 "type": "function",
                 "function": {
                     "name": "get_sales_invoices",
-                    "description": "Fetch sales invoices for the authorized branch with optional date filtering",
+                    "description": "Fetch finalized AR sales invoices from SAP for the authorized branch with totals, customer codes, and payment status.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)"},
-                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)"}
+                            "range": {"type": "string", "enum": ["today", "week", "month", "last_month", "year", "2025", "total"], "description": "Named date range."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "search": {"type": "string", "description": "Search term."},
+                            "limit": {"type": "integer", "description": "Max invoices to return (default 20)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_purchase_orders",
+                    "description": "Fetch vendor purchase orders from SAP, including summary of total, pending, received, and cancelled orders.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "status": {"type": "string", "enum": ["all", "pending", "received", "cancelled"], "description": "Status filter."},
+                            "search": {"type": "string", "description": "Search term for supplier name or code."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "limit": {"type": "integer", "description": "Max orders to return (default 10)."}
                         }
                     }
                 }
@@ -91,11 +284,29 @@ class AIAssistantService:
                 "type": "function",
                 "function": {
                     "name": "get_inventory_stock",
-                    "description": "Fetch current stock and inventory for the authorized warehouse. Optionally filter by item_code.",
+                    "description": "Fetch current stock and warehouse quantities. Can return low-stock alert items or look up a specific item code.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "item_code": {"type": "string", "description": "Specific item code to look up (optional)."}
+                            "item_code": {"type": "string", "description": "Specific item code to look up."},
+                            "low_stock_only": {"type": "boolean", "description": "If true, returns only products running low on stock or below threshold."},
+                            "warehouse": {"type": "string", "description": "Warehouse code (e.g. SH, 01, DEL)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_products",
+                    "description": "Fetch products catalog, top-selling products by quantity/sales, or velocity rankings.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "top_selling_only": {"type": "boolean", "description": "If true, returns products ranked by highest sales volume."},
+                            "range": {"type": "string", "enum": ["today", "week", "month", "year", "total"], "description": "Time range for top selling calculation."},
+                            "search": {"type": "string", "description": "Search product by code or description."},
+                            "limit": {"type": "integer", "description": "Max products to return (default 10)."}
                         }
                     }
                 }
@@ -104,12 +315,13 @@ class AIAssistantService:
                 "type": "function",
                 "function": {
                     "name": "search_customers",
-                    "description": "Search for customers available to the authorized branch by mobile number or name.",
+                    "description": "Search for customers by mobile number, customer code, or name, returning purchase summary.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "search_term": {"type": "string", "description": "Mobile number or name fragment to search."}
-                        }
+                            "search_term": {"type": "string", "description": "Customer mobile number, code, or name."}
+                        },
+                        "required": ["search_term"]
                     }
                 }
             },
@@ -117,22 +329,241 @@ class AIAssistantService:
                 "type": "function",
                 "function": {
                     "name": "get_sales_returns",
-                    "description": "Fetch sales returns (credit memos) for the authorized branch by date range.",
+                    "description": "Fetch customer sales returns and credit notes (AR Credit Memos) from SAP by date range.",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)"},
-                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)"}
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "branch": {"type": "string", "description": "Warehouse/branch code."}
                         }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_production_summary",
+                    "description": "Fetch overall SAP production metrics: planned orders, completed orders, pending production, total produced qty, and scrap/rejection rate %.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "warehouse": {"type": "string", "description": "Warehouse code."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_production_orders",
+                    "description": "Fetch SAP production orders with order status, planned qty, produced qty, rejected qty, and due dates.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "status": {"type": "string", "enum": ["Planned", "Released", "Closed", "Cancelled", "all"], "description": "Order status filter."},
+                            "item_code": {"type": "string", "description": "Specific item being manufactured."},
+                            "warehouse": {"type": "string", "description": "Warehouse code."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "limit": {"type": "integer", "description": "Max orders to return (default 10)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_production_rejection",
+                    "description": "Fetch production rejection analysis, scrap quantities, defective items, and rejection percentages.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "warehouse": {"type": "string", "description": "Warehouse code."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "search": {"type": "string", "description": "Search item code or description."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_production_item_wise",
+                    "description": "Fetch item-wise production target vs completed output, scrap ratios, and fulfillment rates.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "warehouse": {"type": "string", "description": "Warehouse code."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "search": {"type": "string", "description": "Search item code or description."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_sales_report",
+                    "description": "Fetch sales analytics report comparing sales amounts, growth %, and monthly breakdown.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "range": {"type": "string", "enum": ["today", "week", "month", "last_month", "year", "2025", "total"], "description": "Time range."},
+                            "from_date": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "to_date": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "branch": {"type": "string", "description": "Warehouse branch."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_payment_report",
+                    "description": "Fetch payment collection breakdown by payment methods (Cash, Card, UPI, Bank Transfer) from SAP Incoming Payments.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "range": {"type": "string", "enum": ["today", "week", "month", "last_month", "year", "2025", "total"], "description": "Time range."},
+                            "from_date": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "to_date": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "branch": {"type": "string", "description": "Warehouse branch."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_customer_report",
+                    "description": "Fetch customer spending report, purchase counts, and top revenue-generating customers.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "range": {"type": "string", "enum": ["month", "year", "total"], "description": "Time range."},
+                            "customer_code": {"type": "string", "description": "Specific CardCode (optional)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_pending_approvals",
+                    "description": "Fetch pending manager approvals for customer returns, refunds, and exchange workflows from the application database.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "status": {"type": "string", "enum": ["pending", "approved", "rejected", "all"], "description": "Approval status (default pending)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "navigate_to_module",
+                    "description": "Generate an internal navigation action to open a verified application module or record.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "target_module": {
+                                "type": "string",
+                                "enum": [
+                                    "dashboard", "pos", "products", "sales", "sales_orders",
+                                    "purchase_orders", "customers", "returns", "analytics",
+                                    "production_overview", "production_orders", "production_item_wise",
+                                    "production_rejection", "production_date_wise", "production_reports",
+                                    "reports_sales", "reports_invoice", "reports_payment",
+                                    "reports_inventory", "settings"
+                                ],
+                                "description": "The exact ID of the module to open."
+                            },
+                            "label": {"type": "string", "description": "Button label (e.g. 'Open Sales Orders', 'View Inventory')."},
+                            "record_id": {"type": "string", "description": "Optional record ID (e.g. invoice DocEntry)."},
+                            "params": {"type": "object", "description": "Optional query parameters (e.g. status='pending')."}
+                        },
+                        "required": ["target_module"]
                     }
                 }
             }
         ]
 
+    def process_chat(
+        self,
+        message: str,
+        branch_id: str,
+        current_user: Dict[str, Any],
+        conversation_id: Optional[str] = None,
+        history: Optional[List[Dict[str, str]]] = None,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        permitted_warehouse = _get_permitted_branch(current_user, branch_id)
+        default_wh = str(getattr(settings, "SAP_DEFAULT_WAREHOUSE", "SH") or "SH").strip().upper()
+        active_scope_name = permitted_warehouse or f"All Branches (Default: {default_wh})"
+
+        # Temporal anchor setup (Asia/Kolkata)
+        current_time_str = "2026-10-13 14:04:00 IST (Tuesday)"
+        today_date_str = "2026-10-13"
+
+        system_prompt = (
+            f"You are ATLAS, the Personal AI Business Assistant for retail and manufacturing operations.\n"
+            f"SYSTEM TIME CONTEXT:\n"
+            f"- Current Date: {today_date_str} (Timezone: Asia/Kolkata).\n"
+            f"- Current Year: 2026, Month: October.\n"
+            f"- 'Today' is {today_date_str}.\n"
+            f"- 'Yesterday' is 2026-10-12.\n"
+            f"- 'This week' is 2026-10-07 to 2026-10-13.\n"
+            f"- 'This month' is 2026-10-01 to 2026-10-13.\n"
+            f"- 'Last month' is 2026-09-01 to 2026-09-30 (Sep 2026).\n"
+            f"- 'This year' or '2026' is 2026-01-01 to {today_date_str}.\n"
+            f"- 'Year 2025' or 'last year' is 2025-01-01 to 2025-12-31.\n\n"
+            f"USER & AUTHORIZATION CONTEXT:\n"
+            f"- User Name: {current_user.get('name', 'User')}\n"
+            f"- User Role: {current_user.get('role', 'user')}\n"
+            f"- Authorized Warehouse Scope: {active_scope_name}\n\n"
+            f"BUSINESS INTEGRITY RULES:\n"
+            f"1. NEVER invent or hallucinate financial figures, counts, or dates. Always execute backend tools to query live SAP data.\n"
+            f"2. Separate document types strictly: Sales Orders (open/closed customer commitments) are NOT Sales Invoices (financial revenue).\n"
+            f"3. Never combine Sales Invoices with Purchase Orders or Credit Notes into one total.\n"
+            f"4. If SAP returns 0 records, clearly state that no records match the filter; do not treat an empty response as an error, but distinguish API failures.\n"
+            f"5. Currency format: Format all monetary values in Indian Rupees (₹) with comma formatting (e.g. ₹4,05,180).\n"
+            f"6. Whenever answering a data question or when the user asks to 'open', 'view', or 'show' a module, call 'navigate_to_module' to provide a quick internal link.\n"
+            f"7. You are read-only. For any write, edit, or approval request, direct the user to the appropriate screen.\n"
+            f"8. When the user asks for analytics, comparisons, or breakdowns, call 'get_analytical_table':\n"
+            f"   - 'monthly revenue' or 'revenue for the past 6 months': group_by='month', range='past_6_months'\n"
+            f"   - 'weekly sales by branch': group_by='branch', range='week'\n"
+            f"   - 'compare this month with last month': group_by='comparison', range='compare_last_month'\n"
+            f"   - 'compare this month with same month last year': group_by='comparison', range='same_month_last_year'\n"
+            f"   - 'sales by payment method': group_by='payment_method', range='month'\n"
+            f"   - 'top 10 selling products' or top products: group_by='product', limit=10\n"
+            f"   - 'customer-wise sales' or top customers: group_by='customer'\n"
+            f"   - 'recent invoices': group_by='invoice' (or call get_sales_invoices)\n"
+            f"   - 'low stock items': call get_inventory_risk\n"
+            f"   - For any other tabular report or breakdown, call get_analytical_table with appropriate group_by."
+        )
+
+        messages = [{"role": "system", "content": system_prompt}]
+
+        if history:
+            # Keep up to last 10 messages for context
+            messages.extend(history[-10:])
+
+        messages.append({"role": "user", "content": message})
+
+        tools = self._get_tools_schema()
+        collected_cards: List[Dict[str, Any]] = []
+        nav_action: Optional[Dict[str, Any]] = None
+        primary_structured_data: Optional[Dict[str, Any]] = None
+
         try:
             iteration = 0
-            max_iterations = 3
-            structured_data = None
+            max_iterations = 4
             final_text = None
 
             while iteration < max_iterations:
@@ -142,293 +573,1323 @@ class AIAssistantService:
                     tools=tools,
                     tool_choice="auto"
                 )
-                
+
                 response_message = response.choices[0].message
                 tool_calls = response_message.tool_calls
-                
+
                 if not tool_calls:
                     final_text = response_message.content
                     break
-                    
+
                 messages.append(response_message)
-                
+
                 for tool_call in tool_calls:
-                    function_name = tool_call.function.name
+                    fn_name = tool_call.function.name
                     try:
-                        function_args = json.loads(tool_call.function.arguments)
+                        args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
                     except json.JSONDecodeError:
                         messages.append({
                             "tool_call_id": tool_call.id,
                             "role": "tool",
-                            "name": function_name,
-                            "content": json.dumps({"error": "Malformed arguments"})
+                            "name": fn_name,
+                            "content": json.dumps({"error": "Malformed JSON arguments"})
                         })
                         continue
-                        
-                    if function_name == "get_production_orders":
-                        date_from = function_args.get("date_from")
-                        date_to = function_args.get("date_to")
-                        
-                        # Validate dates (basic string validation, ideally use datetime)
-                        if date_from and date_to and date_from > date_to:
-                            messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": json.dumps({"error": "date_from cannot be later than date_to"})
-                            })
-                            continue
-                            
-                        try:
-                            # 1. Fetch raw orders
-                            orders, total = self.production_service.get_production_orders(
-                                skip=0, top=100, warehouse=permitted_warehouse,
-                                date_from=date_from, date_to=date_to
-                            )
-                            # 2. Fetch summary metrics
-                            summary = self.production_service.get_production_summary(
-                                warehouse=permitted_warehouse, date_from=date_from, date_to=date_to
-                            )
-                            
-                            tool_result = {
-                                "summary": summary,
-                                "total_records": total,
-                                "sample_orders": orders[:20]  # Send subset to LLM context
-                            }
-                            
-                            structured_data = {
-                                "type": "production_orders",
-                                "summary": summary,
-                                "orders": orders
-                            }
-                            
-                            messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": json.dumps(tool_result)
-                            })
-                            
-                        except Exception as e:
-                            logger.error(f"Tool error ({function_name}): {e}")
-                            messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": json.dumps({"error": "SAP Service Error: Unable to fetch data"})
-                            })
-                            
-                    elif function_name == "get_sales_invoices":
-                        date_from = function_args.get("date_from")
-                        date_to = function_args.get("date_to")
-                        
-                        if date_from and date_to and date_from > date_to:
-                            messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": json.dumps({"error": "date_from cannot be later than date_to"})
-                            })
-                            continue
-                            
-                        try:
-                            if date_from:
-                                try:
-                                    dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
-                                    dt_to = datetime.strptime(date_to, "%Y-%m-%d").date() if date_to else dt_from
-                                    raw_invoices = self.invoices_service.get_invoices_by_date(dt_from, dt_to)
-                                except ValueError:
-                                    messages.append({
-                                        "tool_call_id": tool_call.id,
-                                        "role": "tool",
-                                        "name": function_name,
-                                        "content": json.dumps({"error": "Invalid date format. Use YYYY-MM-DD."})
-                                    })
-                                    continue
-                            else:
-                                raw_invoices = self.invoices_service.get_recent_invoices(limit=100)
-                                
-                            filtered = []
-                            for inv in raw_invoices:
-                                inv_branch = _normalize_branch(_extract_branch_from_invoice(inv))
-                                if current_user.get("role") == "admin" or inv_branch == permitted_warehouse:
-                                    filtered.append(inv)
-                                    
-                            structured_data = {
-                                "type": "sales_invoices",
-                                "orders": filtered
-                            }
-                            
-                            tool_result = {
-                                "meta": {
-                                    "branch_scope": permitted_warehouse,
-                                    "date_range": f"{date_from} to {date_to}" if date_from else "Recent 100",
-                                    "is_partial": len(filtered) >= 100,
-                                    "disclaimer": "Do NOT calculate monthly or yearly totals from a partial/truncated list of invoices. Return counts only."
-                                },
-                                "total_invoices_found_in_scope": len(filtered),
-                                "sample_invoices": filtered[:20]
-                            }
-                            
-                            messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": json.dumps(tool_result)
-                            })
-                            
-                        except Exception as e:
-                            logger.error(f"Tool error ({function_name}): {e}")
-                            messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": json.dumps({"error": "SAP Service Error: Unable to fetch sales"})
-                            })
 
-                    elif function_name == "get_inventory_stock":
-                        item_code = function_args.get("item_code")
-                        try:
-                            if item_code:
-                                stock = self.inventory_service.get_item_stock(item_code, permitted_warehouse)
-                                tool_result = {
-                                    "meta": {"warehouse": permitted_warehouse, "quantity_semantics": "Stock quantity represents physical On-Hand stock only. No low-stock thresholds are configured."},
-                                    "item_code": item_code,
-                                    "stock_quantity": stock
-                                }
-                                structured_data = {"type": "inventory_stock", "item_code": item_code, "stock": stock}
-                            else:
-                                all_items = self.inventory_service.get_warehouse_stock(permitted_warehouse)
-                                items_only = [item for item in all_items if not item.get("_truncated")]
-                                is_truncated = any(item.get("_truncated") for item in all_items)
-                                tool_result = {
-                                    "meta": {"warehouse": permitted_warehouse, "is_partial": is_truncated, "quantity_semantics": "Stock quantity represents physical On-Hand stock only. No low-stock thresholds are configured."},
-                                    "total_items_in_warehouse_returned": len(items_only),
-                                    "sample_items": items_only[:50]
-                                }
-                                structured_data = {"type": "inventory_list", "items": items_only}
-                                
-                            messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": json.dumps(tool_result)
-                            })
-                        except Exception as e:
-                            logger.error(f"Tool error ({function_name}): {e}")
-                            messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": json.dumps({"error": "SAP Service Error: Unable to fetch inventory"})
-                            })
-                            
-                    elif function_name == "search_customers":
-                        search_term = function_args.get("search_term")
-                        try:
-                            if search_term and search_term.isdigit() and len(search_term) >= 4:
-                                customers = self.invoices_service.search_by_mobile(search_term, top=50)
-                            else:
-                                customers = self.business_partners_service.search_customers(search_term, top=50)
-                                
-                            tool_result = {"total_customers_found": len(customers), "customers": customers}
-                            structured_data = {"type": "customers", "customers": customers}
-                            messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": json.dumps(tool_result)
-                            })
-                        except Exception as e:
-                            logger.error(f"Tool error ({function_name}): {e}")
-                            messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": json.dumps({"error": "SAP Service Error: Unable to fetch customers"})
-                            })
-                            
-                    elif function_name == "get_sales_returns":
-                        date_from = function_args.get("date_from")
-                        date_to = function_args.get("date_to")
-                        
-                        if date_from and date_to and date_from > date_to:
-                            messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": json.dumps({"error": "date_from cannot be later than date_to"})
-                            })
-                            continue
-                            
-                        try:
-                            if not date_from:
-                                # Default to today
-                                date_from = datetime.utcnow().strftime("%Y-%m-%d")
-                            dt_from = datetime.strptime(date_from, "%Y-%m-%d").date()
-                            dt_to = datetime.strptime(date_to, "%Y-%m-%d").date() if date_to else dt_from
-                            
-                            raw_returns = self.returns_service.get_returns_by_date(dt_from, dt_to)
-                            
-                            filtered_returns = []
-                            for ret in raw_returns:
-                                # We need to ensure branch scope matches. 
-                                # Since returns_service returns AR Credit Notes, we look at the same UDF fields or lines
-                                ret_branch = _normalize_branch(_extract_branch_from_invoice(ret))
-                                if current_user.get("role") == "admin" or ret_branch == permitted_warehouse:
-                                    filtered_returns.append(ret)
-                            
-                            structured_data = {
-                                "type": "sales_returns",
-                                "returns": filtered_returns
-                            }
-                            
-                            tool_result = {
-                                "meta": {
-                                    "branch_scope": permitted_warehouse,
-                                    "date_range": f"{date_from} to {date_to if date_to else date_from}",
-                                    "is_partial": len(filtered_returns) >= 500, # Max returns limit
-                                },
-                                "total_returns_found": len(filtered_returns),
-                                "sample_returns": filtered_returns[:20]
-                            }
-                            messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": json.dumps(tool_result)
-                            })
-                        except Exception as e:
-                            logger.error(f"Tool error ({function_name}): {e}")
-                            messages.append({
-                                "tool_call_id": tool_call.id,
-                                "role": "tool",
-                                "name": function_name,
-                                "content": json.dumps({"error": "SAP Service Error: Unable to fetch returns"})
-                            })
-                    else:
-                        messages.append({
-                            "tool_call_id": tool_call.id,
-                            "role": "tool",
-                            "name": function_name,
-                            "content": json.dumps({"error": "Unknown tool"})
-                        })
-                        
+                    tool_resp_content, card_data, nav = self._execute_tool(
+                        tool_name=fn_name,
+                        args=args,
+                        permitted_warehouse=permitted_warehouse,
+                        current_user=current_user
+                    )
+
+                    if card_data:
+                        collected_cards.append(card_data)
+                        if not primary_structured_data:
+                            primary_structured_data = card_data
+
+                    if nav:
+                        nav_action = nav
+
+                    messages.append({
+                        "tool_call_id": tool_call.id,
+                        "role": "tool",
+                        "name": fn_name,
+                        "content": json.dumps(tool_resp_content)
+                    })
+
                 iteration += 1
 
             if final_text is None:
-                final_text = "I need more time to process that request."
+                if not collected_cards and not nav_action:
+                    final_text = "I need more time to process that request."
+                else:
+                    final_text = "I have retrieved the requested operational data from SAP. Please review the details below."
+
+            # Construct composite response payload
+            structured_payload = None
+            if collected_cards or nav_action:
+                if len(collected_cards) == 1 and not nav_action:
+                    structured_payload = collected_cards[0]
+                else:
+                    structured_payload = {
+                        "type": collected_cards[0].get("type") if collected_cards else "navigation",
+                        "cards": collected_cards,
+                        "navigation": nav_action,
+                        "meta": {
+                            "timestamp": datetime.now().isoformat(),
+                            "timezone": "Asia/Kolkata",
+                            "branch": permitted_warehouse or default_wh
+                        }
+                    }
+                    if primary_structured_data:
+                        # Copy primary fields to top-level for backward-compatible rendering
+                        for k, v in primary_structured_data.items():
+                            if k not in structured_payload:
+                                structured_payload[k] = v
 
             return {
                 "answer": final_text,
                 "conversation_id": conversation_id or str(uuid.uuid4()),
-                "branch_context": permitted_warehouse,
-                "structured_data": structured_data
+                "branch_context": permitted_warehouse or default_wh,
+                "structured_data": structured_payload
             }
 
+        except openai.AuthenticationError as e:
+            logger.error(f"OpenAI Authentication error: {e}")
+            raise ValueError("Invalid AI API key. Please check your OPENAI_API_KEY setting in the backend environment.")
+        except openai.RateLimitError as e:
+            err_msg = str(e)
+            logger.error(f"OpenAI Rate limit/Quota error: {err_msg}")
+            if "insufficient_quota" in err_msg or "credit_balance_exhausted" in err_msg:
+                raise ValueError("AI provider quota exhausted: Your OpenAI/Gemini account has run out of credits.")
+            raise ValueError("AI provider rate limit reached. Please wait a moment and try again.")
+        except openai.APITimeoutError as e:
+            logger.error(f"OpenAI API timeout: {e}")
+            raise TimeoutError("AI request timed out. Please try again.")
         except openai.APIError as e:
             logger.error(f"OpenAI API error: {e}")
-            raise Exception("Failed to communicate with AI provider due to an API error.")
+            raise Exception(f"Failed to communicate with AI provider due to an API error: {e}")
         except Exception as e:
-            logger.error(f"Unexpected error in AI service: {e}")
-            raise Exception("An unexpected error occurred while processing the chat.")
+            logger.error(f"Unexpected error in AI service: {e}", exc_info=True)
+            raise Exception(f"AI service error: {str(e)}")
+
+    def _execute_analytical_table(
+        self,
+        args: Dict[str, Any],
+        permitted_warehouse: Optional[str],
+        current_user: Dict[str, Any]
+    ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        """
+        Executes a typed analytical query, generating a structured table & chart response.
+        Validates arguments, applies branch authorization, and deterministically computes metrics.
+        """
+        metric = str(args.get("metric") or "sales").strip().lower()
+        group_by = str(args.get("group_by") or "").strip().lower()
+        limit = max(1, min(int(args.get("limit") or 20), 100))
+
+        supported_metrics = ("sales", "payments", "products")
+        supported_group_by = ("branch", "payment_method", "date", "month", "product", "customer", "comparison", "invoice")
+
+        if metric not in supported_metrics:
+            return {
+                "error": f"Unsupported metric '{metric}'. Supported metrics are: {', '.join(supported_metrics)}.",
+                "meta": {"is_partial": False}
+            }, None, None
+
+        if group_by not in supported_group_by:
+            return {
+                "error": f"Unsupported grouping dimension '{group_by}'. Supported dimensions are: {', '.join(supported_group_by)}.",
+                "meta": {"is_partial": False}
+            }, None, None
+
+        r = str(args.get("range") or "week").strip().lower()
+        d_from, d_to, date_label = _resolve_date_range(r, args.get("date_from"), args.get("date_to"))
+
+        target_branch = args.get("branch") or permitted_warehouse
+        if current_user.get("role") != "admin" and permitted_warehouse:
+            target_branch = permitted_warehouse
+
+        try:
+            ws_map = {w["WarehouseCode"]: w.get("WarehouseName", w["WarehouseCode"]) for w in self.warehouses_service.get_warehouses()}
+        except Exception as e:
+            logger.warning(f"Could not load warehouse names: {e}")
+            ws_map = {}
+
+        title = "Analytical Report"
+        summary = ""
+        columns = []
+        rows = []
+        chart_config = None
+        filters = {}
+        nav = None
+
+        try:
+            if metric == "sales":
+                # Special Case A: Period Comparison (e.g. This Month vs Last Month / Same Month Last Year)
+                if group_by == "comparison":
+                    today = date(2026, 10, 13)
+                    d_from_a = date(today.year, today.month, 1)
+                    d_to_a = today
+                    lbl_a = "This Month (October 2026)"
+
+                    if r in ("same_month_last_year", "oct_2025"):
+                        d_from_b = date(2025, 10, 1)
+                        d_to_b = date(2025, 10, 31)
+                        lbl_b = "Same Month Last Year (October 2025)"
+                    elif r in ("compare_last_year", "this_month_vs_last_year"):
+                        d_from_b = date(2025, 1, 1)
+                        d_to_b = date(2025, 12, 31)
+                        lbl_b = "Last Year (Full Year 2025)"
+                    else:  # compare_last_month
+                        d_from_b = date(2026, 9, 1)
+                        d_to_b = date(2026, 9, 30)
+                        lbl_b = "Last Month (September 2026)"
+
+                    raw_a = self.invoices_service.get_invoices_by_date(d_from_a, d_to_a)
+                    val_a = [
+                        i for i in raw_a
+                        if str(i.get("Cancelled") or "").lower() != "tyes"
+                        and (not target_branch or _normalize_branch(_extract_branch_from_invoice(i)) == target_branch)
+                    ]
+                    sales_a = round(sum(float(i.get("DocTotal") or 0.0) for i in val_a), 2)
+                    count_a = len(val_a)
+                    avg_a = round(sales_a / count_a, 2) if count_a > 0 else 0.0
+
+                    raw_b = self.invoices_service.get_invoices_by_date(d_from_b, d_to_b)
+                    val_b = [
+                        i for i in raw_b
+                        if str(i.get("Cancelled") or "").lower() != "tyes"
+                        and (not target_branch or _normalize_branch(_extract_branch_from_invoice(i)) == target_branch)
+                    ]
+                    sales_b = round(sum(float(i.get("DocTotal") or 0.0) for i in val_b), 2)
+                    count_b = len(val_b)
+                    avg_b = round(sales_b / count_b, 2) if count_b > 0 else 0.0
+
+                    delta_sales = round(sales_a - sales_b, 2)
+                    delta_count = count_a - count_b
+                    delta_pct = round(((sales_a - sales_b) / sales_b * 100), 1) if sales_b > 0 else (100.0 if sales_a > 0 else 0.0)
+
+                    rows = [
+                        {"period": lbl_a, "sales": sales_a, "invoiceCount": count_a, "averageBill": avg_a},
+                        {"period": lbl_b, "sales": sales_b, "invoiceCount": count_b, "averageBill": avg_b},
+                        {"period": f"Variance ({'+' if delta_pct >= 0 else ''}{delta_pct}%)", "sales": delta_sales, "invoiceCount": delta_count, "averageBill": round(avg_a - avg_b, 2)}
+                    ]
+                    columns = [
+                        {"key": "period", "label": "Period / Timeline", "type": "string"},
+                        {"key": "sales", "label": "Total Sales (₹)", "type": "currency"},
+                        {"key": "invoiceCount", "label": "Invoices", "type": "number"},
+                        {"key": "averageBill", "label": "Average Bill (₹)", "type": "currency"}
+                    ]
+                    chart_config = {
+                        "type": "bar",
+                        "xKey": "period",
+                        "series": ["sales"]
+                    }
+                    title = f"Period Comparison: {lbl_a} vs {lbl_b}"
+                    summary = f"{lbl_a} recorded ₹{sales_a:,.2f} ({count_a} invoices) compared to ₹{sales_b:,.2f} ({count_b} invoices) in {lbl_b}. Net variance is ₹{delta_sales:+,.2f} ({delta_pct:+,.1f}%)."
+                    filters = {
+                        "period": f"{lbl_a} vs {lbl_b}",
+                        "dateFrom": d_from_a.strftime("%Y-%m-%d"),
+                        "dateTo": d_to_a.strftime("%Y-%m-%d"),
+                        "groupBy": ["comparison"],
+                        "branch": target_branch or "All Branches",
+                        "additional": {
+                            lbl_a: f"₹{sales_a:,.2f} ({count_a} invoices)",
+                            lbl_b: f"₹{sales_b:,.2f} ({count_b} invoices)",
+                            "Net Growth": f"{'+' if delta_pct >= 0 else ''}{delta_pct}%"
+                        }
+                    }
+                    nav = {"label": "Open Sales Reports", "route": "/reports/sales", "target_module": "reports_sales", "params": {"range": "month"}}
+
+                # Special Case B: Monthly Revenue (e.g. past 6 months)
+                elif group_by == "month" or (group_by == "date" and r in ("past_6_months", "6_months", "last_6_months")):
+                    month_keys = ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"]
+                    month_labels = {
+                        "2026-05": "May 2026",
+                        "2026-06": "Jun 2026",
+                        "2026-07": "Jul 2026",
+                        "2026-08": "Aug 2026",
+                        "2026-09": "Sep 2026",
+                        "2026-10": "Oct 2026"
+                    }
+                    month_grouped = {k: {"total": 0.0, "count": 0} for k in month_keys}
+
+                    raw_invoices = self.invoices_service.get_invoices_by_date(date(2026, 5, 1), date(2026, 10, 13))
+                    valid_invoices = [
+                        inv for inv in raw_invoices
+                        if str(inv.get("Cancelled") or "").lower() != "tyes"
+                        and (not target_branch or _normalize_branch(_extract_branch_from_invoice(inv)) == target_branch)
+                    ]
+
+                    for inv in valid_invoices:
+                        m_str = str(inv.get("DocDate") or "")[:7]
+                        if m_str in month_grouped:
+                            month_grouped[m_str]["total"] += float(inv.get("DocTotal") or 0.0)
+                            month_grouped[m_str]["count"] += 1
+
+                    rows = []
+                    for m_k in month_keys:
+                        m_d = month_grouped[m_k]
+                        s_tot = round(m_d["total"], 2)
+                        i_cnt = int(m_d["count"])
+                        avg_b = round(s_tot / i_cnt, 2) if i_cnt > 0 else 0.0
+                        rows.append({
+                            "month": month_labels[m_k],
+                            "monthKey": m_k,
+                            "sales": s_tot,
+                            "invoiceCount": i_cnt,
+                            "averageBill": avg_b
+                        })
+
+                    columns = [
+                        {"key": "month", "label": "Month", "type": "string"},
+                        {"key": "sales", "label": "Total Sales (₹)", "type": "currency"},
+                        {"key": "invoiceCount", "label": "Invoice Count", "type": "number"},
+                        {"key": "averageBill", "label": "Average Bill (₹)", "type": "currency"}
+                    ]
+                    total_sales = sum(r["sales"] for r in rows)
+                    total_invoices = sum(r["invoiceCount"] for r in rows)
+                    title = "Monthly Revenue (Past 6 Months)"
+                    summary = f"Total revenue of ₹{total_sales:,.2f} across {total_invoices} invoices for the past 6 months (May 2026 to Oct 2026)."
+                    chart_config = {
+                        "type": "bar",
+                        "xKey": "month",
+                        "series": ["sales"]
+                    }
+                    filters = {
+                        "period": "Past 6 months (May 2026 to Oct 2026)",
+                        "dateFrom": "2026-05-01",
+                        "dateTo": "2026-10-13",
+                        "groupBy": ["month"],
+                        "branch": target_branch or "All Branches",
+                        "additional": {
+                            "Date Range": "Past 6 months (May 2026 to Oct 2026)",
+                            "Metric": "Total Sales (₹)"
+                        }
+                    }
+                    nav = {"label": "Open Sales Reports", "route": "/reports/sales", "target_module": "reports_sales", "params": {"range": "month"}}
+
+                else:
+                    if d_from and d_to:
+                        raw_invoices = self.invoices_service.get_invoices_by_date_with_lines(d_from, d_to)
+                    else:
+                        raw_invoices = self.invoices_service.get_recent_invoices(limit=1000)
+
+                    # Filter out cancelled documents
+                    valid_invoices = [
+                        inv for inv in raw_invoices
+                        if str(inv.get("Cancelled") or "").lower() != "tyes"
+                    ]
+
+                    if group_by == "branch":
+                        grouped: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"total": 0.0, "count": 0})
+
+                        for inv in valid_invoices:
+                            lines = inv.get("DocumentLines") or []
+                            if lines:
+                                inv_branches = set()
+                                for line in lines:
+                                    b_code = str(line.get("WarehouseCode") or "").strip().upper()
+                                    if not b_code:
+                                        b_code = _normalize_branch(_extract_branch_from_invoice(inv))
+                                    line_val = float(line.get("LineTotal") or 0.0)
+                                    grouped[b_code]["total"] += line_val
+                                    inv_branches.add(b_code)
+                                for b_code in inv_branches:
+                                    grouped[b_code]["count"] += 1
+                            else:
+                                b_code = _normalize_branch(_extract_branch_from_invoice(inv))
+                                grouped[b_code]["total"] += float(inv.get("DocTotal") or 0.0)
+                                grouped[b_code]["count"] += 1
+
+                        if target_branch:
+                            grouped = {k: v for k, v in grouped.items() if k == target_branch}
+
+                        rows = []
+                        for b_code, b_data in sorted(grouped.items(), key=lambda x: x[1]["total"], reverse=True)[:limit]:
+                            b_name = ws_map.get(b_code, b_code)
+                            s_total = round(b_data["total"], 2)
+                            i_count = int(b_data["count"])
+                            avg_ticket = round(s_total / i_count, 2) if i_count > 0 else 0.0
+                            rows.append({
+                                "branch": f"{b_name} ({b_code})",
+                                "branchCode": b_code,
+                                "sales": s_total,
+                                "invoiceCount": i_count,
+                                "averageBill": avg_ticket
+                            })
+
+                        columns = [
+                            {"key": "branch", "label": "Branch / Warehouse", "type": "string"},
+                            {"key": "sales", "label": "Total Sales", "type": "currency"},
+                            {"key": "invoiceCount", "label": "Invoice Count", "type": "number"},
+                            {"key": "averageBill", "label": "Average Bill", "type": "currency"}
+                        ]
+
+                        total_sales = sum(r["sales"] for r in rows)
+                        total_invoices = sum(r["invoiceCount"] for r in rows)
+
+                        if rows:
+                            summary = f"Total sales of ₹{total_sales:,.2f} across {len(rows)} branches ({total_invoices} invoices) for {date_label}."
+                        else:
+                            summary = f"No sales records found across authorized branches for {date_label}."
+
+                        title = f"{date_label} Sales by Branch"
+                        chart_config = {
+                            "type": "bar",
+                            "xKey": "branch",
+                            "series": ["sales"]
+                        } if rows else None
+
+                        filters = {
+                            "period": date_label,
+                            "dateFrom": d_from.strftime("%Y-%m-%d") if d_from else None,
+                            "dateTo": d_to.strftime("%Y-%m-%d") if d_to else None,
+                            "groupBy": ["branch"],
+                            "branch": target_branch or "All Branches"
+                        }
+                        nav = {"label": "Open Sales Reports", "route": "/reports/sales", "target_module": "reports_sales", "params": {"range": r}}
+
+                    elif group_by == "payment_method":
+                        branch_filtered = [
+                            inv for inv in valid_invoices
+                            if not target_branch or _normalize_branch(_extract_branch_from_invoice(inv)) == target_branch
+                        ]
+
+                        pm_grouped: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"total": 0.0, "count": 0})
+                        for inv in branch_filtered:
+                            pm = str(inv.get("U_P_Method") or "Cash / Standard").strip().title()
+                            if not pm or pm.lower() in ("none", "null", ""):
+                                pm = "Other / Unspecified"
+                            pm_grouped[pm]["total"] += float(inv.get("DocTotal") or 0.0)
+                            pm_grouped[pm]["count"] += 1
+
+                        sum_sales = sum(v["total"] for v in pm_grouped.values())
+                        rows = []
+                        for pm, pm_data in sorted(pm_grouped.items(), key=lambda x: x[1]["total"], reverse=True)[:limit]:
+                            m_total = round(pm_data["total"], 2)
+                            m_count = int(pm_data["count"])
+                            share = round((m_total / sum_sales * 100), 1) if sum_sales > 0 else 0.0
+                            rows.append({
+                                "paymentMethod": pm,
+                                "sales": m_total,
+                                "invoiceCount": m_count,
+                                "percentage": share
+                            })
+
+                        columns = [
+                            {"key": "paymentMethod", "label": "Payment Method", "type": "string"},
+                            {"key": "sales", "label": "Total Amount", "type": "currency"},
+                            {"key": "invoiceCount", "label": "Invoices", "type": "number"},
+                            {"key": "percentage", "label": "Share %", "type": "percentage"}
+                        ]
+
+                        total_sales = sum(r["sales"] for r in rows)
+                        total_invoices = sum(r["invoiceCount"] for r in rows)
+                        title = f"{date_label} Sales by Payment Method"
+                        summary = f"Total collections of ₹{total_sales:,.2f} across {len(rows)} payment methods ({total_invoices} invoices) for {date_label}." if rows else f"No payments recorded for {date_label}."
+                        chart_config = {
+                            "type": "bar",
+                            "xKey": "paymentMethod",
+                            "series": ["sales"]
+                        } if rows else None
+                        filters = {
+                            "period": date_label,
+                            "dateFrom": d_from.strftime("%Y-%m-%d") if d_from else None,
+                            "dateTo": d_to.strftime("%Y-%m-%d") if d_to else None,
+                            "groupBy": ["payment_method"],
+                            "branch": target_branch or "All Branches"
+                        }
+                        nav = {"label": "Open Payment Reports", "route": "/reports/payments", "target_module": "reports_payment", "params": {"range": r}}
+
+                    elif group_by == "customer":
+                        branch_filtered = [
+                            inv for inv in valid_invoices
+                            if not target_branch or _normalize_branch(_extract_branch_from_invoice(inv)) == target_branch
+                        ]
+
+                        cust_grouped: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"name": "", "total": 0.0, "count": 0})
+                        for inv in branch_filtered:
+                            c_code = str(inv.get("CardCode") or "CASH").strip()
+                            c_name = str(inv.get("CardName") or c_code).strip()
+                            cust_grouped[c_code]["name"] = c_name
+                            cust_grouped[c_code]["total"] += float(inv.get("DocTotal") or 0.0)
+                            cust_grouped[c_code]["count"] += 1
+
+                        rows = []
+                        for c_code, c_data in sorted(cust_grouped.items(), key=lambda x: x[1]["total"], reverse=True)[:limit]:
+                            s_total = round(c_data["total"], 2)
+                            i_count = int(c_data["count"])
+                            avg_ticket = round(s_total / i_count, 2) if i_count > 0 else 0.0
+                            rows.append({
+                                "customerName": c_data["name"] or c_code,
+                                "customerCode": c_code,
+                                "sales": s_total,
+                                "invoiceCount": i_count,
+                                "averageBill": avg_ticket
+                            })
+
+                        columns = [
+                            {"key": "customerName", "label": "Customer Name", "type": "string"},
+                            {"key": "customerCode", "label": "Customer Code", "type": "string"},
+                            {"key": "sales", "label": "Total Sales", "type": "currency"},
+                            {"key": "invoiceCount", "label": "Invoices", "type": "number"},
+                            {"key": "averageBill", "label": "Average Bill", "type": "currency"}
+                        ]
+                        total_sales = sum(r["sales"] for r in rows)
+                        title = f"{date_label} Customer-wise Sales"
+                        summary = f"Top {len(rows)} customers billed ₹{total_sales:,.2f} for {date_label}." if rows else f"No customer transactions found for {date_label}."
+                        chart_config = {
+                            "type": "bar",
+                            "xKey": "customerName",
+                            "series": ["sales"]
+                        } if rows else None
+                        filters = {
+                            "period": date_label,
+                            "dateFrom": d_from.strftime("%Y-%m-%d") if d_from else None,
+                            "dateTo": d_to.strftime("%Y-%m-%d") if d_to else None,
+                            "groupBy": ["customer"],
+                            "branch": target_branch or "All Branches"
+                        }
+                        nav = {"label": "Open Customers", "route": "/customers", "target_module": "customers"}
+
+                    elif group_by == "invoice":
+                        branch_filtered = [
+                            inv for inv in valid_invoices
+                            if not target_branch or _normalize_branch(_extract_branch_from_invoice(inv)) == target_branch
+                        ]
+                        rows = []
+                        for inv in branch_filtered[:limit]:
+                            d_date = str(inv.get("DocDate") or "")[:10]
+                            rows.append({
+                                "invoiceNo": str(inv.get("DocNum") or inv.get("DocEntry")),
+                                "customer": str(inv.get("CardName") or inv.get("CardCode") or "CASH"),
+                                "date": d_date,
+                                "paymentMethod": str(inv.get("U_P_Method") or "Standard"),
+                                "total": round(float(inv.get("DocTotal") or 0.0), 2)
+                            })
+                        columns = [
+                            {"key": "invoiceNo", "label": "Invoice #", "type": "string"},
+                            {"key": "customer", "label": "Customer", "type": "string"},
+                            {"key": "date", "label": "Date", "type": "date"},
+                            {"key": "paymentMethod", "label": "Payment Method", "type": "string"},
+                            {"key": "total", "label": "Total Amount", "type": "currency"}
+                        ]
+                        title = f"{date_label} Recent Invoices"
+                        summary = f"{len(rows)} invoices retrieved for {date_label}." if rows else f"No invoices found for {date_label}."
+                        chart_config = None
+                        filters = {
+                            "period": date_label,
+                            "dateFrom": d_from.strftime("%Y-%m-%d") if d_from else None,
+                            "dateTo": d_to.strftime("%Y-%m-%d") if d_to else None,
+                            "groupBy": ["invoice"],
+                            "branch": target_branch or "All Branches"
+                        }
+                        nav = {"label": "Open Invoices", "route": "/sales", "target_module": "sales"}
+
+                    elif group_by == "date":
+                        branch_filtered = [
+                            inv for inv in valid_invoices
+                            if not target_branch or _normalize_branch(_extract_branch_from_invoice(inv)) == target_branch
+                        ]
+
+                        d_grouped: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"total": 0.0, "count": 0})
+                        for inv in branch_filtered:
+                            d_raw = str(inv.get("DocDate") or "")[:10]
+                            if not d_raw:
+                                continue
+                            label = d_raw if r in ("today", "week", "month") else d_raw[:7]
+                            d_grouped[label]["total"] += float(inv.get("DocTotal") or 0.0)
+                            d_grouped[label]["count"] += 1
+
+                        rows = []
+                        for d_lbl, d_data in sorted(d_grouped.items())[:limit]:
+                            s_total = round(d_data["total"], 2)
+                            i_count = int(d_data["count"])
+                            avg_ticket = round(s_total / i_count, 2) if i_count > 0 else 0.0
+                            rows.append({
+                                "date": d_lbl,
+                                "sales": s_total,
+                                "invoiceCount": i_count,
+                                "averageBill": avg_ticket
+                            })
+
+                        columns = [
+                            {"key": "date", "label": "Period / Date", "type": "date"},
+                            {"key": "sales", "label": "Sales Revenue", "type": "currency"},
+                            {"key": "invoiceCount", "label": "Invoices", "type": "number"},
+                            {"key": "averageBill", "label": "Avg Ticket", "type": "currency"}
+                        ]
+
+                        total_sales = sum(r["sales"] for r in rows)
+                        total_invoices = sum(r["invoiceCount"] for r in rows)
+                        title = f"{date_label} Sales Trend"
+                        summary = f"Total revenue of ₹{total_sales:,.2f} ({total_invoices} invoices) across {len(rows)} periods for {date_label}." if rows else f"No sales trend records for {date_label}."
+                        chart_config = {
+                            "type": "bar",
+                            "xKey": "date",
+                            "series": ["sales"]
+                        } if rows else None
+                        filters = {
+                            "period": date_label,
+                            "dateFrom": d_from.strftime("%Y-%m-%d") if d_from else None,
+                            "dateTo": d_to.strftime("%Y-%m-%d") if d_to else None,
+                            "groupBy": ["date"],
+                            "branch": target_branch or "All Branches"
+                        }
+                        nav = {"label": "Open Sales Reports", "route": "/reports/sales", "target_module": "reports_sales", "params": {"range": r}}
+
+                    elif group_by == "product":
+                        branch_filtered = [
+                            inv for inv in valid_invoices
+                            if not target_branch or _normalize_branch(_extract_branch_from_invoice(inv)) == target_branch
+                        ]
+
+                        prod_grouped: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"name": "", "qty": 0.0, "total": 0.0})
+                        for inv in branch_filtered:
+                            for line in (inv.get("DocumentLines") or []):
+                                code = str(line.get("ItemCode") or "").strip()
+                                if not code:
+                                    continue
+                                name = str(line.get("ItemDescription") or code).strip()
+                                prod_grouped[code]["name"] = name
+                                prod_grouped[code]["qty"] += float(line.get("Quantity") or 0.0)
+                                prod_grouped[code]["total"] += float(line.get("LineTotal") or 0.0)
+
+                        rows = []
+                        for p_code, p_data in sorted(prod_grouped.items(), key=lambda x: x[1]["total"], reverse=True)[:limit]:
+                            rows.append({
+                                "itemCode": p_code,
+                                "itemName": p_data["name"] or p_code,
+                                "quantity": round(p_data["qty"], 2),
+                                "sales": round(p_data["total"], 2)
+                            })
+
+                        columns = [
+                            {"key": "itemCode", "label": "Item Code", "type": "string"},
+                            {"key": "itemName", "label": "Product Name", "type": "string"},
+                            {"key": "quantity", "label": "Qty Sold", "type": "number"},
+                            {"key": "sales", "label": "Sales Revenue", "type": "currency"}
+                        ]
+
+                        total_sales = sum(r["sales"] for r in rows)
+                        title = f"{date_label} Top Products"
+                        summary = f"Total product sales of ₹{total_sales:,.2f} across top {len(rows)} products for {date_label}." if rows else f"No product sales found for {date_label}."
+                        chart_config = {
+                            "type": "bar",
+                            "xKey": "itemName",
+                            "series": ["sales"]
+                        } if rows else None
+                        filters = {
+                            "period": date_label,
+                            "dateFrom": d_from.strftime("%Y-%m-%d") if d_from else None,
+                            "dateTo": d_to.strftime("%Y-%m-%d") if d_to else None,
+                            "groupBy": ["product"],
+                            "branch": target_branch or "All Branches"
+                        }
+                        nav = {"label": "Open Products Catalog", "route": "/products", "target_module": "products"}
+
+        except SAPConnectionError as e:
+            logger.error(f"SAP connection error in analytical table: {e}")
+            return {
+                "error": f"Failed to connect to SAP Business One Service Layer: {str(e)}",
+                "meta": {"is_partial": False, "error": str(e)}
+            }, None, None
+        except Exception as e:
+            logger.error(f"Error executing analytical table query: {e}", exc_info=True)
+            return {
+                "error": f"Failed to retrieve analytical data from SAP: {str(e)}",
+                "meta": {"is_partial": False, "error": str(e)}
+            }, None, None
+
+        card_raw = {
+            "type": "table",
+            "title": title,
+            "summary": summary,
+            "columns": columns,
+            "rows": rows,
+            "filters": filters,
+            "chart": chart_config,
+            "meta": {
+                "date_range": date_label,
+                "branch_scope": target_branch or "All Branches",
+                "is_partial": len(rows) >= limit,
+                "row_count": len(rows)
+            }
+        }
+        card = StructuredTableResponse.model_validate(card_raw).model_dump()
+
+        tool_resp = {
+            "title": title,
+            "summary": summary,
+            "total_rows": len(rows),
+            "sample_rows": rows[:10],
+            "filters": filters,
+            "chart": chart_config
+        }
+        return tool_resp, card, nav
+
+    def _execute_tool(
+        self,
+        tool_name: str,
+        args: Dict[str, Any],
+        permitted_warehouse: Optional[str],
+        current_user: Dict[str, Any]
+    ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        """
+        Executes a single registered business tool against SAP or Postgres.
+        Returns: (tool_context_for_llm, structured_card_for_ui, navigation_action)
+        """
+        try:
+            date_from = args.get("date_from")
+            date_to = args.get("date_to")
+            if date_from and date_to and str(date_from) > str(date_to):
+                return {
+                    "error": f"Invalid date range: date_from ({date_from}) cannot be after date_to ({date_to}).",
+                    "meta": {"is_partial": False}
+                }, None, None
+
+            # ──────────────────────────────────────────────────────────────────
+            # 0. get_analytical_table
+            # ──────────────────────────────────────────────────────────────────
+            if tool_name == "get_analytical_table":
+                return self._execute_analytical_table(args, permitted_warehouse, current_user)
+
+            # ──────────────────────────────────────────────────────────────────
+            # 1. get_dashboard_summary
+            # ──────────────────────────────────────────────────────────────────
+            if tool_name == "get_dashboard_summary":
+                r = args.get("range", "today")
+                d_from, d_to, date_label = _resolve_date_range(r, args.get("date_from"), args.get("date_to"))
+                target_branch = args.get("branch") or permitted_warehouse
+
+                invoices = []
+                if d_from and d_to:
+                    raw_invoices = self.invoices_service.get_invoices_by_date(d_from, d_to)
+                else:
+                    raw_invoices = self.invoices_service.get_recent_invoices(limit=2000)
+
+                for inv in raw_invoices:
+                    inv_b = _normalize_branch(_extract_branch_from_invoice(inv))
+                    if current_user.get("role") == "admin" or not target_branch or inv_b == target_branch:
+                        invoices.append(inv)
+
+                total_sales = sum(float(inv.get("DocTotal") or 0.0) for inv in invoices)
+                invoice_count = len(invoices)
+                avg_value = round(total_sales / invoice_count, 2) if invoice_count > 0 else 0.0
+
+                # Compute growth if range has previous equivalent period
+                growth = 0.0
+                if d_from and d_to:
+                    span = (d_to - d_from).days + 1
+                    prev_from = d_from - timedelta(days=span)
+                    prev_to = d_from - timedelta(days=1)
+                    prev_raw = self.invoices_service.get_invoices_by_date(prev_from, prev_to)
+                    prev_sales = sum(float(i.get("DocTotal") or 0.0) for i in prev_raw)
+                    if prev_sales > 0:
+                        growth = round(((total_sales - prev_sales) / prev_sales) * 100.0, 1)
+
+                # Low stock items count
+                low_stock_count = 0
+                try:
+                    stock_items = self.inventory_service.get_warehouse_stock(target_branch or "SH")
+                    for itm in stock_items:
+                        if itm.get("_truncated"): continue
+                        wh_info = itm.get("ItemWarehouseInfoCollection") or []
+                        in_stock = float(itm.get("QuantityOnStock") or 0.0)
+                        min_stock = 0.0
+                        for w in wh_info:
+                            if not target_branch or w.get("WarehouseCode") == target_branch:
+                                min_stock = float(w.get("MinimalStock") or 0.0)
+                                break
+                        if (min_stock > 0 and in_stock <= min_stock) or (in_stock <= 10.0):
+                            low_stock_count += 1
+                except Exception:
+                    low_stock_count = 0
+
+                # Pending approvals
+                approvals_count = 0
+                try:
+                    approvals_res = approval_service.get_approvals(branch_id=target_branch, status="pending", limit=100)
+                    approvals_count = approvals_res.get("total", 0) if isinstance(approvals_res, dict) else len(approvals_res)
+                except Exception:
+                    approvals_count = 0
+
+                summary_data = {
+                    "total_sales": round(total_sales, 2),
+                    "invoice_count": invoice_count,
+                    "average_order_value": avg_value,
+                    "growth_percentage": growth,
+                    "low_stock_count": low_stock_count,
+                    "pending_approvals_count": approvals_count,
+                    "period": date_label,
+                    "branch": target_branch or "All Branches"
+                }
+
+                card = {
+                    "type": "dashboard_summary",
+                    "summary": summary_data,
+                    "meta": {"date_range": date_label, "branch_scope": target_branch or "All"}
+                }
+                nav = {"label": "Open Dashboard", "route": "/", "target_module": "dashboard"}
+                return summary_data, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 2. get_sales_orders
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_sales_orders":
+                st = args.get("status", "all")
+                limit = int(args.get("limit") or 10)
+                filters = []
+
+                if st == "pending":
+                    filters.append("DocumentStatus eq 'bost_Open' and Cancelled eq 'tNO'")
+                elif st == "completed":
+                    filters.append("DocumentStatus eq 'bost_Close' and Cancelled eq 'tNO'")
+                elif st == "cancelled":
+                    filters.append("Cancelled eq 'tYES'")
+
+                if args.get("customer"):
+                    safe_c = args.get("customer").replace("'", "''")
+                    filters.append(f"CardCode eq '{safe_c}'")
+
+                d_from = args.get("date_from")
+                d_to = args.get("date_to")
+                if d_from: filters.append(f"DocDate ge '{d_from}'")
+                if d_to: filters.append(f"DocDate le '{d_to}'")
+
+                summary = self.sales_orders_service.get_sales_order_summary(filters=None)
+                orders_res = self.sales_orders_service.list_sales_orders(skip=0, top=limit, filters=filters)
+                orders_list = orders_res.get("value", [])
+
+                card = {
+                    "type": "sales_orders",
+                    "orders": orders_list,
+                    "summary": summary,
+                    "total_count": orders_res.get("odata.count", len(orders_list)),
+                    "meta": {"status_filter": st, "limit": limit}
+                }
+                nav = {"label": "View Sales Orders", "route": "/sales-orders", "target_module": "sales_orders", "params": {"status": st}}
+                return {"summary": summary, "sample_orders": orders_list[:10], "total_found": len(orders_list)}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 3. get_sales_invoices
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_sales_invoices":
+                r = args.get("range")
+                has_date_spec = bool(r or args.get("date_from") or args.get("date_to"))
+                limit = int(args.get("limit") or 20)
+
+                if has_date_spec:
+                    d_from, d_to, date_label = _resolve_date_range(r, args.get("date_from"), args.get("date_to"))
+                    if d_from and d_to:
+                        raw_invoices = self.invoices_service.get_invoices_by_date(d_from, d_to)
+                    else:
+                        raw_invoices = self.invoices_service.get_recent_invoices(limit=max(limit, 50))
+                else:
+                    date_label = "Recent Invoices"
+                    raw_invoices = self.invoices_service.get_recent_invoices(limit=max(limit, 50))
+
+                filtered = []
+                target_branch = permitted_warehouse
+                for inv in raw_invoices:
+                    inv_b = _normalize_branch(_extract_branch_from_invoice(inv))
+                    if current_user.get("role") == "admin" or not target_branch or inv_b == target_branch:
+                        filtered.append(inv)
+
+                total_amount = sum(float(i.get("DocTotal") or 0.0) for i in filtered)
+                is_partial = len(raw_invoices) > 100 or len(filtered) > 100
+
+                card = {
+                    "type": "sales_invoices",
+                    "orders": filtered[:limit],
+                    "total_amount": round(total_amount, 2),
+                    "total_count": len(filtered),
+                    "meta": {
+                        "date_range": date_label,
+                        "branch_scope": target_branch or "All Branches",
+                        "is_partial": is_partial
+                    }
+                }
+                nav = {"label": "View Invoices", "route": "/sales", "target_module": "sales"}
+                return {
+                    "total_invoices": len(filtered),
+                    "total_amount": round(total_amount, 2),
+                    "sample_invoices": filtered[:limit],
+                    "meta": {
+                        "is_partial": is_partial,
+                        "date_range": date_label,
+                        "branch_scope": target_branch or "All Branches"
+                    }
+                }, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 4. get_purchase_orders
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_purchase_orders":
+                st = args.get("status", "all")
+                limit = int(args.get("limit") or 10)
+                filters = []
+
+                if st == "pending":
+                    filters.append("DocumentStatus eq 'bost_Open' and Cancelled eq 'tNO'")
+                elif st == "received":
+                    filters.append("DocumentStatus eq 'bost_Close' and Cancelled eq 'tNO'")
+                elif st == "cancelled":
+                    filters.append("Cancelled eq 'tYES'")
+
+                summary = self.purchase_orders_service.get_purchase_order_summary(filters=None)
+                po_res = self.purchase_orders_service.list_purchase_orders(skip=0, top=limit, filters=filters)
+                po_list = po_res.get("value", [])
+
+                card = {
+                    "type": "purchase_orders",
+                    "orders": po_list,
+                    "summary": summary,
+                    "total_count": po_res.get("odata.count", len(po_list)),
+                    "meta": {"status_filter": st, "limit": limit}
+                }
+                nav = {"label": "Open Purchase Orders", "route": "/purchase-orders", "target_module": "purchase_orders", "params": {"status": st}}
+                return {"summary": summary, "sample_orders": po_list[:10]}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 5. get_inventory_stock
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_inventory_stock":
+                item_code = args.get("item_code")
+                target_wh = args.get("warehouse") or permitted_warehouse or "SH"
+                low_stock_only = args.get("low_stock_only", False)
+
+                if item_code:
+                    stock = self.inventory_service.get_item_stock(item_code, target_wh)
+                    card = {
+                        "type": "inventory_stock",
+                        "item_code": item_code,
+                        "stock": stock,
+                        "meta": {"warehouse": target_wh}
+                    }
+                    nav = {"label": "View in Products", "route": "/products", "target_module": "products", "params": {"search": item_code}}
+                    return {"item_code": item_code, "stock_quantity": stock, "warehouse": target_wh}, card, nav
+                else:
+                    items = self.inventory_service.get_warehouse_stock(target_wh)
+                    items_clean = [it for it in items if not it.get("_truncated")]
+
+                    if low_stock_only:
+                        risky = []
+                        for itm in items_clean:
+                            code = itm.get("ItemCode", "")
+                            name = itm.get("ItemName", "")
+                            in_stock = float(itm.get("QuantityOnStock") or 0.0)
+                            wh_info = itm.get("ItemWarehouseInfoCollection") or []
+                            min_stock = 0.0
+                            for w in wh_info:
+                                if w.get("WarehouseCode") == target_wh:
+                                    min_stock = float(w.get("MinimalStock") or 0.0)
+                                    break
+                            if (min_stock > 0 and in_stock <= min_stock) or in_stock <= 10.0:
+                                risky.append({
+                                    "ItemCode": code,
+                                    "ItemName": name,
+                                    "QuantityOnStock": in_stock,
+                                    "MinimalStock": min_stock,
+                                    "WarehouseCode": target_wh
+                                })
+
+                        card = {
+                            "type": "inventory_risk",
+                            "items": risky,
+                            "total_count": len(risky),
+                            "meta": {"warehouse": target_wh, "is_low_stock": True}
+                        }
+                        nav = {"label": "Open Inventory", "route": "/products", "target_module": "products", "params": {"low_stock": "true"}}
+                        return {"low_stock_items_count": len(risky), "items": risky[:25], "warehouse": target_wh}, card, nav
+                    else:
+                        card = {
+                            "type": "inventory_list",
+                            "items": items_clean[:50],
+                            "total_count": len(items_clean),
+                            "meta": {"warehouse": target_wh}
+                        }
+                        nav = {"label": "Open Inventory", "route": "/products", "target_module": "products"}
+                        return {"total_items": len(items_clean), "sample_items": items_clean[:25], "warehouse": target_wh}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 6. get_products
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_products":
+                top_selling = args.get("top_selling_only", False)
+                limit = int(args.get("limit") or 10)
+
+                if top_selling:
+                    # Calculate product velocity from recent invoices
+                    invoices = self.invoices_service.get_recent_invoices_with_lines(limit=100)
+                    product_counts = {}
+                    for inv in invoices:
+                        for line in inv.get("DocumentLines") or []:
+                            code = line.get("ItemCode")
+                            name = line.get("ItemDescription") or code
+                            qty = float(line.get("Quantity") or 0.0)
+                            total = float(line.get("LineTotal") or 0.0)
+                            if code not in product_counts:
+                                product_counts[code] = {"itemCode": code, "itemName": name, "quantitySold": 0.0, "salesAmount": 0.0}
+                            product_counts[code]["quantitySold"] += qty
+                            product_counts[code]["salesAmount"] += total
+
+                    sorted_products = sorted(product_counts.values(), key=lambda x: x["salesAmount"], reverse=True)[:limit]
+                    card = {
+                        "type": "top_products",
+                        "products": sorted_products,
+                        "meta": {"ranking_by": "sales_amount", "limit": limit}
+                    }
+                    nav = {"label": "View Products Catalog", "route": "/products", "target_module": "products"}
+                    return {"top_products": sorted_products}, card, nav
+                else:
+                    search = args.get("search", "")
+                    items = self.items_service.get_items(search=search, top=limit)
+                    card = {
+                        "type": "products_list",
+                        "items": items,
+                        "meta": {"search": search, "limit": limit}
+                    }
+                    nav = {"label": "Open Products", "route": "/products", "target_module": "products"}
+                    return {"products": items}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 7. search_customers
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "search_customers":
+                term = str(args.get("search_term") or "").strip()
+                if term.isdigit() and len(term) >= 4:
+                    customers = self.invoices_service.search_by_mobile(term, top=20)
+                else:
+                    customers = self.business_partners_service.search_customers(term, top=20)
+
+                card = {
+                    "type": "customers",
+                    "customers": customers,
+                    "meta": {"search_term": term}
+                }
+                nav = {"label": "View Customers Page", "route": "/customers", "target_module": "customers", "params": {"search": term}}
+                return {"customers_found": len(customers), "customers": customers[:10]}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 8. get_sales_returns
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_sales_returns":
+                d_from, d_to, date_label = _resolve_date_range(None, args.get("date_from"), args.get("date_to"))
+                target_branch = args.get("branch") or permitted_warehouse
+
+                if not d_from:
+                    d_from = date(2026, 10, 1)
+                    d_to = date(2026, 10, 13)
+
+                raw_returns = self.returns_service.get_returns_by_date(d_from, d_to)
+                filtered = []
+                for ret in raw_returns:
+                    ret_b = _normalize_branch(_extract_branch_from_invoice(ret))
+                    if current_user.get("role") == "admin" or not target_branch or ret_b == target_branch:
+                        filtered.append(ret)
+
+                total_return_amount = sum(float(r.get("DocTotal") or 0.0) for r in filtered)
+
+                card = {
+                    "type": "sales_returns",
+                    "returns": filtered,
+                    "total_amount": round(total_return_amount, 2),
+                    "meta": {"date_range": date_label, "branch_scope": target_branch or "All"}
+                }
+                nav = {"label": "View Returns & Approvals", "route": "/returns", "target_module": "returns"}
+                return {"returns_count": len(filtered), "total_refund_amount": round(total_return_amount, 2), "sample_returns": filtered[:10]}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 9. get_production_summary
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_production_summary":
+                target_wh = args.get("warehouse") or permitted_warehouse
+                summary = self.production_service.get_production_summary(
+                    warehouse=target_wh,
+                    date_from=args.get("date_from"),
+                    date_to=args.get("date_to")
+                )
+                card = {
+                    "type": "production_summary",
+                    "summary": summary,
+                    "meta": {"warehouse": target_wh or "All"}
+                }
+                nav = {"label": "Open Production Overview", "route": "/production", "target_module": "production_overview"}
+                return {"summary": summary}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 10. get_production_orders
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_production_orders":
+                target_wh = args.get("warehouse") or permitted_warehouse
+                status_filter = args.get("status") if args.get("status") != "all" else None
+                limit = int(args.get("limit") or 15)
+
+                orders, total = self.production_service.get_production_orders(
+                    skip=0,
+                    top=limit,
+                    status=status_filter,
+                    item_code=args.get("item_code"),
+                    warehouse=target_wh,
+                    date_from=args.get("date_from"),
+                    date_to=args.get("date_to")
+                )
+                summary = self.production_service.get_production_summary(warehouse=target_wh)
+
+                card = {
+                    "type": "production_orders",
+                    "orders": orders,
+                    "summary": summary,
+                    "total_count": total,
+                    "meta": {"warehouse": target_wh or "All", "status": status_filter or "all"}
+                }
+                nav = {"label": "Open Production Orders", "route": "/production/orders", "target_module": "production_orders"}
+                return {"total_orders": total, "summary": summary, "sample_orders": orders[:10]}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 11. get_production_rejection
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_production_rejection":
+                target_wh = args.get("warehouse") or permitted_warehouse
+                rej_summary = self.production_service.get_rejection_summary(
+                    warehouse=target_wh,
+                    date_from=args.get("date_from"),
+                    date_to=args.get("date_to"),
+                    search=args.get("search")
+                )
+                card = {
+                    "type": "production_rejection",
+                    "rejection_data": rej_summary,
+                    "meta": {"warehouse": target_wh or "All"}
+                }
+                nav = {"label": "View Production Rejection", "route": "/production/rejection", "target_module": "production_rejection"}
+                return {"rejection_summary": rej_summary}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 12. get_production_item_wise
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_production_item_wise":
+                target_wh = args.get("warehouse") or permitted_warehouse
+                items = self.production_service.get_item_wise_production(
+                    warehouse=target_wh,
+                    date_from=args.get("date_from"),
+                    date_to=args.get("date_to"),
+                    search=args.get("search")
+                )
+                card = {
+                    "type": "production_item_wise",
+                    "items": items,
+                    "meta": {"warehouse": target_wh or "All"}
+                }
+                nav = {"label": "View Item-wise Production", "route": "/production/item-wise", "target_module": "production_item_wise"}
+                return {"item_wise_production": items[:15]}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 13. get_sales_report
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_sales_report":
+                r = args.get("range", "monthly")
+                d_from, d_to, date_label = _resolve_date_range(r, args.get("from_date"), args.get("to_date"))
+                target_branch = args.get("branch") or permitted_warehouse
+
+                if d_from and d_to:
+                    raw_invoices = self.invoices_service.get_invoices_by_date(d_from, d_to)
+                else:
+                    raw_invoices = self.invoices_service.get_recent_invoices(limit=1000)
+
+                filtered = []
+                for inv in raw_invoices:
+                    inv_b = _normalize_branch(_extract_branch_from_invoice(inv))
+                    if current_user.get("role") == "admin" or not target_branch or inv_b == target_branch:
+                        filtered.append(inv)
+
+                total_sales = sum(float(i.get("DocTotal") or 0.0) for i in filtered)
+
+                # Monthly/daily trend breakdown
+                month_buckets = {}
+                for inv in filtered:
+                    d_str = str(inv.get("DocDate") or "")[:7]
+                    if not d_str: continue
+                    month_buckets[d_str] = month_buckets.get(d_str, 0.0) + float(inv.get("DocTotal") or 0.0)
+
+                trend_list = [{"label": k, "sales": round(v, 2)} for k, v in sorted(month_buckets.items())]
+
+                card = {
+                    "type": "sales_report",
+                    "total_sales": round(total_sales, 2),
+                    "invoice_count": len(filtered),
+                    "trend": trend_list,
+                    "meta": {"date_range": date_label, "branch_scope": target_branch or "All"}
+                }
+                nav = {"label": "View Sales Reports", "route": "/reports/sales", "target_module": "reports_sales"}
+                return {"total_sales": round(total_sales, 2), "invoice_count": len(filtered), "trend": trend_list}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 14. get_invoice_report
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_invoice_report":
+                d_from, d_to, date_label = _resolve_date_range(None, args.get("from_date"), args.get("to_date"))
+                target_branch = args.get("branch") or permitted_warehouse
+
+                if not d_from:
+                    d_from = date(2026, 10, 1)
+                    d_to = date(2026, 10, 13)
+
+                raw_invoices = self.invoices_service.get_invoices_by_date(d_from, d_to)
+                filtered = [inv for inv in raw_invoices if current_user.get("role") == "admin" or not target_branch or _normalize_branch(_extract_branch_from_invoice(inv)) == target_branch]
+
+                total_gross = sum(float(i.get("DocTotal") or 0.0) for i in filtered)
+                total_vat = sum(float(i.get("VatSum") or 0.0) for i in filtered)
+                total_discount = sum(float(i.get("TotalDiscount") or 0.0) for i in filtered)
+
+                report_data = {
+                    "total_invoices": len(filtered),
+                    "total_gross_amount": round(total_gross, 2),
+                    "total_tax_collected": round(total_vat, 2),
+                    "total_discounts_given": round(total_discount, 2),
+                    "date_range": date_label
+                }
+
+                card = {
+                    "type": "invoice_report",
+                    "data": report_data,
+                    "meta": {"date_range": date_label}
+                }
+                nav = {"label": "View Invoice Reports", "route": "/reports/invoice", "target_module": "reports_invoice"}
+                return report_data, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 15. get_payment_report
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_payment_report":
+                r = args.get("range", "monthly")
+                d_from, d_to, date_label = _resolve_date_range(r, args.get("from_date"), args.get("to_date"))
+                target_branch = args.get("branch") or permitted_warehouse
+
+                if not d_from or not d_to:
+                    d_from = date(2026, 10, 1)
+                    d_to = date(2026, 10, 13)
+
+                payments = self.payments_service.get_payments_by_date(
+                    start_date=d_from.strftime("%Y-%m-%d"),
+                    end_date=d_to.strftime("%Y-%m-%d"),
+                    branch=target_branch
+                )
+
+                total_amount = 0.0
+                methods_split = {"Cash": 0.0, "Card": 0.0, "Transfer / UPI": 0.0}
+
+                for p in payments:
+                    cash = float(p.get("CashSum") or 0.0)
+                    transfer = float(p.get("TransferSum") or 0.0)
+                    card = sum(float(c.get("CreditSum") or 0.0) for c in (p.get("PaymentCreditCards") or []))
+
+                    total_p = cash + transfer + card
+                    if total_p == 0.0:
+                        total_p = cash or transfer or card
+
+                    total_amount += total_p
+                    if card > 0: methods_split["Card"] += card
+                    elif transfer > 0: methods_split["Transfer / UPI"] += transfer
+                    else: methods_split["Cash"] += cash
+
+                distribution = [{"method": k, "amount": round(v, 2), "percentage": round((v / total_amount * 100), 1) if total_amount > 0 else 0.0} for k, v in methods_split.items()]
+
+                card = {
+                    "type": "payment_report",
+                    "total_payments": round(total_amount, 2),
+                    "payment_count": len(payments),
+                    "distribution": distribution,
+                    "meta": {"date_range": date_label}
+                }
+                nav = {"label": "View Payment Reports", "route": "/reports/payment", "target_module": "reports_payment"}
+                return {"total_collected": round(total_amount, 2), "payment_count": len(payments), "distribution": distribution}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 16. get_customer_report
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_customer_report":
+                r = args.get("range", "monthly")
+                invoices = self.invoices_service.get_recent_invoices(limit=500)
+                cust_map = {}
+
+                for inv in invoices:
+                    code = str(inv.get("CardCode") or "UNKNOWN")
+                    name = str(inv.get("CardName") or code)
+                    amt = float(inv.get("DocTotal") or 0.0)
+
+                    if code not in cust_map:
+                        cust_map[code] = {"customer_code": code, "customer_name": name, "total_spend": 0.0, "invoice_count": 0}
+                    cust_map[code]["total_spend"] += amt
+                    cust_map[code]["invoice_count"] += 1
+
+                top_customers = sorted(cust_map.values(), key=lambda x: x["total_spend"], reverse=True)[:10]
+
+                card = {
+                    "type": "customer_report",
+                    "top_customers": top_customers,
+                    "meta": {"range": r}
+                }
+                nav = {"label": "Open Customers Page", "route": "/customers", "target_module": "customers"}
+                return {"top_customers": top_customers}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 17. get_pending_approvals
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_pending_approvals":
+                st = args.get("status", "pending")
+                approvals_res = approval_service.get_approvals(branch_id=permitted_warehouse, status=st, limit=20)
+                items = approvals_res.get("items", []) if isinstance(approvals_res, dict) else approvals_res
+
+                card = {
+                    "type": "pending_approvals",
+                    "approvals": items,
+                    "total_count": approvals_res.get("total", len(items)) if isinstance(approvals_res, dict) else len(items),
+                    "meta": {"status": st}
+                }
+                nav = {"label": "Open Returns & Approvals", "route": "/returns", "target_module": "returns"}
+                return {"approvals_count": len(items), "approvals": items}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 18. navigate_to_module
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "navigate_to_module":
+                tgt = args.get("target_module")
+                route_info = INTERNAL_ROUTE_MAP.get(tgt)
+                if not route_info:
+                    return {"error": f"Unknown module '{tgt}'"}, None, None
+
+                path = route_info["path"]
+                if args.get("record_id") and tgt == "sales":
+                    path = f"/sales/{args.get('record_id')}"
+
+                params = args.get("params") or {}
+                nav = {
+                    "target_module": tgt,
+                    "label": args.get("label") or f"Open {route_info['name']}",
+                    "route": path,
+                    "params": params
+                }
+                card = {
+                    "type": "navigation",
+                    "target": nav
+                }
+                return {"navigated": True, "route": path, "name": route_info["name"]}, card, nav
+
+            else:
+                return {"error": f"Unknown tool '{tool_name}'"}, None, None
+
+        except SAPConnectionError as e:
+            logger.error(f"SAP Connection Error during tool {tool_name}: {e}")
+            card = {
+                "type": "sap_offline",
+                "message": "SAP Business One Service Layer is temporarily unreachable. Live operational data could not be fetched.",
+                "tool": tool_name
+            }
+            return {"error": "SAP Service Layer connection offline."}, card, None
+        except Exception as e:
+            logger.error(f"Execution error in tool {tool_name}: {e}", exc_info=True)
+            return {"error": f"Tool execution failed: {str(e)}"}, None, None

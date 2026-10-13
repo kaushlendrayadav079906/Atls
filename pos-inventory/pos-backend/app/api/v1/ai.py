@@ -18,6 +18,7 @@ class ChatRequest(BaseModel):
     branch_id: str
     conversation_id: Optional[str] = None
     history: Optional[List[ChatMessage]] = None
+    context: Optional[Dict[str, Any]] = None
 
 @router.post("/chat")
 def chat_with_assistant(
@@ -32,11 +33,20 @@ def chat_with_assistant(
             branch_id=request.branch_id,
             conversation_id=request.conversation_id,
             history=history_dicts,
-            current_user=current_user
+            current_user=current_user,
+            context=request.context
         )
         return response
+    except TimeoutError as e:
+        logger.error(f"Timeout in AI chat: {e}")
+        raise HTTPException(status_code=504, detail="AI request timed out. Please try again.")
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        detail = str(e)
+        logger.warning(f"Validation or quota issue in AI chat: {detail}")
+        if "quota exhausted" in detail or "credits" in detail:
+            raise HTTPException(status_code=402, detail=detail)
+        raise HTTPException(status_code=400, detail=detail)
     except Exception as e:
         logger.error(f"Error in AI chat: {e}")
-        raise HTTPException(status_code=500, detail="Failed to process chat request")
+        detail_msg = str(e) if str(e).startswith("AI service error:") else "Failed to process chat request."
+        raise HTTPException(status_code=500, detail=detail_msg)

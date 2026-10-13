@@ -299,9 +299,8 @@ async def health_check():
     try:
         from app.services.sap.client import get_sap_client
         client = get_sap_client()
-        # Ensure it's logged in or try a lightweight call
-        if client.session_id:
-            sap_status = "connected"
+        sap_info = client.check_health()
+        sap_status = sap_info.get("status", "unavailable")
     except Exception as e:
         logger.warning(f"Health check SAP failure: {e}")
 
@@ -345,6 +344,13 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
 
+    uvicorn.run(
+        "app.main:app",
+        host=settings.HOST,
+        port=settings.PORT,
+        reload=settings.DEBUG,
+        log_level=settings.LOG_LEVEL.lower(),
+    )
     uvicorn.run(
         "app.main:app",
         host=settings.HOST,

@@ -94,9 +94,14 @@ class Settings(BaseSettings):
     # http://localhost:<PORT>.
     PUBLIC_BASE_URL: str = ""
 
-    # AI Provider (OpenAI)
+    # AI Provider Configuration
+    AI_PROVIDER: str = "openai"  # "openai" or "gemini"
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o"
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_TIMEOUT: float = 30.0
+    OPENAI_BASE_URL: str = ""
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-1.5-flash"
     
     class Config:
         env_file = ".env"

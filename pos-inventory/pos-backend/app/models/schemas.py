@@ -651,3 +651,41 @@ class InventoryRiskItem(BaseModel):
     ordered: float
     minimal_stock: float
     warehouse: str
+
+
+# ============================================================
+# Analytical Table Models for AI Assistant / BI Responses
+# ============================================================
+
+class TableColumn(BaseModel):
+    key: str
+    label: str
+    type: str = Field(..., pattern="^(date|string|currency|number|delta|percentage)$")
+
+
+class TableChartConfig(BaseModel):
+    type: str = Field("bar", pattern="^(bar|line|pie|area)$")
+    xKey: str
+    series: List[str]
+
+
+class TableFilters(BaseModel):
+    period: Optional[str] = None
+    dateFrom: Optional[str] = None
+    dateTo: Optional[str] = None
+    groupBy: Optional[List[str]] = None
+    branch: Optional[str] = None
+    additional: Optional[Dict[str, Any]] = None
+
+
+class StructuredTableResponse(BaseModel):
+    type: str = "table"
+    title: str
+    summary: str
+    columns: List[TableColumn]
+    rows: List[Dict[str, Any]]
+    filters: TableFilters
+    chart: Optional[TableChartConfig] = None
+    meta: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+

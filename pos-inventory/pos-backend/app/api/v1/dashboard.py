@@ -1024,7 +1024,7 @@ async def export_operator_reports(
     )
 
 @router.get("/alerts", response_model=List[DashboardAlert])
-async def get_alerts(current_user: dict = Depends(get_current_user)):
+async def get_alerts(current_user: dict = Depends(require_manager_or_admin)):
     """Fetch pending approvals as alerts for authorized users. Branch scoped."""
     target_branch = _get_permitted_branch(current_user, None)
     
@@ -1053,7 +1053,7 @@ from app.models.schemas import InventoryRiskItem
 from app.services.sap.inventory_service import SAPInventoryService
 
 @router.get('/inventory-risk', response_model=List[InventoryRiskItem])
-async def get_inventory_risk(current_user: dict = Depends(get_current_user)):
+async def get_inventory_risk(current_user: dict = Depends(require_manager_or_admin)):
     target_branch = _get_permitted_branch(current_user, None)
     
     try:

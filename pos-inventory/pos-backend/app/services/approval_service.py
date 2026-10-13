@@ -240,3 +240,10 @@ def get_approvals(
                     "failed": counts_row[4] if counts_row[4] else 0,
                 }
             }
+
+
+def get_pending_approvals(branch_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Fetch pending approval requests for alerts/dashboard, optionally scoped to branch."""
+    result = get_approvals(branch_id=branch_id, status="pending", limit=100)
+    return result.get("items", [])
+

@@ -21,9 +21,11 @@ import {
   User,
   X,
   Eye,
-  Edit
+  Edit,
+  Sparkles
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { AIAssistantPanel } from '../../components/AIAssistantPanel';
 import { salesApi } from '../../api/sales';
 import { useDebounce } from '../../hooks/useDebounce';
 import type { DashboardRecentSalesPage, SaleDetail, DashboardRecentSale } from '../../types/sales';
@@ -304,6 +306,20 @@ export const SalesList = () => {
   const offset = (page - 1) * limit;
 
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
+
+  const [aiOpen, setAiOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail?.open !== undefined) {
+        setAiOpen(e.detail.open);
+      } else {
+        setAiOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('atls-toggle-ai', handler);
+    return () => window.removeEventListener('atls-toggle-ai', handler);
+  }, []);
 
   const applyQuickFilter = (filter: QuickFilter) => {
     setQuickFilter(filter);
@@ -660,6 +676,33 @@ export const SalesList = () => {
           onClose={() => setSelectedSaleId(null)} 
           initialSale={data?.items?.find(s => s.docEntry === selectedSaleId)}
         />
+      )}
+
+      {/* AI Assistant Right Panel */}
+      <AIAssistantPanel
+        pageContext="invoices"
+        pageFilters={{
+          search: debouncedSearch,
+          quickFilter,
+          dateFrom,
+          dateTo,
+          page
+        }}
+        isOpen={aiOpen}
+        onClose={() => setAiOpen(false)}
+        className="h-full rounded-none border-y-0 border-r-0 border-l"
+      />
+
+      {/* Floating AI Button when closed */}
+      {!aiOpen && (
+        <button
+          onClick={() => setAiOpen(true)}
+          className="fixed right-5 bottom-6 z-40 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 px-4 py-2.5 text-[12px] font-semibold text-white shadow-[0_4px_20px_rgba(99,102,241,0.35)] transition-all cursor-pointer hover:shadow-[0_6px_25px_rgba(99,102,241,0.5)] hover:scale-[1.02] active:scale-[0.98]"
+          title="Open ATLAS AI Assistant"
+        >
+          <Sparkles size={16} />
+          <span>Open ATLAS AI Assistant</span>
+        </button>
       )}
 
     </div>

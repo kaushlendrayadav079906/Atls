@@ -122,6 +122,89 @@ class SAPServiceLayerClient:
             self.session_id = None
             self.session_timeout = None
 
+    def check_health(self) -> Dict[str, Any]:
+        """
+        Check SAP Service Layer connectivity.
+        Distinguishes application liveness from SAP service layer availability.
+        Returns:
+            Dict containing status ("connected" | "disconnected"), authenticated (bool), details, and timestamp.
+        """
+        if sap_breaker.state.name == "OPEN":
+            return {
+                "status": "disconnected",
+                "authenticated": False,
+                "circuit_breaker": "OPEN",
+                "message": "SAP circuit breaker is OPEN due to repeated failures",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+        if not self.client:
+            self._init_client()
+
+        try:
+            # If no active session or expired, attempt login
+            if not self.session_id or (self.session_timeout and datetime.utcnow() >= self.session_timeout):
+                self.login()
+                return {
+                    "status": "connected",
+                    "authenticated": True,
+                    "circuit_breaker": sap_breaker.state.name,
+                    "message": "SAP authenticated and connected",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+
+            # Probe active session with lightweight request
+            probe_url = f"{self.base_url}/$metadata"
+            resp = self.client.get(
+                probe_url,
+                headers={"Accept": "application/xml"},
+                cookies=self._get_cookies(),
+                timeout=4.0,
+            )
+            if resp.status_code in (200, 204):
+                return {
+                    "status": "connected",
+                    "authenticated": True,
+                    "circuit_breaker": sap_breaker.state.name,
+                    "message": "SAP connection alive and verified",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            elif resp.status_code == 401:
+                self.session_id = None
+                self.login()
+                return {
+                    "status": "connected",
+                    "authenticated": True,
+                    "circuit_breaker": sap_breaker.state.name,
+                    "message": "SAP session re-authenticated",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            else:
+                return {
+                    "status": "disconnected",
+                    "authenticated": False,
+                    "circuit_breaker": sap_breaker.state.name,
+                    "message": f"SAP returned HTTP {resp.status_code}",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+        except SAPConnectionError as exc:
+            return {
+                "status": "disconnected",
+                "authenticated": False,
+                "circuit_breaker": sap_breaker.state.name,
+                "message": str(exc),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        except Exception as exc:
+            return {
+                "status": "disconnected",
+                "authenticated": False,
+                "circuit_breaker": sap_breaker.state.name,
+                "message": f"Connection probe failed: {str(exc)}",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+
     def _ensure_session(self):
         """Ensure we have a valid session, login if needed (thread-safe)."""
         # Fast path: session valid, no lock needed

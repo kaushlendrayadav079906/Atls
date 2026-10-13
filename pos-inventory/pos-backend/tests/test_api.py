@@ -37,6 +37,44 @@ def test_health_check(client):
     assert "database" in data["dependencies"]
 
 
+def test_sap_health_connected(client):
+    """Dedicated SAP health endpoint should report connected when client is healthy."""
+    with patch(
+        "app.services.sap.client.SAPServiceLayerClient.check_health",
+        return_value={
+            "status": "connected",
+            "authenticated": True,
+            "circuit_breaker": "closed",
+            "message": "SAP Service Layer metadata ping successful",
+            "timestamp": "2026-10-13T10:00:00Z"
+        }
+    ):
+        response = client.get("/api/v1/health/sap")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "connected"
+        assert data["authenticated"] is True
+
+
+def test_sap_health_disconnected(client):
+    """Dedicated SAP health endpoint should report disconnected when client errors."""
+    with patch(
+        "app.services.sap.client.SAPServiceLayerClient.check_health",
+        return_value={
+            "status": "disconnected",
+            "authenticated": False,
+            "circuit_breaker": "open",
+            "message": "Circuit breaker is open",
+            "timestamp": "2026-10-13T10:00:00Z"
+        }
+    ):
+        response = client.get("/api/v1/health/sap")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "disconnected"
+        assert data["authenticated"] is False
+
+
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
 def test_login_invalid_credentials(client):

@@ -773,7 +773,7 @@ def _complete_approval_request(req_id: str, reviewer_id: str, payload: dict) -> 
 
 
 @router.post("/approvals/{req_id}/approve")
-async def approve_request(req_id: str, current_user: dict = Depends(get_current_user)):
+async def approve_request(req_id: str, current_user: dict = Depends(require_admin)):
     """Approve a request and execute the SAP action."""
     role = str(current_user.get("role") or "").lower()
     if role not in ("admin", "manager"):
@@ -781,8 +781,7 @@ async def approve_request(req_id: str, current_user: dict = Depends(get_current_
     req = approval_service.get_approval_request(req_id)
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
-    if role != "admin":
-        _ensure_approval_branch_access(req, current_user)
+    _ensure_approval_branch_access(req, current_user)
     reviewer_id = _approval_reviewer_id(current_user)
     if req["status"] != "pending":
         raise HTTPException(status_code=400, detail=f"Request is already {req['status']}")
@@ -957,7 +956,7 @@ async def approve_request(req_id: str, current_user: dict = Depends(get_current_
 
 
 @router.post("/approvals/{req_id}/reject")
-async def reject_request(req_id: str, current_user: dict = Depends(get_current_user)):
+async def reject_request(req_id: str, current_user: dict = Depends(require_admin)):
     """Reject a request."""
     role = str(current_user.get("role") or "").lower()
     if role not in ("admin", "manager"):
@@ -965,8 +964,7 @@ async def reject_request(req_id: str, current_user: dict = Depends(get_current_u
     req = approval_service.get_approval_request(req_id)
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
-    if role != "admin":
-        _ensure_approval_branch_access(req, current_user)
+    _ensure_approval_branch_access(req, current_user)
     reviewer_id = _approval_reviewer_id(current_user)
     if req["status"] != "pending":
         raise HTTPException(status_code=400, detail=f"Request is already {req['status']}")
