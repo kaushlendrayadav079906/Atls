@@ -349,6 +349,69 @@ describe('AIChatRenderer Integration and Backward Compatibility', () => {
     expect(html).toContain('Live SAP Service Unavailable');
     expect(html).toContain('SAP Service Layer is unreachable.');
   });
+
+  it('renders finance_summary KPI grid correctly', () => {
+    const financeSummaryData = {
+      type: 'finance_summary',
+      title: 'Monthly Financial Overview',
+      period: 'This Month',
+      summary: 'Verified accounting data from SAP Business One.',
+      cards: [
+        { title: 'Total Sales', value: 405180, format: 'currency', subtitle: '+12.5% vs prev' },
+        { title: 'Total Purchases', value: 218460, format: 'currency', subtitle: '+8.2% vs prev' },
+        { title: 'Gross Profit', value: 186720, format: 'currency', subtitle: '+18.4% vs prev' },
+        { title: 'Gross Margin', value: '46.1%', subtitle: 'Net margin' }
+      ]
+    };
+
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <AIChatRenderer structuredData={financeSummaryData} />
+      </MemoryRouter>
+    );
+
+    expect(html).toContain('Monthly Financial Overview');
+    expect(html).toContain('This Month');
+    expect(html).toContain('Total Sales');
+    expect(html).toContain('4,05,180.00');
+    expect(html).toContain('Total Purchases');
+    expect(html).toContain('Gross Profit');
+    expect(html).toContain('Gross Margin');
+  });
+
+  it('renders all three view toggle options (Chart, Results, Both)', () => {
+    const tableWithChart = {
+      type: 'table' as const,
+      title: 'Revenue Comparison',
+      summary: 'Revenue vs Purchases',
+      columns: [
+        { key: 'month', label: 'Month', type: 'string' as const },
+        { key: 'sales', label: 'Sales', type: 'currency' as const }
+      ],
+      rows: [
+        { month: 'Oct 2026', sales: 150000 },
+        { month: 'Nov 2026', sales: 180000 }
+      ],
+      chart: {
+        type: 'bar' as const,
+        xKey: 'month',
+        series: ['sales'],
+        defaultView: 'both' as const
+      }
+    };
+
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <AIChatRenderer structuredData={tableWithChart} />
+      </MemoryRouter>
+    );
+
+    expect(html).toContain('Chart');
+    expect(html).toContain('Results');
+    expect(html).toContain('Both');
+    expect(html).toContain('Oct 2026');
+    expect(html).toContain('1,50,000.00');
+  });
 });
 
 describe('FormattedMessage Markdown and Bullets', () => {

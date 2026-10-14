@@ -12,6 +12,7 @@ export interface TableChartConfig {
   type: TableChartType;
   xKey: string;
   series: string[];
+  defaultView?: 'chart' | 'results' | 'both';
 }
 
 export interface TableFilters {

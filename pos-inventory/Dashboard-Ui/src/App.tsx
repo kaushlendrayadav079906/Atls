@@ -28,6 +28,14 @@ import { ProductionItemWisePage } from './pages/production/ProductionItemWisePag
 import { ProductionRejectionPage } from './pages/production/ProductionRejectionPage';
 import { ProductionDateWisePage } from './pages/production/ProductionDateWisePage';
 import { ProductionReportsPage } from './pages/production/ProductionReportsPage';
+import { FinanceOverviewPage } from './pages/finance/FinanceOverviewPage';
+import { PurchaseInvoicesPage } from './pages/finance/PurchaseInvoicesPage';
+import { IncomingPaymentsPage } from './pages/finance/IncomingPaymentsPage';
+import { OutgoingPaymentsPage } from './pages/finance/OutgoingPaymentsPage';
+import { CustomerAnalysisPage } from './pages/finance/CustomerAnalysisPage';
+import { SupplierAnalysisPage } from './pages/finance/SupplierAnalysisPage';
+import { ProfitabilityReportsPage } from './pages/finance/ProfitabilityReportsPage';
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -89,7 +97,19 @@ function App() {
                 <Route path="date-wise" element={<ProductionDateWisePage />} />
                 <Route path="reports" element={<ProductionReportsPage />} />
               </Route>
+              <Route path="finance">
+
+                <Route index element={<FinanceOverviewPage />} />
+                <Route path="overview" element={<FinanceOverviewPage />} />
+                <Route path="purchase-invoices" element={<PurchaseInvoicesPage />} />
+                <Route path="incoming-payments" element={<IncomingPaymentsPage />} />
+                <Route path="outgoing-payments" element={<OutgoingPaymentsPage />} />
+                <Route path="customer-analysis" element={<CustomerAnalysisPage />} />
+                <Route path="supplier-analysis" element={<SupplierAnalysisPage />} />
+                <Route path="profitability-reports" element={<ProfitabilityReportsPage />} />
+              </Route>
               <Route path="reports">
+
                 <Route index element={<ReportsPage />} />
                 <Route path="sales" element={<SalesReportPage />} />
                 <Route path="invoice" element={<InvoiceReportPage />} />

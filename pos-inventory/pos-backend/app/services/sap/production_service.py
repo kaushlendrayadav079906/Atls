@@ -61,7 +61,11 @@ class SAPProductionService:
             filters.append(f"(contains(DocumentNumber, '{search}') or contains(ItemNo, '{search}') or contains(ProductDescription, '{search}'))")
         
         if status:
-            filters.append(f"ProductionOrderStatus eq 'bopos{status}'")
+            if status.lower() in ("pending", "open"):
+                filters.append("(ProductionOrderStatus eq 'boposPlanned' or ProductionOrderStatus eq 'boposReleased')")
+            else:
+                clean_status = status[5:] if status.startswith("bopos") else status
+                filters.append(f"ProductionOrderStatus eq 'bopos{clean_status}'")
             
         if item_code:
             item_code = item_code.replace("'", "''")

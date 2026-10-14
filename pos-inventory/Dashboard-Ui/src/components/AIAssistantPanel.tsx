@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Minus, Maximize2, X, Send, Sparkles
 } from 'lucide-react';
-import { apiClient } from '../api/client';
+import { aiAssistantApi, financeApi, type FinanceOverviewResponse } from '../api/endpoints';
 import { useAuth } from '../contexts/AuthContext';
 import { AIChatRenderer } from './AIChatRenderer';
 import { FormattedMessage } from './FormattedMessage';
+import { FinanceAIWorkspace } from './finance/FinanceAIWorkspace';
 
 export type AIAssistantContext =
   | 'dashboard'
@@ -30,7 +31,17 @@ export type AIAssistantContext =
   | 'reports_payment'
   | 'reports_inventory'
   | 'reports_customer'
-  | 'reports_ai';
+  | 'reports_ai'
+
+  | 'finance'
+  | 'finance_overview'
+  | 'finance_purchase_invoices'
+  | 'finance_incoming_payments'
+  | 'finance_outgoing_payments'
+  | 'finance_customer_analysis'
+  | 'finance_supplier_analysis'
+  | 'finance_profitability_reports';
+
 
 export interface AIAssistantPanelProps {
   pageContext?: AIAssistantContext;
@@ -53,6 +64,34 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [loadingChat, setLoadingChat] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  // Full-screen Finance Workspace State
+  const isFinance = pageContext === 'finance' || pageContext === 'finance_overview' || pageContext.startsWith('finance_');
+  const [financeOverviewData, setFinanceOverviewData] = useState<FinanceOverviewResponse | null>(null);
+  const [financeLoading, setFinanceLoading] = useState(false);
+  const [financeRange, setFinanceRange] = useState('monthly');
+  const [financeBranch, setFinanceBranch] = useState(pageFilters?.branch || user?.branch_id || 'SH');
+
+  const fetchFinanceOverview = async () => {
+    setFinanceLoading(true);
+    try {
+      const data = await financeApi.getOverview({
+        range: financeRange,
+        branch: financeBranch === 'All Branches' ? undefined : financeBranch,
+      });
+      setFinanceOverviewData(data);
+    } catch (err) {
+      console.error('Failed to load finance overview in Assistant Panel', err);
+    } finally {
+      setFinanceLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (aiFullscreen && isFinance && !financeOverviewData) {
+      fetchFinanceOverview();
+    }
+  }, [aiFullscreen, isFinance, financeRange, financeBranch]);
 
   // Chat message history (seeded with reference demo on dashboard or tailored greeting)
   const [chatHistory, setChatHistory] = useState<Array<{
@@ -148,6 +187,14 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         }
       ];
     }
+    if (pageContext === 'finance' || pageContext === 'finance_overview' || pageContext.startsWith('finance_')) {
+      return [
+        {
+          role: 'assistant',
+          content: "Hello! I'm your ATLAS Finance Assistant.\n\nI can help you with:\n• Sales, purchases and payments\n• Invoice and payment details\n• Customer & supplier analysis\n• Outstanding receivables and payables\n• Profitability and financial reports\n• Open relevant pages in ATLAS",
+        }
+      ];
+    }
     // Default dashboard welcome thread
     return [
       {
@@ -156,6 +203,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
       }
     ];
   });
+
 
   // Suggested questions based on page context
   const suggestedQuestions = React.useMemo(() => {
@@ -241,6 +289,22 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
           'Summarize customer activity',
           'Summarize the reports available to me',
         ];
+      case 'finance':
+      case 'finance_overview':
+      case 'finance_purchase_invoices':
+      case 'finance_incoming_payments':
+      case 'finance_outgoing_payments':
+      case 'finance_customer_analysis':
+      case 'finance_supplier_analysis':
+      case 'finance_profitability_reports':
+        return [
+          'Incoming payments',
+          'Outgoing payments',
+          'Top customers',
+          'Outstanding receivables',
+          'Show revenue per month for the past 6 months',
+          'Top suppliers by purchase',
+        ];
       default:
         return [
           'Show sales today',
@@ -252,6 +316,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         ];
     }
   }, [pageContext]);
+
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -282,45 +347,46 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
     setLoadingChat(true);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 35000);
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
 
     try {
-      const res = await apiClient.post('/ai-assistant/chat', {
+      const data = await aiAssistantApi.chat({
         message: msgToSend,
         branch_id: pageFilters?.branch || user?.branch_id || 'SH',
-        conversation_id: conversationId,
+        conversation_id: conversationId || undefined,
         history: chatHistory.map(m => ({ role: m.role, content: m.content })),
         context: {
           page: pageContext,
           ...pageFilters
         }
       }, {
-        signal: controller.signal
+        signal: controller.signal,
+        timeout: 45000
       });
       clearTimeout(timeoutId);
 
-      if (res.data.conversation_id) {
-        setConversationId(res.data.conversation_id);
+      if (data.conversation_id) {
+        setConversationId(data.conversation_id);
       }
 
       setChatHistory(prev => [
         ...prev,
         {
           role: 'assistant',
-          content: res.data.answer,
-          structured_data: res.data.structured_data,
+          content: data.answer,
+          structured_data: data.structured_data,
         },
       ]);
     } catch (err: any) {
       clearTimeout(timeoutId);
       let errMsg = 'Failed to communicate with AI Assistant. Please try again.';
 
-      if (err.name === 'CanceledError' || err.name === 'AbortError') {
-        errMsg = 'The AI Assistant request timed out after 35 seconds. Please try again or refine your query.';
+      if (err.name === 'CanceledError' || err.name === 'AbortError' || err.code === 'ECONNABORTED' || (err.message && err.message.includes('timeout'))) {
+        errMsg = 'The AI Assistant request timed out after 45 seconds. Please try again or refine your query.';
       } else if (err?.response?.status === 402) {
         errMsg = 'AI Provider quota exhausted: Your OpenAI/Gemini account credit balance has run out. Please check your billing at platform.openai.com.';
       } else if (err?.response?.status === 504) {
-        errMsg = 'Request timed out on the backend server while contacting the AI service.';
+        errMsg = err?.response?.data?.detail || 'Request timed out on the backend server while contacting the AI service.';
       } else if (err?.response?.data?.detail) {
         errMsg = err.response.data.detail;
       } else if (err.message) {
@@ -340,6 +406,28 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
   };
 
   if (!isOpen) return null;
+
+  if (isFinance && aiFullscreen) {
+    return (
+      <FinanceAIWorkspace
+        isOpen={aiFullscreen}
+        onClose={onClose}
+        onMinimize={() => setAiFullscreen(false)}
+        chatMessages={chatHistory as any}
+        onSendMessage={async (msg) => {
+          await handleSendChat(msg);
+        }}
+        chatLoading={loadingChat}
+        range={financeRange}
+        setRange={setFinanceRange}
+        branch={financeBranch}
+        setBranch={setFinanceBranch}
+        overviewData={financeOverviewData}
+        overviewLoading={financeLoading}
+        onRefreshOverview={fetchFinanceOverview}
+      />
+    );
+  }
 
   return (
     <aside
@@ -362,9 +450,15 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
               Business Intelligence
             </div>
           </div>
-          <span className="rounded-full bg-white/90 border border-indigo-200/80 px-2 py-0.5 text-[9px] font-bold text-indigo-700 tracking-wide shadow-2xs">
-            READ-ONLY SAP
-          </span>
+          {isFinance ? (
+            <span className="rounded-full bg-purple-50 border border-purple-200/90 px-2.5 py-0.5 text-[9px] font-black text-purple-700 tracking-wider shadow-2xs">
+              FINANCE MODE
+            </span>
+          ) : (
+            <span className="rounded-full bg-white/90 border border-indigo-200/80 px-2 py-0.5 text-[9px] font-bold text-indigo-700 tracking-wide shadow-2xs">
+              READ-ONLY SAP
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1 text-slate-400">
@@ -401,16 +495,30 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
           </div>
           <div className="rounded-2xl rounded-tl-xs bg-white border border-indigo-100/90 p-3 text-[12px] text-slate-700 shadow-2xs leading-relaxed max-w-[90%]">
             <span className="font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              Hello! I'm your ATLAS AI Assistant.
+              {isFinance ? "Hello! I'm your ATLAS Finance Assistant." : "Hello! I'm your ATLAS AI Assistant."}
             </span>
-            <p className="mt-1 text-[11.5px] text-slate-500">I can help you analyze and explore:</p>
+            <p className="mt-1 text-[11.5px] text-slate-500">I can help you with:</p>
             <ul className="mt-1 list-disc list-inside text-[11.5px] text-slate-600 space-y-0.5">
-              <li>Production batches, orders & rejection trends</li>
-              <li>Sales, invoices, payments & stock levels</li>
-              <li>Live authorized data from SAP Business One</li>
+              {isFinance ? (
+                <>
+                  <li>Sales, purchases and payments</li>
+                  <li>Invoice and payment details</li>
+                  <li>Customer & supplier analysis</li>
+                  <li>Outstanding receivables and payables</li>
+                  <li>Profitability and financial reports</li>
+                  <li>Open relevant pages in ATLAS</li>
+                </>
+              ) : (
+                <>
+                  <li>Production batches, orders & rejection trends</li>
+                  <li>Sales, invoices, payments & stock levels</li>
+                  <li>Live authorized data from SAP Business One</li>
+                </>
+              )}
             </ul>
           </div>
         </div>
+
 
         {/* Date Pill Divider */}
         <div className="flex justify-center my-1">
@@ -479,8 +587,9 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
-            placeholder="Ask anything about your business..."
+            placeholder={isFinance ? "Ask anything about your finance data..." : "Ask anything about your business..."}
             className="flex-1 bg-transparent px-2.5 text-[12px] text-slate-800 outline-none placeholder:text-slate-400"
+
           />
           <button
             onClick={() => handleSendChat()}

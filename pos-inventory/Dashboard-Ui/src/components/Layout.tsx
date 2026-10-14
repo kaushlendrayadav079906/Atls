@@ -16,6 +16,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Sparkles,
+  Landmark,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -52,6 +53,20 @@ const navItems = [
       { name: 'Production Rejection', path: '/production/rejection' },
       { name: 'Date-wise Production', path: '/production/date-wise' },
       { name: 'Reports', path: '/production/reports' },
+    ]
+  },
+  {
+    name: 'Financial',
+    path: '/finance',
+    icon: Landmark,
+    subItems: [
+      { name: 'Finance Overview', path: '/finance' },
+      { name: 'Purchase Invoices', path: '/finance/purchase-invoices' },
+      { name: 'Incoming Payments', path: '/finance/incoming-payments' },
+      { name: 'Outgoing Payments', path: '/finance/outgoing-payments' },
+      { name: 'Customer Analysis', path: '/finance/customer-analysis' },
+      { name: 'Supplier Analysis', path: '/finance/supplier-analysis' },
+      { name: 'Profitability Reports', path: '/finance/profitability-reports' },
     ]
   },
   { name: 'Atlas Analytics', path: '/analytics', icon: BarChart3 },
@@ -96,6 +111,10 @@ export const Layout = () => {
   const [productionExpanded, setProductionExpanded] = useState(
     location.pathname.startsWith('/production')
   );
+  const [financeExpanded, setFinanceExpanded] = useState(
+    location.pathname.startsWith('/finance')
+  );
+
   const { isSapConnected } = useSystemHealth();
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -138,8 +157,18 @@ export const Layout = () => {
     if (pathname === '/reports/ai') return 'reports_ai';
     if (pathname.startsWith('/reports')) return 'reports';
 
+    if (pathname === '/finance' || pathname === '/finance/overview') return 'finance_overview';
+    if (pathname === '/finance/purchase-invoices') return 'finance_purchase_invoices';
+    if (pathname === '/finance/incoming-payments') return 'finance_incoming_payments';
+    if (pathname === '/finance/outgoing-payments') return 'finance_outgoing_payments';
+    if (pathname === '/finance/customer-analysis') return 'finance_customer_analysis';
+    if (pathname === '/finance/supplier-analysis') return 'finance_supplier_analysis';
+    if (pathname === '/finance/profitability-reports') return 'finance_profitability_reports';
+    if (pathname.startsWith('/finance')) return 'finance';
+
     return 'dashboard';
   };
+
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -311,11 +340,13 @@ export const Layout = () => {
               const isActiveParent = hasSubItems && (
                 (item.name === 'Reports' && location.pathname.startsWith('/reports')) ||
                 (item.name === 'Sales & Invoices' && location.pathname.startsWith('/sales')) ||
-                (item.name === 'Production' && location.pathname.startsWith('/production'))
+                (item.name === 'Production' && location.pathname.startsWith('/production')) ||
+                (item.name === 'Financial' && location.pathname.startsWith('/finance'))
               );
               const isExpanded = item.name === 'Reports' ? reportsExpanded :
                 (item.name === 'Sales & Invoices' ? salesExpanded :
-                  (item.name === 'Production' ? productionExpanded : false));
+                  (item.name === 'Production' ? productionExpanded :
+                    (item.name === 'Financial' ? financeExpanded : false)));
 
               return (
                 <div key={item.name}>
@@ -327,7 +358,9 @@ export const Layout = () => {
                         if (item.name === 'Reports') setReportsExpanded(!reportsExpanded);
                         if (item.name === 'Sales & Invoices') setSalesExpanded(!salesExpanded);
                         if (item.name === 'Production') setProductionExpanded(!productionExpanded);
+                        if (item.name === 'Financial') setFinanceExpanded(!financeExpanded);
                       }}
+
                       style={{
                         backgroundColor: isActiveParent ? SIDEBAR_ACTIVE_BG : undefined,
                         color: isActiveParent ? COLOR_PRIMARY : TEXT_SECONDARY,
@@ -474,7 +507,7 @@ export const Layout = () => {
 
         {/* ── Main area ── */}
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-slate-50 relative">
-          {location.pathname !== '/' ? (
+          {location.pathname !== '/' && location.pathname !== '/finance' && location.pathname !== '/finance/' ? (
             <div className="flex-1 overflow-auto w-full p-4 sm:p-5 flex flex-col lg:flex-row gap-6 items-start transition-all duration-300">
               <div className="flex-1 min-w-0 w-full">
                 <Outlet />
@@ -494,10 +527,11 @@ export const Layout = () => {
             </div>
           )}
 
-          {/* Floating AI Button across all non-dashboard pages when assistant panel is closed */}
-          {location.pathname !== '/' && !aiOpen && (
+          {/* Floating AI Button across all non-dashboard / non-finance pages when assistant panel is closed */}
+          {location.pathname !== '/' && location.pathname !== '/finance' && location.pathname !== '/finance/' && !aiOpen && (
             <button
               onClick={() => setAiOpen(true)}
+
               className="fixed right-5 bottom-6 z-40 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 px-4 py-2.5 text-[12px] font-semibold text-white shadow-[0_4px_20px_rgba(99,102,241,0.35)] transition-all cursor-pointer hover:shadow-[0_6px_25px_rgba(99,102,241,0.5)] hover:scale-[1.02] active:scale-[0.98]"
               title="Open ATLAS AI Assistant"
             >

@@ -11,7 +11,16 @@ import {
   AlertCircle,
   ExternalLink,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Landmark,
+  CheckCircle2,
+  XCircle,
+  ShieldCheck,
+  Lock,
+  Edit3,
+  History,
+  Settings,
+  RefreshCw,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -33,8 +42,8 @@ export const AIChatRenderer = ({ structuredData }: { structuredData: any }) => {
 
   if (!structuredData) return null;
 
-  // Handle composite cards payload if backend returned multiple cards
-  if (Array.isArray(structuredData.cards) && structuredData.cards.length > 0) {
+  // Handle composite cards payload if backend returned multiple cards (excluding finance_summary cards)
+  if (structuredData.type !== 'finance_summary' && Array.isArray(structuredData.cards) && structuredData.cards.length > 0) {
     const hasNavInCards = structuredData.cards.some((c: any) => c.type === 'navigation');
     const hasTableInCards = structuredData.cards.some((c: any) => c.type === 'table');
     const shouldRenderRootTable = structuredData.type === 'table' && !hasTableInCards;
@@ -115,6 +124,12 @@ const SingleCardRenderer = ({ card, navigate }: { card: any; navigate: any }) =>
           <div className="flex items-center gap-1 font-semibold text-amber-900">
             <TriangleAlert className="h-3 w-3 text-amber-600" />
             PARTIAL DATA: Results capped at display limit.
+          </div>
+        )}
+        {meta.is_cached && (
+          <div className="flex items-center gap-1 font-semibold text-indigo-900">
+            <Sparkles className="h-3 w-3 text-indigo-600" />
+            CACHED: Served from high-speed operational cache.
           </div>
         )}
         {meta.date_range && <div>Range: <span className="font-semibold">{meta.date_range}</span></div>}
@@ -782,6 +797,349 @@ const SingleCardRenderer = ({ card, navigate }: { card: any; navigate: any }) =>
             <p className="text-[10px] text-rose-700 leading-relaxed">
               {card.message || 'Could not communicate with SAP Service Layer. Displayed figures reflect local cache only where available.'}
             </p>
+          </div>
+        );
+      }
+
+      // ── 17. Finance Summary KPI Grid ───────────────────────────────────────
+      case 'finance_summary': {
+        const cards = card.cards || [];
+        return (
+          <div className="rounded-xl border border-indigo-100/90 bg-white p-3 shadow-2xs overflow-hidden">
+            <div className="text-[11px] font-bold text-slate-900 mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Landmark size={14} className="text-indigo-600" />
+                {card.title || 'Financial Summary Overview'}
+              </span>
+              <span className="rounded-full bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 text-[8.5px] font-bold text-indigo-700">
+                {card.period || 'Live SAP'}
+              </span>
+            </div>
+            {card.summary && (
+              <p className="text-[10px] text-slate-600 mb-2.5 leading-relaxed">{card.summary}</p>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+              {cards.map((c: any, idx: number) => {
+                const isCurrency = c.format === 'currency';
+                const formattedVal = isCurrency
+                  ? money.format(typeof c.value === 'number' ? c.value : parseFloat(c.value || 0))
+                  : String(c.value ?? '-');
+                return (
+                  <div key={idx} className="bg-slate-50/90 p-2 rounded-xl border border-slate-100 flex flex-col justify-between">
+                    <div>
+                      <div className="text-slate-500 text-[8.5px] truncate font-medium">{c.title}</div>
+                      <div className="text-[12px] font-bold text-slate-900 mt-0.5 tracking-tight truncate">
+                        {formattedVal}
+                      </div>
+                    </div>
+                    {c.subtitle && (
+                      <div className="text-[8px] text-slate-400 mt-1 truncate">{c.subtitle}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {renderMetaWarnings()}
+          </div>
+        );
+      }
+
+      // ── 18. Finance Record Inspection ──────────────────────────────────────
+      case 'record_details': {
+        const editableFields = Object.entries(card.editable_fields || {});
+        const lockedFields = card.locked_fields || [];
+        return (
+          <div className="rounded-xl border border-blue-200/90 bg-white p-3 shadow-2xs overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2.5">
+              <div className="flex items-center gap-1.5">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-600 text-white">
+                  <ShieldCheck size={13} />
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold text-slate-900">
+                    {card.entity_type === 'business_partner' ? 'Business Partner' : 'Finance Document'} #{card.doc_num || card.record_id}
+                  </div>
+                  <div className="text-[8.5px] text-slate-500 capitalize">{card.entity_type?.replace('_', ' ')} • Status: <span className="font-semibold text-slate-700">{card.status || 'Active'}</span></div>
+                </div>
+              </div>
+              <span className={`rounded-full px-2 py-0.5 text-[8.5px] font-bold ${
+                card.can_edit ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {card.can_edit ? 'EDITABLE' : 'LOCKED / READ-ONLY'}
+              </span>
+            </div>
+
+            {/* Editable Fields Summary */}
+            <div className="mb-2">
+              <div className="text-[9px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Edit3 size={11} className="text-blue-600" /> Permitted Fields ({editableFields.length})
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[10px]">
+                {editableFields.map(([key, val]: [string, any]) => (
+                  <div key={key} className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                    <span className="text-[8.5px] text-slate-400 block">{val.label || key}</span>
+                    <span className="font-semibold text-slate-800 truncate block">{String(val.current_value ?? '(empty)')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Locked Fields */}
+            {lockedFields.length > 0 && (
+              <div className="mb-2.5">
+                <div className="text-[9px] font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <Lock size={11} className="text-amber-600" /> Locked Accounting Fields ({lockedFields.length})
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {lockedFields.map((f: string) => (
+                    <span key={f} className="rounded-md bg-amber-50 text-amber-800 border border-amber-200/60 px-1.5 py-0.5 text-[8px] font-medium" title="Immutable to preserve GL audit integrity">
+                      {f}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('atls-open-finance-record', {
+                  detail: {
+                    entity_type: card.entity_type,
+                    record_id: card.record_id,
+                    doc_num: card.doc_num
+                  }
+                }));
+              }}
+              className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold shadow-2xs transition cursor-pointer"
+            >
+              <Edit3 size={12} />
+              Open Record Details & Editor
+            </button>
+            {renderMetaWarnings()}
+          </div>
+        );
+      }
+
+      // ── 19. Finance Record Update Proposal Diff ─────────────────────────────
+      case 'record_proposal': {
+        const diff = card.diff || [];
+        return (
+          <div className="rounded-xl border border-indigo-200/90 bg-white p-3 shadow-2xs overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+              <div className="flex items-center gap-1.5">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600 text-white">
+                  <Edit3 size={13} />
+                </div>
+                <div>
+                  <div className="text-[11px] font-bold text-slate-900">
+                    Proposed Update: #{card.doc_num || card.record_id}
+                  </div>
+                  <div className="text-[8.5px] text-slate-500 capitalize">{card.entity_type?.replace('_', ' ')} • Review Required</div>
+                </div>
+              </div>
+              <span className="rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-2 py-0.5 text-[8.5px] font-bold">
+                PENDING APPROVAL
+              </span>
+            </div>
+
+            {/* Diff table */}
+            <div className="overflow-x-auto rounded-lg border border-slate-100 mb-2.5">
+              <table className="w-full text-left text-[9.5px]">
+                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200/70">
+                  <tr>
+                    <th className="p-1.5">Field</th>
+                    <th className="p-1.5">Current Value</th>
+                    <th className="p-1.5">Proposed Value</th>
+                    <th className="p-1.5 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {diff.map((item: any, i: number) => (
+                    <tr key={i} className="hover:bg-slate-50/50">
+                      <td className="p-1.5 font-bold text-slate-800">{item.label || item.field}</td>
+                      <td className="p-1.5 text-slate-500 font-mono">{String(item.old_value ?? '—')}</td>
+                      <td className="p-1.5 text-blue-700 font-bold font-mono bg-blue-50/40">{String(item.new_value ?? '—')}</td>
+                      <td className="p-1.5 text-right">
+                        {item.permitted ? (
+                          <span className="text-emerald-700 font-bold text-[8.5px] bg-emerald-50 px-1.5 py-0.5 rounded">Permitted</span>
+                        ) : (
+                          <span className="text-rose-700 font-bold text-[8.5px] bg-rose-50 px-1.5 py-0.5 rounded">Locked / Denied</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {card.has_permitted_changes ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('atls-open-finance-record', {
+                      detail: {
+                        entity_type: card.entity_type,
+                        record_id: card.record_id,
+                        doc_num: card.doc_num,
+                        proposed_updates: diff.reduce((acc: any, d: any) => ({ ...acc, [d.field]: d.new_value }), {})
+                      }
+                    }));
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold shadow-2xs transition cursor-pointer"
+                >
+                  <ShieldCheck size={12} />
+                  Review & Confirm for SAP
+                </button>
+              </div>
+            ) : (
+              <div className="text-[9px] text-rose-600 font-medium bg-rose-50 p-2 rounded-lg border border-rose-100">
+                All proposed fields are locked by SAP business rules or restricted for your role.
+              </div>
+            )}
+            {renderMetaWarnings()}
+          </div>
+        );
+      }
+
+      // ── 20. Finance Record Submission Result ────────────────────────────────
+      case 'record_submission': {
+        const isSuccess = card.status === 'success';
+        return (
+          <div className={`rounded-xl border p-3 shadow-2xs overflow-hidden ${
+            isSuccess ? 'border-emerald-200 bg-emerald-50/50' : 'border-rose-200 bg-rose-50/50'
+          }`}>
+            <div className="flex items-center gap-2 mb-2">
+              {isSuccess ? (
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-xs">
+                  <CheckCircle2 size={16} />
+                </div>
+              ) : (
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-600 text-white shadow-xs">
+                  <XCircle size={16} />
+                </div>
+              )}
+              <div>
+                <div className={`text-[12px] font-bold ${isSuccess ? 'text-emerald-950' : 'text-rose-950'}`}>
+                  {isSuccess ? 'SAP Write-Back Succeeded' : 'SAP Submission Failed'}
+                </div>
+                <div className="text-[9px] text-slate-500 font-mono">
+                  Doc: #{card.doc_num || card.record_id} • Audit ID: {card.audit_id || 'N/A'}
+                </div>
+              </div>
+            </div>
+
+            {isSuccess ? (
+              <div className="text-[10px] text-emerald-900 space-y-1">
+                <p>Changes successfully verified and recorded in SAP Business One Service Layer.</p>
+                {Array.isArray(card.fields_updated) && card.fields_updated.length > 0 && (
+                  <div className="text-[8.5px] text-emerald-800 font-mono bg-white/80 p-1.5 rounded border border-emerald-100">
+                    Updated fields: {card.fields_updated.join(', ')}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-[10px] text-rose-800 bg-white/90 p-2 rounded border border-rose-100">
+                {card.error || 'The update was rejected by SAP Business One Service Layer.'}
+              </div>
+            )}
+            {renderMetaWarnings()}
+          </div>
+        );
+      }
+
+      // ── 21. Finance Audit Log ───────────────────────────────────────────────
+      case 'audit_log': {
+        const entries = card.entries || [];
+        return (
+          <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+              <span className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900">
+                <History size={13} className="text-indigo-600" />
+                Finance Audit Log ({card.total_entries || entries.length} events)
+              </span>
+              <span className="text-[8.5px] font-mono text-slate-400">Governance & Compliance</span>
+            </div>
+            <div className="overflow-x-auto max-h-48 rounded-lg border border-slate-100">
+              <table className="w-full text-left text-[9px]">
+                <thead className="bg-slate-50 text-slate-600 font-semibold sticky top-0">
+                  <tr>
+                    <th className="p-1">Time</th>
+                    <th className="p-1">User</th>
+                    <th className="p-1">Entity</th>
+                    <th className="p-1">Doc #</th>
+                    <th className="p-1 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {entries.slice(0, 8).map((e: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-slate-50/50">
+                      <td className="p-1 font-mono text-slate-500">{e.timestamp?.slice(11, 19) || 'Just now'}</td>
+                      <td className="p-1 font-semibold text-slate-800">{e.user_id || 'admin'}</td>
+                      <td className="p-1 capitalize text-slate-600">{e.entity_type?.replace('_', ' ')}</td>
+                      <td className="p-1 font-mono text-slate-700">{e.doc_num || e.record_id}</td>
+                      <td className="p-1 text-right">
+                        <span className={`px-1 py-0.5 rounded text-[8px] font-bold ${
+                          e.status === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                        }`}>
+                          {e.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {renderMetaWarnings()}
+          </div>
+        );
+      }
+
+      // ── 22. Finance Admin Settings ──────────────────────────────────────────
+      case 'admin_settings': {
+        const s = card.settings || {};
+        return (
+          <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+              <span className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900">
+                <Settings size={13} className="text-slate-700" />
+                Finance Assistant Admin Settings
+              </span>
+              <span className="text-[8.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                ACTIVE
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 text-[9.5px] mb-2">
+              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                <div className="text-slate-400 text-[8px]">Assistant Status</div>
+                <div className="font-bold text-emerald-700">{s.assistant_enabled ? 'Enabled' : 'Disabled'}</div>
+              </div>
+              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                <div className="text-slate-400 text-[8px]">SAP Connection</div>
+                <div className="font-bold text-slate-800">{s.sap_connection?.status || 'Online'}</div>
+              </div>
+              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                <div className="text-slate-400 text-[8px]">Permitted Roles</div>
+                <div className="font-bold text-slate-800">{(s.permitted_roles || []).join(', ')}</div>
+              </div>
+              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                <div className="text-slate-400 text-[8px]">Audit Logging</div>
+                <div className="font-bold text-slate-800">{s.audit_logging_enabled ? 'Strict GL' : 'Off'}</div>
+              </div>
+            </div>
+            {renderMetaWarnings()}
+          </div>
+        );
+      }
+
+      // ── 23. Finance Refreshed Notification ──────────────────────────────────
+      case 'finance_refreshed': {
+        return (
+          <div className="rounded-xl border border-emerald-200/90 bg-emerald-50/80 p-2.5 text-emerald-900 shadow-2xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <RefreshCw size={14} className="text-emerald-600" />
+              <div className="text-[10.5px] font-bold">Finance Data Refreshed</div>
+            </div>
+            <span className="text-[8.5px] font-mono text-emerald-700">{card.refreshed_at?.slice(11, 19) || 'Just now'}</span>
           </div>
         );
       }

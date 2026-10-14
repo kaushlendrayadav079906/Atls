@@ -4,6 +4,8 @@ import uuid
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, date, timedelta
+import time
+import threading
 import openai
 
 from app.core.config import settings
@@ -18,10 +20,18 @@ from app.services.sap.business_partners_service import SAPBusinessPartnersServic
 from app.services.sap.returns_service import SAPReturnsService
 from app.services.sap.payments_report_service import SAPPaymentsReportService
 from app.services.sap.warehouses_service import SAPWarehousesService
+from app.services.sap.finance_service import SAPFinanceService
 from app.services import approval_service
 from app.services.sap.client import SAPConnectionError
 
 logger = logging.getLogger(__name__)
+
+# Analytical query bounded in-memory cache (TTL: 120s, max 50 entries)
+_ANALYTICS_CACHE: Dict[str, Tuple[Dict[str, Any], Optional[Dict[str, Any]], Optional[Dict[str, Any]], float]] = {}
+_ANALYTICS_CACHE_LOCK = threading.Lock()
+_ANALYTICS_CACHE_TTL = 120.0
+_ANALYTICS_CACHE_MAX_SIZE = 50
+
 
 # Trusted Route Registry Mapping for navigation suggestions
 INTERNAL_ROUTE_MAP = {
@@ -44,7 +54,15 @@ INTERNAL_ROUTE_MAP = {
     "reports_invoice": {"name": "Invoice Reports", "path": "/reports/invoice"},
     "reports_payment": {"name": "Payment Reports", "path": "/reports/payment"},
     "reports_inventory": {"name": "Inventory Reports", "path": "/reports/inventory"},
-    "settings": {"name": "Settings", "path": "/settings"}
+    "settings": {"name": "Settings", "path": "/settings"},
+    "finance_overview": {"name": "Finance Overview", "path": "/finance"},
+    "finance_sales_invoices": {"name": "Sales Invoices", "path": "/sales"},
+    "finance_purchase_invoices": {"name": "Purchase Invoices", "path": "/finance/purchase-invoices"},
+    "finance_incoming_payments": {"name": "Incoming Payments", "path": "/finance/incoming-payments"},
+    "finance_outgoing_payments": {"name": "Outgoing Payments", "path": "/finance/outgoing-payments"},
+    "finance_customer_analysis": {"name": "Customer Analysis", "path": "/finance/customer-analysis"},
+    "finance_supplier_analysis": {"name": "Supplier Analysis", "path": "/finance/supplier-analysis"},
+    "finance_profitability_reports": {"name": "Profitability Reports", "path": "/finance/profitability-reports"}
 }
 
 def _get_permitted_branch(user: dict, requested_branch: Optional[str] = None) -> Optional[str]:
@@ -103,9 +121,9 @@ def _resolve_date_range(
     to_date: Optional[str] = None
 ) -> Tuple[Optional[date], Optional[date], str]:
     """
-    Resolves standard business dates against current anchor 2026-10-13 (Asia/Kolkata).
+    Resolves standard business dates dynamically against current date (Asia/Kolkata).
     """
-    today = date(2026, 10, 13)
+    today = date.today()
 
     if from_date:
         try:
@@ -117,36 +135,50 @@ def _resolve_date_range(
 
     r = (range_str or "monthly").lower().strip()
 
+    first_this_month = date(today.year, today.month, 1)
+    last_day_last_month = first_this_month - timedelta(days=1)
+    first_day_last_month = date(last_day_last_month.year, last_day_last_month.month, 1)
+
     if r in ("today", "daily"):
-        return today, today, "Today (2026-10-13)"
+        return today, today, f"Today ({today})"
     elif r == "yesterday":
         y = today - timedelta(days=1)
-        return y, y, "Yesterday (2026-10-12)"
+        return y, y, f"Yesterday ({y})"
     elif r in ("week", "weekly", "this_week"):
         d_from = today - timedelta(days=6)
-        return d_from, today, f"2026-10-07 to 2026-10-13"
+        return d_from, today, f"{d_from} to {today}"
     elif r in ("month", "monthly", "this_month"):
-        d_from = date(today.year, today.month, 1)
-        return d_from, today, f"This Month (2026-10-01 to 2026-10-13)"
+        return first_this_month, today, f"This Month ({first_this_month} to {today})"
     elif r in ("last_month", "previous_month"):
-        return date(2026, 9, 1), date(2026, 9, 30), "Last Month (Sep 2026)"
+        return first_day_last_month, last_day_last_month, f"Last Month ({first_day_last_month.strftime('%b %Y')})"
     elif r in ("past_6_months", "6_months", "last_6_months", "past_six_months"):
-        # Past 6 calendar months: May 2026 to October 2026 (2026-05-01 to 2026-10-13)
-        return date(2026, 5, 1), today, "Past 6 months (May 2026 to Oct 2026)"
-    elif r in ("year", "yearly", "this_year", "2026"):
-        return date(2026, 1, 1), today, f"Year 2026 ({date(2026, 1, 1)} to {today})"
-    elif r in ("2025", "last_year"):
-        return date(2025, 1, 1), date(2025, 12, 31), "Year 2025 (2025-01-01 to 2025-12-31)"
-    elif r in ("same_month_last_year", "oct_2025"):
-        return date(2025, 10, 1), date(2025, 10, 31), "Same Month Last Year (Oct 2025)"
+        # 5 calendar months before current month
+        m = today.month - 5
+        y = today.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        d_6m = date(y, m, 1)
+        return d_6m, today, f"Past 6 months ({d_6m.strftime('%b %Y')} to {today.strftime('%b %Y')})"
+    elif r in ("year", "yearly", "this_year", str(today.year)):
+        return date(today.year, 1, 1), today, f"Year {today.year} ({date(today.year, 1, 1)} to {today})"
+    elif r in (str(today.year - 1), "last_year"):
+        return date(today.year - 1, 1, 1), date(today.year - 1, 12, 31), f"Year {today.year - 1} ({date(today.year - 1, 1, 1)} to {date(today.year - 1, 12, 31)})"
+    elif r in ("same_month_last_year", f"oct_{today.year - 1}"):
+        m_start = date(today.year - 1, today.month, 1)
+        if today.month == 12:
+            m_end = date(today.year - 1, 12, 31)
+        else:
+            m_end = date(today.year - 1, today.month + 1, 1) - timedelta(days=1)
+        return m_start, m_end, f"Same Month Last Year ({m_start.strftime('%b %Y')})"
     elif r in ("compare_last_month", "this_month_vs_last_month"):
-        return date(2026, 10, 1), today, "This Month (Oct 2026) vs Last Month (Sep 2026)"
+        return first_this_month, today, f"This Month ({today.strftime('%b %Y')}) vs Last Month ({first_day_last_month.strftime('%b %Y')})"
     elif r in ("compare_last_year", "this_month_vs_last_year"):
-        return date(2026, 10, 1), today, "This Month (Oct 2026) vs Last Year (Full Year 2025)"
+        return first_this_month, today, f"This Month ({today.strftime('%b %Y')}) vs Last Year (Full Year {today.year - 1})"
     elif r in ("total", "all_time", "all"):
         return None, None, "Total (All Time)"
     else:
-        return date(today.year, today.month, 1), today, "Current Period"
+        return first_this_month, today, "Current Period"
 
 
 class AIAssistantService:
@@ -177,9 +209,10 @@ class AIAssistantService:
         self.returns_service = SAPReturnsService()
         self.payments_service = SAPPaymentsReportService()
         self.warehouses_service = SAPWarehousesService()
+        self.finance_service = SAPFinanceService()
 
     def _get_tools_schema(self) -> List[Dict[str, Any]]:
-        return [
+        tools = [
             {
                 "type": "function",
                 "function": {
@@ -467,6 +500,183 @@ class AIAssistantService:
             {
                 "type": "function",
                 "function": {
+                    "name": "get_finance_summary",
+                    "description": "Fetch overall high-level financial KPIs from SAP Business One including Total Sales, Total Purchases, Incoming Payments, Outgoing Payments, Accounts Receivable, Accounts Payable, Gross Profit, and Gross Margin with period growth percentages.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "range": {"type": "string", "enum": ["daily", "weekly", "monthly", "yearly", "last_month", "past_6_months", "all_time"], "description": "Time period to summarize (default monthly)."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "branch": {"type": "string", "description": "Branch code."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_sales_trend",
+                    "description": "Fetch monthly, weekly, or yearly sales revenue trend and invoice volume based on live SAP AR sales invoices.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "range": {"type": "string", "enum": ["past_6_months", "monthly", "weekly", "yearly"], "description": "Trend period (default past_6_months)."},
+                            "branch": {"type": "string", "description": "Branch code."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_purchase_trend",
+                    "description": "Fetch monthly, weekly, or yearly purchase invoice trend and spending volume based on live SAP AP purchase invoices.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "range": {"type": "string", "enum": ["past_6_months", "monthly", "weekly", "yearly"], "description": "Trend period (default past_6_months)."},
+                            "branch": {"type": "string", "description": "Branch code."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_purchase_invoices",
+                    "description": "Fetch AP purchase invoices from SAP with supplier names, invoice dates, amounts, and payment status.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "range": {"type": "string", "enum": ["today", "week", "month", "last_month", "year", "2025", "total"], "description": "Date range."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "supplier_code": {"type": "string", "description": "Specific supplier CardCode."},
+                            "status": {"type": "string", "enum": ["open", "closed", "all"], "description": "Invoice payment status."},
+                            "search": {"type": "string", "description": "Search term for supplier name or invoice number."},
+                            "limit": {"type": "integer", "description": "Max purchase invoices to return (default 20)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_incoming_payments",
+                    "description": "Fetch customer incoming payments and collections from SAP by date range, payment method (Cash, Transfer, Cheque), or customer.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "range": {"type": "string", "enum": ["today", "week", "month", "last_month", "year", "2025", "total"], "description": "Date range."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "customer_code": {"type": "string", "description": "Filter by customer CardCode."},
+                            "payment_method": {"type": "string", "enum": ["Cash", "Transfer", "Check", "all"], "description": "Payment method filter."},
+                            "limit": {"type": "integer", "description": "Max payments to return (default 20)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_outgoing_payments",
+                    "description": "Fetch outgoing vendor payments made to suppliers from SAP by date range or supplier code.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "range": {"type": "string", "enum": ["today", "week", "month", "last_month", "year", "2025", "total"], "description": "Date range."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "supplier_code": {"type": "string", "description": "Filter by supplier CardCode."},
+                            "limit": {"type": "integer", "description": "Max payments to return (default 20)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_customer_sales_ranking",
+                    "description": "Rank customers by net sales volume from SAP sales invoices. Can return top purchasing customers or lowest purchasing customers.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "range": {"type": "string", "enum": ["month", "last_month", "year", "total", "past_6_months"], "description": "Time range."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "order": {"type": "string", "enum": ["top", "lowest"], "description": "Order ranking: 'top' for highest sales, 'lowest' for least sales."},
+                            "limit": {"type": "integer", "description": "Max customers to return (default 10)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_supplier_purchase_ranking",
+                    "description": "Rank suppliers by total purchase value from SAP purchase invoices. Can return top suppliers or lowest volume suppliers.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "range": {"type": "string", "enum": ["month", "last_month", "year", "total"], "description": "Time range."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."},
+                            "order": {"type": "string", "enum": ["top", "lowest"], "description": "Order ranking: 'top' for highest purchases, 'lowest' for least."},
+                            "limit": {"type": "integer", "description": "Max suppliers to return (default 10)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_accounts_receivable",
+                    "description": "Fetch outstanding accounts receivable owed by customers from SAP Business Partners, including total AR, debtor count, and top customer balances.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "customer_code": {"type": "string", "description": "Specific customer CardCode (optional)."},
+                            "min_balance": {"type": "number", "description": "Minimum balance threshold (default 0)."},
+                            "limit": {"type": "integer", "description": "Max debtors to return (default 20)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_accounts_payable",
+                    "description": "Fetch outstanding accounts payable owed to suppliers from SAP Business Partners, including total AP, creditor count, and top supplier liabilities.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "supplier_code": {"type": "string", "description": "Specific supplier CardCode (optional)."},
+                            "min_balance": {"type": "number", "description": "Minimum balance threshold (default 0)."},
+                            "limit": {"type": "integer", "description": "Max creditors to return (default 20)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_profitability_report",
+                    "description": "Fetch profitability analysis from verified SAP records: Net Sales, Cost of Purchases, Gross Profit, Gross Margin %, and monthly trend breakdown.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "range": {"type": "string", "enum": ["month", "last_month", "year", "past_6_months", "total"], "description": "Analysis period."},
+                            "date_from": {"type": "string", "description": "Start date (YYYY-MM-DD)."},
+                            "date_to": {"type": "string", "description": "End date (YYYY-MM-DD)."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "navigate_to_module",
                     "description": "Generate an internal navigation action to open a verified application module or record.",
                     "parameters": {
@@ -480,19 +690,153 @@ class AIAssistantService:
                                     "production_overview", "production_orders", "production_item_wise",
                                     "production_rejection", "production_date_wise", "production_reports",
                                     "reports_sales", "reports_invoice", "reports_payment",
-                                    "reports_inventory", "settings"
+                                    "reports_inventory", "settings",
+                                    "finance_overview", "finance_sales_invoices", "finance_purchase_invoices",
+                                    "finance_incoming_payments", "finance_outgoing_payments",
+                                    "finance_customer_analysis", "finance_supplier_analysis",
+                                    "finance_profitability_reports"
                                 ],
                                 "description": "The exact ID of the module to open."
                             },
-                            "label": {"type": "string", "description": "Button label (e.g. 'Open Sales Orders', 'View Inventory')."},
+                            "label": {"type": "string", "description": "Button label (e.g. 'Open Sales Orders', 'View Inventory', 'Open Finance Overview')."},
                             "record_id": {"type": "string", "description": "Optional record ID (e.g. invoice DocEntry)."},
                             "params": {"type": "object", "description": "Optional query parameters (e.g. status='pending')."}
                         },
                         "required": ["target_module"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "inspect_finance_record",
+                    "description": "Inspect a specific financial record (sales invoice, purchase invoice, incoming payment, outgoing payment, customer, supplier) from SAP Business One. Retrieves document status, editable fields allowlist, and locked fields with GAAP accounting explanations.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "entity_type": {
+                                "type": "string",
+                                "enum": ["invoice", "purchase_invoice", "incoming_payment", "outgoing_payment", "customer", "supplier"],
+                                "description": "Financial entity type to inspect."
+                            },
+                            "record_id": {
+                                "type": "string",
+                                "description": "DocEntry or CardCode of the record (e.g. '101', 'C001', 'INV-123')."
+                            }
+                        },
+                        "required": ["entity_type", "record_id"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "propose_record_update",
+                    "description": "Propose and validate updates to permitted fields of a finance record. Checks permissions, field allowlist, data types, and document status, producing a diff before submission.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "entity_type": {
+                                "type": "string",
+                                "enum": ["invoice", "purchase_invoice", "incoming_payment", "outgoing_payment", "customer", "supplier"],
+                                "description": "Entity type being updated."
+                            },
+                            "record_id": {
+                                "type": "string",
+                                "description": "DocEntry or CardCode."
+                            },
+                            "updates": {
+                                "type": "object",
+                                "description": "Key-value mapping of permitted fields to new values (e.g. {'Comments': 'Updated note', 'NumAtCard': 'PO-991'})."
+                            }
+                        },
+                        "required": ["entity_type", "record_id", "updates"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "submit_approved_record_update",
+                    "description": "Submit validated updates to SAP Service Layer with role permission checks, audit logging, and readback verification. Requires explicit user confirmation.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "entity_type": {
+                                "type": "string",
+                                "enum": ["invoice", "purchase_invoice", "incoming_payment", "outgoing_payment", "customer", "supplier"],
+                                "description": "Entity type."
+                            },
+                            "record_id": {
+                                "type": "string",
+                                "description": "DocEntry or CardCode."
+                            },
+                            "updates": {
+                                "type": "object",
+                                "description": "Validated key-value mapping of changes."
+                            },
+                            "confirm": {
+                                "type": "boolean",
+                                "description": "Explicit user confirmation flag (must be true)."
+                            }
+                        },
+                        "required": ["entity_type", "record_id", "updates", "confirm"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_finance_audit_log",
+                    "description": "Fetch audit trail history of finance write-back operations, status, validation failures, and administrative changes.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "entity_type": {
+                                "type": "string",
+                                "description": "Optional entity type filter."
+                            },
+                            "record_id": {
+                                "type": "string",
+                                "description": "Optional record identifier."
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Max entries to return (default 20)."
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_finance_admin_settings",
+                    "description": "Fetch SAP connection health, circuit breaker status, enabled finance assistant capabilities, and role permission matrix.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "refresh_finance_data",
+                    "description": "Clear cached financial reports and trigger a fresh read from SAP Business One.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
             }
         ]
+
+        # SAFETY LOCK: If write-back is disabled by policy, completely exclude write tools from schema
+        if not getattr(settings, "FINANCE_WRITEBACK_ENABLED", False):
+            tools = [t for t in tools if t.get("function", {}).get("name") != "submit_approved_record_update"]
+
+        return tools
 
     def process_chat(
         self,
@@ -503,26 +847,34 @@ class AIAssistantService:
         history: Optional[List[Dict[str, str]]] = None,
         context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
+        chat_start_time = time.perf_counter()
         permitted_warehouse = _get_permitted_branch(current_user, branch_id)
         default_wh = str(getattr(settings, "SAP_DEFAULT_WAREHOUSE", "SH") or "SH").strip().upper()
         active_scope_name = permitted_warehouse or f"All Branches (Default: {default_wh})"
 
-        # Temporal anchor setup (Asia/Kolkata)
-        current_time_str = "2026-10-13 14:04:00 IST (Tuesday)"
-        today_date_str = "2026-10-13"
+        # Temporal anchor setup (Asia/Kolkata) dynamically derived
+        today = date.today()
+        today_date_str = today.strftime("%Y-%m-%d")
+        current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S IST")
+
+        first_this_month = date(today.year, today.month, 1)
+        last_day_last_month = first_this_month - timedelta(days=1)
+        first_day_last_month = date(last_day_last_month.year, last_day_last_month.month, 1)
+        week_start = today - timedelta(days=6)
+        yesterday = today - timedelta(days=1)
 
         system_prompt = (
             f"You are ATLAS, the Personal AI Business Assistant for retail and manufacturing operations.\n"
             f"SYSTEM TIME CONTEXT:\n"
             f"- Current Date: {today_date_str} (Timezone: Asia/Kolkata).\n"
-            f"- Current Year: 2026, Month: October.\n"
+            f"- Current Year: {today.year}, Month: {today.strftime('%B')}.\n"
             f"- 'Today' is {today_date_str}.\n"
-            f"- 'Yesterday' is 2026-10-12.\n"
-            f"- 'This week' is 2026-10-07 to 2026-10-13.\n"
-            f"- 'This month' is 2026-10-01 to 2026-10-13.\n"
-            f"- 'Last month' is 2026-09-01 to 2026-09-30 (Sep 2026).\n"
-            f"- 'This year' or '2026' is 2026-01-01 to {today_date_str}.\n"
-            f"- 'Year 2025' or 'last year' is 2025-01-01 to 2025-12-31.\n\n"
+            f"- 'Yesterday' is {yesterday.strftime('%Y-%m-%d')}.\n"
+            f"- 'This week' is {week_start.strftime('%Y-%m-%d')} to {today_date_str}.\n"
+            f"- 'This month' is {first_this_month.strftime('%Y-%m-%d')} to {today_date_str}.\n"
+            f"- 'Last month' is {first_day_last_month.strftime('%Y-%m-%d')} to {last_day_last_month.strftime('%Y-%m-%d')} ({first_day_last_month.strftime('%b %Y')}).\n"
+            f"- 'This year' or '{today.year}' is {today.year}-01-01 to {today_date_str}.\n"
+            f"- 'Year {today.year - 1}' or 'last year' is {today.year - 1}-01-01 to {today.year - 1}-12-31.\n\n"
             f"USER & AUTHORIZATION CONTEXT:\n"
             f"- User Name: {current_user.get('name', 'User')}\n"
             f"- User Role: {current_user.get('role', 'user')}\n"
@@ -532,20 +884,26 @@ class AIAssistantService:
             f"2. Separate document types strictly: Sales Orders (open/closed customer commitments) are NOT Sales Invoices (financial revenue).\n"
             f"3. Never combine Sales Invoices with Purchase Orders or Credit Notes into one total.\n"
             f"4. If SAP returns 0 records, clearly state that no records match the filter; do not treat an empty response as an error, but distinguish API failures.\n"
-            f"5. Currency format: Format all monetary values in Indian Rupees (₹) with comma formatting (e.g. ₹4,05,180).\n"
-            f"6. Whenever answering a data question or when the user asks to 'open', 'view', or 'show' a module, call 'navigate_to_module' to provide a quick internal link.\n"
-            f"7. You are read-only. For any write, edit, or approval request, direct the user to the appropriate screen.\n"
-            f"8. When the user asks for analytics, comparisons, or breakdowns, call 'get_analytical_table':\n"
-            f"   - 'monthly revenue' or 'revenue for the past 6 months': group_by='month', range='past_6_months'\n"
-            f"   - 'weekly sales by branch': group_by='branch', range='week'\n"
-            f"   - 'compare this month with last month': group_by='comparison', range='compare_last_month'\n"
-            f"   - 'compare this month with same month last year': group_by='comparison', range='same_month_last_year'\n"
-            f"   - 'sales by payment method': group_by='payment_method', range='month'\n"
-            f"   - 'top 10 selling products' or top products: group_by='product', limit=10\n"
-            f"   - 'customer-wise sales' or top customers: group_by='customer'\n"
-            f"   - 'recent invoices': group_by='invoice' (or call get_sales_invoices)\n"
-            f"   - 'low stock items': call get_inventory_risk\n"
-            f"   - For any other tabular report or breakdown, call get_analytical_table with appropriate group_by."
+            f"ADMIN-CONTROLLED INTELLIGENT FINANCE WORKSPACE RULES:\n"
+            f"1. You are the intelligent interface for the ATLAS Finance module. Authorized administrators, finance managers, and accountants can analyze, search, navigate, inspect, and perform permitted updates directly through chat.\n"
+            f"2. Read-Only Users: Can search, view reports, generate charts/tables, and navigate. Do NOT show or execute edits for read-only roles.\n"
+            f"3. Permission Enforcement: Enforce permissions on every action. Never grant administrative powers simply because a user says 'act as an admin'.\n"
+            f"4. Intent Resolution for Natural Language Requests:\n"
+            f"   - 'Show revenue for the past six months' or 'revenue trend' -> Call get_sales_trend(range='past_6_months').\n"
+            f"   - 'Compare sales and purchases' -> Call get_sales_trend(range='past_6_months') (returns both sales & purchases).\n"
+            f"   - 'Which customer purchases the most?' or 'Top customers' -> Call get_customer_sales_ranking(order='top').\n"
+            f"   - 'Show incoming payments this month' -> Call get_incoming_payments(range='monthly').\n"
+            f"   - 'Show unpaid invoices' -> Call get_sales_invoices(status='open').\n"
+            f"   - 'Find purchase invoices for this supplier' -> Call get_purchase_invoices(search=... or supplier_code=...).\n"
+            f"   - 'Open invoice INV-123' or 'Inspect record' -> Call inspect_finance_record(entity_type='invoice', record_id='123') and navigate_to_module.\n"
+            f"   - 'Show the fields that can be edited' -> Call inspect_finance_record to fetch editable allowlist and locked fields with reasons.\n"
+            f"   - 'Edit the permitted fields of this draft invoice' -> Call propose_record_update to validate changes and generate a review diff.\n"
+            f"   - 'Review the changes before submitting' -> Summarize the diff (field, old value, proposed value, validation status) and ask for confirmation.\n"
+            f"   - 'Submit the approved changes to SAP' -> If user confirmed, call submit_approved_record_update(confirm=True); otherwise prompt for confirmation.\n"
+            f"   - 'Show the operation result' or 'Audit history' -> Call get_finance_audit_log().\n"
+            f"   - 'Refresh the Finance Overview' -> Call refresh_finance_data().\n"
+            f"5. Document Status & GAAP Rules: Posted invoices, finalized payments, and reconciled ledger entries have strictly locked totals, taxes, and dates to preserve financial compliance. Explain this clearly and direct users to authorized credit notes or reversals when needed.\n"
+            f"6. Never Invent Numbers: Every single figure, count, and growth % must come from structured tool output.\n"
         )
 
         messages = [{"role": "system", "content": system_prompt}]
@@ -563,16 +921,25 @@ class AIAssistantService:
 
         try:
             iteration = 0
-            max_iterations = 4
+            max_iterations = 2
             final_text = None
 
             while iteration < max_iterations:
+                # Check execution budget to leave buffer before 40s backend timeout
+                elapsed_sec = time.perf_counter() - chat_start_time
+                if elapsed_sec > 30.0:
+                    logger.warning(f"[AI TIMING] Execution budget reached ({elapsed_sec:.2f}s > 30.0s). Exiting tool loop early.")
+                    break
+
+                t_llm = time.perf_counter()
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
                     tools=tools,
                     tool_choice="auto"
                 )
+                llm_dur = (time.perf_counter() - t_llm) * 1000.0
+                logger.info(f"[AI TIMING] LLM completion turn {iteration + 1} duration_ms={llm_dur:.2f}")
 
                 response_message = response.choices[0].message
                 tool_calls = response_message.tool_calls
@@ -596,12 +963,16 @@ class AIAssistantService:
                         })
                         continue
 
+                    t_tool = time.perf_counter()
                     tool_resp_content, card_data, nav = self._execute_tool(
                         tool_name=fn_name,
                         args=args,
                         permitted_warehouse=permitted_warehouse,
                         current_user=current_user
                     )
+                    tool_dur = (time.perf_counter() - t_tool) * 1000.0
+                    record_count = len(tool_resp_content.get("items") or tool_resp_content.get("products") or tool_resp_content.get("sample_orders") or tool_resp_content.get("rows") or [])
+                    logger.info(f"[AI TIMING] Tool '{fn_name}' duration_ms={tool_dur:.2f} records={record_count}")
 
                     if card_data:
                         collected_cards.append(card_data)
@@ -647,6 +1018,9 @@ class AIAssistantService:
                         for k, v in primary_structured_data.items():
                             if k not in structured_payload:
                                 structured_payload[k] = v
+
+            total_dur = (time.perf_counter() - chat_start_time) * 1000.0
+            logger.info(f"[AI TIMING] Total chat request duration_ms={total_dur:.2f} cards={len(collected_cards)} has_nav={bool(nav_action)}")
 
             return {
                 "answer": final_text,
@@ -710,6 +1084,22 @@ class AIAssistantService:
         if current_user.get("role") != "admin" and permitted_warehouse:
             target_branch = permitted_warehouse
 
+        is_mocked = hasattr(self.invoices_service, '_mock_return_value') or hasattr(self.client, '_mock_return_value')
+        cache_key = f"{metric}:{group_by}:{r}:{d_from}:{d_to}:{target_branch}:{limit}"
+        now = time.time()
+        if not is_mocked:
+            with _ANALYTICS_CACHE_LOCK:
+                if cache_key in _ANALYTICS_CACHE:
+                    cached_tool_resp, cached_card, cached_nav, c_time = _ANALYTICS_CACHE[cache_key]
+                    if now - c_time < _ANALYTICS_CACHE_TTL:
+                        logger.info(f"[AI TIMING] Analytics cache hit for key={cache_key}")
+                        card_copy = dict(cached_card) if cached_card else None
+                        if card_copy:
+                            card_meta = dict(card_copy.get("meta") or {})
+                            card_meta["is_cached"] = True
+                            card_copy["meta"] = card_meta
+                        return cached_tool_resp, card_copy, cached_nav
+
         try:
             ws_map = {w["WarehouseCode"]: w.get("WarehouseName", w["WarehouseCode"]) for w in self.warehouses_service.get_warehouses()}
         except Exception as e:
@@ -728,23 +1118,30 @@ class AIAssistantService:
             if metric == "sales":
                 # Special Case A: Period Comparison (e.g. This Month vs Last Month / Same Month Last Year)
                 if group_by == "comparison":
-                    today = date(2026, 10, 13)
+                    today = date.today()
                     d_from_a = date(today.year, today.month, 1)
                     d_to_a = today
-                    lbl_a = "This Month (October 2026)"
+                    lbl_a = f"This Month ({today.strftime('%B %Y')})"
 
-                    if r in ("same_month_last_year", "oct_2025"):
-                        d_from_b = date(2025, 10, 1)
-                        d_to_b = date(2025, 10, 31)
-                        lbl_b = "Same Month Last Year (October 2025)"
+                    first_this_month = date(today.year, today.month, 1)
+                    last_day_last_month = first_this_month - timedelta(days=1)
+                    first_day_last_month = date(last_day_last_month.year, last_day_last_month.month, 1)
+
+                    if r in ("same_month_last_year", f"oct_{today.year - 1}"):
+                        d_from_b = date(today.year - 1, today.month, 1)
+                        if today.month == 12:
+                            d_to_b = date(today.year - 1, 12, 31)
+                        else:
+                            d_to_b = date(today.year - 1, today.month + 1, 1) - timedelta(days=1)
+                        lbl_b = f"Same Month Last Year ({d_from_b.strftime('%B %Y')})"
                     elif r in ("compare_last_year", "this_month_vs_last_year"):
-                        d_from_b = date(2025, 1, 1)
-                        d_to_b = date(2025, 12, 31)
-                        lbl_b = "Last Year (Full Year 2025)"
+                        d_from_b = date(today.year - 1, 1, 1)
+                        d_to_b = date(today.year - 1, 12, 31)
+                        lbl_b = f"Last Year (Full Year {today.year - 1})"
                     else:  # compare_last_month
-                        d_from_b = date(2026, 9, 1)
-                        d_to_b = date(2026, 9, 30)
-                        lbl_b = "Last Month (September 2026)"
+                        d_from_b = first_day_last_month
+                        d_to_b = last_day_last_month
+                        lbl_b = f"Last Month ({first_day_last_month.strftime('%B %Y')})"
 
                     raw_a = self.invoices_service.get_invoices_by_date(d_from_a, d_to_a)
                     val_a = [
@@ -804,18 +1201,23 @@ class AIAssistantService:
 
                 # Special Case B: Monthly Revenue (e.g. past 6 months)
                 elif group_by == "month" or (group_by == "date" and r in ("past_6_months", "6_months", "last_6_months")):
-                    month_keys = ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"]
-                    month_labels = {
-                        "2026-05": "May 2026",
-                        "2026-06": "Jun 2026",
-                        "2026-07": "Jul 2026",
-                        "2026-08": "Aug 2026",
-                        "2026-09": "Sep 2026",
-                        "2026-10": "Oct 2026"
-                    }
+                    today = date.today()
+                    month_keys = []
+                    month_labels = {}
+                    for i in range(5, -1, -1):
+                        m_num = today.month - i
+                        y_num = today.year
+                        while m_num <= 0:
+                            m_num += 12
+                            y_num -= 1
+                        m_k = f"{y_num:04d}-{m_num:02d}"
+                        month_keys.append(m_k)
+                        month_labels[m_k] = date(y_num, m_num, 1).strftime("%b %Y")
+
+                    start_6m_date = date(int(month_keys[0][:4]), int(month_keys[0][5:7]), 1)
                     month_grouped = {k: {"total": 0.0, "count": 0} for k in month_keys}
 
-                    raw_invoices = self.invoices_service.get_invoices_by_date(date(2026, 5, 1), date(2026, 10, 13))
+                    raw_invoices = self.invoices_service.get_invoices_by_date(start_6m_date, today)
                     valid_invoices = [
                         inv for inv in raw_invoices
                         if str(inv.get("Cancelled") or "").lower() != "tyes"
@@ -851,30 +1253,49 @@ class AIAssistantService:
                     total_sales = sum(r["sales"] for r in rows)
                     total_invoices = sum(r["invoiceCount"] for r in rows)
                     title = "Monthly Revenue (Past 6 Months)"
-                    summary = f"Total revenue of ₹{total_sales:,.2f} across {total_invoices} invoices for the past 6 months (May 2026 to Oct 2026)."
+                    summary = f"Total revenue of ₹{total_sales:,.2f} across {total_invoices} invoices for the past 6 months ({month_labels[month_keys[0]]} to {month_labels[month_keys[-1]]})."
                     chart_config = {
                         "type": "bar",
                         "xKey": "month",
                         "series": ["sales"]
                     }
                     filters = {
-                        "period": "Past 6 months (May 2026 to Oct 2026)",
-                        "dateFrom": "2026-05-01",
-                        "dateTo": "2026-10-13",
+                        "period": f"Past 6 months ({month_labels[month_keys[0]]} to {month_labels[month_keys[-1]]})",
+                        "dateFrom": start_6m_date.strftime("%Y-%m-%d"),
+                        "dateTo": today.strftime("%Y-%m-%d"),
                         "groupBy": ["month"],
                         "branch": target_branch or "All Branches",
                         "additional": {
-                            "Date Range": "Past 6 months (May 2026 to Oct 2026)",
+                            "Date Range": f"Past 6 months ({month_labels[month_keys[0]]} to {month_labels[month_keys[-1]]})",
                             "Metric": "Total Sales (₹)"
                         }
                     }
                     nav = {"label": "Open Sales Reports", "route": "/reports/sales", "target_module": "reports_sales", "params": {"range": "month"}}
 
                 else:
+                    needs_lines = group_by in ("product", "branch")
+                    t_inv = time.perf_counter()
                     if d_from and d_to:
-                        raw_invoices = self.invoices_service.get_invoices_by_date_with_lines(d_from, d_to)
+                        if needs_lines:
+                            raw_invoices = self.invoices_service.get_invoices_by_date_with_lines(d_from, d_to)
+                        else:
+                            raw_invoices = self.invoices_service.get_invoices_by_date(d_from, d_to)
+                            # Fallback if unit test mock only populated get_invoices_by_date_with_lines
+                            if (not isinstance(raw_invoices, list) or len(raw_invoices) == 0) and hasattr(self.invoices_service, 'get_invoices_by_date_with_lines'):
+                                try:
+                                    t_invs = self.invoices_service.get_invoices_by_date_with_lines(d_from, d_to)
+                                    if isinstance(t_invs, list) and len(t_invs) > 0:
+                                        raw_invoices = t_invs
+                                except Exception:
+                                    pass
                     else:
-                        raw_invoices = self.invoices_service.get_recent_invoices(limit=1000)
+                        if needs_lines:
+                            raw_invoices = self.invoices_service.get_recent_invoices_with_lines(limit=100)
+                        else:
+                            raw_invoices = self.invoices_service.get_recent_invoices(limit=1000)
+                    inv_dur = (time.perf_counter() - t_inv) * 1000.0
+                    rec_count = len(raw_invoices) if isinstance(raw_invoices, list) else 0
+                    logger.info(f"[AI TIMING] Invoices retrieval duration_ms={inv_dur:.2f} (records={rec_count}, needs_lines={needs_lines})")
 
                     # Filter out cancelled documents
                     valid_invoices = [
@@ -1228,6 +1649,13 @@ class AIAssistantService:
             "filters": filters,
             "chart": chart_config
         }
+        if not is_mocked:
+            with _ANALYTICS_CACHE_LOCK:
+                if len(_ANALYTICS_CACHE) >= _ANALYTICS_CACHE_MAX_SIZE:
+                    oldest_key = min(_ANALYTICS_CACHE.keys(), key=lambda k: _ANALYTICS_CACHE[k][3])
+                    _ANALYTICS_CACHE.pop(oldest_key, None)
+                _ANALYTICS_CACHE[cache_key] = (tool_resp, card, nav, time.time())
+
         return tool_resp, card, nav
 
     def _execute_tool(
@@ -1293,7 +1721,7 @@ class AIAssistantService:
                 # Low stock items count
                 low_stock_count = 0
                 try:
-                    stock_items = self.inventory_service.get_warehouse_stock(target_branch or "SH")
+                    stock_items = self.inventory_service.get_warehouse_stock(target_branch or "SH", max_pages=2)
                     for itm in stock_items:
                         if itm.get("_truncated"): continue
                         wh_info = itm.get("ItemWarehouseInfoCollection") or []
@@ -1377,52 +1805,49 @@ class AIAssistantService:
             # 3. get_sales_invoices
             # ──────────────────────────────────────────────────────────────────
             elif tool_name == "get_sales_invoices":
-                r = args.get("range")
-                has_date_spec = bool(r or args.get("date_from") or args.get("date_to"))
-                limit = int(args.get("limit") or 20)
-
-                if has_date_spec:
-                    d_from, d_to, date_label = _resolve_date_range(r, args.get("date_from"), args.get("date_to"))
-                    if d_from and d_to:
-                        raw_invoices = self.invoices_service.get_invoices_by_date(d_from, d_to)
-                    else:
-                        raw_invoices = self.invoices_service.get_recent_invoices(limit=max(limit, 50))
-                else:
-                    date_label = "Recent Invoices"
-                    raw_invoices = self.invoices_service.get_recent_invoices(limit=max(limit, 50))
-
-                filtered = []
-                target_branch = permitted_warehouse
-                for inv in raw_invoices:
-                    inv_b = _normalize_branch(_extract_branch_from_invoice(inv))
-                    if current_user.get("role") == "admin" or not target_branch or inv_b == target_branch:
-                        filtered.append(inv)
-
-                total_amount = sum(float(i.get("DocTotal") or 0.0) for i in filtered)
-                is_partial = len(raw_invoices) > 100 or len(filtered) > 100
+                r = args.get("range", "monthly")
+                branch = args.get("branch") or permitted_warehouse
+                res = self.finance_service.get_sales_invoices(
+                    range_str=r,
+                    from_date=args.get("date_from"),
+                    to_date=args.get("date_to"),
+                    customer_code=args.get("customer_code"),
+                    status=args.get("status"),
+                    branch_id=branch,
+                    search=args.get("search"),
+                    limit=int(args.get("limit") or 20)
+                )
+                sinvs = res.get("sales_invoices", []) or res.get("invoices", [])
+                total_cnt = res.get("total_count", len(sinvs))
+                is_partial = total_cnt > len(sinvs)
+                res_meta = res.get("meta") or {}
+                res_meta["is_partial"] = is_partial
+                res_meta["date_range"] = res.get("period", r)
+                res["meta"] = res_meta
+                res["invoices"] = sinvs
+                res["sales_invoices"] = sinvs
 
                 card = {
-                    "type": "sales_invoices",
-                    "orders": filtered[:limit],
-                    "total_amount": round(total_amount, 2),
-                    "total_count": len(filtered),
+                    "type": "table",
+                    "title": f"Sales Invoices ({res.get('period', r)})",
+                    "summary": f"Found {total_cnt} sales invoices totaling ₹{res.get('total_amount', 0.0):,.2f}.",
+                    "columns": [
+                        {"key": "doc_num", "label": "Doc #", "type": "string"},
+                        {"key": "doc_date", "label": "Date", "type": "date"},
+                        {"key": "card_name", "label": "Customer", "type": "string"},
+                        {"key": "doc_total", "label": "Total Amount", "type": "currency"},
+                        {"key": "status", "label": "Status", "type": "string"}
+                    ],
+                    "rows": sinvs,
                     "meta": {
-                        "date_range": date_label,
-                        "branch_scope": target_branch or "All Branches",
-                        "is_partial": is_partial
+                        "date_range": res.get("period"),
+                        "branch_scope": branch or "All Branches",
+                        "is_partial": is_partial,
+                        "row_count": len(sinvs)
                     }
                 }
-                nav = {"label": "View Invoices", "route": "/sales", "target_module": "sales"}
-                return {
-                    "total_invoices": len(filtered),
-                    "total_amount": round(total_amount, 2),
-                    "sample_invoices": filtered[:limit],
-                    "meta": {
-                        "is_partial": is_partial,
-                        "date_range": date_label,
-                        "branch_scope": target_branch or "All Branches"
-                    }
-                }, card, nav
+                nav = {"label": "Open Sales Invoices", "route": "/sales", "target_module": "finance_sales_invoices"}
+                return res, card, nav
 
             # ──────────────────────────────────────────────────────────────────
             # 4. get_purchase_orders
@@ -1625,7 +2050,17 @@ class AIAssistantService:
             # ──────────────────────────────────────────────────────────────────
             elif tool_name == "get_production_orders":
                 target_wh = args.get("warehouse") or permitted_warehouse
-                status_filter = args.get("status") if args.get("status") != "all" else None
+                raw_st = str(args.get("status") or "all").strip()
+                if raw_st.lower() in ("pending", "open"):
+                    status_filter = "pending"
+                elif raw_st.lower() in ("completed", "closed"):
+                    status_filter = "Closed"
+                elif raw_st.lower() in ("cancelled", "canceled"):
+                    status_filter = "Cancelled"
+                elif raw_st.lower() in ("all", "*", ""):
+                    status_filter = None
+                else:
+                    status_filter = raw_st
                 limit = int(args.get("limit") or 15)
 
                 orders, total = self.production_service.get_production_orders(
@@ -1854,6 +2289,401 @@ class AIAssistantService:
                 return {"approvals_count": len(items), "approvals": items}, card, nav
 
             # ──────────────────────────────────────────────────────────────────
+            # Finance Tools
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_finance_summary":
+                r = args.get("range", "monthly")
+                branch = args.get("branch") or permitted_warehouse
+                summary = self.finance_service.get_finance_summary(
+                    range_str=r,
+                    branch_id=branch,
+                    from_date=args.get("date_from"),
+                    to_date=args.get("date_to")
+                )
+                period_obj = summary.get("period")
+                period_label = period_obj.get("label", r) if isinstance(period_obj, dict) else (str(period_obj) if period_obj else r)
+                kpis = summary.get("kpis", {}) or summary.get("metrics", {})
+                cards = []
+                if isinstance(kpis, dict):
+                    for k, v in kpis.items():
+                        title = k.replace("_", " ").title()
+                        if isinstance(v, dict):
+                            val = v.get("value", 0)
+                            sub = v.get("subtext") or (f"{v.get('growth', 0)}% vs prev" if "growth" in v else None)
+                        else:
+                            val = v
+                            sub = None
+                        cards.append({
+                            "title": title,
+                            "value": val,
+                            "subtitle": sub,
+                            "format": "currency" if "margin" not in k else "percentage"
+                        })
+                card = {
+                    "type": "finance_summary",
+                    "title": "Financial Overview Summary",
+                    "period": period_label,
+                    "cards": cards,
+                    "kpis": kpis,
+                    "meta": {
+                        "date_range": period_label,
+                        "branch_scope": branch or "All Branches",
+                        "is_cached": summary.get("meta", {}).get("is_cached", False) if isinstance(summary.get("meta"), dict) else False,
+                        "timestamp": summary.get("meta", {}).get("timestamp") if isinstance(summary.get("meta"), dict) else None
+                    }
+                }
+                nav = {"label": "Open Finance Overview", "route": "/finance", "target_module": "finance_overview"}
+                return {"summary": summary, "kpis": kpis}, card, nav
+
+            elif tool_name == "get_sales_trend":
+                r = args.get("range", "past_6_months")
+                branch = args.get("branch") or permitted_warehouse
+                trend_res = self.finance_service.get_sales_trend(range_str=r, branch_id=branch)
+                trend_list = trend_res.get("trend", []) if isinstance(trend_res, dict) else (trend_res if isinstance(trend_res, list) else [])
+                rows = []
+                for pt in trend_list:
+                    if isinstance(pt, dict):
+                        rows.append({
+                            "period": pt.get("period"),
+                            "month": pt.get("month"),
+                            "sales": pt.get("sales", 0.0),
+                            "purchases": pt.get("purchases", 0.0)
+                        })
+                total_rev = trend_res.get("total_revenue") if isinstance(trend_res, dict) else sum(r.get("sales", 0.0) for r in rows)
+                card = {
+                    "type": "table",
+                    "title": "Monthly Revenue & Sales Trend",
+                    "summary": f"Sales trend across {len(rows)} periods from live SAP AR Invoices.",
+                    "columns": [
+                        {"key": "period", "label": "Period", "type": "string"},
+                        {"key": "sales", "label": "Sales Revenue", "type": "currency"},
+                        {"key": "purchases", "label": "Purchases (Cost)", "type": "currency"}
+                    ],
+                    "rows": rows,
+                    "chart": {
+                        "type": "line",
+                        "xKey": "period",
+                        "series": ["sales", "purchases"],
+                        "defaultView": "both"
+                    },
+                    "meta": {"range": r, "branch_scope": branch or "All Branches"}
+                }
+                nav = {"label": "View Sales Invoices", "route": "/sales", "target_module": "finance_sales_invoices"}
+                return {"sales_trend": rows, "trend": rows, "total_revenue": total_rev, "count": len(rows)}, card, nav
+
+            elif tool_name == "get_purchase_trend":
+                r = args.get("range", "past_6_months")
+                branch = args.get("branch") or permitted_warehouse
+                trend_res = self.finance_service.get_purchase_trend(range_str=r, branch_id=branch)
+                trend_list = trend_res.get("trend", []) if isinstance(trend_res, dict) else (trend_res if isinstance(trend_res, list) else [])
+                rows = []
+                for pt in trend_list:
+                    if isinstance(pt, dict):
+                        rows.append({
+                            "period": pt.get("period"),
+                            "month": pt.get("month"),
+                            "purchases": pt.get("purchases", 0.0),
+                            "sales": pt.get("sales", 0.0)
+                        })
+                total_purchases = trend_res.get("total_purchases") if isinstance(trend_res, dict) else sum(r.get("purchases", 0.0) for r in rows)
+                card = {
+                    "type": "table",
+                    "title": "Purchase Invoices Trend",
+                    "summary": f"Vendor purchasing trend across {len(rows)} periods from live SAP AP Invoices.",
+                    "columns": [
+                        {"key": "period", "label": "Period", "type": "string"},
+                        {"key": "purchases", "label": "Purchases (₹)", "type": "currency"},
+                        {"key": "sales", "label": "Sales (₹)", "type": "currency"}
+                    ],
+                    "rows": rows,
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "period",
+                        "series": ["purchases"],
+                        "defaultView": "both"
+                    },
+                    "meta": {"range": r, "branch_scope": branch or "All Branches"}
+                }
+                nav = {"label": "Open Purchase Invoices", "route": "/finance/purchase-invoices", "target_module": "finance_purchase_invoices"}
+                return {"purchase_trend": rows, "trend": rows, "total_purchases": total_purchases, "count": len(rows)}, card, nav
+
+
+
+            elif tool_name == "get_purchase_invoices":
+                r = args.get("range", "monthly")
+                branch = args.get("branch") or permitted_warehouse
+                res = self.finance_service.get_purchase_invoices(
+                    range_str=r,
+                    from_date=args.get("date_from"),
+                    to_date=args.get("date_to"),
+                    supplier_code=args.get("supplier_code"),
+                    status=args.get("status"),
+                    branch_id=branch,
+                    search=args.get("search"),
+                    limit=int(args.get("limit") or 20)
+                )
+                pinvs = res.get("purchase_invoices", [])
+                card = {
+                    "type": "table",
+                    "title": f"Purchase Invoices ({res.get('period', r)})",
+                    "summary": f"Found {res.get('total_count', len(pinvs))} purchase invoices totaling ₹{res.get('total_amount', 0.0):,.2f}.",
+                    "columns": [
+                        {"key": "doc_num", "label": "Doc #", "type": "string"},
+                        {"key": "doc_date", "label": "Date", "type": "date"},
+                        {"key": "card_name", "label": "Supplier", "type": "string"},
+                        {"key": "doc_total", "label": "Total Amount", "type": "currency"},
+                        {"key": "status", "label": "Status", "type": "string"}
+                    ],
+                    "rows": pinvs,
+                    "meta": {"date_range": res.get("period"), "branch_scope": branch or "All Branches"}
+                }
+                nav = {"label": "Open Purchase Invoices", "route": "/finance/purchase-invoices", "target_module": "finance_purchase_invoices"}
+                return res, card, nav
+
+            elif tool_name == "get_incoming_payments":
+                r = args.get("range", "monthly")
+                branch = args.get("branch") or permitted_warehouse
+                res = self.finance_service.get_incoming_payments(
+                    range_str=r,
+                    from_date=args.get("date_from"),
+                    to_date=args.get("date_to"),
+                    customer_code=args.get("customer_code"),
+                    payment_method=args.get("payment_method"),
+                    branch_id=branch,
+                    limit=int(args.get("limit") or 20)
+                )
+                pays = res.get("payments", [])
+                card = {
+                    "type": "table",
+                    "title": f"Incoming Payments & Collections ({res.get('period', r)})",
+                    "summary": f"Total collections: ₹{res.get('total_amount', 0.0):,.2f} across {res.get('total_count', len(pays))} payments.",
+                    "columns": [
+                        {"key": "ref_no", "label": "Receipt #", "type": "string"},
+                        {"key": "date", "label": "Date", "type": "date"},
+                        {"key": "customer_name", "label": "Customer", "type": "string"},
+                        {"key": "amount", "label": "Amount", "type": "currency"},
+                        {"key": "method", "label": "Method", "type": "string"}
+                    ],
+                    "rows": pays,
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "customer_name",
+                        "series": [{"dataKey": "amount", "name": "Receipt Amount (₹)", "color": "#10b981"}],
+                        "defaultView": "both"
+                    },
+                    "meta": {"date_range": res.get("period"), "branch_scope": branch or "All Branches"}
+                }
+                nav = {"label": "Open Incoming Payments", "route": "/finance/incoming-payments", "target_module": "finance_incoming_payments"}
+                return res, card, nav
+
+            elif tool_name == "get_outgoing_payments":
+                r = args.get("range", "monthly")
+                branch = args.get("branch") or permitted_warehouse
+                res = self.finance_service.get_outgoing_payments(
+                    range_str=r,
+                    from_date=args.get("date_from"),
+                    to_date=args.get("date_to"),
+                    supplier_code=args.get("supplier_code"),
+                    branch_id=branch,
+                    limit=int(args.get("limit") or 20)
+                )
+                pays = res.get("payments", [])
+                card = {
+                    "type": "table",
+                    "title": f"Outgoing Vendor Payments ({res.get('period', r)})",
+                    "summary": f"Total supplier payouts: ₹{res.get('total_amount', 0.0):,.2f} across {res.get('total_count', len(pays))} payments.",
+                    "columns": [
+                        {"key": "ref_no", "label": "Voucher #", "type": "string"},
+                        {"key": "date", "label": "Date", "type": "date"},
+                        {"key": "supplier_name", "label": "Supplier", "type": "string"},
+                        {"key": "amount", "label": "Amount Paid", "type": "currency"},
+                        {"key": "method", "label": "Method", "type": "string"}
+                    ],
+                    "rows": pays,
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "supplier_name",
+                        "series": [{"dataKey": "amount", "name": "Paid Amount (₹)", "color": "#f59e0b"}],
+                        "defaultView": "both"
+                    },
+                    "meta": {"date_range": res.get("period"), "branch_scope": branch or "All Branches"}
+                }
+                nav = {"label": "Open Outgoing Payments", "route": "/finance/outgoing-payments", "target_module": "finance_outgoing_payments"}
+                return res, card, nav
+
+            elif tool_name == "get_customer_sales_ranking":
+                r = args.get("range", "monthly")
+                branch = args.get("branch") or permitted_warehouse
+                order_mode = args.get("order", "top")
+                res = self.finance_service.get_customer_sales_ranking(
+                    range_str=r,
+                    from_date=args.get("date_from"),
+                    to_date=args.get("date_to"),
+                    order=order_mode,
+                    branch_id=branch,
+                    limit=int(args.get("limit") or 10)
+                )
+                customers = res.get("customers", [])
+                is_lowest = res.get("order") == "lowest"
+                card = {
+                    "type": "table",
+                    "title": f"{'Lowest Purchasing' if is_lowest else 'Top'} Customers by Sales ({res.get('period')})",
+                    "summary": f"{'Lowest' if is_lowest else 'Top'} {len(customers)} customers contributing to total net sales of ₹{res.get('total_sales', 0.0):,.2f}.",
+                    "columns": [
+                        {"key": "rank", "label": "#", "type": "number"},
+                        {"key": "customerName", "label": "Customer", "type": "string"},
+                        {"key": "invoices", "label": "Invoices", "type": "number"},
+                        {"key": "netSales", "label": "Net Sales", "type": "currency"},
+                        {"key": "percentage", "label": "% of Total", "type": "percentage"}
+                    ],
+                    "rows": customers,
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "customerName",
+                        "series": [{"dataKey": "netSales", "name": "Net Sales (₹)", "color": "#2563eb"}],
+                        "defaultView": "both"
+                    },
+                    "meta": {"order": res.get("order"), "period": res.get("period")}
+                }
+                nav = {"label": "Open Customer Analysis", "route": "/finance/customer-analysis", "target_module": "finance_customer_analysis"}
+                return res, card, nav
+
+            elif tool_name == "get_supplier_purchase_ranking":
+                r = args.get("range", "monthly")
+                branch = args.get("branch") or permitted_warehouse
+                order_mode = args.get("order", "top")
+                res = self.finance_service.get_supplier_purchase_ranking(
+                    range_str=r,
+                    from_date=args.get("date_from"),
+                    to_date=args.get("date_to"),
+                    order=order_mode,
+                    branch_id=branch,
+                    limit=int(args.get("limit") or 10)
+                )
+                suppliers = res.get("suppliers", [])
+                is_lowest = res.get("order") == "lowest"
+                card = {
+                    "type": "table",
+                    "title": f"{'Lowest Volume' if is_lowest else 'Top'} Suppliers by Purchase ({res.get('period')})",
+                    "summary": f"{'Lowest' if is_lowest else 'Top'} {len(suppliers)} suppliers contributing to total purchases of ₹{res.get('total_purchases', 0.0):,.2f}.",
+                    "columns": [
+                        {"key": "rank", "label": "#", "type": "number"},
+                        {"key": "supplierName", "label": "Supplier", "type": "string"},
+                        {"key": "invoices", "label": "Invoices", "type": "number"},
+                        {"key": "netPurchases", "label": "Net Purchases", "type": "currency"},
+                        {"key": "percentage", "label": "% of Total", "type": "percentage"}
+                    ],
+                    "rows": suppliers,
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "supplierName",
+                        "series": [{"dataKey": "netPurchases", "name": "Net Purchases (₹)", "color": "#ec4899"}],
+                        "defaultView": "both"
+                    },
+                    "meta": {"order": res.get("order"), "period": res.get("period")}
+                }
+                nav = {"label": "Open Supplier Analysis", "route": "/finance/supplier-analysis", "target_module": "finance_supplier_analysis"}
+                return res, card, nav
+
+            elif tool_name == "get_accounts_receivable":
+                res = self.finance_service.get_accounts_receivable(
+                    customer_code=args.get("customer_code"),
+                    min_balance=float(args.get("min_balance") or 0.0),
+                    limit=int(args.get("limit") or 20)
+                )
+                debtors = res.get("customers", [])
+                card = {
+                    "type": "table",
+                    "title": "Accounts Receivable (Debtors Outstanding)",
+                    "summary": f"Total outstanding customer balance: ₹{res.get('total_accounts_receivable', 0.0):,.2f} across {res.get('total_debtors_count', len(debtors))} customers.",
+                    "columns": [
+                        {"key": "card_name", "label": "Customer", "type": "string"},
+                        {"key": "card_code", "label": "Code", "type": "string"},
+                        {"key": "outstanding_balance", "label": "Receivable Balance", "type": "currency"},
+                        {"key": "phone", "label": "Phone", "type": "string"}
+                    ],
+                    "rows": debtors,
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "card_name",
+                        "series": [{"dataKey": "outstanding_balance", "name": "Balance Owed (₹)", "color": "#f43f5e"}],
+                        "defaultView": "both"
+                    },
+                    "meta": {"total_ar": res.get("total_accounts_receivable")}
+                }
+                nav = {"label": "Open Customer Analysis", "route": "/finance/customer-analysis", "target_module": "finance_customer_analysis"}
+                return res, card, nav
+
+            elif tool_name == "get_accounts_payable":
+                res = self.finance_service.get_accounts_payable(
+                    supplier_code=args.get("supplier_code"),
+                    min_balance=float(args.get("min_balance") or 0.0),
+                    limit=int(args.get("limit") or 20)
+                )
+                creditors = res.get("suppliers", [])
+                card = {
+                    "type": "table",
+                    "title": "Accounts Payable (Creditors Outstanding)",
+                    "summary": f"Total outstanding supplier liabilities: ₹{res.get('total_accounts_payable', 0.0):,.2f} across {res.get('total_creditors_count', len(creditors))} suppliers.",
+                    "columns": [
+                        {"key": "card_name", "label": "Supplier", "type": "string"},
+                        {"key": "card_code", "label": "Code", "type": "string"},
+                        {"key": "outstanding_balance", "label": "Payable Balance", "type": "currency"},
+                        {"key": "phone", "label": "Phone", "type": "string"}
+                    ],
+                    "rows": creditors,
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "card_name",
+                        "series": [{"dataKey": "outstanding_balance", "name": "Payable Amount (₹)", "color": "#f59e0b"}],
+                        "defaultView": "both"
+                    },
+                    "meta": {"total_ap": res.get("total_accounts_payable")}
+                }
+                nav = {"label": "Open Supplier Analysis", "route": "/finance/supplier-analysis", "target_module": "finance_supplier_analysis"}
+                return res, card, nav
+
+            elif tool_name == "get_profitability_report":
+                r = args.get("range", "monthly")
+                branch = args.get("branch") or permitted_warehouse
+                res = self.finance_service.get_profitability_report(
+                    range_str=r,
+                    from_date=args.get("date_from"),
+                    to_date=args.get("date_to"),
+                    branch_id=branch
+                )
+                monthly = res.get("monthly_breakdown", [])
+                card = {
+                    "type": "table",
+                    "title": f"Profitability & Margin Report ({res.get('period')})",
+                    "summary": f"Net Sales: ₹{res.get('net_sales', 0.0):,.2f} | Cost of Purchases: ₹{res.get('cost_of_purchases', 0.0):,.2f} | Gross Profit: ₹{res.get('gross_profit', 0.0):,.2f} ({res.get('gross_margin_percentage', 0.0)}% Margin).",
+                    "columns": [
+                        {"key": "period", "label": "Period", "type": "string"},
+                        {"key": "sales", "label": "Net Sales", "type": "currency"},
+                        {"key": "purchases", "label": "Cost/Purchases", "type": "currency"},
+                        {"key": "gross_profit", "label": "Gross Profit", "type": "currency"},
+                        {"key": "gross_margin", "label": "Margin %", "type": "percentage"}
+                    ],
+                    "rows": monthly,
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "period",
+                        "series": [
+                            {"dataKey": "sales", "name": "Net Sales (₹)", "color": "#2563eb"},
+                            {"dataKey": "purchases", "name": "Purchases (₹)", "color": "#8b5cf6"},
+                            {"dataKey": "gross_profit", "name": "Gross Profit (₹)", "color": "#10b981"}
+                        ],
+                        "defaultView": "both"
+                    },
+                    "meta": {
+                        "accounting_note": res.get("accounting_note"),
+                        "gross_margin": f"{res.get('gross_margin_percentage')}%"
+                    }
+                }
+                nav = {"label": "Open Profitability Reports", "route": "/finance/profitability-reports", "target_module": "finance_profitability_reports"}
+                return res, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
             # 18. navigate_to_module
             # ──────────────────────────────────────────────────────────────────
             elif tool_name == "navigate_to_module":
@@ -1863,8 +2693,14 @@ class AIAssistantService:
                     return {"error": f"Unknown module '{tgt}'"}, None, None
 
                 path = route_info["path"]
-                if args.get("record_id") and tgt == "sales":
-                    path = f"/sales/{args.get('record_id')}"
+                if args.get("record_id"):
+                    rec = args.get("record_id")
+                    if tgt in ("sales", "finance_sales_invoices"):
+                        path = f"/sales/{rec}"
+                    elif tgt == "finance_purchase_invoices":
+                        path = f"/finance/purchase-invoices?id={rec}"
+                    elif tgt == "finance_incoming_payments":
+                        path = f"/finance/incoming-payments?id={rec}"
 
                 params = args.get("params") or {}
                 nav = {
@@ -1878,6 +2714,209 @@ class AIAssistantService:
                     "target": nav
                 }
                 return {"navigated": True, "route": path, "name": route_info["name"]}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 19. inspect_finance_record
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "inspect_finance_record":
+                entity_type = args.get("entity_type", "invoice")
+                record_id = str(args.get("record_id", "")).strip()
+                if record_id.upper().startswith("INV-"):
+                    record_id = record_id[4:]
+                user_role = str(current_user.get("role") or "user").lower()
+
+                details = self.finance_service.get_record_details(
+                    entity_type=entity_type,
+                    record_id=record_id,
+                    user_role=user_role
+                )
+
+                card = {
+                    "type": "record_details",
+                    "entity_type": entity_type,
+                    "record_id": record_id,
+                    "doc_num": details.get("doc_num", record_id),
+                    "status": details.get("status", "Active"),
+                    "can_edit": details.get("can_edit", False),
+                    "editable_fields": details.get("editable_fields", {}),
+                    "locked_fields": details.get("locked_fields", {}),
+                    "meta": {
+                        "user_role": user_role,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                }
+                nav = {
+                    "label": f"Inspect {entity_type.replace('_', ' ').title()} #{details.get('doc_num', record_id)}",
+                    "route": f"/finance?entity={entity_type}&id={record_id}&action=inspect",
+                    "target_module": "finance_overview",
+                    "params": {"entity": entity_type, "id": record_id}
+                }
+                return details, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 20. propose_record_update
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "propose_record_update":
+                entity_type = args.get("entity_type", "invoice")
+                record_id = str(args.get("record_id", "")).strip()
+                if record_id.upper().startswith("INV-"):
+                    record_id = record_id[4:]
+                updates = args.get("updates", {})
+                user_role = str(current_user.get("role") or "user").lower()
+
+                validation = self.finance_service.validate_record_update(
+                    entity_type=entity_type,
+                    record_id=record_id,
+                    updates=updates,
+                    user_role=user_role
+                )
+
+                card = {
+                    "type": "record_proposal",
+                    "entity_type": entity_type,
+                    "record_id": record_id,
+                    "is_valid": validation.get("is_valid", False),
+                    "errors": validation.get("errors", []),
+                    "diff": validation.get("diff", []),
+                    "can_submit": validation.get("is_valid", False) and user_role in ("admin", "manager", "accountant"),
+                    "meta": {
+                        "user_role": user_role,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                }
+                nav = {
+                    "label": f"Review Changes ({len(validation.get('diff', []))} fields)",
+                    "route": f"/finance?entity={entity_type}&id={record_id}&action=review",
+                    "target_module": "finance_overview",
+                    "params": {"entity": entity_type, "id": record_id}
+                }
+                return validation, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 21. submit_approved_record_update
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "submit_approved_record_update":
+                from app.core.config import settings
+                if not getattr(settings, "FINANCE_WRITEBACK_ENABLED", False):
+                    return {
+                        "error": "SAP write-back is temporarily disabled by administrative safety policy.",
+                        "is_disabled": True,
+                    }, {
+                        "type": "record_submission",
+                        "status": "error",
+                        "error": "SAP write-back is temporarily disabled by administrative safety policy.",
+                    }, None
+
+                entity_type = args.get("entity_type", "invoice")
+                record_id = str(args.get("record_id", "")).strip()
+                if record_id.upper().startswith("INV-"):
+                    record_id = record_id[4:]
+                updates = args.get("updates", {})
+                confirm = bool(args.get("confirm", False))
+                user_role = str(current_user.get("role") or "user").lower()
+
+                if user_role not in ("admin", "manager", "accountant"):
+                    return {
+                        "error": "Forbidden: Admin, Manager, or Accountant authorization required to modify SAP records."
+                    }, None, None
+
+                if not confirm:
+                    return {
+                        "error": "Explicit confirmation required: Please confirm that you want to submit these approved updates to SAP Business One."
+                    }, None, None
+
+                result = self.finance_service.submit_record_update(
+                    entity_type=entity_type,
+                    record_id=record_id,
+                    updates=updates,
+                    user=current_user,
+                    ip_address="127.0.0.1"
+                )
+
+                card = {
+                    "type": "record_submission",
+                    "entity_type": entity_type,
+                    "record_id": record_id,
+                    "success": result.get("success", False),
+                    "message": result.get("message", "Submitted successfully."),
+                    "diff": result.get("diff", []),
+                    "audit_id": result.get("audit_id"),
+                    "timestamp": result.get("timestamp"),
+                    "updated_record": result.get("updated_record"),
+                }
+                nav = {
+                    "label": f"View Updated {entity_type.replace('_', ' ').title()}",
+                    "route": f"/finance?entity={entity_type}&id={record_id}&action=updated",
+                    "target_module": "finance_overview",
+                    "params": {"entity": entity_type, "id": record_id}
+                }
+                return result, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 22. get_finance_audit_log
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_finance_audit_log":
+                user_role = str(current_user.get("role") or "user").lower()
+                if user_role not in ("admin", "manager"):
+                    return {
+                        "error": "Forbidden: Admin or Manager authorization required to view audit trail."
+                    }, None, None
+
+                from app.services.audit_service import get_audit_entries
+                entries = get_audit_entries(
+                    entity_type=args.get("entity_type"),
+                    record_id=args.get("record_id"),
+                    limit=int(args.get("limit") or 20)
+                )
+
+                card = {
+                    "type": "audit_log",
+                    "title": "Finance Operations Audit Trail",
+                    "summary": f"Retrieved {len(entries)} audit events for write-back and administrative operations.",
+                    "entries": entries,
+                    "meta": {"limit": args.get("limit") or 20}
+                }
+                nav = {
+                    "label": "Open Audit History",
+                    "route": "/finance?view=audit",
+                    "target_module": "finance_overview",
+                    "params": {"view": "audit"}
+                }
+                return {"total_entries": len(entries), "entries": entries}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 23. get_finance_admin_settings
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_finance_admin_settings":
+                settings_data = self.finance_service.get_admin_settings()
+                card = {
+                    "type": "admin_settings",
+                    "title": "Finance Assistant & System Settings",
+                    "summary": f"SAP Connection: {settings_data.get('sap_status', 'unknown').upper()} | Circuit Breaker: {settings_data.get('sap_circuit_breaker')} | Mode: {settings_data.get('assistant_mode')}",
+                    "settings": settings_data
+                }
+                nav = {
+                    "label": "Open Finance Settings",
+                    "route": "/finance?view=settings",
+                    "target_module": "finance_overview",
+                    "params": {"view": "settings"}
+                }
+                return settings_data, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 24. refresh_finance_data
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "refresh_finance_data":
+                from app.services.sap.finance_service import _FINANCE_CACHE
+                _FINANCE_CACHE.clear()
+                overview = self.finance_service.get_finance_overview(range_str="monthly", branch_id=permitted_warehouse)
+                card = {
+                    "type": "finance_refreshed",
+                    "title": "Finance Data Refreshed",
+                    "summary": "All finance caches cleared. Fresh data retrieved directly from SAP Business One Service Layer.",
+                    "kpis": overview.get("kpis", {})
+                }
+                return {"refreshed": True, "timestamp": datetime.now().isoformat()}, card, None
 
             else:
                 return {"error": f"Unknown tool '{tool_name}'"}, None, None

@@ -83,6 +83,16 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
+        try:
+            from app.services import user_service
+            db_user = user_service.get_user_by_username(user_id)
+            if db_user:
+                payload["role"] = db_user.get("role", payload.get("role"))
+                if db_user.get("branch_id"):
+                    payload["branch_id"] = db_user.get("branch_id")
+        except Exception:
+            pass
+
         return payload
     except HTTPException:
         raise
@@ -98,6 +108,16 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
 async def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Dependency that requires the current user to have the 'admin' role."""
     if current_user.get("role") != "admin":
+        sub = current_user.get("sub")
+        if sub:
+            try:
+                from app.services import user_service
+                db_user = user_service.get_user_by_username(sub)
+                if db_user and db_user.get("role") == "admin":
+                    current_user["role"] = "admin"
+                    return current_user
+            except Exception:
+                pass
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required.",
@@ -108,8 +128,19 @@ async def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)
 async def require_manager_or_admin(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Dependency that requires the current user to have 'admin' or 'manager' role."""
     if current_user.get("role") not in ("admin", "manager"):
+        sub = current_user.get("sub")
+        if sub:
+            try:
+                from app.services import user_service
+                db_user = user_service.get_user_by_username(sub)
+                if db_user and db_user.get("role") in ("admin", "manager"):
+                    current_user["role"] = db_user.get("role")
+                    return current_user
+            except Exception:
+                pass
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Manager or Admin access required.",
         )
     return current_user
+

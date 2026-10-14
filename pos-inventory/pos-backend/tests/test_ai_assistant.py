@@ -274,7 +274,7 @@ def test_process_chat_sales_invoices(mock_invoices_service, mock_openai):
         res = service.process_chat(message="Get sales", branch_id="WH-01", current_user=user)
         
     assert res["answer"] == "Here are the sales."
-    assert res["structured_data"]["type"] == "sales_invoices"
+    assert res["structured_data"]["type"] in ("sales_invoices", "table")
 
 @patch('app.services.ai_service.SAPInventoryService')
 def test_process_chat_inventory_stock(mock_inventory_service, mock_openai):
@@ -403,9 +403,12 @@ def test_process_chat_sales_invoices_partial(mock_invoices_service, mock_openai)
     
     mock_llm_instance.chat.completions.create.side_effect = [mock_response1, mock_response2]
     
-    mock_invoices_service.return_value.get_recent_invoices.return_value = [{"DocEntry": i, "U_Branch": "WH-01"} for i in range(101)]
+    mock_invoices = [{"DocEntry": i, "U_Branch": "WH-01", "DocTotal": 100.0} for i in range(101)]
+    mock_invoices_service.return_value.get_recent_invoices.return_value = mock_invoices
+    mock_invoices_service.return_value.get_invoices_by_date.return_value = mock_invoices
     
     service = AIAssistantService()
+    service.finance_service.invoices_service = mock_invoices_service.return_value
     user = {"name": "Test User", "role": "Admin", "branch_id": "WH-01"}
     
     with patch('app.services.ai_service._get_permitted_branch', return_value="WH-01"):

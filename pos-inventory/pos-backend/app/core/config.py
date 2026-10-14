@@ -102,6 +102,11 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = ""
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-1.5-flash"
+
+    # Safety switch: Controls whether Finance AI and Finance endpoints can write to SAP Service Layer.
+    # When False, all SAP write operations (PATCH, POST, PUT, DELETE) are strictly blocked at the backend.
+    # Set to False by default; requires explicit administrator authorization to re-enable.
+    FINANCE_WRITEBACK_ENABLED: bool = False
     
     class Config:
         env_file = ".env"

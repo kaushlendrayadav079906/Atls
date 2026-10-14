@@ -50,23 +50,22 @@ class SAPInventoryService:
             logger.error(f"Error fetching stock for item {item_code}: {str(e)}")
             return 0.0
     
-    def get_warehouse_stock(self, warehouse: str) -> List[Dict[str, Any]]:
+    def get_warehouse_stock(self, warehouse: str, max_pages: int = 20) -> List[Dict[str, Any]]:
         """
         Get all items stock in a warehouse.
 
         Paginates SAP results via $skip to avoid silent truncation.
-        Returns all pages up to a safe maximum (MAX_PAGES). If the SAP
+        Returns all pages up to a safe maximum (max_pages). If the SAP
         response would exceed that cap, a warning is logged and callers
         receive the partial result with a ``{"_truncated": True}`` sentinel
         appended so they can surface an explicit incomplete-data state. Page
         failures propagate so callers cannot treat partial pages as complete.
         """
         PAGE_SIZE = 500
-        MAX_PAGES = 20  # cap at 10 000 items; raise once confirmed with client
         all_items: List[Dict[str, Any]] = []
         skip = 0
 
-        for page_num in range(MAX_PAGES):
+        for page_num in range(max_pages):
             try:
                 params = {
                     "$select": "ItemCode,ItemName,QuantityOnStock,ItemWarehouseInfoCollection",
@@ -87,8 +86,8 @@ class SAPInventoryService:
             # Loop exhausted MAX_PAGES without reaching end
             logger.warning(
                 "get_warehouse_stock: result cap reached (warehouse=%r, max_items=%d). "
-                "Increase MAX_PAGES or add a tighter filter.",
-                warehouse, MAX_PAGES * PAGE_SIZE,
+                "Increase max_pages or add a tighter filter.",
+                warehouse, max_pages * PAGE_SIZE,
             )
             all_items.append({"_truncated": True})
 

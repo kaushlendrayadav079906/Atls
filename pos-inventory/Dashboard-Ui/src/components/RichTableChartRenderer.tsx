@@ -5,7 +5,9 @@ import {
   AlertCircle,
   FileSpreadsheet,
   Info,
-  Calendar
+  Calendar,
+  Search,
+  LayoutGrid
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -118,8 +120,18 @@ export const RichTableChartRenderer: React.FC<RichTableChartRendererProps> = ({
     rows.length > 0
   );
 
-  // Tab state: 'results' (table) or 'chart'
-  const [activeTab, setActiveTab] = useState<'results' | 'chart'>('results');
+  // Tab state: 'results' (table), 'chart', or 'both'
+  const initialTab: 'results' | 'chart' | 'both' = (chart?.defaultView as any) || (hasChartConfig ? 'both' : 'results');
+  const [activeTab, setActiveTab] = useState<'results' | 'chart' | 'both'>(initialTab);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredRows = searchQuery.trim()
+    ? rows.filter((row) =>
+        Object.values(row).some((v) =>
+          String(v ?? '').toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      )
+    : rows;
 
   // Error State Rendering
   if (error || meta?.error) {
@@ -162,6 +174,69 @@ export const RichTableChartRenderer: React.FC<RichTableChartRendererProps> = ({
     }
   }
 
+  const renderTable = (tableRows: Array<Record<string, any>>) => (
+    <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xs my-1">
+      <div className="overflow-x-auto max-h-[300px] scrollbar-thin">
+        <table className="w-full text-left text-[10px] text-slate-700 whitespace-nowrap border-collapse">
+          <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/80 text-[9px] font-bold text-slate-500 uppercase tracking-wider z-10">
+            <tr>
+              <th className="px-2.5 py-2 text-center w-8 text-slate-400 border-r border-slate-100 font-mono">
+                #
+              </th>
+              {columns.map((col) => {
+                const isNumeric = ['currency', 'number', 'percentage', 'delta'].includes(col.type);
+                return (
+                  <th
+                    key={col.key}
+                    className={`px-3 py-2 ${isNumeric ? 'text-right' : 'text-left'}`}
+                  >
+                    {col.label}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-slate-700">
+            {tableRows.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length + 1} className="p-4 text-center text-slate-400 text-[10px]">
+                  No matching records found.
+                </td>
+              </tr>
+            ) : (
+              tableRows.map((row, rowIdx) => (
+                <tr
+                  key={rowIdx}
+                  className="hover:bg-indigo-50/30 transition-colors"
+                >
+                  <td className="px-2.5 py-1.5 text-center text-slate-400 font-mono text-[9px] border-r border-slate-100 bg-slate-50/30">
+                    {rowIdx + 1}
+                  </td>
+                  {columns.map((col) => {
+                    const cellVal = row[col.key];
+                    const { text, className: cellClass } = formatCellValue(cellVal, col.type);
+                    const isNumeric = ['currency', 'number', 'percentage', 'delta'].includes(col.type);
+
+                    return (
+                      <td
+                        key={col.key}
+                        className={`px-3 py-1.5 ${
+                          isNumeric ? 'text-right font-medium tabular-nums' : 'text-left'
+                        } ${cellClass || ''}`}
+                      >
+                        {text}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   return (
     <div className={`rounded-2xl border border-indigo-100/90 bg-white shadow-2xs overflow-hidden mt-2.5 transition-all text-slate-800 ${className}`}>
       {/* ── 1. Header with Title & Summary ───────────────────────────────── */}
@@ -198,7 +273,7 @@ export const RichTableChartRenderer: React.FC<RichTableChartRendererProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTab('chart')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
                   activeTab === 'chart'
                     ? 'bg-white text-indigo-700 font-bold shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -211,8 +286,8 @@ export const RichTableChartRenderer: React.FC<RichTableChartRendererProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('results')}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
-                activeTab === 'results' || !hasChartConfig
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
+                activeTab === 'results' || (!hasChartConfig && activeTab !== 'both')
                   ? 'bg-white text-indigo-700 font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -220,6 +295,20 @@ export const RichTableChartRenderer: React.FC<RichTableChartRendererProps> = ({
               <TableIcon size={12} className={activeTab === 'results' ? 'text-indigo-600' : 'text-slate-400'} />
               <span>Results</span>
             </button>
+            {hasChartConfig && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('both')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
+                  activeTab === 'both'
+                    ? 'bg-white text-indigo-700 font-bold shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <LayoutGrid size={12} className={activeTab === 'both' ? 'text-indigo-600' : 'text-slate-400'} />
+                <span>Both</span>
+              </button>
+            )}
           </div>
 
           {meta?.date_range && (
@@ -230,7 +319,7 @@ export const RichTableChartRenderer: React.FC<RichTableChartRendererProps> = ({
           )}
         </div>
 
-        {/* Applied Filters Metadata (matching reference screenshot layout) */}
+        {/* Applied Filters Metadata */}
         {filterEntries.length > 0 && (
           <div className="mb-2.5 rounded-xl bg-slate-50/80 border border-slate-100 p-2 text-[10px] text-slate-600">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1">
@@ -245,7 +334,21 @@ export const RichTableChartRenderer: React.FC<RichTableChartRendererProps> = ({
           </div>
         )}
 
-        {/* ── 3. Content View (Results Table or Chart + Table) ─────────────── */}
+        {/* Search Input for Result Tables */}
+        {rows.length > 3 && activeTab !== 'chart' && (
+          <div className="mb-2.5 relative">
+            <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder={`Filter ${rows.length} rows...`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-7 pr-3 py-1 text-[10px] bg-slate-50/80 border border-slate-200/70 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:bg-white transition-all text-slate-800 placeholder:text-slate-400"
+            />
+          </div>
+        )}
+
+        {/* ── 3. Content View (Chart, Results, or Both) ─────────────────────── */}
         {rows.length === 0 ? (
           /* Empty State */
           <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center bg-slate-50/50 my-1">
@@ -256,110 +359,31 @@ export const RichTableChartRenderer: React.FC<RichTableChartRendererProps> = ({
             </p>
           </div>
         ) : activeTab === 'chart' && hasChartConfig ? (
-          /* Chart View: Chart on top + Underlying Table below (Reference Design) */
+          /* Chart Only View */
           <div className="flex flex-col gap-2.5 my-1">
             <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-2.5">
               <div className="text-[10.5px] font-bold text-slate-800 mb-1 flex items-center justify-between">
-                <span>{columns.find(c => c.key === (chart?.series?.[0] || 'sales'))?.label || 'Total Sales (₹)'}</span>
+                <span>{columns.find((c) => c.key === (chart?.series?.[0] || 'sales'))?.label || 'Analytical Trend'}</span>
                 <span className="text-[8.5px] text-slate-400 font-mono">Recharts Visual</span>
               </div>
               <ChartRenderer config={chart!} rows={rows} columns={columns} />
             </div>
-
-            {/* Underlying Data Table */}
-            <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xs">
-              <div className="overflow-x-auto max-h-[220px] scrollbar-thin">
-                <table className="w-full text-left text-[10px] text-slate-700 whitespace-nowrap border-collapse">
-                  <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/80 text-[9px] font-bold text-slate-500 uppercase tracking-wider z-10">
-                    <tr>
-                      <th className="px-2.5 py-1.5 text-center w-8 text-slate-400 border-r border-slate-100 font-mono">#</th>
-                      {columns.slice(0, 3).map((col) => {
-                        const isNumeric = ['currency', 'number', 'percentage', 'delta'].includes(col.type);
-                        return (
-                          <th key={col.key} className={`px-2.5 py-1.5 ${isNumeric ? 'text-right' : 'text-left'}`}>
-                            {col.label}
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {rows.map((row, rowIdx) => (
-                      <tr key={rowIdx} className="hover:bg-indigo-50/30 transition-colors">
-                        <td className="px-2.5 py-1 text-center text-slate-400 font-mono text-[9px] border-r border-slate-100 bg-slate-50/30">
-                          {rowIdx + 1}
-                        </td>
-                        {columns.slice(0, 3).map((col) => {
-                          const cellVal = row[col.key];
-                          const { text, className: cellClass } = formatCellValue(cellVal, col.type);
-                          const isNumeric = ['currency', 'number', 'percentage', 'delta'].includes(col.type);
-                          return (
-                            <td key={col.key} className={`px-2.5 py-1 ${isNumeric ? 'text-right font-medium tabular-nums' : 'text-left'} ${cellClass || ''}`}>
-                              {text}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          </div>
+        ) : activeTab === 'both' && hasChartConfig ? (
+          /* Both View: Chart on top + Full Result Table underneath */
+          <div className="flex flex-col gap-2.5 my-1">
+            <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-2.5">
+              <div className="text-[10.5px] font-bold text-slate-800 mb-1 flex items-center justify-between">
+                <span>{columns.find((c) => c.key === (chart?.series?.[0] || 'sales'))?.label || 'Analytical Trend'}</span>
+                <span className="text-[8.5px] text-slate-400 font-mono">Recharts Visual</span>
               </div>
+              <ChartRenderer config={chart!} rows={rows} columns={columns} />
             </div>
+            {renderTable(filteredRows)}
           </div>
         ) : (
-          /* Full Results Table View */
-          <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-2xs my-1">
-            <div className="overflow-x-auto max-h-[300px] scrollbar-thin">
-              <table className="w-full text-left text-[10px] text-slate-700 whitespace-nowrap border-collapse">
-                <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/80 text-[9px] font-bold text-slate-500 uppercase tracking-wider z-10">
-                  <tr>
-                    <th className="px-2.5 py-2 text-center w-8 text-slate-400 border-r border-slate-100 font-mono">
-                      #
-                    </th>
-                    {columns.map((col) => {
-                      const isNumeric = ['currency', 'number', 'percentage', 'delta'].includes(col.type);
-                      return (
-                        <th
-                          key={col.key}
-                          className={`px-3 py-2 ${isNumeric ? 'text-right' : 'text-left'}`}
-                        >
-                          {col.label}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {rows.map((row, rowIdx) => (
-                    <tr
-                      key={rowIdx}
-                      className="hover:bg-indigo-50/30 transition-colors"
-                    >
-                      <td className="px-2.5 py-1.5 text-center text-slate-400 font-mono text-[9px] border-r border-slate-100 bg-slate-50/30">
-                        {rowIdx + 1}
-                      </td>
-                      {columns.map((col) => {
-                        const cellVal = row[col.key];
-                        const { text, className: cellClass } = formatCellValue(cellVal, col.type);
-                        const isNumeric = ['currency', 'number', 'percentage', 'delta'].includes(col.type);
-
-                        return (
-                          <td
-                            key={col.key}
-                            className={`px-3 py-1.5 ${
-                              isNumeric ? 'text-right font-medium tabular-nums' : 'text-left'
-                            } ${cellClass || ''}`}
-                          >
-                            {text}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          /* Results Only View */
+          renderTable(filteredRows)
         )}
 
         {/* ── 4. Metadata Warnings ─────────────────────────────────────────── */}

@@ -6,8 +6,7 @@ import {
   ChevronRight, RotateCcw, Calendar, Minus, Maximize2, Send,
   ChevronDown
 } from 'lucide-react';
-import { atlasApi, dashboardApi } from '../api/endpoints';
-import { apiClient } from '../api/client';
+import { atlasApi, dashboardApi, aiAssistantApi } from '../api/endpoints';
 import { useAuth } from '../contexts/AuthContext';
 import { useSystemHealth } from '../hooks/useSystemHealth';
 import { Link, useNavigate } from 'react-router-dom';
@@ -33,6 +32,9 @@ export const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { isSapConnected, checkHealth: recheckHealth } = useSystemHealth();
+
+  const role = user?.role?.toLowerCase();
+  const isManagerOrAdmin = role === 'admin' || role === 'manager';
 
   const [period, setPeriod] = useState<string>('daily');
   const [chartPeriod, setChartPeriod] = useState<string>('yearly');
@@ -160,13 +162,13 @@ export const Dashboard = () => {
     setLoadingChat(true);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 35000);
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
 
     try {
-      const res = await apiClient.post('/ai-assistant/chat', {
+      const data = await aiAssistantApi.chat({
         message: msgToSend,
         branch_id: branchId || user?.branch_id || 'SH',
-        conversation_id: conversationId,
+        conversation_id: conversationId || undefined,
         history: chatHistory.map(m => ({ role: m.role, content: m.content })),
         context: {
           page: 'dashboard',
@@ -175,32 +177,33 @@ export const Dashboard = () => {
           date_to: dateTo
         }
       }, {
-        signal: controller.signal
+        signal: controller.signal,
+        timeout: 45000
       });
       clearTimeout(timeoutId);
 
-      if (res.data.conversation_id) {
-        setConversationId(res.data.conversation_id);
+      if (data.conversation_id) {
+        setConversationId(data.conversation_id);
       }
 
       setChatHistory(prev => [
         ...prev,
         {
           role: 'assistant',
-          content: res.data.answer,
-          structured_data: res.data.structured_data,
+          content: data.answer,
+          structured_data: data.structured_data,
         },
       ]);
     } catch (err: any) {
       clearTimeout(timeoutId);
       let errMsg = 'Failed to communicate with AI Assistant. Please try again.';
 
-      if (err.name === 'CanceledError' || err.name === 'AbortError') {
-        errMsg = 'The AI request timed out after 35 seconds. Please try again or refine your query.';
+      if (err.name === 'CanceledError' || err.name === 'AbortError' || err.code === 'ECONNABORTED' || (err.message && err.message.includes('timeout'))) {
+        errMsg = 'The AI request timed out after 45 seconds. Please try again or refine your query.';
       } else if (err?.response?.status === 402) {
         errMsg = 'AI Provider quota exhausted: Your OpenAI/Gemini account credit balance has run out. Please check your billing at platform.openai.com.';
       } else if (err?.response?.status === 504) {
-        errMsg = 'Request timed out on the backend server while contacting the AI service.';
+        errMsg = err?.response?.data?.detail || 'Request timed out on the backend server while contacting the AI service.';
       } else if (err?.response?.data?.detail) {
         errMsg = err.response.data.detail;
       } else if (err.message) {
@@ -257,6 +260,8 @@ export const Dashboard = () => {
   } = useQuery({
     queryKey: ['dashboardAlerts', branchId],
     queryFn: () => dashboardApi.getAlerts(),
+    enabled: isManagerOrAdmin,
+    retry: false,
     staleTime: 30 * 1000,
   });
 
@@ -302,21 +307,25 @@ export const Dashboard = () => {
   } = useQuery({
     queryKey: ['inventoryRisk', branchId],
     queryFn: () => dashboardApi.getInventoryRisk(),
+    enabled: isManagerOrAdmin,
+    retry: false,
     staleTime: 60 * 1000,
   });
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.allSettled([
+    const refreshTasks: Promise<any>[] = [
       recheckHealth(),
       refetchSummary(),
       refetchSales(),
-      refetchAlerts(),
       refetchProducts(),
       refetchTrend(),
       refetchOrdersTrend(),
-      refetchRisk(),
-    ]);
+    ];
+    if (isManagerOrAdmin) {
+      refreshTasks.push(refetchAlerts(), refetchRisk());
+    }
+    await Promise.allSettled(refreshTasks);
     setTimeout(() => setIsRefreshing(false), 400);
   };
 
@@ -367,15 +376,16 @@ export const Dashboard = () => {
   const pendingApprovalsCount = alerts
     ? alerts.filter((item: any) => item.status?.toLowerCase() === 'pending').length
     : undefined;
-  const isApprovalsForbidden = (alertsError as any)?.response?.status === 403;
+  const isApprovalsForbidden = !isManagerOrAdmin || (alertsError as any)?.response?.status === 403;
 
   const hasCachedRisk = inventoryRisk !== undefined && Array.isArray(inventoryRisk);
   const isRiskLive = isSapConnected === true && hasCachedRisk;
   const isRiskCached = isSapConnected === false && hasCachedRisk;
-  const isRiskUnavailable = !hasCachedRisk || errorRisk;
+  const isRiskForbidden = !isManagerOrAdmin || (errorRisk as any)?.response?.status === 403;
+  const isRiskUnavailable = !isRiskForbidden && (!hasCachedRisk || errorRisk);
   const lowStockCount = hasCachedRisk
     ? inventoryRisk.length
-    : (loadingRisk ? '...' : 'Unavailable');
+    : (loadingRisk ? '...' : isRiskForbidden ? 'Restricted' : 'Unavailable');
 
   return (
     <div className="flex flex-col lg:flex-row gap-5 items-start text-slate-900 pb-8 min-w-0 w-full transition-all duration-300">
@@ -641,7 +651,11 @@ export const Dashboard = () => {
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs">
                 <TriangleAlert size={17} />
               </div>
-              {isRiskLive ? (
+              {isRiskForbidden ? (
+                <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                  Restricted
+                </span>
+              ) : isRiskLive ? (
                 <span className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold ${(inventoryRisk?.length ?? 0) === 0
                     ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
                     : 'border-amber-300 bg-amber-50 text-amber-700'
@@ -661,11 +675,11 @@ export const Dashboard = () => {
             <div className="mt-2.5">
               <div className="text-[11.5px] font-medium text-slate-500">Low-stock Items</div>
               <div className="mt-0.5 text-[21px] font-bold tracking-tight text-slate-900">
-                {loadingRisk ? '...' : (isRiskUnavailable ? 'Unavailable' : lowStockCount)}
+                {loadingRisk ? '...' : (isRiskForbidden ? 'Restricted' : isRiskUnavailable ? 'Unavailable' : lowStockCount)}
               </div>
             </div>
             <div className="mt-2.5 text-[11px] text-slate-400">
-              {isRiskUnavailable ? 'SAP sync required' : ((inventoryRisk?.length ?? 0) === 0 ? 'Healthy inventory' : 'Items low in stock')}
+              {isRiskForbidden ? 'Manager/Admin only' : isRiskUnavailable ? 'SAP sync required' : ((inventoryRisk?.length ?? 0) === 0 ? 'Healthy inventory' : 'Items low in stock')}
             </div>
           </div>
 
