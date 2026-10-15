@@ -1,5 +1,5 @@
 from datetime import datetime, date, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from collections import defaultdict
 import calendar
 
@@ -10,7 +10,7 @@ def format_hour(hr: int) -> str:
         h = 12
     return f"{h:02d} {am_pm}"
 
-def _compute_dynamic_trend(invoices: List[Dict[str, Any]], range_str: str, start_date: date, end_date: date) -> Dict[str, Any]:
+def _compute_dynamic_trend(invoices: List[Dict[str, Any]], range_str: str, start_date: Optional[date] = None, end_date: Optional[date] = None) -> Dict[str, Any]:
     # Determine bounds
     actual_min_date = None
     actual_max_date = None
@@ -24,10 +24,10 @@ def _compute_dynamic_trend(invoices: List[Dict[str, Any]], range_str: str, start
         d_min = datetime.strptime(actual_min_date, "%Y-%m-%d").date()
         d_max = datetime.strptime(actual_max_date, "%Y-%m-%d").date()
     else:
-        d_min = start_date
-        d_max = end_date
+        d_min = start_date or date.today()
+        d_max = end_date or date.today()
 
-    span_days = (d_max - d_min).days + 1
+    span_days = max(1, (d_max - d_min).days + 1)
 
     if range_str == "daily":
         group_by = "hour"
@@ -37,8 +37,10 @@ def _compute_dynamic_trend(invoices: List[Dict[str, Any]], range_str: str, start
         group_by = "day"
     elif range_str == "yearly":
         group_by = "month"
-    elif range_str == "all_time":
-        if span_days <= 31:
+    elif range_str in ("all_time", "custom"):
+        if span_days <= 1:
+            group_by = "hour"
+        elif span_days <= 31:
             group_by = "day"
         elif span_days <= 365:
             group_by = "month"
@@ -71,20 +73,19 @@ def _compute_dynamic_trend(invoices: List[Dict[str, Any]], range_str: str, start
             
     elif group_by == "day":
         if range_str == "weekly":
-            # weekly range is 7 days from start_date to end_date
-            curr = start_date
-            while curr <= end_date:
+            curr = start_date or (date.today() - timedelta(days=date.today().weekday()))
+            week_end = end_date or date.today()
+            while curr <= week_end:
                 key = curr.strftime("%Y-%m-%d")
                 buckets[key] = {"label": curr.strftime("%a"), "sales": 0.0, "invoice_count": 0}
                 curr += timedelta(days=1)
         elif range_str == "monthly":
-            # get 1st to last day of month
-            curr = start_date.replace(day=1)
+            ref_date = start_date or date.today()
+            curr = ref_date.replace(day=1)
             _, last_day = calendar.monthrange(curr.year, curr.month)
             for i in range(1, last_day + 1):
                 d = curr.replace(day=i)
                 key = d.strftime("%Y-%m-%d")
-                # format: "1 Oct"
                 buckets[key] = {"label": f"{i} {d.strftime('%b')}", "sales": 0.0, "invoice_count": 0}
         else:
             # fill from d_min to d_max
@@ -96,8 +97,9 @@ def _compute_dynamic_trend(invoices: List[Dict[str, Any]], range_str: str, start
                 
     elif group_by == "month":
         if range_str == "yearly":
+            target_year = start_date.year if start_date else d_min.year
             for i in range(1, 13):
-                key = f"{start_date.year}-{i:02d}"
+                key = f"{target_year}-{i:02d}"
                 buckets[key] = {"label": calendar.month_abbr[i], "sales": 0.0, "invoice_count": 0}
         else:
             # from min_month to max_month
@@ -146,8 +148,8 @@ def _compute_dynamic_trend(invoices: List[Dict[str, Any]], range_str: str, start
             buckets[key]["sales"] += float(inv.get("DocTotal") or 0)
             buckets[key]["invoice_count"] += 1
         else:
-            # if out of predefined range (should rarely happen except 'all_time'), dynamically add
-            if range_str == "all_time":
+            # if out of predefined range (should rarely happen except 'all_time' or 'custom'), dynamically add
+            if range_str in ("all_time", "custom"):
                 label = key
                 if group_by == "day":
                     try:
@@ -195,8 +197,8 @@ def _compute_dynamic_trend(invoices: List[Dict[str, Any]], range_str: str, start
     return {
         "range": range_str,
         "group_by": group_by,
-        "start_date": start_date.strftime("%Y-%m-%d"),
-        "end_date": end_date.strftime("%Y-%m-%d"),
+        "start_date": start_date.strftime("%Y-%m-%d") if start_date else (d_min.strftime("%Y-%m-%d") if d_min else ""),
+        "end_date": end_date.strftime("%Y-%m-%d") if end_date else (d_max.strftime("%Y-%m-%d") if d_max else ""),
         "total_sales": round(total_sales, 2),
         "total_invoices": total_invoices,
         "total_customers": unique_customers,

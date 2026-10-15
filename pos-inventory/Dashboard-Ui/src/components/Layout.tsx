@@ -24,6 +24,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSystemHealth } from '../hooks/useSystemHealth';
 import { GlobalSearchModal } from './GlobalSearchModal';
 import { AIAssistantPanel, type AIAssistantContext } from './AIAssistantPanel';
+import { useAIAssistant } from '../contexts/AIAssistantContext';
 import atlasLogo from '../assets/LOGO.png';
 
 const navItems = [
@@ -117,19 +118,7 @@ export const Layout = () => {
 
   const { isSapConnected } = useSystemHealth();
   const [searchModalOpen, setSearchModalOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
-
-  useEffect(() => {
-    const handler = (e: any) => {
-      if (e.detail?.open !== undefined) {
-        setAiOpen(e.detail.open);
-      } else {
-        setAiOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('atls-toggle-ai', handler);
-    return () => window.removeEventListener('atls-toggle-ai', handler);
-  }, []);
+  const { isOpen: aiOpen, setIsOpen: setAiOpen } = useAIAssistant();
 
   const getPageContext = (pathname: string): AIAssistantContext => {
     if (pathname === '/products') return 'products';
@@ -507,31 +496,22 @@ export const Layout = () => {
 
         {/* ── Main area ── */}
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-slate-50 relative">
-          {location.pathname !== '/' && location.pathname !== '/finance' && location.pathname !== '/finance/' ? (
-            <div className="flex-1 overflow-auto w-full p-4 sm:p-5 flex flex-col lg:flex-row gap-6 items-start transition-all duration-300">
-              <div className="flex-1 min-w-0 w-full">
-                <Outlet />
-              </div>
-
-              <AIAssistantPanel
-                key={location.pathname}
-                pageContext={getPageContext(location.pathname)}
-                pageFilters={{ pathname: location.pathname }}
-                isOpen={aiOpen}
-                onClose={() => setAiOpen(false)}
-              />
-            </div>
-          ) : (
-            <div className="flex-1 overflow-auto p-4 sm:p-5 w-full">
+          <div className="flex-1 overflow-auto w-full p-4 sm:p-5 flex flex-col lg:flex-row gap-6 items-start transition-all duration-300">
+            <div className="flex-1 min-w-0 w-full">
               <Outlet />
             </div>
-          )}
 
-          {/* Floating AI Button across all non-dashboard / non-finance pages when assistant panel is closed */}
-          {location.pathname !== '/' && location.pathname !== '/finance' && location.pathname !== '/finance/' && !aiOpen && (
+            <AIAssistantPanel
+              pageContext={getPageContext(location.pathname)}
+              isOpen={aiOpen}
+              onClose={() => setAiOpen(false)}
+            />
+          </div>
+
+          {/* Floating AI Button across all pages when assistant panel is closed */}
+          {!aiOpen && (
             <button
               onClick={() => setAiOpen(true)}
-
               className="fixed right-5 bottom-6 z-40 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 px-4 py-2.5 text-[12px] font-semibold text-white shadow-[0_4px_20px_rgba(99,102,241,0.35)] transition-all cursor-pointer hover:shadow-[0_6px_25px_rgba(99,102,241,0.5)] hover:scale-[1.02] active:scale-[0.98]"
               title="Open ATLAS AI Assistant"
             >

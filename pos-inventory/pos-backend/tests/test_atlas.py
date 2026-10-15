@@ -248,3 +248,82 @@ def test_operator_report_date_helper_rejects_invalid_ranges(from_date, to_date):
         _get_date_range_with_custom("monthly", from_date, to_date)
 
     assert error.value.status_code == 422
+
+
+def test_atlas_sales_trends_custom_range_success(manager_token, monkeypatch):
+    mock_invs = [
+        {
+            "DocEntry": 10,
+            "DocNum": 2001,
+            "DocTotal": 500.0,
+            "DocDate": "2026-09-15T10:00:00Z",
+            "DocTime": 1030,
+            "DocumentLines": [{"WarehouseCode": "B1", "LineTotal": 500.0}],
+        }
+    ]
+    fetch_mock = MagicMock(return_value=mock_invs)
+    monkeypatch.setattr("app.api.v1.atlas.SAPInvoicesService.get_invoices_by_date_with_lines", fetch_mock)
+
+    response = client.get("/api/v1/atlas/sales-trends?range=custom&from_date=2026-09-01&to_date=2026-09-30")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["range"] == "custom"
+    assert data["total_sales"] == 500.0
+    assert len(data["trend"]) > 0
+    from datetime import date
+    fetch_mock.assert_called_once_with(date(2026, 9, 1), date(2026, 9, 30))
+
+
+def test_atlas_sales_trends_custom_range_missing_dates_fails(manager_token, monkeypatch):
+    fetch_mock = MagicMock(return_value=[])
+    monkeypatch.setattr("app.api.v1.atlas.SAPInvoicesService.get_invoices_by_date_with_lines", fetch_mock)
+
+    response = client.get("/api/v1/atlas/sales-trends?range=custom")
+    assert response.status_code == 422
+    fetch_mock.assert_not_called()
+
+
+def test_atlas_sales_trends_all_time_no_restriction(manager_token, monkeypatch, mock_invoices):
+    monkeypatch.setattr("app.api.v1.atlas.cache_get", AsyncMock(return_value=None))
+    fetch_mock = MagicMock(return_value=mock_invoices)
+    monkeypatch.setattr("app.api.v1.atlas.SAPInvoicesService.get_invoices_by_date_with_lines", fetch_mock)
+
+    response = client.get("/api/v1/atlas/sales-trends?range=all_time")
+    assert response.status_code == 200
+    fetch_mock.assert_called_once_with(None, None)
+
+
+def test_atlas_overview_custom_range_success(manager_token, monkeypatch, mock_invoices):
+    fetch_mock = MagicMock(return_value=mock_invoices)
+    monkeypatch.setattr("app.api.v1.atlas.SAPInvoicesService.get_invoices_by_date_with_lines", fetch_mock)
+
+    response = client.get("/api/v1/atlas/overview?range=custom&from_date=2026-09-01&to_date=2026-09-30")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["totalSales"] == 110.0
+
+
+def test_recent_sales_feed_with_from_to_dates(operator_token, monkeypatch):
+    from unittest.mock import AsyncMock
+    mock_feed = [
+        {
+            "DocEntry": 1,
+            "DocNum": 101,
+            "DocDate": "2026-09-15T00:00:00Z",
+            "DocTotal": 100.0,
+            "CardCode": "C001",
+            "CardName": "John Doe",
+            "DocumentStatus": "bost_Close",
+            "DocumentLines": [{"ItemCode": "ITM1", "LineTotal": 100.0, "Quantity": 1, "WarehouseCode": "B1"}],
+        }
+    ]
+    fetch_mock = MagicMock(return_value=mock_feed)
+    monkeypatch.setattr("app.api.v1.dashboard.SAPInvoicesService.get_invoices_by_date_with_lines", fetch_mock)
+    monkeypatch.setattr("app.api.v1.dashboard._fetch_credit_notes", lambda b, s, e: [])
+
+    response = client.get("/api/v1/dashboard/recent-sales-feed?range=custom&from_date=2026-09-01&to_date=2026-09-30")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["items"][0]["docNum"] == 101
+

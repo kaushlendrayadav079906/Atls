@@ -113,24 +113,35 @@ class SAPReturnsService:
 
     def get_returns_by_date(
         self,
-        start_date: date,
-        end_date: date,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
         warehouse: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        start_str = start_date.strftime("%Y-%m-%d")
-        end_str = end_date.strftime("%Y-%m-%d")
+        filter_str = None
+        if start_date and end_date:
+            start_str = start_date.strftime("%Y-%m-%d")
+            end_str = end_date.strftime("%Y-%m-%d")
+            filter_str = f"DocDate ge '{start_str}' and DocDate le '{end_str}'"
+        elif start_date:
+            start_str = start_date.strftime("%Y-%m-%d")
+            filter_str = f"DocDate ge '{start_str}'"
+        elif end_date:
+            end_str = end_date.strftime("%Y-%m-%d")
+            filter_str = f"DocDate le '{end_str}'"
+
         page_size = 100
         max_documents = 500
         headers: List[Dict[str, Any]] = []
         skip = 0
         while len(headers) < max_documents:
             top = min(page_size, max_documents - len(headers))
-            params = {
-                "$filter": f"DocDate ge '{start_str}' and DocDate le '{end_str}'",
+            params: Dict[str, Any] = {
                 "$orderby": "DocEntry desc",
                 "$top": top,
                 "$skip": skip,
             }
+            if filter_str:
+                params["$filter"] = filter_str
             response = self.client.get("CreditNotes", params)
             page = response.get("value")
             if not isinstance(page, list):
@@ -143,12 +154,14 @@ class SAPReturnsService:
             skip += len(page)
 
         if len(headers) >= max_documents:
-            probe = self.client.get("CreditNotes", {
-                "$filter": f"DocDate ge '{start_str}' and DocDate le '{end_str}'",
+            probe_params: Dict[str, Any] = {
                 "$orderby": "DocEntry desc",
                 "$top": 1,
                 "$skip": max_documents,
-            })
+            }
+            if filter_str:
+                probe_params["$filter"] = filter_str
+            probe = self.client.get("CreditNotes", probe_params)
             if probe.get("value"):
                 raise RuntimeError(f"Credit-note query exceeds the configured limit of {max_documents} documents")
 

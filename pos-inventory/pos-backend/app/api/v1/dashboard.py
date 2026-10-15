@@ -156,8 +156,10 @@ def _get_date_range_with_custom(
     range_str: str,
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
-) -> Tuple[date, date]:
-    """Return (start_date, end_date), supporting custom date range."""
+) -> Tuple[Optional[date], Optional[date]]:
+    """Return (start_date, end_date), supporting custom date range and all_time (unrestricted)."""
+    if range_str == "all_time" and not from_date and not to_date:
+        return None, None
     if bool(from_date) != bool(to_date):
         raise HTTPException(status_code=422, detail="from_date and to_date must be provided together.")
     if from_date and to_date:
@@ -169,22 +171,25 @@ def _get_date_range_with_custom(
         if start_date > end_date:
             raise HTTPException(status_code=422, detail="from_date must not be after to_date.")
         return start_date, end_date
+    if range_str == "custom":
+        raise HTTPException(status_code=422, detail="Custom range requires from_date and to_date.")
     return _get_date_range(range_str)
 
 
-def _get_date_range(range_str: str) -> Tuple[date, date]:
+def _get_date_range(range_str: str) -> Tuple[Optional[date], Optional[date]]:
     """Return (start_date, end_date) for the requested range."""
     today = date.today()
     if range_str == "daily":
         return today, today
     elif range_str == "weekly":
-        return today - timedelta(days=6), today
+        start = today - timedelta(days=today.weekday())
+        return start, today
     elif range_str == "monthly":
         return today.replace(day=1), today
     elif range_str == "yearly":
         return today.replace(month=1, day=1), today
     else:  # all_time
-        return date(2000, 1, 1), today
+        return None, None
 
 
 def _resolve_branch_for_user(current_user: dict, requested_branch: Optional[str] = None) -> Optional[str]:
@@ -739,6 +744,8 @@ async def get_recent_sales_feed(
     range: str = Query("daily", pattern="^(daily|weekly|monthly|yearly|all_time|custom)$"),
     date_from: Optional[str] = Query(None, description="Custom start date YYYY-MM-DD"),
     date_to: Optional[str] = Query(None, description="Custom end date YYYY-MM-DD"),
+    from_date: Optional[str] = Query(None, description="Custom start date YYYY-MM-DD (alias)"),
+    to_date: Optional[str] = Query(None, description="Custom end date YYYY-MM-DD (alias)"),
     search: Optional[str] = Query(None, description="Search sale ID, bill number, customer name or phone"),
     customer: Optional[str] = Query(None, description="Filter by customer Name or Code"),
     category: Optional[str] = Query(None, description="Filter by category"),
@@ -748,7 +755,9 @@ async def get_recent_sales_feed(
     current_user: dict = Depends(get_current_user),
 ):
     """Paginated recent sales feed for the operator dashboard."""
-    start_date, end_date = _get_date_range_with_custom(range, date_from, date_to)
+    effective_from = from_date or date_from
+    effective_to = to_date or date_to
+    start_date, end_date = _get_date_range_with_custom(range, effective_from, effective_to)
     try:
         invoice_service = SAPInvoicesService()
         branch = _resolve_branch_for_user(current_user)

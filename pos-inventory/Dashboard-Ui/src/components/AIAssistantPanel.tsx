@@ -1,69 +1,49 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Minus, Maximize2, X, Send, Sparkles
 } from 'lucide-react';
-import { aiAssistantApi, financeApi, type FinanceOverviewResponse } from '../api/endpoints';
+import { financeApi, type FinanceOverviewResponse } from '../api/endpoints';
 import { useAuth } from '../contexts/AuthContext';
+import { useAIAssistant, type AIAssistantPageContext } from '../contexts/AIAssistantContext';
 import { AIChatRenderer } from './AIChatRenderer';
 import { FormattedMessage } from './FormattedMessage';
 import { FinanceAIWorkspace } from './finance/FinanceAIWorkspace';
 
-export type AIAssistantContext =
-  | 'dashboard'
-  | 'products'
-  | 'customers'
-  | 'pos'
-  | 'analytics'
-  | 'settings'
-  | 'sales_orders'
-  | 'invoices'
-  | 'purchase_orders'
-  | 'returns'
-  | 'production'
-  | 'production_orders'
-  | 'production_item_wise'
-  | 'production_rejection'
-  | 'production_date_wise'
-  | 'production_reports'
-  | 'reports'
-  | 'reports_sales'
-  | 'reports_invoice'
-  | 'reports_payment'
-  | 'reports_inventory'
-  | 'reports_customer'
-  | 'reports_ai'
-
-  | 'finance'
-  | 'finance_overview'
-  | 'finance_purchase_invoices'
-  | 'finance_incoming_payments'
-  | 'finance_outgoing_payments'
-  | 'finance_customer_analysis'
-  | 'finance_supplier_analysis'
-  | 'finance_profitability_reports';
-
+export type AIAssistantContext = AIAssistantPageContext;
 
 export interface AIAssistantPanelProps {
-  pageContext?: AIAssistantContext;
+  pageContext?: AIAssistantPageContext;
   pageFilters?: Record<string, any>;
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   className?: string;
 }
 
 export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
-  pageContext = 'dashboard',
-  pageFilters = {},
-  isOpen,
-  onClose,
+  pageContext: propsPageContext,
+  pageFilters: propsPageFilters,
+  isOpen: propsIsOpen,
+  onClose: propsOnClose,
   className = '',
 }) => {
   const { user } = useAuth();
-  const [aiFullscreen, setAiFullscreen] = useState(false);
-  const [chatInput, setChatInput] = useState('');
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [loadingChat, setLoadingChat] = useState(false);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const context = useAIAssistant();
+
+  const isOpen = propsIsOpen !== undefined ? propsIsOpen : context.isOpen;
+  const onClose = propsOnClose || (() => context.setIsOpen(false));
+  const pageContext = propsPageContext || context.pageContext;
+  const pageFilters = propsPageFilters || context.pageFilters;
+
+  const {
+    isFullscreen,
+    setIsFullscreen,
+    chatInput,
+    setChatInput,
+    chatHistory,
+    loadingChat,
+    handleSendChat,
+    chatScrollRef,
+  } = context;
 
   // Full-screen Finance Workspace State
   const isFinance = pageContext === 'finance' || pageContext === 'finance_overview' || pageContext.startsWith('finance_');
@@ -88,121 +68,13 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
   };
 
   useEffect(() => {
-    if (aiFullscreen && isFinance && !financeOverviewData) {
+    if (isFullscreen && isFinance && !financeOverviewData) {
       fetchFinanceOverview();
     }
-  }, [aiFullscreen, isFinance, financeRange, financeBranch]);
+  }, [isFullscreen, isFinance, financeRange, financeBranch]);
 
-  // Chat message history (seeded with reference demo on dashboard or tailored greeting)
-  const [chatHistory, setChatHistory] = useState<Array<{
-    role: string;
-    content: string;
-    structured_data?: any;
-    isInitialDemo?: boolean;
-  }>>(() => {
-    if (pageContext === 'products') {
-      return [
-        {
-          role: 'assistant',
-          content: 'Hello! I can help you check stock levels, minimal thresholds, and item details across all warehouses.',
-        }
-      ];
-    }
-    if (pageContext === 'customers') {
-      return [
-        {
-          role: 'assistant',
-          content: 'Hello! I can help you search customers by name or mobile number, review purchase histories, and check balances.',
-        }
-      ];
-    }
-    if (pageContext === 'analytics') {
-      return [
-        {
-          role: 'assistant',
-          content: 'Hello! I can help you analyze branch performance, product velocity, and multi-period revenue trends.',
-        }
-      ];
-    }
-    if (pageContext === 'sales_orders') {
-      return [
-        {
-          role: 'assistant',
-          content: 'Hello! I can help you search, filter, and analyze Sales Orders from SAP Business One.',
-        }
-      ];
-    }
-    if (pageContext === 'invoices') {
-      return [
-        {
-          role: 'assistant',
-          content: 'Hello! I can help you inspect customer invoices, payment breakdowns, and GST totals.',
-        }
-      ];
-    }
-    if (pageContext === 'purchase_orders') {
-      return [
-        {
-          role: 'assistant',
-          content: 'Hello! I can help you monitor supplier purchase orders, open quantities, and receipt status.',
-        }
-      ];
-    }
-    if (pageContext === 'returns') {
-      return [
-        {
-          role: 'assistant',
-          content: 'Hello! I can help you analyze customer returns, pending manager approvals, and credit notes.',
-        }
-      ];
-    }
-    if (pageContext.startsWith('production')) {
-      const messages: Record<string, string> = {
-        production_orders: 'Hello! I can help you analyze production order statuses, planned vs completed quantities, and due dates.',
-        production_item_wise: 'Hello! I can help you review item-wise production metrics, batch completions, and outputs.',
-        production_rejection: 'Hello! I can help you inspect rejection rates, scrap quantities, and item-wise defect logs.',
-        production_date_wise: 'Hello! I can help you track daily and weekly production trends, planned targets, and outputs.',
-        production_reports: 'Hello! I can help you generate and explain production summaries, scrap ratios, and efficiency reports.',
-      };
-      return [
-        {
-          role: 'assistant',
-          content: messages[pageContext] || 'Hello! I can help you monitor production batches, output volumes, and operational performance from SAP.',
-        }
-      ];
-    }
-    if (pageContext.startsWith('reports')) {
-      const messages: Record<string, string> = {
-        reports_sales: 'Hello! I can help you analyze sales trends, top-performing products, customer volumes, and periods.',
-        reports_invoice: 'Hello! I can help you review invoice totals, pending receivables, and tax summaries.',
-        reports_payment: 'Hello! I can help you summarize payment collection channels, cash flow, and bank settlements.',
-        reports_inventory: 'Hello! I can help you track inventory levels, low-stock warnings, and warehouse movements.',
-        reports_customer: 'Hello! I can help you analyze customer spending patterns, order frequencies, and outstanding balances.',
-        reports_ai: 'Hello! I can synthesize automated cross-module insights, anomaly alerts, and performance summaries.',
-      };
-      return [
-        {
-          role: 'assistant',
-          content: messages[pageContext] || 'Hello! I can help you review and interpret all business and financial reports.',
-        }
-      ];
-    }
-    if (pageContext === 'finance' || pageContext === 'finance_overview' || pageContext.startsWith('finance_')) {
-      return [
-        {
-          role: 'assistant',
-          content: "Hello! I'm your ATLAS Finance Assistant.\n\nI can help you with:\n• Sales, purchases and payments\n• Invoice and payment details\n• Customer & supplier analysis\n• Outstanding receivables and payables\n• Profitability and financial reports\n• Open relevant pages in ATLAS",
-        }
-      ];
-    }
-    // Default dashboard welcome thread
-    return [
-      {
-        role: 'assistant',
-        content: "Hello! I'm your ATLAS AI Assistant. Ask me anything about monthly revenue, weekly branch sales, payment channels, or inventory.",
-      }
-    ];
-  });
+
+
 
 
   // Suggested questions based on page context
@@ -318,101 +190,14 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
   }, [pageContext]);
 
 
-  // Scroll to bottom on new messages
-  useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }
-  }, [chatHistory, isOpen]);
-
-  // Listen for AI prompt requests dispatched from Global Search Modal
-  useEffect(() => {
-    const handleAIPrompt = (e: any) => {
-      const prompt = e.detail;
-      if (prompt && isOpen) {
-        handleSendChat(prompt);
-      }
-    };
-    window.addEventListener('atls-ai-prompt', handleAIPrompt);
-    return () => window.removeEventListener('atls-ai-prompt', handleAIPrompt);
-  }, [isOpen]);
-
-  // Send AI Chat Message
-  const handleSendChat = async (overridePrompt?: string) => {
-    const msgToSend = (overridePrompt || chatInput).trim();
-    if (!msgToSend || loadingChat) return;
-
-    setChatInput('');
-    setChatHistory(prev => [...prev, { role: 'user', content: msgToSend }]);
-    setLoadingChat(true);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
-
-    try {
-      const data = await aiAssistantApi.chat({
-        message: msgToSend,
-        branch_id: pageFilters?.branch || user?.branch_id || 'SH',
-        conversation_id: conversationId || undefined,
-        history: chatHistory.map(m => ({ role: m.role, content: m.content })),
-        context: {
-          page: pageContext,
-          ...pageFilters
-        }
-      }, {
-        signal: controller.signal,
-        timeout: 45000
-      });
-      clearTimeout(timeoutId);
-
-      if (data.conversation_id) {
-        setConversationId(data.conversation_id);
-      }
-
-      setChatHistory(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: data.answer,
-          structured_data: data.structured_data,
-        },
-      ]);
-    } catch (err: any) {
-      clearTimeout(timeoutId);
-      let errMsg = 'Failed to communicate with AI Assistant. Please try again.';
-
-      if (err.name === 'CanceledError' || err.name === 'AbortError' || err.code === 'ECONNABORTED' || (err.message && err.message.includes('timeout'))) {
-        errMsg = 'The AI Assistant request timed out after 45 seconds. Please try again or refine your query.';
-      } else if (err?.response?.status === 402) {
-        errMsg = 'AI Provider quota exhausted: Your OpenAI/Gemini account credit balance has run out. Please check your billing at platform.openai.com.';
-      } else if (err?.response?.status === 504) {
-        errMsg = err?.response?.data?.detail || 'Request timed out on the backend server while contacting the AI service.';
-      } else if (err?.response?.data?.detail) {
-        errMsg = err.response.data.detail;
-      } else if (err.message) {
-        errMsg = err.message;
-      }
-
-      setChatHistory(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: errMsg,
-        },
-      ]);
-    } finally {
-      setLoadingChat(false);
-    }
-  };
-
   if (!isOpen) return null;
 
-  if (isFinance && aiFullscreen) {
+  if (isFinance && isFullscreen) {
     return (
       <FinanceAIWorkspace
-        isOpen={aiFullscreen}
+        isOpen={isFullscreen}
         onClose={onClose}
-        onMinimize={() => setAiFullscreen(false)}
+        onMinimize={() => setIsFullscreen(false)}
         chatMessages={chatHistory as any}
         onSendMessage={async (msg) => {
           await handleSendChat(msg);
@@ -431,7 +216,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
 
   return (
     <aside
-      className={`flex flex-col rounded-2xl border border-indigo-200/80 bg-white shadow-lg shadow-indigo-500/5 overflow-hidden transition-all duration-300 ring-1 ring-indigo-500/10 ${aiFullscreen
+      className={`flex flex-col rounded-2xl border border-indigo-200/80 bg-white shadow-lg shadow-indigo-500/5 overflow-hidden transition-all duration-300 ring-1 ring-indigo-500/10 ${isFullscreen
         ? 'fixed inset-4 z-50 shadow-2xl h-[calc(100vh-32px)]'
         : 'w-full lg:w-[390px] xl:w-[410px] 2xl:w-[425px] shrink-0 h-[calc(100vh-100px)] sticky top-0'
         } ${className}`}
@@ -470,7 +255,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
             <Minus size={14} />
           </button>
           <button
-            onClick={() => setAiFullscreen(!aiFullscreen)}
+            onClick={() => setIsFullscreen(!isFullscreen)}
             className="p-1 hover:text-slate-700 hover:bg-white/80 rounded-lg transition cursor-pointer"
             title="Fullscreen / Expand"
           >

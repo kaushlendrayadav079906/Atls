@@ -76,14 +76,15 @@ export const AIChatRenderer = ({ structuredData }: { structuredData: any }) => {
 };
 
 const NavigationActionCard = ({ nav, navigate }: { nav: any; navigate: any }) => {
-  if (!nav || !nav.route) return null;
+  const actualNav = nav?.target || nav;
+  if (!actualNav || !actualNav.route) return null;
 
   const handleClick = () => {
-    let target = nav.route;
-    if (nav.params && Object.keys(nav.params).length > 0) {
-      const q = new URLSearchParams(nav.params).toString();
-      if (q && !target.includes('?')) {
-        target = `${target}?${q}`;
+    let target = actualNav.route;
+    if (actualNav.params && Object.keys(actualNav.params).length > 0) {
+      const q = new URLSearchParams(actualNav.params).toString();
+      if (q) {
+        target = target.includes('?') ? `${target}&${q}` : `${target}?${q}`;
       }
     }
     navigate(target);
@@ -100,10 +101,10 @@ const NavigationActionCard = ({ nav, navigate }: { nav: any; navigate: any }) =>
         </div>
         <div className="truncate">
           <div className="text-[11px] font-bold tracking-tight text-indigo-950">
-            {nav.label || 'Open Module'}
+            {actualNav.label || 'Open Module'}
           </div>
           <div className="text-[9.5px] text-indigo-600/80 font-mono">
-            {nav.route}
+            {actualNav.route}
           </div>
         </div>
       </div>
@@ -143,6 +144,26 @@ const SingleCardRenderer = ({ card, navigate }: { card: any; navigate: any }) =>
       // ── 0. Generic Structured Analytical Table & Chart ───────────────────
       case 'table': {
         return <RichTableChartRenderer data={card} />;
+      }
+
+      // ── Navigation Action ────────────────────────────────────────────────
+      case 'navigation': {
+        return <NavigationActionCard nav={card} navigate={navigate} />;
+      }
+
+      // ── SAP Offline Status ───────────────────────────────────────────────
+      case 'sap_offline': {
+        return (
+          <div className="rounded-xl border border-rose-200 bg-rose-50/80 p-3 text-[11px] text-rose-900 shadow-2xs">
+            <div className="flex items-center gap-2 font-bold text-rose-800">
+              <AlertCircle size={15} className="text-rose-600" />
+              <span>Live SAP Service Unavailable</span>
+            </div>
+            <p className="mt-1 text-[10.5px] text-rose-700 leading-relaxed">
+              {card.message || 'Unable to connect to SAP Business One. Real-time data is currently unavailable. Please check backend SAP connectivity.'}
+            </p>
+          </div>
+        );
       }
 
       // ── 1. Dashboard Summary KPIs ──────────────────────────────────────────

@@ -37,7 +37,8 @@ export const INTERNAL_ROUTES: InternalRoute[] = [
     path: '/products',
     module: 'inventory',
     description: 'Product catalog, barcode lookup, warehouse stock levels, low-stock alerts',
-    supportedFilters: ['search', 'warehouse', 'low_stock'],
+    supportedFilters: ['search', 'warehouse', 'low_stock', 'sku', 'openDetails'],
+    detailRoutePattern: '/products/:id',
   },
   {
     id: 'sales',
@@ -196,15 +197,21 @@ export function resolveInternalRoute(
 ): { path: string; name: string } | null {
   if (!routeIdOrPath) return null;
 
-  // Match by id or by exact path
+  // Split query string if routeIdOrPath already contains ?
+  const [baseInputPath, existingQuery] = routeIdOrPath.split('?');
+
+  // Match by id or by exact path or base path
   const target = INTERNAL_ROUTES.find(
-    (r) => r.id === routeIdOrPath || r.path === routeIdOrPath
+    (r) => r.id === routeIdOrPath || r.path === routeIdOrPath || r.path === baseInputPath
   );
 
   if (!target) {
-    // If path is a sub-path of an existing route, e.g. /sales/123
+    // If path is a sub-path of an existing route, e.g. /sales/123 or /products/AMIT000121
     if (routeIdOrPath.startsWith('/sales/') && routeIdOrPath.length > 7) {
       return { path: routeIdOrPath, name: 'Invoice Details' };
+    }
+    if (routeIdOrPath.startsWith('/products/') && routeIdOrPath.length > 10) {
+      return { path: routeIdOrPath, name: 'Product Details' };
     }
     return null;
   }
@@ -216,18 +223,21 @@ export function resolveInternalRoute(
     return { path: finalPath, name: `${target.name} #${params.id}` };
   }
 
+  // Parse existing query params if any
+  const query = new URLSearchParams(existingQuery || '');
+
   // Append supported query params if provided
   if (params && Object.keys(params).length > 0) {
-    const query = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) {
       if (k !== 'id' && v !== undefined && v !== '' && target.supportedFilters.includes(k)) {
         query.set(k, String(v));
       }
     }
-    const qs = query.toString();
-    if (qs) {
-      finalPath = `${finalPath}?${qs}`;
-    }
+  }
+
+  const qs = query.toString();
+  if (qs) {
+    finalPath = `${finalPath}?${qs}`;
   }
 
   return { path: finalPath, name: target.name };

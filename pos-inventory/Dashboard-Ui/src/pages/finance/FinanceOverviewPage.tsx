@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   TrendingUp,
@@ -13,15 +13,11 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronRight,
-  ChevronUp,
   LineChart as LineChartIcon,
   BarChart2,
   Users,
   Truck,
   Building,
-  Sparkles,
-  Send,
-  Maximize2,
   Receipt,
   FileSpreadsheet,
 } from 'lucide-react';
@@ -36,12 +32,10 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts';
-import { financeApi, aiAssistantApi, type FinanceOverviewResponse } from '../../api/endpoints';
+import { financeApi, type FinanceOverviewResponse } from '../../api/endpoints';
 import { useAuth } from '../../contexts/AuthContext';
+import { useAIAssistant } from '../../contexts/AIAssistantContext';
 import { useSystemHealth } from '../../hooks/useSystemHealth';
-import { AIChatRenderer } from '../../components/AIChatRenderer';
-import { FormattedMessage } from '../../components/FormattedMessage';
-import { FinanceAIWorkspace } from '../../components/finance/FinanceAIWorkspace';
 
 export const FinanceOverviewPage: React.FC = () => {
   const { user } = useAuth();
@@ -67,25 +61,14 @@ export const FinanceOverviewPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Left AI Assistant State
-  const [aiOpen, setAiOpen] = useState(true);
-  const [aiFullscreen, setAiFullscreen] = useState(false);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const { setPageFilters } = useAIAssistant();
 
-  const [chatMessages, setChatMessages] = useState<Array<{
-    role: 'assistant' | 'user';
-    content: string;
-    structured_data?: any;
-    isCardDemo?: boolean;
-  }>>([
-    {
-      role: 'assistant',
-      content:
-        "Hello! I'm your ATLAS Finance Assistant.\n\nI connect directly to SAP Business One Service Layer to provide real-time financial intelligence:\n• Sales revenue & monthly trends\n• Incoming and outgoing payment tracking\n• Top purchasing customers & suppliers\n• Outstanding receivables and payables\n• Gross profit and financial reporting\n• Instant navigation to ATLAS financial modules\n\nAsk a question below or pick a suggested prompt to begin.",
-    },
-  ]);
+  useEffect(() => {
+    setPageFilters({
+      range,
+      branch: branch === 'Current Branch' ? (user?.branch_id || undefined) : branch === 'All Branches' ? undefined : branch,
+    });
+  }, [range, branch, user, setPageFilters]);
 
   // Fetch Finance Overview Data
   const fetchOverview = async () => {
@@ -110,20 +93,6 @@ export const FinanceOverviewPage: React.FC = () => {
     fetchOverview();
   }, [range, branch]);
 
-  // Listen for navbar AI toggle event
-  useEffect(() => {
-    const handleToggle = () => setAiOpen((prev) => !prev);
-    window.addEventListener('atls-toggle-ai', handleToggle);
-    return () => window.removeEventListener('atls-toggle-ai', handleToggle);
-  }, []);
-
-  // Auto scroll chat
-  useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }
-  }, [chatMessages, aiOpen]);
-
   // Currency formatters
   const formatINR = (val?: number) => {
     if (val === undefined || val === null) return '₹0';
@@ -136,231 +105,10 @@ export const FinanceOverviewPage: React.FC = () => {
     return `₹${val}`;
   };
 
-  // Handle AI Chat
-  const handleSendPrompt = async (promptToSend?: string) => {
-    const text = promptToSend || chatInput;
-    if (!text.trim() || chatLoading) return;
-
-    const newMsg = { role: 'user' as const, content: text };
-    setChatMessages((prev) => [...prev, newMsg]);
-    if (!promptToSend) setChatInput('');
-    setChatLoading(true);
-
-    try {
-      const historyPayload = chatMessages
-        .filter((m) => !m.isCardDemo)
-        .map((m) => ({ role: m.role, content: m.content }));
-
-      const res = await aiAssistantApi.chat({
-        message: text,
-        branch_id: user?.branch_id || '',
-        history: historyPayload,
-      });
-
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: res.answer,
-          structured_data: res.structured_data,
-        },
-      ]);
-    } catch (err: any) {
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: `Unable to process request: ${err?.response?.data?.detail || err.message || 'Error communicating with AI service'}`,
-        },
-      ]);
-    } finally {
-      setChatLoading(false);
-    }
-  };
-
   const kpis = data?.kpis;
 
   return (
-    <div className="flex flex-col xl:flex-row gap-5 items-start w-full">
-      {/* ────────────────────────────────────────────────────────────────────
-          FULL-SCREEN ATLAS FINANCE AI WORKSPACE
-      ─────────────────────────────────────────────────────────────────────── */}
-      {aiFullscreen && (
-        <FinanceAIWorkspace
-          isOpen={aiFullscreen}
-          onClose={() => {
-            setAiFullscreen(false);
-            setAiOpen(false);
-          }}
-          onMinimize={() => setAiFullscreen(false)}
-          chatMessages={chatMessages}
-          onSendMessage={handleSendPrompt}
-          chatLoading={chatLoading}
-          range={range}
-          setRange={setRange}
-          branch={branch}
-          setBranch={setBranch}
-          overviewData={data}
-          overviewLoading={loading}
-          onRefreshOverview={fetchOverview}
-        />
-      )}
-
-      {/* ────────────────────────────────────────────────────────────────────
-          LEFT: ATLAS AI ASSISTANT PANEL (FINANCE MODE)
-      ─────────────────────────────────────────────────────────────────────── */}
-      {aiOpen && !aiFullscreen ? (
-        <aside
-          className="flex flex-col rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden transition-all duration-300 w-full xl:w-[390px] 2xl:w-[420px] shrink-0 h-[calc(100vh-85px)] sticky top-0"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-indigo-100/90 px-4 py-2.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-purple-50/90 shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs">
-                <Sparkles size={14} className="animate-pulse" />
-              </div>
-              <div>
-                <span className="text-[13px] font-black bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  ATLAS AI Assistant
-                </span>
-                <div className="text-[8.5px] font-bold text-indigo-500 tracking-wider uppercase">
-                  BUSINESS INTELLIGENCE
-                </div>
-              </div>
-              <span className="rounded-full bg-purple-50 border border-purple-200/90 px-2 py-0.5 text-[8.5px] font-bold text-purple-700 tracking-wider shadow-2xs">
-                FINANCE MODE
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1 text-slate-400">
-              <button
-                onClick={() => setAiOpen(false)}
-                className="p-1 hover:text-slate-700 hover:bg-white/80 rounded-lg transition cursor-pointer"
-                title="Minimize / Collapse"
-              >
-                <ChevronUp size={14} />
-              </button>
-              <button
-                onClick={() => setAiFullscreen(!aiFullscreen)}
-                className="p-1 hover:text-slate-700 hover:bg-white/80 rounded-lg transition cursor-pointer"
-                title="Fullscreen / Expand"
-              >
-                <Maximize2 size={13} />
-              </button>
-            </div>
-          </div>
-
-          {/* Conversation Stream */}
-          <div
-            ref={chatScrollRef}
-            className="flex-1 overflow-y-auto p-4 flex flex-col gap-3.5 bg-gradient-to-b from-indigo-50/20 via-white to-purple-50/20"
-          >
-            {/* Timestamp */}
-            <div className="flex justify-center my-0.5">
-              <span className="text-[10px] text-slate-400 font-medium">10:24 AM</span>
-            </div>
-
-            {/* Messages */}
-            {chatMessages.map((msg, idx) => (
-              <div key={idx} className={`flex items-start gap-2.5 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                {msg.role !== 'user' && (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs">
-                    <Sparkles size={13} />
-                  </div>
-                )}
-
-                <div
-                  className={`rounded-2xl p-3 text-[12px] leading-relaxed max-w-[88%] shadow-xs ${msg.role === 'user'
-                    ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-tr-xs'
-                    : 'bg-white text-slate-800 border border-indigo-100/90 rounded-tl-xs shadow-2xs'
-                    }`}
-                >
-                  <FormattedMessage content={msg.content} />
-
-                  {/* Reference Screenshot Demo Interactive Card */}
-
-
-                  {msg.structured_data && <AIChatRenderer structuredData={msg.structured_data} />}
-                </div>
-
-                {msg.role === 'user' && (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[10px] font-bold text-white shadow-xs">
-                    {user?.name ? user.name.split(' ').filter(Boolean).map((n: string) => n[0]).slice(0, 2).join('').toUpperCase() : 'KK'}
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {chatLoading && (
-              <div className="flex items-start gap-2.5">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs animate-pulse">
-                  <Sparkles size={13} />
-                </div>
-                <div className="rounded-2xl rounded-tl-xs bg-white border border-indigo-100/90 p-2.5 text-[11px] text-indigo-700 font-medium shadow-2xs flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 animate-ping" />
-                  Analyzing SAP Business One financial records...
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Prompts */}
-          <div className="px-3 pt-2 pb-2 bg-gradient-to-r from-slate-50 via-indigo-50/25 to-purple-50/25 border-t border-indigo-100/80 flex flex-wrap gap-1.5 shrink-0">
-            {[
-              'Revenue last 6 months',
-              'Incoming payments',
-              'Outgoing payments',
-              'Top customers',
-              'Outstanding receivables',
-              'Profitability report',
-            ].map((p) => (
-              <button
-                key={p}
-                onClick={() => handleSendPrompt(p)}
-                className="rounded-xl border border-indigo-200/80 bg-white hover:bg-indigo-50/60 px-2.5 py-1 text-[10.5px] font-medium text-slate-700 transition cursor-pointer shadow-3xs"
-              >
-                {p}
-              </button>
-            ))}
-          </div>
-
-          {/* Chat Input */}
-          <div className="p-3 bg-white border-t border-indigo-100/90 shrink-0">
-            <div className="flex items-center gap-2 rounded-2xl border border-indigo-200/90 bg-slate-50/50 p-1.5 shadow-xs focus-within:border-indigo-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendPrompt()}
-                placeholder="Ask anything about your finance data..."
-                className="flex-1 bg-transparent px-2.5 text-[12px] text-slate-800 outline-none placeholder:text-slate-400"
-              />
-              <button
-                onClick={() => handleSendPrompt()}
-                disabled={chatLoading || !chatInput.trim()}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 text-white disabled:opacity-40 transition cursor-pointer shadow-xs"
-                title="Send"
-              >
-                <Send size={13} />
-              </button>
-            </div>
-          </div>
-        </aside>
-      ) : (
-        /* Floating reopen button if collapsed */
-        <button
-          onClick={() => setAiOpen(true)}
-          className="fixed left-5 bottom-6 z-40 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-4 py-2 text-[12px] font-bold text-white shadow-xl hover:scale-105 transition cursor-pointer"
-        >
-          <Sparkles size={15} />
-          <span>Open Finance AI</span>
-        </button>
-      )}
-
-      {/* ────────────────────────────────────────────────────────────────────
-          RIGHT: FINANCE OVERVIEW MAIN DASHBOARD
-      ─────────────────────────────────────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 w-full space-y-5">
+    <div className="flex-1 min-w-0 w-full space-y-5">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -1022,7 +770,6 @@ export const FinanceOverviewPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
   );
 };
 export default FinanceOverviewPage;

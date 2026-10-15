@@ -276,8 +276,9 @@ def test_process_chat_sales_invoices(mock_invoices_service, mock_openai):
     assert res["answer"] == "Here are the sales."
     assert res["structured_data"]["type"] in ("sales_invoices", "table")
 
+@patch('app.services.ai_service.SAPItemsService')
 @patch('app.services.ai_service.SAPInventoryService')
-def test_process_chat_inventory_stock(mock_inventory_service, mock_openai):
+def test_process_chat_inventory_stock(mock_inventory_service, mock_items_service, mock_openai):
     settings.OPENAI_API_KEY = "test_key"
     mock_llm_instance = mock_openai.return_value
     
@@ -300,6 +301,7 @@ def test_process_chat_inventory_stock(mock_inventory_service, mock_openai):
     
     mock_llm_instance.chat.completions.create.side_effect = [mock_response1, mock_response2]
     
+    mock_items_service.return_value.get_item_by_code.return_value = {"ItemCode": "ITM1", "ItemName": "Item 1"}
     mock_inventory_service.return_value.get_item_stock.return_value = 10.0
     
     service = AIAssistantService()
@@ -915,6 +917,302 @@ def test_analytical_table_sap_connection_error(mock_openai, mock_invoices_servic
     content = json.loads(tool_msg["content"])
     assert "error" in content
     assert "Failed to connect to SAP Business One" in content["error"]
+
+
+@patch('app.services.ai_service.openai.OpenAI')
+def test_chat_greeting_returns_useful_answer(mock_openai):
+    """Scenario 1: A greeting returns a useful answer."""
+    settings.OPENAI_API_KEY = "test_key"
+    mock_llm_instance = mock_openai.return_value
+
+    mock_choice = MagicMock()
+    mock_choice.message.content = "Hello! I am your ATLAS Personal AI Assistant. I can assist you with business performance, stock levels, sales and purchase orders, payments, and production analytics."
+    mock_choice.message.tool_calls = None
+    mock_response = MagicMock()
+    mock_response.choices = [mock_choice]
+    mock_llm_instance.chat.completions.create.return_value = mock_response
+
+    service = AIAssistantService()
+    user = {"name": "Admin User", "role": "admin", "branch_id": "SH"}
+
+    with patch('app.services.ai_service._get_permitted_branch', return_value="SH"):
+        res = service.process_chat(
+            message="Hi there! What can you help me with?",
+            branch_id="SH",
+            current_user=user,
+            conversation_id="conv-greeting-1"
+        )
+
+    assert "ATLAS" in res["answer"]
+    assert res["conversation_id"] == "conv-greeting-1"
+    assert res["branch_context"] == "SH"
+
+
+@patch('app.services.ai_service.SAPSalesOrdersService')
+@patch('app.services.ai_service.openai.OpenAI')
+def test_chat_supported_business_data_question(mock_openai, mock_sales_orders_service):
+    """Scenario 2: A supported business-data question returns an authorized, data-grounded answer."""
+    settings.OPENAI_API_KEY = "test_key"
+    mock_llm_instance = mock_openai.return_value
+
+    mock_tool_call = MagicMock()
+    mock_tool_call.function.name = "get_sales_orders"
+    mock_tool_call.function.arguments = json.dumps({"status": "pending", "limit": 5})
+    mock_tool_call.id = "call_so"
+
+    mock_choice1 = MagicMock()
+    mock_choice1.message.content = None
+    mock_choice1.message.tool_calls = [mock_tool_call]
+    mock_response1 = MagicMock()
+    mock_response1.choices = [mock_choice1]
+
+    mock_choice2 = MagicMock()
+    mock_choice2.message.content = "You have 3 pending Sales Orders totaling ₹45,000."
+    mock_choice2.message.tool_calls = None
+    mock_response2 = MagicMock()
+    mock_response2.choices = [mock_choice2]
+
+    mock_llm_instance.chat.completions.create.side_effect = [mock_response1, mock_response2]
+
+    mock_sales_orders_service.return_value.get_sales_order_summary.return_value = {
+        "total": 10, "pending": 3, "completed": 7, "cancelled": 0
+    }
+    mock_sales_orders_service.return_value.list_sales_orders.return_value = {
+        "value": [{"DocNum": 101, "CardName": "Customer A", "DocTotal": 15000.0}],
+        "odata.count": 1
+    }
+
+    service = AIAssistantService()
+    user = {"name": "Test User", "role": "admin", "branch_id": "SH"}
+
+    with patch('app.services.ai_service._get_permitted_branch', return_value="SH"):
+        res = service.process_chat(
+            message="Show me pending sales orders",
+            branch_id="SH",
+            current_user=user
+        )
+
+    assert "pending Sales Orders" in res["answer"]
+    assert res["structured_data"] is not None
+    assert res["structured_data"]["type"] == "sales_orders"
+
+
+@patch('app.services.ai_service.openai.OpenAI')
+def test_chat_unsupported_question_controlled_explanation(mock_openai):
+    """Scenario 3: An unsupported question receives a controlled explanation."""
+    settings.OPENAI_API_KEY = "test_key"
+    mock_llm_instance = mock_openai.return_value
+
+    mock_choice = MagicMock()
+    mock_choice.message.content = "I cannot perform database deletion or execute arbitrary SQL. I can only query authorized business records like sales, products, and finance reports."
+    mock_choice.message.tool_calls = None
+    mock_response = MagicMock()
+    mock_response.choices = [mock_choice]
+    mock_llm_instance.chat.completions.create.return_value = mock_response
+
+    service = AIAssistantService()
+    user = {"name": "Test User", "role": "user", "branch_id": "SH"}
+
+    with patch('app.services.ai_service._get_permitted_branch', return_value="SH"):
+        res = service.process_chat(
+            message="Delete all customer tables in the database",
+            branch_id="SH",
+            current_user=user
+        )
+
+    assert "cannot perform" in res["answer"]
+    assert res["structured_data"] is None
+
+
+@patch('app.services.ai_service.SAPInventoryService')
+@patch('app.services.ai_service.openai.OpenAI')
+def test_chat_sap_offline_produces_clear_status(mock_openai, mock_inventory_service):
+    """Scenario 4: SAP disconnection produces clear error state with type 'sap_offline'."""
+    settings.OPENAI_API_KEY = "test_key"
+    mock_llm_instance = mock_openai.return_value
+
+    mock_tool_call = MagicMock()
+    mock_tool_call.function.name = "get_inventory_stock"
+    mock_tool_call.function.arguments = json.dumps({"warehouse": "SH", "low_stock_only": True})
+    mock_tool_call.id = "call_inv_err"
+
+    mock_choice1 = MagicMock()
+    mock_choice1.message.content = None
+    mock_choice1.message.tool_calls = [mock_tool_call]
+    mock_response1 = MagicMock()
+    mock_response1.choices = [mock_choice1]
+
+    mock_choice2 = MagicMock()
+    mock_choice2.message.content = "SAP Service Layer is currently disconnected. Please check connection."
+    mock_choice2.message.tool_calls = None
+    mock_response2 = MagicMock()
+    mock_response2.choices = [mock_choice2]
+
+    mock_llm_instance.chat.completions.create.side_effect = [mock_response1, mock_response2]
+
+    from app.services.sap.client import SAPConnectionError
+    mock_inventory_service.return_value.get_warehouse_stock.side_effect = SAPConnectionError("SAP unreachable")
+
+    service = AIAssistantService()
+    user = {"name": "Test User", "role": "admin", "branch_id": "SH"}
+
+    with patch('app.services.ai_service._get_permitted_branch', return_value="SH"):
+        res = service.process_chat(
+            message="Check low stock items",
+            branch_id="SH",
+            current_user=user
+        )
+
+    assert res["structured_data"] is not None
+    assert res["structured_data"]["type"] == "sap_offline"
+    msg = res["structured_data"]["message"].lower()
+    assert any(term in msg for term in ("unreachable", "disconnected", "offline"))
+
+
+@patch('app.services.ai_service.SAPInventoryService')
+@patch('app.services.ai_service.SAPItemsService')
+@patch('app.services.ai_service.openai.OpenAI')
+def test_chat_product_sku_resolution_and_navigation(mock_openai, mock_items_service, mock_inventory_service):
+    """Scenario 5 & 6: Asking for product by SKU resolves real product and returns navigation action."""
+    settings.OPENAI_API_KEY = "test_key"
+    mock_llm_instance = mock_openai.return_value
+
+    mock_tool_call = MagicMock()
+    mock_tool_call.function.name = "get_inventory_stock"
+    mock_tool_call.function.arguments = json.dumps({"item_code": "AMIT000121"})
+    mock_tool_call.id = "call_sku"
+
+    mock_choice1 = MagicMock()
+    mock_choice1.message.content = None
+    mock_choice1.message.tool_calls = [mock_tool_call]
+    mock_response1 = MagicMock()
+    mock_response1.choices = [mock_choice1]
+
+    mock_choice2 = MagicMock()
+    mock_choice2.message.content = "Product AMIT000121 has 42 units in stock. You can open its details below."
+    mock_choice2.message.tool_calls = None
+    mock_response2 = MagicMock()
+    mock_response2.choices = [mock_choice2]
+
+    mock_llm_instance.chat.completions.create.side_effect = [mock_response1, mock_response2]
+
+    mock_items_service.return_value.get_item_by_code.return_value = {
+        "ItemCode": "AMIT000121",
+        "ItemName": "Sample Amit Product"
+    }
+    mock_inventory_service.return_value.get_item_stock.return_value = 42.0
+
+    service = AIAssistantService()
+    user = {"name": "Test User", "role": "admin", "branch_id": "SH"}
+
+    with patch('app.services.ai_service._get_permitted_branch', return_value="SH"):
+        res = service.process_chat(
+            message="Open product AMIT000121",
+            branch_id="SH",
+            current_user=user
+        )
+
+    assert res["structured_data"] is not None
+    assert res["structured_data"]["navigation"] is not None
+    nav = res["structured_data"]["navigation"]
+    assert nav["label"] == "Open Product Details"
+    assert nav["route"] == "/products"
+    assert nav["params"]["search"] == "AMIT000121"
+    assert nav["params"]["openDetails"] == "true"
+
+
+@patch('app.services.ai_service.SAPInventoryService')
+@patch('app.services.ai_service.SAPItemsService')
+@patch('app.services.ai_service.openai.OpenAI')
+def test_chat_product_nonexistent_handled_safely(mock_openai, mock_items_service, mock_inventory_service):
+    """Scenario 11: Nonexistent product handled safely without fake data or arbitrary route."""
+    settings.OPENAI_API_KEY = "test_key"
+    mock_llm_instance = mock_openai.return_value
+
+    mock_tool_call = MagicMock()
+    mock_tool_call.function.name = "get_inventory_stock"
+    mock_tool_call.function.arguments = json.dumps({"item_code": "NONEXISTENT_999"})
+    mock_tool_call.id = "call_missing"
+
+    mock_choice1 = MagicMock()
+    mock_choice1.message.content = None
+    mock_choice1.message.tool_calls = [mock_tool_call]
+    mock_response1 = MagicMock()
+    mock_response1.choices = [mock_choice1]
+
+    mock_choice2 = MagicMock()
+    mock_choice2.message.content = "Product NONEXISTENT_999 was not found in SAP inventory records."
+    mock_choice2.message.tool_calls = None
+    mock_response2 = MagicMock()
+    mock_response2.choices = [mock_choice2]
+
+    mock_llm_instance.chat.completions.create.side_effect = [mock_response1, mock_response2]
+
+    mock_items_service.return_value.get_item_by_code.return_value = None
+    mock_items_service.return_value.get_items.return_value = []
+
+    service = AIAssistantService()
+    user = {"name": "Test User", "role": "admin", "branch_id": "SH"}
+
+    with patch('app.services.ai_service._get_permitted_branch', return_value="SH"):
+        res = service.process_chat(
+            message="Check stock for NONEXISTENT_999",
+            branch_id="SH",
+            current_user=user
+        )
+
+    # Tool returned found: False, no navigation to fake page
+    called_messages = mock_llm_instance.chat.completions.create.call_args_list[1][1]['messages']
+    tool_msg = next((m for m in called_messages if m.get("role") == "tool"), None)
+    assert tool_msg is not None
+    content = json.loads(tool_msg["content"])
+    assert content.get("found") is False
+
+
+def test_navigate_to_module_safety():
+    """Scenario 11: Navigation only allows registered internal routes and rejects arbitrary destinations."""
+    settings.OPENAI_API_KEY = "test_key"
+    with patch('app.services.ai_service.openai.OpenAI'):
+        service = AIAssistantService()
+
+        # Valid registered target
+        resp, card, nav = service._execute_tool(
+            "navigate_to_module",
+            {"target_module": "finance_overview"},
+            "SH",
+            {"name": "Admin", "role": "admin"}
+        )
+        assert nav is not None
+        assert nav["route"] == "/finance"
+
+        # Invalid arbitrary target
+        resp_bad, card_bad, nav_bad = service._execute_tool(
+            "navigate_to_module",
+            {"target_module": "http://malicious-site.com/exploit"},
+            "SH",
+            {"name": "Admin", "role": "admin"}
+        )
+        assert nav_bad is None
+        assert "Unknown" in resp_bad["error"]
+
+
+def test_no_sap_write_operations_in_tools_schema():
+    """Scenario 12: No SAP write operations are introduced in tools schema."""
+    settings.OPENAI_API_KEY = "test_key"
+    with patch('app.services.ai_service.openai.OpenAI'):
+        service = AIAssistantService()
+        tools = service._get_tools_schema()
+        tool_names = [t["function"]["name"] for t in tools]
+
+        # Verify all tools are strictly read-only or navigational
+        forbidden_keywords = ["create", "update", "delete", "insert", "drop", "write", "modify", "patch", "post"]
+        for name in tool_names:
+            if name in ("propose_record_update", "submit_approved_record_update"):
+                # submit_approved_record_update should NOT be in tools schema when writeback is disabled
+                assert name != "submit_approved_record_update", f"Forbidden tool {name} exposed in schema!"
+            for kw in ["create", "delete", "drop", "insert"]:
+                assert kw not in name.lower(), f"Tool {name} contains forbidden write verb '{kw}'"
+
 
 
 

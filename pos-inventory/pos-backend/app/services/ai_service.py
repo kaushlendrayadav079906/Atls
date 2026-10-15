@@ -863,6 +863,15 @@ class AIAssistantService:
         week_start = today - timedelta(days=6)
         yesterday = today - timedelta(days=1)
 
+        # Ensure message is present
+        if not message or not message.strip():
+            return {
+                "answer": "How can I assist you with ATLAS today?",
+                "conversation_id": conversation_id or str(uuid.uuid4()),
+                "branch_context": permitted_warehouse or default_wh,
+                "structured_data": None
+            }
+
         system_prompt = (
             f"You are ATLAS, the Personal AI Business Assistant for retail and manufacturing operations.\n"
             f"SYSTEM TIME CONTEXT:\n"
@@ -884,6 +893,14 @@ class AIAssistantService:
             f"2. Separate document types strictly: Sales Orders (open/closed customer commitments) are NOT Sales Invoices (financial revenue).\n"
             f"3. Never combine Sales Invoices with Purchase Orders or Credit Notes into one total.\n"
             f"4. If SAP returns 0 records, clearly state that no records match the filter; do not treat an empty response as an error, but distinguish API failures.\n"
+            f"5. If SAP is disconnected or data is unavailable, state clearly that SAP Service Layer is offline. NEVER report an outage as zero sales or zero business activity.\n\n"
+            f"SMART INTERNAL PAGE NAVIGATION & RECORD LOOKUP RULES:\n"
+            f"1. When the user asks to open, view, or navigate to a page, catalog, report, or business record (e.g., 'Open product AMIT000121', 'Show the products catalog', 'Open Sales Orders', 'Show Finance Overview', 'Open Production Orders', 'Take me to the customer details page'):\n"
+            f"   - Call navigate_to_module with the target module ID ('dashboard', 'products', 'sales', 'sales_orders', 'purchase_orders', 'customers', 'returns', 'analytics', 'production_orders', 'production_item_wise', 'production_rejection', 'reports_sales', 'reports_invoice', 'reports_payment', 'finance_overview', etc.).\n"
+            f"   - For individual products (e.g., 'Open product AMIT000121'), call get_inventory_stock(item_code='AMIT000121') to verify the real product in SAP and return navigate_to_module with target_module='products', record_id='AMIT000121', and label='Open Product Details'.\n"
+            f"   - If a product does not exist in SAP, clearly state that the item was not found in SAP inventory records.\n"
+            f"   - Always provide a clickable action link such as 'Open Product Details'.\n"
+            f"   - Never invent arbitrary URLs, nonexistent routes, or fake product IDs.\n\n"
             f"ADMIN-CONTROLLED INTELLIGENT FINANCE WORKSPACE RULES:\n"
             f"1. You are the intelligent interface for the ATLAS Finance module. Authorized administrators, finance managers, and accountants can analyze, search, navigate, inspect, and perform permitted updates directly through chat.\n"
             f"2. Read-Only Users: Can search, view reports, generate charts/tables, and navigate. Do NOT show or execute edits for read-only roles.\n"
@@ -964,14 +981,32 @@ class AIAssistantService:
                         continue
 
                     t_tool = time.perf_counter()
-                    tool_resp_content, card_data, nav = self._execute_tool(
-                        tool_name=fn_name,
-                        args=args,
-                        permitted_warehouse=permitted_warehouse,
-                        current_user=current_user
-                    )
+                    try:
+                        tool_resp_content, card_data, nav = self._execute_tool(
+                            tool_name=fn_name,
+                            args=args,
+                            permitted_warehouse=permitted_warehouse,
+                            current_user=current_user
+                        )
+                    except SAPConnectionError as sce:
+                        logger.error(f"SAP connection error in tool '{fn_name}': {sce}")
+                        tool_resp_content = {
+                            "error": "SAP Service Layer is currently disconnected or unreachable.",
+                            "status": "sap_disconnected"
+                        }
+                        card_data = {
+                            "type": "sap_offline",
+                            "message": "SAP Business One is currently disconnected or unreachable. Real-time business data is currently unavailable."
+                        }
+                        nav = None
+                    except Exception as te:
+                        logger.error(f"Tool '{fn_name}' execution error: {te}", exc_info=True)
+                        tool_resp_content = {"error": f"Failed to execute {fn_name}: {str(te)}"}
+                        card_data = None
+                        nav = None
+
                     tool_dur = (time.perf_counter() - t_tool) * 1000.0
-                    record_count = len(tool_resp_content.get("items") or tool_resp_content.get("products") or tool_resp_content.get("sample_orders") or tool_resp_content.get("rows") or [])
+                    record_count = len((tool_resp_content.get("items") if isinstance(tool_resp_content, dict) else None) or (tool_resp_content.get("products") if isinstance(tool_resp_content, dict) else None) or (tool_resp_content.get("sample_orders") if isinstance(tool_resp_content, dict) else None) or (tool_resp_content.get("rows") if isinstance(tool_resp_content, dict) else None) or [])
                     logger.info(f"[AI TIMING] Tool '{fn_name}' duration_ms={tool_dur:.2f} records={record_count}")
 
                     if card_data:
@@ -986,7 +1021,7 @@ class AIAssistantService:
                         "tool_call_id": tool_call.id,
                         "role": "tool",
                         "name": fn_name,
-                        "content": json.dumps(tool_resp_content)
+                        "content": json.dumps(tool_resp_content, default=str)
                     })
 
                 iteration += 1
@@ -1887,15 +1922,51 @@ class AIAssistantService:
                 low_stock_only = args.get("low_stock_only", False)
 
                 if item_code:
+                    item_code = str(item_code).strip()
+                    item_info = None
+                    try:
+                        item_info = self.items_service.get_item_by_code(item_code)
+                    except Exception as ex:
+                        logger.warning(f"Error checking item by code {item_code}: {ex}")
+
+                    if not item_info:
+                        try:
+                            search_results = self.items_service.get_items(search=item_code, top=5)
+                            if search_results:
+                                item_info = search_results[0]
+                                item_code = item_info.get("ItemCode", item_code)
+                        except Exception as ex:
+                            logger.warning(f"Error searching items for {item_code}: {ex}")
+
+                    if not item_info:
+                        return {
+                            "item_code": item_code,
+                            "found": False,
+                            "error": f"Product with code or SKU '{item_code}' does not exist in SAP inventory records."
+                        }, None, None
+
                     stock = self.inventory_service.get_item_stock(item_code, target_wh)
+                    item_name = item_info.get("ItemName") or item_code
                     card = {
                         "type": "inventory_stock",
                         "item_code": item_code,
+                        "item_name": item_name,
                         "stock": stock,
                         "meta": {"warehouse": target_wh}
                     }
-                    nav = {"label": "View in Products", "route": "/products", "target_module": "products", "params": {"search": item_code}}
-                    return {"item_code": item_code, "stock_quantity": stock, "warehouse": target_wh}, card, nav
+                    nav = {
+                        "label": "Open Product Details",
+                        "route": "/products",
+                        "target_module": "products",
+                        "params": {"search": item_code, "openDetails": "true"}
+                    }
+                    return {
+                        "item_code": item_code,
+                        "item_name": item_name,
+                        "stock_quantity": stock,
+                        "warehouse": target_wh,
+                        "found": True
+                    }, card, nav
                 else:
                     items = self.inventory_service.get_warehouse_stock(target_wh)
                     items_clean = [it for it in items if not it.get("_truncated")]
@@ -2693,24 +2764,43 @@ class AIAssistantService:
                     return {"error": f"Unknown module '{tgt}'"}, None, None
 
                 path = route_info["path"]
+                params = dict(args.get("params") or {})
+                label = args.get("label") or f"Open {route_info['name']}"
+
                 if args.get("record_id"):
-                    rec = args.get("record_id")
-                    if tgt in ("sales", "finance_sales_invoices"):
+                    rec = str(args.get("record_id")).strip()
+                    if tgt == "products":
+                        try:
+                            itm = self.items_service.get_item_by_code(rec)
+                            if itm:
+                                rec = itm.get("ItemCode", rec)
+                        except Exception:
+                            pass
+                        path = f"/products?search={rec}&openDetails=true"
+                        label = "Open Product Details"
+                    elif tgt in ("sales", "finance_sales_invoices"):
                         path = f"/sales/{rec}"
+                        label = f"Open Invoice #{rec}"
                     elif tgt == "finance_purchase_invoices":
                         path = f"/finance/purchase-invoices?id={rec}"
+                        label = f"Open Purchase Invoice #{rec}"
                     elif tgt == "finance_incoming_payments":
                         path = f"/finance/incoming-payments?id={rec}"
+                        label = f"Open Payment #{rec}"
+                    elif tgt == "customers":
+                        path = f"/customers?search={rec}"
+                        label = f"Open Customer Details ({rec})"
 
-                params = args.get("params") or {}
                 nav = {
                     "target_module": tgt,
-                    "label": args.get("label") or f"Open {route_info['name']}",
+                    "label": label,
                     "route": path,
                     "params": params
                 }
                 card = {
                     "type": "navigation",
+                    "route": path,
+                    "label": label,
                     "target": nav
                 }
                 return {"navigated": True, "route": path, "name": route_info["name"]}, card, nav

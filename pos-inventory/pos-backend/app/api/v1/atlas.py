@@ -115,9 +115,11 @@ def _filter_invoices_advanced(
 
 @router.get("/overview", response_model=AtlasOverview)
 async def get_overview(
-    range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time)$"),
+    range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time|custom)$"),
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
+    date_from: Optional[str] = Query(None, description="Alias for from_date"),
+    date_to: Optional[str] = Query(None, description="Alias for to_date"),
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
     customer: Optional[str] = Query(None, description="Filter by customer Code or Name"),
     category: Optional[str] = Query(None, description="Filter by product category"),
@@ -125,7 +127,9 @@ async def get_overview(
     current_user: dict = Depends(get_current_user),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
-    start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
+    start = from_date or date_from
+    end = to_date or date_to
+    start_date, end_date = _get_date_range_with_custom(range, start, end)
     
     cache_key = f"pos:atlas:overview:{range}:{start_date}:{end_date}:{target_branch or 'all'}:{customer or 'all'}:{category or 'all'}:{payment_method or 'all'}"
     cached = await cache_get(cache_key)
@@ -159,9 +163,11 @@ async def get_overview(
 
 @router.get("/sales-trends", response_model=DynamicSalesTrendResponse)
 async def get_sales_trends(
-    range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time)$"),
+    range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time|custom)$"),
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
+    date_from: Optional[str] = Query(None, description="Alias for from_date"),
+    date_to: Optional[str] = Query(None, description="Alias for to_date"),
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
     customer: Optional[str] = Query(None, description="Filter by customer Code or Name"),
     category: Optional[str] = Query(None, description="Filter by product category"),
@@ -169,7 +175,9 @@ async def get_sales_trends(
     current_user: dict = Depends(get_current_user),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
-    start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
+    start = from_date or date_from
+    end = to_date or date_to
+    start_date, end_date = _get_date_range_with_custom(range, start, end)
     
     cache_key = f"pos:atlas:trends:{range}:{start_date}:{end_date}:{target_branch or 'all'}:{customer or 'all'}:{category or 'all'}:{payment_method or 'all'}"
     cached = await cache_get(cache_key)
@@ -250,15 +258,19 @@ async def get_inventory_summary(
 
 @router.get("/branch-comparison", response_model=AtlasBranchComparison)
 async def get_branch_comparison(
-    range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time)$"),
+    range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time|custom)$"),
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
+    date_from: Optional[str] = Query(None, description="Alias for from_date"),
+    date_to: Optional[str] = Query(None, description="Alias for to_date"),
     current_user: dict = Depends(get_current_user),
 ):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Branch comparison is restricted to administrators.")
 
-    start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
+    start = from_date or date_from
+    end = to_date or date_to
+    start_date, end_date = _get_date_range_with_custom(range, start, end)
     
     try:
         loop = asyncio.get_running_loop()
@@ -288,14 +300,18 @@ async def get_branch_comparison(
 
 @router.get("/returns-summary", response_model=AtlasReturnsSummary)
 async def get_returns_summary(
-    range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time)$"),
+    range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time|custom)$"),
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
+    date_from: Optional[str] = Query(None, description="Alias for from_date"),
+    date_to: Optional[str] = Query(None, description="Alias for to_date"),
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
     current_user: dict = Depends(get_current_user),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
-    start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
+    start = from_date or date_from
+    end = to_date or date_to
+    start_date, end_date = _get_date_range_with_custom(range, start, end)
 
     try:
         loop = asyncio.get_running_loop()
@@ -330,9 +346,11 @@ from collections import defaultdict
 
 @router.get("/top-customers", response_model=List[AtlasTopCustomer])
 async def get_top_customers(
-    range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time)$"),
+    range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time|custom)$"),
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
+    date_from: Optional[str] = Query(None, description="Alias for from_date"),
+    date_to: Optional[str] = Query(None, description="Alias for to_date"),
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
     customer: Optional[str] = Query(None, description="Filter by customer Code or Name"),
     category: Optional[str] = Query(None, description="Filter by product category"),
@@ -341,7 +359,9 @@ async def get_top_customers(
     current_user: dict = Depends(get_current_user),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
-    start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
+    start = from_date or date_from
+    end = to_date or date_to
+    start_date, end_date = _get_date_range_with_custom(range, start, end)
     
     try:
         loop = asyncio.get_running_loop()
@@ -379,9 +399,11 @@ async def get_top_customers(
 
 @router.get("/product-velocity", response_model=List[AtlasProductVelocity])
 async def get_product_velocity(
-    range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time)$"),
+    range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time|custom)$"),
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
+    date_from: Optional[str] = Query(None, description="Alias for from_date"),
+    date_to: Optional[str] = Query(None, description="Alias for to_date"),
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
     customer: Optional[str] = Query(None, description="Filter by customer Code or Name"),
     category: Optional[str] = Query(None, description="Filter by product category"),
@@ -390,7 +412,9 @@ async def get_product_velocity(
     current_user: dict = Depends(get_current_user),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
-    start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
+    start = from_date or date_from
+    end = to_date or date_to
+    start_date, end_date = _get_date_range_with_custom(range, start, end)
     
     try:
         loop = asyncio.get_running_loop()

@@ -14,8 +14,10 @@ import {
     XCircle
 } from 'lucide-react';
 import { useMemo, useState, useEffect, type ReactNode } from 'react';
+import { useSearchParams, useParams } from 'react-router-dom';
 import { posApi } from '../api/pos';
 import { useDebounce } from '../hooks/useDebounce';
+import { useAIAssistant } from '../contexts/AIAssistantContext';
 import type { Product } from '../types/pos';
 
 const fallbackProducts: Product[] = [];
@@ -41,13 +43,35 @@ const money = new Intl.NumberFormat('en-IN', {
 });
 
 export const ProductsStockPage = () => {
-  const [search, setSearch] = useState('');
+  const [searchParams] = useSearchParams();
+  const params = useParams();
+  const { setPageFilters } = useAIAssistant();
+
+  const urlSearch = searchParams.get('search') || searchParams.get('sku') || params.id || '';
+  const urlOpenDetails = searchParams.get('openDetails') === 'true' || Boolean(params.id);
+
+  const [search, setSearch] = useState(urlSearch);
   const [filter, setFilter] = useState<'all' | 'low' | 'healthy'>('all');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(params.id || null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const debouncedSearch = useDebounce(search, 300);
+
+  // Sync with URL params changes
+  useEffect(() => {
+    if (urlSearch && urlSearch !== search) {
+      setSearch(urlSearch);
+    }
+  }, [urlSearch]);
+
+  // Sync page filters to AIAssistantContext
+  useEffect(() => {
+    setPageFilters({
+      search,
+      filter,
+    });
+  }, [search, filter, setPageFilters]);
 
   useEffect(() => {
     setPage(1);
@@ -74,6 +98,26 @@ export const ProductsStockPage = () => {
   });
 
   const baseProducts = Array.isArray(products) ? products : [];
+
+  // Auto-open product details modal if navigated with openDetails or product ID
+  useEffect(() => {
+    if (urlOpenDetails && baseProducts.length > 0 && !isModalOpen) {
+      const targetQuery = (urlSearch || selectedId || '').toLowerCase();
+      const matched = baseProducts.find(
+        (p) =>
+          p.id?.toLowerCase() === targetQuery ||
+          p.barcode?.toLowerCase() === targetQuery ||
+          p.name?.toLowerCase().includes(targetQuery)
+      );
+      if (matched) {
+        setSelectedId(matched.id);
+        setIsModalOpen(true);
+      } else if (baseProducts.length === 1) {
+        setSelectedId(baseProducts[0].id);
+        setIsModalOpen(true);
+      }
+    }
+  }, [urlOpenDetails, urlSearch, baseProducts]);
 
   const filteredProducts = useMemo(() => {
     return baseProducts.filter((product) => {

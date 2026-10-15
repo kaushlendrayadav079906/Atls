@@ -1,20 +1,25 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Bell, Check, Clock3, RefreshCcw, ShoppingBag, ShoppingCart, Sparkles,
   TrendingUp, TriangleAlert, Users, Package, FileText, ExternalLink, X,
-  ChevronRight, RotateCcw, Calendar, Minus, Maximize2, Send,
-  ChevronDown
+  ChevronRight, RotateCcw, Calendar, ChevronDown
 } from 'lucide-react';
-import { atlasApi, dashboardApi, aiAssistantApi } from '../api/endpoints';
+import { atlasApi, dashboardApi } from '../api/endpoints';
 import { useAuth } from '../contexts/AuthContext';
+import { useAIAssistant } from '../contexts/AIAssistantContext';
 import { useSystemHealth } from '../hooks/useSystemHealth';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
-import { AIChatRenderer } from '../components/AIChatRenderer';
-import { FormattedMessage } from '../components/FormattedMessage';
+import {
+  resolveDashboardDateRange,
+  validateCustomDateRange,
+  getDateScopeLabel,
+  type QuickFilter,
+  type DashboardPeriod
+} from '../utils/date';
 
 const money = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -36,65 +41,50 @@ export const Dashboard = () => {
   const role = user?.role?.toLowerCase();
   const isManagerOrAdmin = role === 'admin' || role === 'manager';
 
-  const [period, setPeriod] = useState<string>('daily');
-  const [chartPeriod, setChartPeriod] = useState<string>('yearly');
-  const [ordersPeriod, setOrdersPeriod] = useState<string>('yearly');
   const [branchId, setBranchId] = useState<string>(user?.branch_id || '');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Date Filter State (Matching Sales Orders Page reference)
-  type QuickFilter = 'today' | 'week' | 'month' | 'year' | 'custom' | '';
+  // Authoritative Shared Date Filter State across Dashboard
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('');
+  const [period, setPeriod] = useState<DashboardPeriod>('all_time');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [customError, setCustomError] = useState<string | null>(null);
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
 
   const applyQuickFilter = (filter: QuickFilter) => {
-    setQuickFilter(filter);
+    if (filter === 'custom') {
+      const validation = validateCustomDateRange(customFrom, customTo);
+      if (!validation.isValid) {
+        setCustomError(validation.error || 'Invalid date range');
+        return;
+      }
+      setCustomError(null);
+      const resolved = resolveDashboardDateRange('custom', customFrom, customTo);
+      setQuickFilter(resolved.quickFilter);
+      setPeriod(resolved.period);
+      setDateFrom(resolved.dateFrom);
+      setDateTo(resolved.dateTo);
+      setIsDateDropdownOpen(false);
+      return;
+    }
 
+    setCustomError(null);
+    const resolved = resolveDashboardDateRange(filter);
+    setQuickFilter(resolved.quickFilter);
+    setPeriod(resolved.period);
+    setDateFrom(resolved.dateFrom);
+    setDateTo(resolved.dateTo);
     if (!filter) {
-      setPeriod('all_time');
-      setDateFrom('');
-      setDateTo('');
       setCustomFrom('');
       setCustomTo('');
-      return;
+    } else {
+      setCustomFrom(resolved.dateFrom);
+      setCustomTo(resolved.dateTo);
     }
-
-    if (filter === 'custom') {
-      setPeriod('custom');
-      setDateFrom(customFrom);
-      setDateTo(customTo);
-      return;
-    }
-
-    // Map to period key for backend queries
-    if (filter === 'today') setPeriod('daily');
-    else if (filter === 'week') setPeriod('weekly');
-    else if (filter === 'month') setPeriod('monthly');
-    else if (filter === 'year') setPeriod('yearly');
-
-    const now = new Date();
-    const to = new Date();
-    let from = new Date(now);
-
-    if (filter === 'today') {
-      from = new Date(now);
-    } else if (filter === 'week') {
-      const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday as first day
-      from = new Date(now.setDate(diff));
-    } else if (filter === 'month') {
-      from = new Date(now.getFullYear(), now.getMonth(), 1);
-    } else if (filter === 'year') {
-      from = new Date(now.getFullYear(), 0, 1);
-    }
-
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    setDateFrom(`${from.getFullYear()}-${pad(from.getMonth() + 1)}-${pad(from.getDate())}`);
-    setDateTo(`${to.getFullYear()}-${pad(to.getMonth() + 1)}-${pad(to.getDate())}`);
+    setIsDateDropdownOpen(false);
   };
 
   useEffect(() => {
@@ -109,123 +99,27 @@ export const Dashboard = () => {
     return () => document.removeEventListener('click', handleOutsideClick);
   }, [isDateDropdownOpen]);
 
-  // AI Assistant Panel State
-  const [aiPanelOpen, setAiPanelOpen] = useState(true);
-  const [aiFullscreen, setAiFullscreen] = useState(false);
-  const [chatInput, setChatInput] = useState('');
-  const [chatHistory, setChatHistory] = useState<Array<{ role: string; content: string; structured_data?: any }>>([
-    {
-      role: 'assistant',
-      content: 'Hello! I am ATLAS AI Assistant. How can I help you analyze your business, sales, inventory, or customers today?'
-    }
-  ]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [loadingChat, setLoadingChat] = useState(false);
-  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const { setPageFilters } = useAIAssistant();
+
+  // Keep AIAssistantContext aware of dashboard active date and branch filters
+  useEffect(() => {
+    setPageFilters({
+      period,
+      branch: branchId,
+      date_from: dateFrom,
+      date_to: dateTo,
+      quick_filter: quickFilter,
+    });
+  }, [period, branchId, dateFrom, dateTo, quickFilter, setPageFilters]);
 
   // Quick Drilldown Drawer State (Level C)
   const [selectedSale, setSelectedSale] = useState<any | null>(null);
-
-  useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }
-  }, [chatHistory, aiPanelOpen]);
-
-  // Listen for AI prompt requests dispatched from Global Search Modal
-  useEffect(() => {
-    const handleAIPrompt = (e: any) => {
-      const prompt = e.detail;
-      if (prompt) {
-        setAiPanelOpen(true);
-        handleSendChat(prompt);
-      }
-    };
-    const handleToggleAI = () => {
-      setAiPanelOpen(prev => !prev);
-    };
-    window.addEventListener('atls-ai-prompt', handleAIPrompt);
-    window.addEventListener('atls-toggle-ai', handleToggleAI);
-    return () => {
-      window.removeEventListener('atls-ai-prompt', handleAIPrompt);
-      window.removeEventListener('atls-toggle-ai', handleToggleAI);
-    };
-  }, []);
-
-  // Send AI Chat Message
-  const handleSendChat = async (overridePrompt?: string) => {
-    const msgToSend = (overridePrompt || chatInput).trim();
-    if (!msgToSend || loadingChat) return;
-
-    setChatInput('');
-    setChatHistory(prev => [...prev, { role: 'user', content: msgToSend }]);
-    setLoadingChat(true);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
-
-    try {
-      const data = await aiAssistantApi.chat({
-        message: msgToSend,
-        branch_id: branchId || user?.branch_id || 'SH',
-        conversation_id: conversationId || undefined,
-        history: chatHistory.map(m => ({ role: m.role, content: m.content })),
-        context: {
-          page: 'dashboard',
-          period,
-          date_from: dateFrom,
-          date_to: dateTo
-        }
-      }, {
-        signal: controller.signal,
-        timeout: 45000
-      });
-      clearTimeout(timeoutId);
-
-      if (data.conversation_id) {
-        setConversationId(data.conversation_id);
-      }
-
-      setChatHistory(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: data.answer,
-          structured_data: data.structured_data,
-        },
-      ]);
-    } catch (err: any) {
-      clearTimeout(timeoutId);
-      let errMsg = 'Failed to communicate with AI Assistant. Please try again.';
-
-      if (err.name === 'CanceledError' || err.name === 'AbortError' || err.code === 'ECONNABORTED' || (err.message && err.message.includes('timeout'))) {
-        errMsg = 'The AI request timed out after 45 seconds. Please try again or refine your query.';
-      } else if (err?.response?.status === 402) {
-        errMsg = 'AI Provider quota exhausted: Your OpenAI/Gemini account credit balance has run out. Please check your billing at platform.openai.com.';
-      } else if (err?.response?.status === 504) {
-        errMsg = err?.response?.data?.detail || 'Request timed out on the backend server while contacting the AI service.';
-      } else if (err?.response?.data?.detail) {
-        errMsg = err.response.data.detail;
-      } else if (err.message) {
-        errMsg = err.message;
-      }
-
-      setChatHistory(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: errMsg,
-        },
-      ]);
-    } finally {
-      setLoadingChat(false);
-    }
-  };
 
   // ── Queries ─────────────────────────────────────────────────────────────
   const {
     data: summary,
     isLoading: loadingSummary,
+    isError: errorSummary,
     dataUpdatedAt: summaryUpdatedAt,
     refetch: refetchSummary,
   } = useQuery({
@@ -237,6 +131,7 @@ export const Dashboard = () => {
   const {
     data: recentSales,
     isLoading: loadingSales,
+    isError: errorSales,
     dataUpdatedAt: salesUpdatedAt,
     refetch: refetchSales,
   } = useQuery({
@@ -268,6 +163,7 @@ export const Dashboard = () => {
   const {
     data: topProducts,
     isLoading: loadingProducts,
+    isError: errorProducts,
     dataUpdatedAt: productsUpdatedAt,
     refetch: refetchProducts,
   } = useQuery({
@@ -279,24 +175,19 @@ export const Dashboard = () => {
   const {
     data: trendData,
     isLoading: loadingTrend,
+    isError: errorTrend,
     dataUpdatedAt: trendUpdatedAt,
     refetch: refetchTrend,
   } = useQuery({
-    queryKey: ['salesTrend', branchId, chartPeriod, dateFrom, dateTo],
-    queryFn: () => atlasApi.getSalesTrend(branchId, chartPeriod, undefined, undefined, undefined, dateFrom || undefined, dateTo || undefined),
+    queryKey: ['salesTrend', branchId, period, dateFrom, dateTo],
+    queryFn: () => atlasApi.getSalesTrend(branchId, period, undefined, undefined, undefined, dateFrom || undefined, dateTo || undefined),
     staleTime: 60 * 1000,
   });
 
-  const {
-    data: ordersTrendData,
-    isLoading: loadingOrdersTrend,
-    dataUpdatedAt: ordersTrendUpdatedAt,
-    refetch: refetchOrdersTrend,
-  } = useQuery({
-    queryKey: ['ordersTrend', branchId, ordersPeriod, dateFrom, dateTo],
-    queryFn: () => atlasApi.getSalesTrend(branchId, ordersPeriod, undefined, undefined, undefined, dateFrom || undefined, dateTo || undefined),
-    staleTime: 60 * 1000,
-  });
+  const loadingOrdersTrend = loadingTrend;
+  const errorOrdersTrend = errorTrend;
+  const ordersTrendUpdatedAt = trendUpdatedAt;
+  const refetchOrdersTrend = refetchTrend;
 
   const {
     data: inventoryRisk,
@@ -320,7 +211,6 @@ export const Dashboard = () => {
       refetchSales(),
       refetchProducts(),
       refetchTrend(),
-      refetchOrdersTrend(),
     ];
     if (isManagerOrAdmin) {
       refreshTasks.push(refetchAlerts(), refetchRisk());
@@ -337,14 +227,14 @@ export const Dashboard = () => {
   }, [trendData]);
 
   const ordersPoints = useMemo(() => {
-    if (ordersTrendData?.trend && Array.isArray(ordersTrendData.trend) && ordersTrendData.trend.length > 0) {
-      return ordersTrendData.trend.map((t: any) => ({
+    if (trendData?.trend && Array.isArray(trendData.trend) && trendData.trend.length > 0) {
+      return trendData.trend.map((t: any) => ({
         label: t.label || t.date || '',
         count: t.invoice_count ?? 0,
       }));
     }
     return [];
-  }, [ordersTrendData]);
+  }, [trendData]);
 
   const recentSalesList = useMemo(() => {
     if (recentSales?.items && Array.isArray(recentSales.items) && recentSales.items.length > 0) {
@@ -361,17 +251,39 @@ export const Dashboard = () => {
   }, [topProducts]);
 
   const hasCachedSummary = summary?.totalSales !== undefined;
-  const isSummaryLive = isSapConnected === true && hasCachedSummary;
-  const isSummaryCached = isSapConnected === false && hasCachedSummary;
-  const isSummaryUnavailable = !hasCachedSummary;
+  const isSummaryLive = isSapConnected === true && hasCachedSummary && !errorSummary;
+  const isSummaryCached = isSapConnected === false && hasCachedSummary && !errorSummary;
+  const isSummaryUnavailable = !hasCachedSummary || errorSummary;
 
-  const salesDisplayValue = hasCachedSummary
+  const salesDisplayValue = hasCachedSummary && !errorSummary
     ? money.format(summary.totalSales)
-    : (loadingSummary ? '...' : 'Unavailable');
+    : (loadingSummary ? '...' : errorSummary ? 'Error' : 'Unavailable');
 
-  const completedBillsCount = summary?.invoiceCount !== undefined
+  const completedBillsCount = summary?.invoiceCount !== undefined && !errorSummary
     ? summary.invoiceCount
-    : (loadingSummary ? '...' : 'Unavailable');
+    : (loadingSummary ? '...' : errorSummary ? 'Error' : 'Unavailable');
+
+  const salesKpiTitle = useMemo(() => {
+    switch (quickFilter) {
+      case 'today': return 'Sales Today';
+      case 'week': return 'Sales This Week';
+      case 'month': return 'Sales This Month';
+      case 'year': return 'Sales This Year';
+      case 'custom': return 'Sales (Custom)';
+      default: return 'Sales (All Dates)';
+    }
+  }, [quickFilter]);
+
+  const completedBillsKpiSubtitle = useMemo(() => {
+    switch (quickFilter) {
+      case 'today': return 'completed today';
+      case 'week': return 'completed this week';
+      case 'month': return 'completed this month';
+      case 'year': return 'completed this year';
+      case 'custom': return 'completed in range';
+      default: return 'completed all-time';
+    }
+  }, [quickFilter]);
 
   const pendingApprovalsCount = alerts
     ? alerts.filter((item: any) => item.status?.toLowerCase() === 'pending').length
@@ -388,11 +300,11 @@ export const Dashboard = () => {
     : (loadingRisk ? '...' : isRiskForbidden ? 'Restricted' : 'Unavailable');
 
   return (
-    <div className="flex flex-col lg:flex-row gap-5 items-start text-slate-900 pb-8 min-w-0 w-full transition-all duration-300">
+    <div className="flex min-w-0 flex-1 flex-col gap-4 text-slate-900 pb-8 w-full transition-all duration-300">
       {/* ────────────────────────────────────────────────────────────────────
           CENTER DASHBOARD CONTENT AREA
       ─────────────────────────────────────────────────────────────────────── */}
-      <div className={`flex min-w-0 flex-col gap-4 transition-all duration-300 ${aiPanelOpen ? 'flex-1 w-full lg:w-auto' : 'w-full flex-1'}`}>
+      <div className="flex min-w-0 flex-col gap-4 transition-all duration-300 w-full">
         {/* ROW 1: Heading, Branch Selector, Date Pills */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -425,11 +337,7 @@ export const Dashboard = () => {
               >
                 <Calendar className="w-3.5 h-3.5 text-slate-500" />
                 <span>
-                  {quickFilter ? (
-                    quickFilter === 'today' ? 'Today' :
-                      quickFilter === 'custom' ? (dateFrom && dateTo ? `${dateFrom} to ${dateTo}` : 'Custom Range') :
-                        `This ${quickFilter.charAt(0).toUpperCase() + quickFilter.slice(1)}`
-                  ) : 'All Dates (Total)'}
+                  {getDateScopeLabel(quickFilter, dateFrom, dateTo)}
                 </span>
                 <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isDateDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -437,7 +345,7 @@ export const Dashboard = () => {
               {isDateDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 shadow-xl rounded-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
                   <button
-                    onClick={() => { applyQuickFilter(''); setIsDateDropdownOpen(false); }}
+                    onClick={() => applyQuickFilter('')}
                     className={`w-full text-left px-4 py-2 text-sm transition-colors cursor-pointer ${quickFilter === '' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
                       }`}
                   >
@@ -451,7 +359,7 @@ export const Dashboard = () => {
                     return (
                       <button
                         key={f}
-                        onClick={() => { applyQuickFilter(f); setIsDateDropdownOpen(false); }}
+                        onClick={() => applyQuickFilter(f)}
                         className={`w-full text-left px-4 py-2 text-sm transition-colors cursor-pointer ${quickFilter === f ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
                           }`}
                       >
@@ -469,7 +377,10 @@ export const Dashboard = () => {
                         type="date"
                         className="w-full text-sm border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500"
                         value={customFrom}
-                        onChange={e => setCustomFrom(e.target.value)}
+                        onChange={e => {
+                          setCustomFrom(e.target.value);
+                          if (customError) setCustomError(null);
+                        }}
                       />
                     </div>
                     <div>
@@ -478,12 +389,18 @@ export const Dashboard = () => {
                         type="date"
                         className="w-full text-sm border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500"
                         value={customTo}
-                        onChange={e => setCustomTo(e.target.value)}
+                        onChange={e => {
+                          setCustomTo(e.target.value);
+                          if (customError) setCustomError(null);
+                        }}
                       />
                     </div>
+                    {customError && (
+                      <p className="text-[11px] text-rose-600 font-medium">{customError}</p>
+                    )}
                     <button
-                      disabled={!customFrom || !customTo}
-                      onClick={() => { applyQuickFilter('custom'); setIsDateDropdownOpen(false); }}
+                      disabled={!customFrom || !customTo || customFrom > customTo}
+                      onClick={() => applyQuickFilter('custom')}
                       className="w-full mt-2 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded font-medium text-sm transition-colors cursor-pointer"
                     >
                       Apply Custom
@@ -532,7 +449,11 @@ export const Dashboard = () => {
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-xs">
                 <ShoppingCart size={17} />
               </div>
-              {isSummaryLive ? (
+              {errorSummary ? (
+                <span className="rounded-md border border-rose-300 bg-rose-50/80 px-2 py-0.5 text-[10px] font-bold text-rose-700">
+                  ERROR
+                </span>
+              ) : isSummaryLive ? (
                 <span className="rounded-md border border-emerald-300 bg-emerald-50/80 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
                   LIVE
                 </span>
@@ -547,7 +468,7 @@ export const Dashboard = () => {
               )}
             </div>
             <div className="mt-2.5">
-              <div className="text-[11.5px] font-medium text-slate-500">Sales Today</div>
+              <div className="text-[11.5px] font-medium text-slate-500">{salesKpiTitle}</div>
               <div className="mt-0.5 flex items-baseline gap-1.5">
                 <span className="text-[21px] font-bold tracking-tight text-slate-900">
                   {loadingSummary ? '...' : salesDisplayValue}
@@ -561,9 +482,9 @@ export const Dashboard = () => {
             </div>
             <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400">
               <span>
-                {hasCachedSummary && summary?.invoiceCount !== undefined
+                {hasCachedSummary && summary?.invoiceCount !== undefined && !errorSummary
                   ? `${summary.invoiceCount} invoices`
-                  : (isSummaryUnavailable ? 'SAP sync required' : 'Invoices')}
+                  : (errorSummary ? 'API Error' : isSummaryUnavailable ? 'SAP sync required' : 'Invoices')}
               </span>
               <div className="flex items-center gap-0.5 text-sky-400">
                 <span className="inline-block h-2 w-0.5 bg-sky-400 rounded-full" />
@@ -580,7 +501,11 @@ export const Dashboard = () => {
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-white shadow-xs">
                 <Check size={18} strokeWidth={2.5} />
               </div>
-              {isSummaryLive ? (
+              {errorSummary ? (
+                <span className="rounded-md border border-rose-300 bg-rose-50/80 px-2 py-0.5 text-[10px] font-bold text-rose-700">
+                  ERROR
+                </span>
+              ) : isSummaryLive ? (
                 <span className="rounded-md border border-blue-200 bg-blue-50/80 px-2 py-0.5 text-[10px] font-bold text-blue-700">
                   BILLED
                 </span>
@@ -609,9 +534,9 @@ export const Dashboard = () => {
             </div>
             <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400">
               <span>
-                {hasCachedSummary && summary?.invoiceCount !== undefined
-                  ? `${summary.invoiceCount} completed`
-                  : (isSummaryUnavailable ? 'SAP sync required' : 'Completed')}
+                {hasCachedSummary && summary?.invoiceCount !== undefined && !errorSummary
+                  ? `${summary.invoiceCount} ${completedBillsKpiSubtitle}`
+                  : (errorSummary ? 'API Error' : isSummaryUnavailable ? 'SAP sync required' : 'Completed')}
               </span>
               <div className="flex items-center gap-0.5 text-blue-400">
                 <span className="inline-block h-2 w-0.5 bg-blue-400 rounded-full" />
@@ -734,7 +659,9 @@ export const Dashboard = () => {
                 <div className="flex items-center gap-2">
                   <TrendingUp size={16} className="text-blue-500" />
                   <span className="text-[14px] font-bold text-slate-900">Sales Overview</span>
-                  {trendPoints.length > 0 ? (
+                  {errorTrend ? (
+                    <span className="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">ERROR</span>
+                  ) : trendPoints.length > 0 ? (
                     isSapConnected ? (
                       <span className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.2 text-[9px] font-bold text-emerald-700">LIVE</span>
                     ) : (
@@ -751,18 +678,18 @@ export const Dashboard = () => {
 
                 {/* Period switcher */}
                 <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[10px] font-medium text-slate-600">
-                  {[
-                    { label: 'Today', key: 'daily' },
-                    { label: 'Week', key: 'weekly' },
-                    { label: 'Month', key: 'monthly' },
-                    { label: 'Year', key: 'yearly' },
-                    { label: 'Total', key: 'all_time' },
-                  ].map((p) => {
-                    const isActive = chartPeriod === p.key;
+                  {([
+                    { label: 'Today', key: 'today' },
+                    { label: 'Week', key: 'week' },
+                    { label: 'Month', key: 'month' },
+                    { label: 'Year', key: 'year' },
+                    { label: 'Total', key: '' },
+                  ] as const).map((p) => {
+                    const isActive = quickFilter === p.key;
                     return (
                       <button
                         key={p.label}
-                        onClick={() => setChartPeriod(p.key)}
+                        onClick={() => applyQuickFilter(p.key)}
                         className={`rounded-md px-2 py-0.5 transition-colors cursor-pointer ${isActive
                           ? 'bg-blue-600 text-white font-semibold'
                           : 'hover:text-slate-900 text-slate-600'
@@ -822,9 +749,11 @@ export const Dashboard = () => {
                 ) : (
                   <div className="h-full w-full flex flex-col items-center justify-center rounded-xl bg-slate-50/60 border border-dashed border-slate-200 p-4 text-center">
                     <TrendingUp size={24} className="text-slate-300 mb-2" />
-                    <p className="text-[12px] font-medium text-slate-600">Sales trend unavailable</p>
+                    <p className="text-[12px] font-medium text-slate-600">
+                      {errorTrend ? 'Failed to load sales trend' : 'Sales trend unavailable'}
+                    </p>
                     <p className="text-[10.5px] text-slate-400 mt-0.5">
-                      {isSapConnected === false ? 'SAP Service Layer is offline' : 'No sales records for selected period'}
+                      {errorTrend ? 'An error occurred while fetching trend data' : isSapConnected === false ? 'SAP Service Layer is offline' : 'No sales records for selected period'}
                     </p>
                     <button
                       onClick={() => refetchTrend()}
@@ -851,7 +780,9 @@ export const Dashboard = () => {
                 <div className="flex items-center gap-2">
                   <ShoppingBag size={16} className="text-purple-500" />
                   <span className="text-[14px] font-bold text-slate-900">Orders Overview</span>
-                  {ordersPoints.length > 0 ? (
+                  {errorOrdersTrend ? (
+                    <span className="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">ERROR</span>
+                  ) : ordersPoints.length > 0 ? (
                     isSapConnected ? (
                       <span className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.2 text-[9px] font-bold text-emerald-700">LIVE</span>
                     ) : (
@@ -868,18 +799,18 @@ export const Dashboard = () => {
 
                 {/* Period switcher */}
                 <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[10px] font-medium text-slate-600">
-                  {[
-                    { label: 'Today', key: 'daily' },
-                    { label: 'Week', key: 'weekly' },
-                    { label: 'Month', key: 'monthly' },
-                    { label: 'Year', key: 'yearly' },
-                    { label: 'Total', key: 'all_time' },
-                  ].map((p) => {
-                    const isActive = ordersPeriod === p.key;
+                  {([
+                    { label: 'Today', key: 'today' },
+                    { label: 'Week', key: 'week' },
+                    { label: 'Month', key: 'month' },
+                    { label: 'Year', key: 'year' },
+                    { label: 'Total', key: '' },
+                  ] as const).map((p) => {
+                    const isActive = quickFilter === p.key;
                     return (
                       <button
                         key={p.label}
-                        onClick={() => setOrdersPeriod(p.key)}
+                        onClick={() => applyQuickFilter(p.key)}
                         className={`rounded-md px-2 py-0.5 transition-colors cursor-pointer ${isActive
                           ? 'bg-blue-600 text-white font-semibold'
                           : 'hover:text-slate-900 text-slate-600'
@@ -930,12 +861,14 @@ export const Dashboard = () => {
                 ) : (
                   <div className="h-full w-full flex flex-col items-center justify-center rounded-xl bg-slate-50/60 border border-dashed border-slate-200 p-4 text-center">
                     <ShoppingBag size={24} className="text-slate-300 mb-2" />
-                    <p className="text-[12px] font-medium text-slate-600">Orders trend unavailable</p>
+                    <p className="text-[12px] font-medium text-slate-600">
+                      {errorOrdersTrend ? 'Failed to load orders trend' : 'Orders trend unavailable'}
+                    </p>
                     <p className="text-[10.5px] text-slate-400 mt-0.5">
-                      {isSapConnected === false ? 'SAP Service Layer is offline' : 'No orders for selected period'}
+                      {errorOrdersTrend ? 'An error occurred while fetching orders data' : isSapConnected === false ? 'SAP Service Layer is offline' : 'No orders for selected period'}
                     </p>
                     <button
-                      onClick={() => refetchTrend()}
+                      onClick={() => refetchOrdersTrend()}
                       className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-medium text-purple-600 hover:text-purple-700 bg-white border border-slate-200 rounded-md px-2.5 py-1 shadow-2xs hover:bg-slate-50 cursor-pointer"
                     >
                       <RefreshCcw size={10} />
@@ -961,7 +894,9 @@ export const Dashboard = () => {
               <div className="flex items-center gap-2">
                 <FileText size={16} className="text-blue-500" />
                 <span className="text-[14px] font-bold text-slate-900">Recent Sales</span>
-                {recentSalesList.length > 0 ? (
+                {errorSales ? (
+                  <span className="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">ERROR</span>
+                ) : recentSalesList.length > 0 ? (
                   isSapConnected ? (
                     <span className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.2 text-[9px] font-bold text-emerald-700">LIVE</span>
                   ) : (
@@ -1024,7 +959,7 @@ export const Dashboard = () => {
                       <td colSpan={6} className="py-8 text-center text-slate-400 text-[11px]">
                         <div className="flex flex-col items-center justify-center gap-1.5">
                           <FileText size={20} className="text-slate-300" />
-                          <span>{isSapConnected === false ? 'Recent sales feed unavailable (SAP offline)' : 'No recent sales recorded'}</span>
+                          <span>{errorSales ? 'Failed to fetch recent sales' : isSapConnected === false ? 'Recent sales feed unavailable (SAP offline)' : 'No recent sales recorded'}</span>
                           <button
                             onClick={() => refetchSales()}
                             className="mt-1 text-[11px] font-medium text-blue-600 hover:underline cursor-pointer"
@@ -1046,11 +981,13 @@ export const Dashboard = () => {
               <div className="flex items-center gap-2">
                 <Package size={16} className="text-emerald-500" />
                 <span className="text-[14px] font-bold text-slate-900">Top Products</span>
-                {topProductsList.length > 0 ? (
+                {errorProducts ? (
+                  <span className="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">ERROR</span>
+                ) : topProductsList.length > 0 ? (
                   isSapConnected ? (
                     <span className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.2 text-[9px] font-bold text-emerald-700">LIVE</span>
                   ) : (
-                    <span className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.2 text-[9px] font-bold text-amber-700" title={`Cached at ${formatTime(productsUpdatedAt)}`}>
+                    <span className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.2 text-[9px] font-bold text-amber-700" title={`Cached at ${formatTime(productsUpdatedAt)}`}>
                       CACHED
                     </span>
                   )
@@ -1102,7 +1039,7 @@ export const Dashboard = () => {
                       <td colSpan={4} className="py-8 text-center text-slate-400 text-[11px]">
                         <div className="flex flex-col items-center justify-center gap-1.5">
                           <Package size={20} className="text-slate-300" />
-                          <span>{isSapConnected === false ? 'Top products unavailable (SAP offline)' : 'No product velocity data'}</span>
+                          <span>{errorProducts ? 'Failed to fetch top products' : isSapConnected === false ? 'Top products unavailable (SAP offline)' : 'No product velocity data'}</span>
                           <button
                             onClick={() => refetchProducts()}
                             className="mt-1 text-[11px] font-medium text-emerald-600 hover:underline cursor-pointer"
@@ -1224,177 +1161,7 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* ────────────────────────────────────────────────────────────────────
-          RIGHT LARGE AI ASSISTANT PANEL (Matching Reference Screenshot)
-      ─────────────────────────────────────────────────────────────────────── */}
-      {aiPanelOpen ? (
-        <aside
-          className={`flex flex-col rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden transition-all duration-300 ${aiFullscreen
-            ? 'fixed inset-4 z-50 shadow-2xl h-[calc(100vh-32px)]'
-            : 'w-full xl:w-[400px] 2xl:w-[425px] shrink-0 h-[calc(100vh-100px)] sticky top-0'
-            }`}
-        >
-          {/* Panel Header - Google Gemini Signature Gradient Style */}
-          <div className="flex items-center justify-between border-b border-indigo-100/90 px-4 py-2.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-purple-50/90 shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs">
-                <Sparkles size={14} className="animate-pulse" />
-              </div>
-              <div>
-                <span className="text-[13.5px] font-black bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  ATLAS AI Assistant
-                </span>
-                <div className="text-[8.5px] font-bold text-indigo-500 tracking-wider uppercase">
-                  Business Intelligence
-                </div>
-              </div>
-              <span className="rounded-full bg-white/90 border border-indigo-200/80 px-2 py-0.5 text-[9px] font-bold text-indigo-700 tracking-wide shadow-2xs">
-                READ-ONLY SAP
-              </span>
-            </div>
 
-            <div className="flex items-center gap-1 text-slate-400">
-              <button
-                onClick={() => setAiPanelOpen(false)}
-                className="p-1 hover:text-slate-700 hover:bg-white/80 rounded-lg transition cursor-pointer"
-                title="Minimize / Collapse"
-              >
-                <Minus size={14} />
-              </button>
-              <button
-                onClick={() => setAiFullscreen(!aiFullscreen)}
-                className="p-1 hover:text-slate-700 hover:bg-white/80 rounded-lg transition cursor-pointer"
-                title="Fullscreen / Expand"
-              >
-                <Maximize2 size={13} />
-              </button>
-              <button
-                onClick={() => setAiPanelOpen(false)}
-                className="p-1 hover:text-slate-700 hover:bg-white/80 rounded-lg transition cursor-pointer"
-                title="Close"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-
-          {/* Scrollable Conversation Area with Ambient Gemini Tint */}
-          <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4 flex flex-col gap-3.5 bg-gradient-to-b from-indigo-50/20 via-white to-purple-50/20">
-            {/* Top Assistant Greeting */}
-            <div className="flex items-start gap-2.5">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs">
-                <Sparkles size={13} />
-              </div>
-              <div className="rounded-2xl rounded-tl-xs bg-white border border-indigo-100/90 p-3 text-[12px] text-slate-700 shadow-2xs leading-relaxed max-w-[90%]">
-                <span className="font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  Hello! I'm your ATLAS AI Assistant.
-                </span>
-                <p className="mt-1 text-[11.5px] text-slate-500">I can help you with:</p>
-                <ul className="mt-1 list-disc list-inside text-[11.5px] text-slate-600 space-y-0.5">
-                  <li>Check sales, inventory, customers</li>
-                  <li>Find data from SAP system</li>
-                  <li>Analyze business performance</li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Date Pill Divider */}
-            <div className="flex justify-center my-1">
-              <span className="rounded-full bg-slate-200/70 px-3 py-0.5 text-[10px] font-semibold text-slate-500">
-                Today
-              </span>
-            </div>
-
-            {/* Conversation Flow */}
-            {chatHistory.map((msg, i) => (
-              <div key={i} className={`flex items-start gap-2.5 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                {msg.role !== 'user' && (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs">
-                    <Sparkles size={13} />
-                  </div>
-                )}
-                <div
-                  className={`rounded-2xl p-3 text-[12px] leading-relaxed max-w-[88%] shadow-xs ${msg.role === 'user'
-                    ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-tr-xs'
-                    : 'bg-white text-slate-800 border border-indigo-100/90 rounded-tl-xs shadow-2xs'
-                    }`}
-                >
-                  <FormattedMessage content={msg.content} />
-                  <AIChatRenderer structuredData={msg.structured_data} />
-                </div>
-                {msg.role === 'user' && (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[10px] font-bold text-white shadow-xs">
-                    {user?.name ? user.name.split(' ').filter(Boolean).map((n: string) => n[0]).slice(0, 2).join('').toUpperCase() : 'KK'}
-                  </div>
-                )}
-              </div>
-            ))}
-
-            {loadingChat && (
-              <div className="flex items-start gap-2.5">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs animate-pulse">
-                  <Sparkles size={13} />
-                </div>
-                <div className="rounded-2xl rounded-tl-xs bg-white border border-indigo-100/90 p-2.5 text-[11px] text-indigo-700 font-medium shadow-2xs flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 animate-ping" />
-                  ATLAS AI is analyzing business records...
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Suggested Question Pills - Gemini Modern Gradient Pills */}
-          <div className="px-3 pt-2.5 pb-2 bg-gradient-to-r from-slate-50 via-indigo-50/25 to-purple-50/25 border-t border-indigo-100/80 flex flex-wrap gap-1.5 shrink-0">
-            {[
-              'Show sales by product',
-              'Compare with last year',
-              'Show top customers',
-              'List low stock items',
-              'Recent invoices',
-            ].map((prompt) => (
-              <button
-                key={prompt}
-                onClick={() => handleSendChat(prompt)}
-                className="rounded-xl border border-indigo-200/80 bg-white/95 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 hover:border-indigo-400 px-2.5 py-1 text-[10.5px] font-medium text-slate-700 hover:text-indigo-950 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 group"
-              >
-                <Sparkles size={10} className="text-indigo-500 group-hover:rotate-12 transition-transform shrink-0" />
-                <span>{prompt}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Bottom Fixed Message Input */}
-          <div className="p-3 bg-white border-t border-indigo-100/90 shrink-0">
-            <div className="flex items-center gap-2 rounded-2xl border border-indigo-200/90 bg-slate-50/50 p-1.5 shadow-xs focus-within:border-indigo-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
-                placeholder="Ask anything about your business..."
-                className="flex-1 bg-transparent px-2.5 text-[12px] text-slate-800 outline-none placeholder:text-slate-400"
-              />
-              <button
-                onClick={() => handleSendChat()}
-                disabled={loadingChat || !chatInput.trim()}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white disabled:opacity-40 transition cursor-pointer shadow-xs"
-                title="Send message"
-              >
-                <Send size={13} />
-              </button>
-            </div>
-          </div>
-        </aside>
-      ) : (
-        /* Floating Button to Re-open AI Assistant when collapsed */
-        <button
-          onClick={() => setAiPanelOpen(true)}
-          className="fixed right-5 bottom-6 z-40 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 px-4 py-2.5 text-[12px] font-semibold text-white shadow-[0_4px_20px_rgba(99,102,241,0.35)] transition-all cursor-pointer hover:shadow-[0_6px_25px_rgba(99,102,241,0.5)] hover:scale-[1.02] active:scale-[0.98]"
-        >
-          <Sparkles size={16} />
-          <span>Open ATLAS AI Assistant</span>
-        </button>
-      )}
 
       {/* ────────────────────────────────────────────────────────────────────
           LEVEL C: QUICK INVOICE INSPECTION DRAWER

@@ -35,7 +35,7 @@ import { OutgoingPaymentsPage } from './pages/finance/OutgoingPaymentsPage';
 import { CustomerAnalysisPage } from './pages/finance/CustomerAnalysisPage';
 import { SupplierAnalysisPage } from './pages/finance/SupplierAnalysisPage';
 import { ProfitabilityReportsPage } from './pages/finance/ProfitabilityReportsPage';
-
+import { AIAssistantProvider } from './contexts/AIAssistantContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,19 +68,21 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route 
-              path="/" 
-              element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Dashboard />} />
-              <Route path="products" element={<ProductsStockPage />} />
+          <AIAssistantProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route 
+                path="/" 
+                element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Dashboard />} />
+                <Route path="products" element={<ProductsStockPage />} />
+                <Route path="products/:id" element={<ProductsStockPage />} />
               <Route path="customers" element={<CustomersPage />} />
               <Route path="pos" element={<PosCheckoutPage />} />
               <Route path="sales" element={<SalesList />} />
@@ -123,7 +125,8 @@ function App() {
               <Route path="*" element={<div className="p-8 text-center text-gray-500">Coming soon</div>} />
             </Route>
           </Routes>
-        </BrowserRouter>
+        </AIAssistantProvider>
+      </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
   );

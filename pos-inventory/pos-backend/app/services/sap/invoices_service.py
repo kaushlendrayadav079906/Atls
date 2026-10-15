@@ -748,22 +748,28 @@ class SAPInvoicesService:
 
     def get_invoices_by_date(
         self,
-        start_date: date,
+        start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> List[Dict[str, Any]]:
         """
         Get invoices for a date range using header fields only.
 
         Paginates with $skip to handle ranges that exceed SAP's 100-row Prefer cap.
+        If start_date and end_date are None, retrieves without date restriction.
         """
         try:
-            if not end_date:
-                end_date = start_date
+            filter_str = None
+            if start_date and end_date:
+                start_str = start_date.strftime("%Y-%m-%d")
+                end_str = end_date.strftime("%Y-%m-%d")
+                filter_str = f"DocDate ge '{start_str}' and DocDate le '{end_str}'"
+            elif start_date:
+                start_str = start_date.strftime("%Y-%m-%d")
+                filter_str = f"DocDate ge '{start_str}'"
+            elif end_date:
+                end_str = end_date.strftime("%Y-%m-%d")
+                filter_str = f"DocDate le '{end_str}'"
 
-            start_str = start_date.strftime("%Y-%m-%d")
-            end_str = end_date.strftime("%Y-%m-%d")
-
-            filter_str = f"DocDate ge '{start_str}' and DocDate le '{end_str}'"
             page_size = 100
             all_invoices: List[Dict[str, Any]] = []
             skip = 0
@@ -774,13 +780,14 @@ class SAPInvoicesService:
 
             while len(all_invoices) < _MAX_INVOICES_PER_DATE_RANGE:
                 top = min(page_size, _MAX_INVOICES_PER_DATE_RANGE - len(all_invoices))
-                params = {
-                    "$filter": filter_str,
+                params: Dict[str, Any] = {
                     "$orderby": "DocDate desc, DocEntry desc",
                     "$select": header_select,
                     "$top": top,
                     "$skip": skip,
                 }
+                if filter_str:
+                    params["$filter"] = filter_str
                 response = self.client.get("Invoices", params)
                 page = response.get("value", [])
                 if not page:
@@ -791,13 +798,15 @@ class SAPInvoicesService:
                 skip += len(page)
 
             if len(all_invoices) >= _MAX_INVOICES_PER_DATE_RANGE:
-                probe = self.client.get("Invoices", {
-                    "$filter": filter_str,
+                probe_params: Dict[str, Any] = {
                     "$orderby": "DocDate desc, DocEntry desc",
                     "$select": header_select,
                     "$top": 1,
                     "$skip": _MAX_INVOICES_PER_DATE_RANGE,
-                })
+                }
+                if filter_str:
+                    probe_params["$filter"] = filter_str
+                probe = self.client.get("Invoices", probe_params)
                 if probe.get("value"):
                     raise RuntimeError(
                         f"Invoice query exceeds the configured limit of {_MAX_INVOICES_PER_DATE_RANGE} documents."
@@ -811,7 +820,7 @@ class SAPInvoicesService:
 
     def get_invoices_by_date_with_lines(
         self,
-        start_date: date,
+        start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         max_line_rows: int = 20000,
         page_size: int = 1000,
@@ -823,7 +832,7 @@ class SAPInvoicesService:
 
         line_rows = self._get_invoice_lines_by_date(
             start_date,
-            end_date or start_date,
+            end_date,
             max_rows=max_line_rows,
             page_size=page_size,
         )
@@ -834,19 +843,18 @@ class SAPInvoicesService:
 
     def _get_invoice_lines_by_date(
         self,
-        start_date: date,
-        end_date: date,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
         max_rows: int = 20000,
         page_size: int = 1000,
     ) -> List[Dict[str, Any]]:
         """Fetch invoice line rows via QueryService crossjoin for a date range."""
-        start_str = start_date.strftime("%Y-%m-%d")
-        end_str = end_date.strftime("%Y-%m-%d")
-        filter_str = (
-            "Invoices/DocEntry eq Invoices/DocumentLines/DocEntry"
-            f" and Invoices/DocDate ge '{start_str}'"
-            f" and Invoices/DocDate le '{end_str}'"
-        )
+        filter_parts = ["Invoices/DocEntry eq Invoices/DocumentLines/DocEntry"]
+        if start_date:
+            filter_parts.append(f"Invoices/DocDate ge '{start_date.strftime('%Y-%m-%d')}'")
+        if end_date:
+            filter_parts.append(f"Invoices/DocDate le '{end_date.strftime('%Y-%m-%d')}'")
+        filter_str = " and ".join(filter_parts)
         return self._query_crossjoin_lines(filter_str, max_rows=max_rows, page_size=page_size)
 
     def _get_invoice_lines_by_doc_entries(
