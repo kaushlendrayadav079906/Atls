@@ -216,9 +216,9 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
 
   return (
     <aside
-      className={`flex flex-col rounded-2xl border border-indigo-200/80 bg-white shadow-lg shadow-indigo-500/5 overflow-hidden transition-all duration-300 ring-1 ring-indigo-500/10 ${isFullscreen
-        ? 'fixed inset-4 z-50 shadow-2xl h-[calc(100vh-32px)]'
-        : 'w-full lg:w-[390px] xl:w-[410px] 2xl:w-[425px] shrink-0 h-[calc(100vh-100px)] sticky top-0'
+      className={`flex flex-col rounded-2xl border border-indigo-200/80 bg-white/95 backdrop-blur-md shadow-2xl shadow-indigo-900/15 overflow-hidden transition-all duration-300 ring-1 ring-indigo-500/15 z-50 ${isFullscreen
+        ? 'fixed inset-4 shadow-2xl h-[calc(100vh-32px)]'
+        : 'fixed right-3 sm:right-5 top-16 sm:top-[70px] bottom-3 sm:bottom-4 w-[calc(100vw-24px)] sm:w-[400px] xl:w-[425px] 2xl:w-[440px]'
         } ${className}`}
     >
       {/* Panel Header - Google Gemini Signature Gradient Style */}

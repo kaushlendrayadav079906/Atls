@@ -655,30 +655,33 @@ export const Layout = () => {
 
           return (
             <main className="flex min-w-0 flex-1 flex-col overflow-hidden relative bg-[#f0f6ff]">
-              <div className="flex-1 overflow-y-auto overflow-x-hidden w-full flex flex-col transition-all duration-300">
+              <div
+                className={`flex-1 overflow-y-auto overflow-x-hidden flex flex-col transition-all duration-300 ${
+                  aiOpen
+                    ? 'w-full lg:w-[calc(100%-425px)] xl:w-[calc(100%-450px)] 2xl:w-[calc(100%-465px)]'
+                    : 'w-full'
+                }`}
+              >
                 <div
-                  className={`flex-1 w-full flex flex-col lg:flex-row ${
-                    isFullBleedPage ? 'p-0' : 'p-4 sm:p-5 gap-6'
-                  } items-start transition-all duration-300`}
+                  className={`flex-1 w-full ${
+                    isFullBleedPage ? 'p-0' : 'p-4 sm:p-5'
+                  } transition-all duration-300`}
                 >
-                  <div className="flex-1 min-w-0 w-full">
-                    <Outlet />
-                  </div>
-
-                  {aiOpen && (
-                    <div className={isFullBleedPage ? 'p-4 sm:p-6 shrink-0 w-full lg:w-auto' : 'shrink-0'}>
-                      <AIAssistantPanel
-                        pageContext={getPageContext(location.pathname)}
-                        isOpen={aiOpen}
-                        onClose={() => setAiOpen(false)}
-                      />
-                    </div>
-                  )}
+                  <Outlet />
                 </div>
 
                 {/* ── ATLAS Global Footer (Full-Width Light Blue Design across all pages) ── */}
                 <AtlasGlobalFooter />
               </div>
+
+              {/* Floating Fixed AI Assistant Panel when open */}
+              {aiOpen && (
+                <AIAssistantPanel
+                  pageContext={getPageContext(location.pathname)}
+                  isOpen={aiOpen}
+                  onClose={() => setAiOpen(false)}
+                />
+              )}
 
               {/* Draggable Floating AI Assistant Launcher across all pages when panel is closed */}
               {!aiOpen && (
