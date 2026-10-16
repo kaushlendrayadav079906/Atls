@@ -141,19 +141,19 @@ export const ProductionOverviewPage = () => {
       {/* HEADER */}
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <h1 className="text-[26px] font-bold leading-none tracking-tight text-slate-900">Production Overview</h1>
-          <p className="mt-1.5 text-[13px] text-slate-500">Monitor and manage your production orders, output, rejections and performance.</p>
+          <h1 className="atlas-page-title text-[28px] sm:text-[32px] md:text-[34px] font-bold leading-tight tracking-tight text-slate-900">Production Overview</h1>
+          <p className="mt-1.5 atlas-page-subtitle text-[14px] sm:text-[15px] text-slate-500 font-medium">Monitor and manage your production orders, output, rejections and performance.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Branch indicator */}
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13.5px] sm:text-[14px] font-semibold text-slate-700 shadow-sm">
             <Factory size={16} />
             {branchId ? `Branch: ${branchId}` : 'All Branches'}
           </div>
 
           {/* Date Selector */}
-          <div className="flex bg-white rounded-lg border border-slate-200 overflow-hidden text-[13px] font-medium">
+          <div className="flex bg-white rounded-xl border border-slate-200 overflow-hidden text-[13.5px] sm:text-[14px] font-semibold shadow-sm">
             {(['today', 'week', 'month', 'year', 'total'] as const).map((r) => (
               <button
                 key={r}
@@ -169,7 +169,7 @@ export const ProductionOverviewPage = () => {
 
           <button
             onClick={handleRefresh}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition"
             title="Refresh Data"
           >
             <RefreshCcw size={16} />
@@ -253,8 +253,8 @@ export const ProductionOverviewPage = () => {
             {/* Graph 1: Production Trend */}
             <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col relative">
               <div className="mb-4">
-                <h2 className="text-base font-semibold">Production Trend</h2>
-                <p className="text-[13px] text-slate-500 mt-0.5">Planned vs Produced vs Rejected Quantity</p>
+                <h2 className="atlas-section-title text-lg sm:text-[20px] font-bold text-slate-900">Production Trend</h2>
+                <p className="text-[13.5px] sm:text-[14px] text-slate-500 mt-0.5">Planned vs Produced vs Rejected Quantity</p>
               </div>
               <div className="flex-1 min-h-[300px]">
                 {loadingTrend ? (
@@ -306,8 +306,8 @@ export const ProductionOverviewPage = () => {
             {/* Graph 2: Status Distribution */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
               <div className="mb-6">
-                <h2 className="text-base font-semibold">Production Order Status</h2>
-                <p className="text-[13px] text-slate-500 mt-0.5">Distribution of production orders by status</p>
+                <h2 className="atlas-section-title text-lg sm:text-[20px] font-bold text-slate-900">Production Order Status</h2>
+                <p className="text-[13.5px] sm:text-[14px] text-slate-500 mt-0.5">Distribution of production orders by status</p>
               </div>
               <div className="flex-1 flex flex-col justify-center">
                 {loadingStatus ? (
@@ -371,11 +371,11 @@ export const ProductionOverviewPage = () => {
             {/* Recent Orders */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
               <div className="p-5 border-b border-slate-100 flex justify-between items-center">
-                <h2 className="text-base font-semibold">Recent Production Orders</h2>
+                <h2 className="atlas-section-title text-lg sm:text-[20px] font-bold text-slate-900">Recent Production Orders</h2>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="bg-slate-50 text-slate-500 font-medium">
+                <table className="w-full text-left text-[13.5px] sm:text-[14px] whitespace-nowrap">
+                  <thead className="bg-slate-50 text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500">
                     <tr>
                       <th className="px-5 py-3">Order No.</th>
                       <th className="px-5 py-3">Item</th>
@@ -462,11 +462,11 @@ export const ProductionOverviewPage = () => {
             {/* Production by Warehouse */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
               <div className="p-5 border-b border-slate-100">
-                <h2 className="text-base font-semibold">Production by Warehouse</h2>
+                <h2 className="atlas-section-title text-lg sm:text-[20px] font-bold text-slate-900">Production by Warehouse</h2>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="bg-slate-50 text-slate-500 font-medium">
+                <table className="w-full text-left text-[13.5px] sm:text-[14px] whitespace-nowrap">
+                  <thead className="bg-slate-50 text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500">
                     <tr>
                       <th className="px-5 py-3">Warehouse</th>
                       <th className="px-5 py-3 text-right">Planned</th>
@@ -505,11 +505,11 @@ export const ProductionOverviewPage = () => {
             {/* Top Produced Items */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden lg:col-span-2">
               <div className="p-5 border-b border-slate-100">
-                <h2 className="text-base font-semibold">Top Produced Items</h2>
+                <h2 className="atlas-section-title text-lg sm:text-[20px] font-bold text-slate-900">Top Produced Items</h2>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm whitespace-nowrap">
-                  <thead className="bg-slate-50 text-slate-500 font-medium">
+                <table className="w-full text-left text-[13.5px] sm:text-[14px] whitespace-nowrap">
+                  <thead className="bg-slate-50 text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500">
                     <tr>
                       <th className="px-5 py-3 w-16">Rank</th>
                       <th className="px-5 py-3">Item</th>
@@ -572,17 +572,17 @@ const KpiCard = ({ title, value, icon, bgColor, suffix, loading, tooltip }: {
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-medium text-slate-500 truncate" title={tooltip}>{title}</p>
+        <p className="atlas-card-title text-[13px] sm:text-[13.5px] font-bold uppercase tracking-wider text-slate-500 truncate" title={tooltip}>{title}</p>
         <div className="mt-1 flex items-baseline gap-2">
           {loading ? (
             <Skeleton className="h-7 w-20" />
           ) : (
-            <h3 className="text-2xl font-bold text-slate-900 truncate">
+            <h3 className="atlas-kpi-val text-2xl sm:text-[27px] font-black tracking-tight text-slate-900 truncate">
               {value}
             </h3>
           )}
           {suffix && !loading && (
-            <span className="text-sm font-medium text-slate-500">{suffix}</span>
+            <span className="text-[13px] sm:text-[14px] font-bold text-slate-600">{suffix}</span>
           )}
         </div>
       </div>

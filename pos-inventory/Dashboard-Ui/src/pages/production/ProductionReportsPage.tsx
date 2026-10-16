@@ -167,23 +167,23 @@ export const ProductionReportsPage = () => {
       {/* HEADER */}
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <h1 className="text-[26px] font-bold leading-none tracking-tight text-slate-900">Production Reports</h1>
-          <p className="mt-1.5 text-[13px] text-slate-500">Generate and export production reports using real SAP data.</p>
+          <h1 className="atlas-page-title text-[28px] sm:text-[32px] md:text-[34px] font-bold leading-tight tracking-tight text-slate-900">Production Reports</h1>
+          <p className="mt-1.5 atlas-page-subtitle text-[14px] sm:text-[15px] text-slate-500 font-medium">Generate and export production reports using real SAP data.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700">
-            <Factory size={16} />
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13.5px] sm:text-[14px] font-semibold text-slate-700 shadow-sm">
+            <Factory size={18} className="text-blue-600" />
             {branchId ? `Branch: ${branchId}` : 'All Branches'}
           </div>
 
-          <div className="flex bg-white rounded-lg border border-slate-200 overflow-hidden text-[13px] font-medium">
+          <div className="flex bg-white rounded-xl border border-slate-200 overflow-hidden text-[13.5px] sm:text-[14px] font-semibold shadow-sm">
             {(['today', 'week', 'month', 'year', 'total'] as const).map((r) => (
               <button
                 key={r}
                 onClick={() => handleDateChange(r)}
-                className={`px-3 py-2 border-r border-slate-200 last:border-none transition-colors ${
-                  dateRange === r ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50'
+                className={`px-3.5 py-2 border-r border-slate-200 last:border-none transition-colors ${
+                  dateRange === r ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 {r.charAt(0).toUpperCase() + r.slice(1)}
@@ -191,39 +191,38 @@ export const ProductionReportsPage = () => {
             ))}
           </div>
 
-
           <button
             onClick={handleRefresh}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition"
             title="Refresh Data"
           >
-            <RefreshCcw size={16} />
+            <RefreshCcw size={18} />
           </button>
         </div>
       </div>
 
       {/* FILTER BAR */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center">
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-slate-700">Warehouse:</label>
+      <div className="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center">
+        <div className="flex items-center gap-2.5">
+          <label className="text-[13.5px] sm:text-[14px] font-bold text-slate-700">Warehouse:</label>
           <input
             type="text"
             placeholder="Warehouse filter..."
             value={warehouseFilter}
             onChange={(e) => setWarehouseFilter(e.target.value)}
-            className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
+            className="px-3.5 py-2 border border-slate-200 rounded-xl text-[14px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 w-52 shadow-sm"
           />
         </div>
 
         <button
           onClick={handleResetFilters}
-          className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
+          className="px-4 py-2 text-[13.5px] sm:text-[14px] font-bold text-slate-700 hover:bg-slate-50 border border-slate-200 rounded-xl shadow-sm transition-colors"
         >
           Reset Filters
         </button>
 
-        <div className="ml-auto text-sm text-slate-500 flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-md border border-slate-100">
-          <AlertCircle size={14} className="text-blue-500" />
+        <div className="ml-auto text-[13.5px] sm:text-[14px] text-slate-600 flex items-center gap-2 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-100 font-medium">
+          <AlertCircle size={16} className="text-blue-600" />
           <span>Selected range: <strong>{date_from || 'Any'}</strong> to <strong>{date_to || 'Any'}</strong></span>
         </div>
       </div>
@@ -238,11 +237,11 @@ export const ProductionReportsPage = () => {
                   <FileText size={20} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900">{report.title}</h3>
-                  <div className="text-[12px] font-medium text-slate-500 mt-0.5">Source: {report.dataSource}</div>
+                  <h3 className="text-[16px] sm:text-[17px] font-bold text-slate-900">{report.title}</h3>
+                  <div className="text-[12.5px] font-semibold text-slate-500 mt-0.5">Source: {report.dataSource}</div>
                 </div>
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed min-h-[60px]">
+              <p className="text-[14px] text-slate-600 leading-relaxed min-h-[60px]">
                 {report.description}
               </p>
             </div>
@@ -251,9 +250,9 @@ export const ProductionReportsPage = () => {
               <div className="flex gap-2">
                 <button
                   onClick={() => handlePreview(report.route)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-[13.5px] font-bold text-slate-700 hover:bg-slate-50 hover:text-blue-600 shadow-sm transition-colors"
                 >
-                  <Eye size={14} />
+                  <Eye size={15} />
                   Preview
                 </button>
                 
@@ -261,13 +260,13 @@ export const ProductionReportsPage = () => {
                   onClick={() => handleExport(report.id)}
                   disabled={!report.supportsExport || exportingId === report.id}
                   title={report.supportsExport ? "Export to CSV" : "Export is not currently supported"}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 border rounded-lg text-[13.5px] font-bold shadow-sm transition-colors ${
                     report.supportsExport && exportingId !== report.id
                       ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" 
                       : "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
                   }`}
                 >
-                  <Download size={14} className={exportingId === report.id ? "animate-bounce" : ""} />
+                  <Download size={15} className={exportingId === report.id ? "animate-bounce" : ""} />
                   {exportingId === report.id ? 'Exporting...' : 'Export'}
                 </button>
               </div>

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, X, Package, Users, FileText, LayoutDashboard,
   Sparkles, ArrowRight, CornerDownLeft, RotateCcw,
-  BarChart3, Factory, Settings, ShoppingCart
+  BarChart3, Factory, Settings, ShoppingCart, Mail
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 
@@ -24,6 +24,9 @@ interface NavDestination {
 
 const STATIC_DESTINATIONS: NavDestination[] = [
   { id: 'nav-dash', title: 'Dashboard', category: 'Navigation', path: '/', icon: LayoutDashboard, keywords: ['home', 'overview', 'kpi', 'metrics'] },
+  { id: 'nav-product-hub', title: 'Product & Operations Hub', category: 'Navigation', path: '/product', icon: Package, keywords: ['product', 'products', 'inventory', 'stock', 'pos', 'sales', 'orders', 'customers'] },
+  { id: 'nav-solutions-hub', title: 'Solutions Hub (Production & Finance)', category: 'Navigation', path: '/solutions', icon: Factory, keywords: ['solutions', 'production', 'manufacturing', 'finance', 'accounting', 'payments'] },
+  { id: 'nav-reports-hub', title: 'Reports Hub & Analytics', category: 'Navigation', path: '/reports', icon: FileText, keywords: ['reports', 'reporting', 'analytics', 'bi', 'sales report', 'invoices', 'inventory report'] },
   { id: 'nav-pos', title: 'Point of Sale (POS)', category: 'Operations', path: '/pos', icon: ShoppingCart, keywords: ['checkout', 'billing', 'cashier', 'new sale'] },
   { id: 'nav-products', title: 'Products & Inventory', category: 'Operations', path: '/products', icon: Package, keywords: ['items', 'catalog', 'stock', 'pricing'] },
   { id: 'nav-sales', title: 'Sales & Invoices', category: 'Operations', path: '/sales', icon: FileText, keywords: ['invoices', 'bills', 'orders', 'transactions'] },
@@ -36,6 +39,7 @@ const STATIC_DESTINATIONS: NavDestination[] = [
   { id: 'nav-sales-rep', title: 'Sales Reports', category: 'Reports', path: '/reports/sales', icon: BarChart3, keywords: ['revenue', 'daily report', 'summary'] },
   { id: 'nav-inv-rep', title: 'Invoice Reports', category: 'Reports', path: '/reports/invoice', icon: FileText, keywords: ['gst', 'tax invoice', 'billing report'] },
   { id: 'nav-stock-rep', title: 'Inventory Reports', category: 'Reports', path: '/reports/inventory', icon: Package, keywords: ['low stock', 'valuation', 'warehouse'] },
+  { id: 'nav-contact', title: 'Contact & Support', category: 'Navigation', path: '/contact', icon: Mail, keywords: ['contact', 'support', 'help', 'email', 'inquiries', 'connect'] },
   { id: 'nav-settings', title: 'Settings & Users', category: 'Navigation', path: '/settings', icon: Settings, keywords: ['admin', 'branches', 'roles', 'config'] },
 ];
 
@@ -274,8 +278,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Input Bar */}
-        <div className="flex items-center px-4 py-3.5 border-b border-slate-200 gap-3 bg-white">
-          <Search className="h-5 w-5 text-blue-600 shrink-0" />
+        <div className="flex items-center px-4 py-4 border-b border-slate-200 gap-3 bg-white">
+          <Search className="h-5.5 w-5.5 text-blue-600 shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -285,10 +289,10 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
               setSelectedIndex(0);
             }}
             placeholder="Search products, customers, invoices, pages, or ask a question..."
-            className="flex-1 text-[14px] text-slate-900 placeholder:text-slate-400 bg-transparent outline-none"
+            className="flex-1 text-[15px] sm:text-[16px] text-slate-900 placeholder:text-slate-400 bg-transparent outline-none font-medium"
           />
           {loading && (
-            <div className="flex items-center gap-1 text-[11px] text-blue-600 font-medium animate-pulse">
+            <div className="flex items-center gap-1.5 text-[13px] text-blue-600 font-semibold animate-pulse">
               <span>Searching...</span>
             </div>
           )}
@@ -301,20 +305,20 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
               }}
               className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100"
             >
-              <X className="h-4 w-4" />
+              <X className="h-4.5 w-4.5" />
             </button>
           )}
           <button
             onClick={onClose}
-            className="rounded px-2 py-1 text-[11px] font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200"
+            className="rounded px-2.5 py-1 text-[12px] font-bold text-slate-500 bg-slate-100 hover:bg-slate-200"
           >
             ESC
           </button>
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 px-4 py-2 bg-slate-50 border-b border-slate-200 overflow-x-auto text-[11px] font-medium text-slate-600">
-          <span className="text-slate-400 mr-1 text-[10px] uppercase font-bold tracking-wider">Filter:</span>
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200 overflow-x-auto text-[13px] font-semibold text-slate-600">
+          <span className="text-slate-400 mr-1 text-[11.5px] uppercase font-bold tracking-wider">Filter:</span>
           {(['all', 'pages', 'products', 'customers', 'invoices'] as const).map(tab => (
             <button
               key={tab}
@@ -322,9 +326,9 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 setActiveTab(tab);
                 setSelectedIndex(0);
               }}
-              className={`px-2.5 py-1 rounded-lg capitalize transition-colors ${
+              className={`px-3 py-1.5 rounded-lg capitalize transition-colors ${
                 activeTab === tab 
-                  ? 'bg-blue-600 text-white font-semibold shadow-sm' 
+                  ? 'bg-blue-600 text-white font-bold shadow-sm' 
                   : 'hover:bg-slate-200 text-slate-600'
               }`}
             >
@@ -336,16 +340,16 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         {/* Results List */}
         <div ref={listRef} className="flex-1 overflow-y-auto p-2 divide-y divide-slate-100 max-h-[460px]">
           {error && (
-            <div className="p-3 my-2 text-xs text-amber-700 bg-amber-50 rounded-lg border border-amber-200">
+            <div className="p-3 my-2 text-[13.5px] text-amber-700 bg-amber-50 rounded-lg border border-amber-200 font-medium">
               {error}
             </div>
           )}
 
           {flatItems.length === 0 && !loading && (
             <div className="py-12 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
-              <Search className="h-8 w-8 text-slate-300" />
-              <p className="text-sm font-medium">No results found for "{query}"</p>
-              <p className="text-xs text-slate-400">Try searching for product names, customer phone numbers, invoice IDs, or routes.</p>
+              <Search className="h-9 w-9 text-slate-300" />
+              <p className="text-[15px] font-bold text-slate-700">No results found for "{query}"</p>
+              <p className="text-[13.5px] text-slate-500">Try searching for product names, customer phone numbers, invoice IDs, or routes.</p>
             </div>
           )}
 
@@ -356,14 +360,14 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 key={item.id}
                 onClick={item.action}
                 onMouseEnter={() => setSelectedIndex(idx)}
-                className={`group flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${
+                className={`group flex items-center justify-between px-3.5 py-3 rounded-xl cursor-pointer transition-colors ${
                   isSelected 
                     ? 'bg-blue-50/80 border border-blue-200' 
                     : 'hover:bg-slate-50 border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                     item.type === 'ai' 
                       ? 'bg-purple-100 text-purple-600'
                       : item.type === 'product'
@@ -374,17 +378,17 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                       ? 'bg-sky-100 text-sky-700'
                       : 'bg-blue-100 text-blue-700'
                   }`}>
-                    {item.type === 'ai' && <Sparkles className="h-4 w-4" />}
-                    {item.type === 'product' && <Package className="h-4 w-4" />}
-                    {item.type === 'customer' && <Users className="h-4 w-4" />}
-                    {item.type === 'invoice' && <FileText className="h-4 w-4" />}
-                    {item.type === 'page' && <LayoutDashboard className="h-4 w-4" />}
+                    {item.type === 'ai' && <Sparkles className="h-4.5 w-4.5" />}
+                    {item.type === 'product' && <Package className="h-4.5 w-4.5" />}
+                    {item.type === 'customer' && <Users className="h-4.5 w-4.5" />}
+                    {item.type === 'invoice' && <FileText className="h-4.5 w-4.5" />}
+                    {item.type === 'page' && <LayoutDashboard className="h-4.5 w-4.5" />}
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[13px] font-semibold text-slate-900 truncate">
+                    <div className="text-[14.5px] font-bold text-slate-900 truncate">
                       {item.title}
                     </div>
-                    <div className="text-[11px] text-slate-500 truncate">
+                    <div className="text-[13px] text-slate-500 font-medium truncate">
                       {item.subtitle}
                     </div>
                   </div>
@@ -392,7 +396,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
                 <div className="flex items-center gap-2 shrink-0 ml-3">
                   {item.badge && (
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+                    <span className={`text-[12px] font-bold px-2.5 py-1 rounded-md ${
                       item.type === 'ai' 
                         ? 'bg-purple-100 text-purple-700'
                         : item.type === 'product'
@@ -407,9 +411,9 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                     </span>
                   )}
                   {isSelected ? (
-                    <CornerDownLeft className="h-3.5 w-3.5 text-blue-600" />
+                    <CornerDownLeft className="h-4 w-4 text-blue-600" />
                   ) : (
-                    <ArrowRight className="h-3.5 w-3.5 text-slate-300 opacity-0 group-hover:opacity-100" />
+                    <ArrowRight className="h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100" />
                   )}
                 </div>
               </div>
@@ -418,19 +422,19 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         </div>
 
         {/* Footer info */}
-        <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500">
+        <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-200 text-[12.5px] sm:text-[13px] text-slate-600 font-medium">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 text-[10px] font-semibold bg-white border border-slate-200 rounded">↑</kbd>
-              <kbd className="px-1.5 py-0.5 text-[10px] font-semibold bg-white border border-slate-200 rounded">↓</kbd>
+              <kbd className="px-1.5 py-0.5 text-[11px] font-bold bg-white border border-slate-200 rounded">↑</kbd>
+              <kbd className="px-1.5 py-0.5 text-[11px] font-bold bg-white border border-slate-200 rounded">↓</kbd>
               Navigate
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 text-[10px] font-semibold bg-white border border-slate-200 rounded">↵</kbd>
+              <kbd className="px-1.5 py-0.5 text-[11px] font-bold bg-white border border-slate-200 rounded">↵</kbd>
               Open
             </span>
           </div>
-          <span className="text-[10px] text-slate-400">
+          <span className="text-[12px] text-slate-500 font-medium">
             Real SAP & ATLS database queries
           </span>
         </div>

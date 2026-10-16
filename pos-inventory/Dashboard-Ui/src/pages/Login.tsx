@@ -155,19 +155,19 @@ export const Login = () => {
                     </svg>
                   </div>
                   <div className="flex flex-col items-start">
-                    <span className="text-[24px] font-black tracking-tight text-[#0c1f3d] leading-none">Atls</span>
-                    <span className="text-[11px] font-bold text-[#0c1f3d]">POS Inventory</span>
+                    <span className="text-[26px] font-black tracking-tight text-[#0c1f3d] leading-none">Atls</span>
+                    <span className="text-[12.5px] font-bold text-[#0c1f3d]">POS Inventory</span>
                   </div>
                 </div>
 
-                <h1 className="mt-6 text-[28px] font-black tracking-tight text-[#0b1f46]">Welcome Back</h1>
-                <p className="mt-2 text-[14px] text-slate-500 max-w-[300px]">
+                <h1 className="mt-6 text-[30px] sm:text-[32px] font-black tracking-tight text-[#0b1f46]">Welcome Back</h1>
+                <p className="mt-2 text-[14.5px] sm:text-[15px] font-medium text-slate-500 max-w-[320px]">
                   Sign in to access your POS Inventory dashboard and manage your retail operations.
                 </p>
               </div>
 
               {error && (
-                <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700 font-medium">
                   <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
                   <span>{error}</span>
                 </div>
@@ -175,30 +175,30 @@ export const Login = () => {
 
               <form onSubmit={handleSubmit} className="mt-8 space-y-5">
                 <div>
-                  <label className="mb-1.5 block text-[13px] font-bold text-[#0b1f46]">Email or Username</label>
+                  <label className="mb-1.5 block text-[14px] font-bold text-[#0b1f46]">Email or Username</label>
                   <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    <Mail className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500" />
                     <input
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
                       type="text"
                       placeholder="Enter your email or username"
-                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-[#0e6fe9] focus:ring-1 focus:ring-[#0e6fe9]"
+                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-[14.5px] font-medium outline-none transition focus:border-[#0e6fe9] focus:ring-1 focus:ring-[#0e6fe9]"
                       disabled={loading}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-[13px] font-bold text-[#0b1f46]">Password</label>
+                  <label className="mb-1.5 block text-[14px] font-bold text-[#0b1f46]">Password</label>
                   <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    <Lock className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500" />
                     <input
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
-                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-11 text-sm outline-none transition focus:border-[#0e6fe9] focus:ring-1 focus:ring-[#0e6fe9] font-medium tracking-widest placeholder:tracking-normal"
+                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-11 text-[14.5px] outline-none transition focus:border-[#0e6fe9] focus:ring-1 focus:ring-[#0e6fe9] font-medium tracking-widest placeholder:tracking-normal"
                       disabled={loading}
                     />
                     <button
@@ -206,32 +206,32 @@ export const Login = () => {
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-600"
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-[13px] font-semibold text-[#0b1f46]">
+                <div className="flex items-center justify-between text-[14px] font-semibold text-[#0b1f46]">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-[#0e6fe9] focus:ring-[#0e6fe9]" defaultChecked />
+                    <input type="checkbox" className="h-4.5 w-4.5 rounded border-slate-300 text-[#0e6fe9] focus:ring-[#0e6fe9]" defaultChecked />
                     <span>Remember me</span>
                   </label>
-                  <Link to="/register" className="text-[#0e6fe9] hover:underline">Forgot password?</Link>
+                  <Link to="/register" className="text-[#0e6fe9] hover:underline font-bold">Forgot password?</Link>
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0c6ce8] py-3.5 text-[15px] font-bold text-white transition hover:bg-[#0b5fd0] disabled:opacity-70"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0c6ce8] py-3.5 text-[15.5px] font-bold text-white transition hover:bg-[#0b5fd0] disabled:opacity-70 shadow-sm"
                 >
                   <span>{loading ? 'Signing in...' : 'Sign in'}</span>
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="h-4.5 w-4.5" />
                 </button>
               </form>
 
               <div className="mt-6 flex items-center justify-center gap-4">
                 <div className="h-px flex-1 bg-slate-200" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Or continue with</span>
+                <span className="text-[12px] font-bold uppercase tracking-wider text-slate-500">Or continue with</span>
                 <div className="h-px flex-1 bg-slate-200" />
               </div>
 
@@ -239,9 +239,9 @@ export const Login = () => {
                 {['Google', 'Microsoft', 'SSO'].map((label) => (
                   <button
                     key={label}
-                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-[13px] font-bold text-slate-600 transition hover:bg-slate-50"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-[14px] font-bold text-slate-600 transition hover:bg-slate-50"
                   >
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[10px] font-black text-[#0b1f46]">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-black text-[#0b1f46]">
                       {label.charAt(0)}
                     </span>
                     {label}
@@ -249,7 +249,7 @@ export const Login = () => {
                 ))}
               </div>
 
-              <div className="mt-8 text-center text-[13px] font-medium text-slate-500">
+              <div className="mt-8 text-center text-[14px] font-medium text-slate-500">
                 Don’t have an account?{' '}
                 <Link to="/register" className="font-bold text-[#0e6fe9] hover:underline">Create account</Link>
               </div>
@@ -257,8 +257,8 @@ export const Login = () => {
 
             {/* Registration Promo Card (Right) */}
             <div className="hidden xl:block w-[320px] rounded-3xl bg-white p-8 shadow-[0_10px_40px_rgba(0,0,0,0.06)] border border-slate-100">
-              <h2 className="text-[22px] font-black tracking-tight text-[#0b1f46]">New to Atls?</h2>
-              <p className="mt-2 text-[13px] font-medium text-slate-500">Create your account to get started.</p>
+              <h2 className="text-[24px] font-black tracking-tight text-[#0b1f46]">New to Atls?</h2>
+              <p className="mt-2 text-[14px] font-medium text-slate-500">Create your account to get started.</p>
 
               <div className="mt-8 space-y-6">
                 {[
@@ -269,11 +269,11 @@ export const Login = () => {
                 ].map(({ title, subtitle, icon: Icon }) => (
                   <div key={title} className="flex items-start gap-4">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#edf3ff] text-[#0e6fe9]">
-                      <Icon className="h-4 w-4" />
+                      <Icon className="h-4.5 w-4.5" />
                     </div>
                     <div className="pt-0.5">
-                      <div className="text-[14px] font-bold text-[#0b1f46]">{title}</div>
-                      <div className="mt-0.5 text-[12px] font-medium text-slate-500">{subtitle}</div>
+                      <div className="text-[14.5px] font-bold text-[#0b1f46]">{title}</div>
+                      <div className="mt-0.5 text-[13px] font-medium text-slate-500">{subtitle}</div>
                     </div>
                   </div>
                 ))}
@@ -281,11 +281,11 @@ export const Login = () => {
 
               <Link
                 to="/register"
-                className="mt-10 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[#edf3ff] bg-white py-3 text-[14px] font-bold text-[#0e6fe9] transition hover:bg-[#edf3ff]"
+                className="mt-10 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[#edf3ff] bg-white py-3.5 text-[14.5px] font-bold text-[#0e6fe9] transition hover:bg-[#edf3ff]"
               >
-                <User className="h-4 w-4" />
+                <User className="h-4.5 w-4.5" />
                 <span>Create Account</span>
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-4.5 w-4.5" />
               </Link>
             </div>
 

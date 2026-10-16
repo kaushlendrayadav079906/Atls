@@ -191,15 +191,15 @@ export const PaymentReportPage = () => {
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center justify-between">
           <div className="flex items-start gap-3">
-            <div className="mt-1 p-2 bg-blue-50 text-blue-600 rounded-lg">
+            <div className="mt-1 p-2.5 bg-blue-50 text-blue-600 rounded-xl">
               <FileText className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Payment Report</h1>
-              <p className="mt-0.5 text-[13px] text-slate-500">View and analyze payment transactions, methods and collection details.</p>
+              <h1 className="atlas-page-title text-[28px] sm:text-[32px] font-bold tracking-tight text-slate-900">Payment Report</h1>
+              <p className="mt-1 atlas-page-subtitle text-sm sm:text-[15px] text-slate-500">View and analyze payment transactions, methods and collection details.</p>
             </div>
           </div>
-          <button className="flex items-center gap-2 rounded-lg bg-[#0052cc] px-4 py-2 text-[13px] font-medium text-white shadow-sm hover:bg-blue-700 transition-colors">
+          <button className="flex items-center gap-2 rounded-xl bg-[#0052cc] px-4.5 py-2.5 text-[13.5px] font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors cursor-pointer">
             <Download className="h-4 w-4" />
             Export
             <ChevronDown className="h-3.5 w-3.5 ml-1 opacity-70" />
@@ -212,7 +212,7 @@ export const PaymentReportPage = () => {
             <button 
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={cn("px-5 py-2.5 text-[13px] font-medium rounded-t-lg transition-all border",
+              className={cn("px-5 py-3 text-[14px] font-semibold rounded-t-xl transition-all border cursor-pointer",
                 activeTab === tab 
                   ? "bg-[#0052cc] text-white border-[#0052cc]" 
                   : "bg-white text-slate-600 border-slate-200 border-b-0 hover:bg-slate-50"
@@ -223,18 +223,18 @@ export const PaymentReportPage = () => {
           ))}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 rounded-tl-none -mt-7 relative z-10 space-y-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 rounded-tl-none -mt-7 relative z-10 space-y-6">
           {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {kpis.map((card, i) => (
-              <div key={i} className="rounded-xl border border-slate-100 bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4.5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div className="flex items-start gap-3 mb-3">
-                  <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", card.bg)}>
-                    <card.icon className="h-5 w-5" />
+                  <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", card.bg)}>
+                    <card.icon className="h-5.5 w-5.5" />
                   </div>
                   <div>
-                    <p className="text-[12px] font-medium text-slate-500 mb-0.5">{card.title}</p>
-                    <div className="text-[20px] font-bold text-slate-900">
+                    <p className="text-[13px] sm:text-[13.5px] font-semibold text-slate-500 mb-0.5">{card.title}</p>
+                    <div className="text-[24px] sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
                       {loadingOverview ? <Loader2 className="h-4 w-4 animate-spin text-slate-300" /> : card.val}
                     </div>
                   </div>
@@ -243,10 +243,10 @@ export const PaymentReportPage = () => {
                   <div className="flex flex-col">
                     {card.trend && (
                       <>
-                        <span className={cn("text-[12px] font-semibold", card.isNegative ? "text-red-500" : "text-emerald-500")}>
+                        <span className={cn("text-[12px] font-bold", card.isNegative ? "text-red-500" : "text-emerald-500")}>
                           {card.trend}
                         </span>
-                        <span className="text-[10px] text-slate-400">vs. previous period</span>
+                        <span className="text-[11.5px] text-slate-400">vs. previous period</span>
                       </>
                     )}
                   </div>
@@ -304,13 +304,13 @@ export const PaymentReportPage = () => {
               </div>
             </div>
             <div>
-              <label className="mb-1.5 block text-[12px] font-medium text-slate-700">Payment Status</label>
+              <label className="mb-1.5 block text-[13.5px] font-semibold text-slate-700">Payment Status</label>
               <div className="relative">
                 <CheckCircle2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <select 
                   value={pendingFilters.paymentStatus || ''}
                   onChange={(e) => setPendingFilters(p => ({ ...p, paymentStatus: e.target.value || undefined }))}
-                  className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-8 text-[12px] text-slate-700 focus:border-[#0052cc] focus:ring-1 focus:ring-[#0052cc] focus:outline-none"
+                  className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-8 text-[13.5px] text-slate-700 focus:border-[#0052cc] focus:ring-1 focus:ring-[#0052cc] focus:outline-none"
                 >
                   <option value="">All Status</option>
                 </select>
@@ -318,10 +318,10 @@ export const PaymentReportPage = () => {
               </div>
             </div>
             <div>
-              <label className="mb-1.5 block text-[12px] font-medium text-slate-700">Customer</label>
+              <label className="mb-1.5 block text-[13.5px] font-semibold text-slate-700">Customer</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <select className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-8 text-[12px] text-slate-700 focus:border-[#0052cc] focus:ring-1 focus:ring-[#0052cc] focus:outline-none">
+                <select className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-8 text-[13.5px] text-slate-700 focus:border-[#0052cc] focus:ring-1 focus:ring-[#0052cc] focus:outline-none">
                   <option value="">All Customers</option>
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
@@ -330,13 +330,13 @@ export const PaymentReportPage = () => {
             <div className="flex items-center gap-2">
               <button 
                 onClick={applyFilters}
-                className="flex-[2] rounded-lg bg-[#0052cc] px-4 py-2.5 text-[13px] font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
+                className="flex-[2] rounded-lg bg-[#0052cc] px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors"
               >
                 Apply Filters
               </button>
               <button 
                 onClick={resetFilters}
-                className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Reset
               </button>
@@ -350,12 +350,12 @@ export const PaymentReportPage = () => {
           {/* Method Distribution */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-[15px] font-bold text-slate-800 flex items-center gap-2">
+              <h3 className="text-[16px] sm:text-[17px] font-bold text-slate-800 flex items-center gap-2">
                 <FileText className="h-4 w-4 text-[#0052cc]" />
                 Payment Method Distribution
               </h3>
               <div className="relative">
-                <select className="appearance-none bg-transparent border border-slate-200 rounded-lg text-[12px] px-3 py-1.5 pr-8 outline-none focus:border-[#0052cc] text-slate-600">
+                <select className="appearance-none bg-transparent border border-slate-200 rounded-lg text-[13px] px-3 py-1.5 pr-8 outline-none focus:border-[#0052cc] text-slate-600 font-medium">
                   <option>This Month</option>
                 </select>
                 <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
@@ -371,15 +371,15 @@ export const PaymentReportPage = () => {
                 <StateMessage type="empty" message="No payment data available for the selected filters." />
               ) : (
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-8 h-full w-full px-4">
-                  <div className="h-[200px] w-[200px] relative">
+                  <div className="h-[210px] w-[210px] relative">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
                           data={pieData}
                           cx="50%"
                           cy="50%"
-                          innerRadius={65}
-                          outerRadius={95}
+                          innerRadius={68}
+                          outerRadius={100}
                           paddingAngle={2}
                           dataKey="value"
                           stroke="none"
@@ -393,24 +393,24 @@ export const PaymentReportPage = () => {
                             const percent = totalDistributionAmount > 0 ? ((Number(val) / totalDistributionAmount) * 100).toFixed(1) + '%' : '0%';
                             return [`${fmt(Number(val))} (${percent})`, 'Amount'];
                           }}
-                          contentStyle={{ borderRadius: '8px', fontSize: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                          contentStyle={{ borderRadius: '8px', fontSize: '13px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                         />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <div className="text-[18px] font-bold text-slate-900">{fmt(totalDistributionAmount)}</div>
-                      <div className="text-[11px] text-slate-500">Total Payments</div>
+                      <div className="text-[20px] font-bold text-slate-900">{fmt(totalDistributionAmount)}</div>
+                      <div className="text-[12.5px] font-medium text-slate-500">Total Payments</div>
                     </div>
                   </div>
                   <div className="flex flex-col gap-3 flex-1">
                     {pieData.map((item, i) => {
                        const pct = totalDistributionAmount > 0 ? ((item.value / totalDistributionAmount) * 100).toFixed(1) + '%' : '0%';
                        return (
-                        <div key={i} className="flex items-center text-[13px] w-full">
+                        <div key={i} className="flex items-center text-[13.5px] w-full">
                           <div className="w-2.5 h-2.5 rounded-full mr-3 shrink-0" style={{ backgroundColor: item.color }} />
-                          <span className="text-slate-600 w-32 shrink-0">{item.name}</span>
+                          <span className="text-slate-600 w-32 shrink-0 font-medium">{item.name}</span>
                           <span className="text-slate-500 w-16 text-right shrink-0">{pct}</span>
-                          <span className="text-slate-700 ml-auto text-right font-medium">{fmt(item.value)}</span>
+                          <span className="text-slate-800 ml-auto text-right font-semibold">{fmt(item.value)}</span>
                         </div>
                       );
                     })}
@@ -423,7 +423,7 @@ export const PaymentReportPage = () => {
           {/* Trend Chart */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[15px] font-bold text-slate-800 flex items-center gap-2">
+              <h3 className="text-[16px] sm:text-[17px] font-bold text-slate-800 flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-[#0052cc]" />
                 Payment Trend
               </h3>
@@ -431,7 +431,7 @@ export const PaymentReportPage = () => {
                 <select 
                   value={trendGranularity}
                   onChange={(e) => setTrendGranularity(e.target.value)}
-                  className="appearance-none bg-transparent border border-slate-200 rounded-lg text-[12px] px-3 py-1.5 pr-8 outline-none focus:border-[#0052cc] text-slate-600"
+                  className="appearance-none bg-transparent border border-slate-200 rounded-lg text-[13px] px-3 py-1.5 pr-8 outline-none focus:border-[#0052cc] text-slate-600 font-medium"
                 >
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
@@ -453,7 +453,7 @@ export const PaymentReportPage = () => {
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={trend} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} dy={10} 
+                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} 
                       tickFormatter={(val) => {
                         if(trendGranularity === 'daily' && val.length === 10) {
                           return new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -461,14 +461,14 @@ export const PaymentReportPage = () => {
                         return val;
                       }}
                     />
-                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} tickFormatter={(val) => `₹ ${(val/100000).toFixed(1)}L`} />
-                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `₹ ${(val/100000).toFixed(1)}L`} />
+                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
                     <RechartsTooltip 
-                      contentStyle={{ borderRadius: '8px', fontSize: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                      contentStyle={{ borderRadius: '8px', fontSize: '13px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                       formatter={(value: any, name: any) => [name === 'Payment Amount' ? fmt(value) : value, name]}
                       labelFormatter={(label) => `Date: ${label}`}
                     />
-                    <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '15px' }} iconType="circle" />
+                    <Legend wrapperStyle={{ fontSize: '13px', paddingTop: '15px' }} iconType="circle" />
                     <Bar yAxisId="left" dataKey="amount" name="Payment Amount" fill="#0ea5e9" radius={[2, 2, 0, 0]} barSize={12} />
                     <Line yAxisId="right" type="monotone" dataKey="count" name="Number of Payments" stroke="#22c55e" strokeWidth={2} dot={{ r: 4, strokeWidth: 2, fill: 'white' }} activeDot={{ r: 6 }} />
                   </ComposedChart>
@@ -482,39 +482,39 @@ export const PaymentReportPage = () => {
         {/* Table */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
           <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h3 className="text-[15px] font-bold text-slate-800 flex items-center gap-2">
+            <h3 className="text-[16px] sm:text-[17px] font-bold text-slate-800 flex items-center gap-2">
               <FileText className="h-4 w-4 text-[#0052cc]" />
               Payment Transactions
             </h3>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input 
                 type="text" 
                 placeholder="Search by invoice no, customer name, payment method..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full sm:w-[420px] bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-[13px] text-slate-700 focus:outline-none focus:border-[#0052cc] focus:bg-white focus:ring-1 focus:ring-[#0052cc] transition-all"
+                className="w-full sm:w-[420px] bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-4 py-2.5 text-[13.5px] text-slate-700 focus:outline-none focus:border-[#0052cc] focus:bg-white focus:ring-1 focus:ring-[#0052cc] transition-all"
               />
             </div>
           </div>
 
           <div className="overflow-x-auto flex-1">
-            <table className="w-full text-left text-[13px] whitespace-nowrap">
-              <thead className="bg-white border-b border-slate-200 text-slate-600 font-medium">
+            <table className="w-full text-left text-[13.5px] sm:text-[14px] whitespace-nowrap">
+              <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[12px] sm:text-[12.5px]">
                 <tr>
-                  <th className="px-4 py-4 text-center w-10">
+                  <th className="px-4 py-3.5 text-center w-10">
                     <input type="checkbox" className="rounded border-slate-300 text-[#0052cc] focus:ring-[#0052cc]" />
                   </th>
-                  <th className="px-2 py-4 w-10">#</th>
-                  <th className="px-4 py-4">Invoice No</th>
-                  <th className="px-4 py-4">Date & Time</th>
-                  <th className="px-4 py-4">Customer</th>
-                  <th className="px-4 py-4 text-right">Invoice Amount</th>
-                  <th className="px-4 py-4 text-right">Paid Amount</th>
+                  <th className="px-2 py-3.5 w-10">#</th>
+                  <th className="px-4 py-3.5">Invoice No</th>
+                  <th className="px-4 py-3.5">Date & Time</th>
+                  <th className="px-4 py-3.5">Customer</th>
+                  <th className="px-4 py-3.5 text-right">Invoice Amount</th>
+                  <th className="px-4 py-3.5 text-right">Paid Amount</th>
                   <th className="px-4 py-4">Payment Method</th>
-                  <th className="px-4 py-4">Transaction ID</th>
-                  <th className="px-4 py-4 text-center">Status</th>
-                  <th className="px-4 py-4 text-center">Actions</th>
+                  <th className="px-4 py-3.5">Transaction ID</th>
+                  <th className="px-4 py-3.5 text-center">Status</th>
+                  <th className="px-4 py-3.5 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-600">
@@ -527,14 +527,14 @@ export const PaymentReportPage = () => {
                   </tr>
                 ) : errorTrans ? (
                   <tr>
-                    <td colSpan={11} className="px-5 py-16 text-center text-red-500">
+                    <td colSpan={11} className="px-5 py-16 text-center text-red-500 text-[14px]">
                       Payment data temporarily unavailable from SAP.
-                      <button onClick={() => refetchTrans()} className="block mx-auto mt-2 text-[#0052cc] hover:underline">Retry</button>
+                      <button onClick={() => refetchTrans()} className="block mx-auto mt-2 text-[#0052cc] hover:underline font-semibold">Retry</button>
                     </td>
                   </tr>
                 ) : !transactionsData || transactionsData.items.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-5 py-16 text-center text-slate-500">
+                    <td colSpan={11} className="px-5 py-16 text-center text-slate-500 text-[14px]">
                       No payment data available for the selected filters.
                     </td>
                   </tr>
@@ -550,18 +550,18 @@ export const PaymentReportPage = () => {
                         <input type="checkbox" className="rounded border-slate-300 text-[#0052cc] focus:ring-[#0052cc]" />
                       </td>
                       <td className="px-2 py-3.5 text-slate-500">{rowIndex}</td>
-                      <td className="px-4 py-3.5 font-medium text-[#0052cc]">{txn.invoiceDocNum ? `INV-${txn.invoiceDocNum}` : '-'}</td>
+                      <td className="px-4 py-3.5 font-semibold text-[#0052cc]">{txn.invoiceDocNum ? `INV-${txn.invoiceDocNum}` : '-'}</td>
                       <td className="px-4 py-3.5 text-slate-600">
                         {txn.docDate.substring(0, 10)} {txn.docDate.substring(11, 16)}
                       </td>
-                      <td className="px-4 py-3.5 font-medium text-slate-700">{txn.customerName || txn.customerCode || 'Unknown'}</td>
-                      <td className="px-4 py-3.5 text-right text-slate-600">{fmt(txn.totalAmount)}</td>
-                      <td className="px-4 py-3.5 text-right text-slate-600">{fmt(txn.totalAmount)}</td>
-                      <td className="px-4 py-3.5 text-slate-600 capitalize">{txn.paymentMethod}</td>
-                      <td className="px-4 py-3.5 text-slate-500">{txn.transactionId || '-'}</td>
+                      <td className="px-4 py-3.5 font-medium text-slate-800">{txn.customerName || txn.customerCode || 'Unknown'}</td>
+                      <td className="px-4 py-3.5 text-right text-slate-700 font-semibold">{fmt(txn.totalAmount)}</td>
+                      <td className="px-4 py-3.5 text-right text-slate-900 font-bold">{fmt(txn.totalAmount)}</td>
+                      <td className="px-4 py-3.5 text-slate-600 capitalize font-medium">{txn.paymentMethod}</td>
+                      <td className="px-4 py-3.5 text-slate-500 font-mono text-[13px]">{txn.transactionId || '-'}</td>
                       <td className="px-4 py-3.5 text-center">
                         <span className={cn(
-                          "inline-flex items-center px-2.5 py-1 rounded text-[11px] font-medium border",
+                          "inline-flex items-center px-2.5 py-1 rounded text-[12px] font-semibold border",
                           isRefund ? "bg-purple-50 text-purple-700 border-purple-200" :
                           isFailed ? "bg-red-50 text-red-600 border-red-200" :
                           isPartial ? "bg-amber-50 text-amber-700 border-amber-200" :
@@ -571,10 +571,10 @@ export const PaymentReportPage = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-center">
-                        <div className="flex items-center justify-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
-                          <button onClick={(e) => { e.stopPropagation(); setSelectedTxnId(txn.docEntry); }} className="p-1 text-[#0052cc] hover:bg-blue-50 rounded transition-colors"><Eye className="w-4 h-4" /></button>
-                          <button className="p-1 text-slate-400 hover:text-[#0052cc] hover:bg-blue-50 rounded transition-colors"><Download className="w-4 h-4" /></button>
-                          <button className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded transition-colors"><MoreVertical className="w-4 h-4" /></button>
+                        <div className="flex items-center justify-center gap-2 opacity-70 hover:opacity-100 transition-opacity">
+                          <button onClick={(e) => { e.stopPropagation(); setSelectedTxnId(txn.docEntry); }} className="p-1.5 text-[#0052cc] hover:bg-blue-50 rounded transition-colors"><Eye className="w-4 h-4" /></button>
+                          <button className="p-1.5 text-slate-400 hover:text-[#0052cc] hover:bg-blue-50 rounded transition-colors"><Download className="w-4 h-4" /></button>
+                          <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded transition-colors"><MoreVertical className="w-4 h-4" /></button>
                         </div>
                       </td>
                     </tr>
@@ -586,9 +586,9 @@ export const PaymentReportPage = () => {
 
           {/* Pagination */}
           {transactionsData && transactionsData.total > 0 && (
-            <div className="bg-white border-t border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between text-[13px] text-slate-500 gap-4">
+            <div className="bg-white border-t border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between text-[13.5px] text-slate-600 gap-4">
               <div>
-                Showing {offset + 1} to {Math.min(offset + limit, transactionsData.total)} of {transactionsData.total.toLocaleString()} payments
+                Showing <span className="font-semibold text-slate-800">{offset + 1}</span> to <span className="font-semibold text-slate-800">{Math.min(offset + limit, transactionsData.total)}</span> of <span className="font-semibold text-slate-800">{transactionsData.total.toLocaleString()}</span> payments
               </div>
               <div className="flex items-center gap-2">
                 <button 
@@ -604,7 +604,7 @@ export const PaymentReportPage = () => {
                       key={i}
                       onClick={() => setPage(i + 1)}
                       className={cn(
-                        "w-7 h-7 flex items-center justify-center rounded-md text-[13px] font-medium transition-colors",
+                        "w-8 h-8 flex items-center justify-center rounded-md text-[13.5px] font-semibold transition-colors",
                         page === i + 1 ? "bg-[#0052cc] text-white" : "hover:bg-slate-100 text-slate-600"
                       )}
                     >
@@ -617,7 +617,7 @@ export const PaymentReportPage = () => {
                       <button 
                         onClick={() => setPage(Math.ceil(transactionsData.total / limit))}
                         className={cn(
-                          "w-7 h-7 flex items-center justify-center rounded-md text-[13px] font-medium transition-colors",
+                          "w-8 h-8 flex items-center justify-center rounded-md text-[13.5px] font-semibold transition-colors",
                           page === Math.ceil(transactionsData.total / limit) ? "bg-[#0052cc] text-white" : "hover:bg-slate-100 text-slate-600"
                         )}
                       >

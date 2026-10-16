@@ -235,14 +235,14 @@ export const ReturnsApprovalsPage = () => {
       <div className="mx-auto max-w-[1600px]">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Returns &amp; Approvals</h1>
-            <p className="mt-1 text-sm text-slate-600">Manage return requests, review approvals, and track workflow status.</p>
+            <h1 className="atlas-page-title text-[28px] sm:text-[32px] md:text-[34px] font-bold tracking-tight text-slate-900">Returns &amp; Approvals</h1>
+            <p className="mt-1 atlas-page-subtitle text-[14px] sm:text-[15px] text-slate-500">Manage return requests, review approvals, and track workflow status.</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="relative date-dropdown-container z-50 hidden sm:block">
               <button
                 onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-                className="flex items-center gap-2 px-4 py-2 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors font-medium text-sm"
+                className="flex items-center gap-2 px-4 py-2.5 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors font-semibold text-[13.5px]"
               >
                 <Calendar className="w-4 h-4 text-slate-500" />
                 {dateRange === '' ? 'All Dates (Total)' :
@@ -256,39 +256,39 @@ export const ReturnsApprovalsPage = () => {
                 <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 shadow-lg rounded-lg py-1">
                   <button
                     onClick={() => { setDateRange(''); setPage(1); setIsDateDropdownOpen(false); }}
-                    className={`w-full text-left px-4 py-2 text-sm transition-colors ${dateRange === '' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
+                    className={`w-full text-left px-4 py-2 text-[13.5px] transition-colors ${dateRange === '' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50 font-medium'
                       }`}
                   >
                     All Dates (Total)
                   </button>
-                  <div className="px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50">Quick Filters</div>
+                  <div className="px-3 py-2 text-[11.5px] font-bold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50">Quick Filters</div>
                   {(['today', 'week', 'month', 'year'] as const).map(f => {
                     const label = f === 'today' ? 'Today' : `This ${f.charAt(0).toUpperCase() + f.slice(1)}`;
                     return (
                       <button
                         key={f}
                         onClick={() => { setDateRange(f); setPage(1); setIsDateDropdownOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm transition-colors ${dateRange === f ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
+                        className={`w-full text-left px-4 py-2 text-[13.5px] transition-colors ${dateRange === f ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50 font-medium'
                           }`}
                       >
                         {label}
                       </button>
                     );
                   })}
-                  <div className="px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50 mt-1">Custom Range</div>
+                  <div className="px-3 py-2 text-[11.5px] font-bold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50 mt-1">Custom Range</div>
                   <div className="p-3 flex flex-col gap-2">
                     <div>
-                      <label className="text-[11px] text-slate-500 mb-1 block">From</label>
-                      <input type="date" className="w-full text-sm border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+                      <label className="text-[12px] font-semibold text-slate-600 mb-1 block">From</label>
+                      <input type="date" className="w-full text-[13px] border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-blue-500" value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
                     </div>
                     <div>
-                      <label className="text-[11px] text-slate-500 mb-1 block">To</label>
-                      <input type="date" className="w-full text-sm border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={customTo} onChange={e => setCustomTo(e.target.value)} />
+                      <label className="text-[12px] font-semibold text-slate-600 mb-1 block">To</label>
+                      <input type="date" className="w-full text-[13px] border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-blue-500" value={customTo} onChange={e => setCustomTo(e.target.value)} />
                     </div>
                     <button
                       disabled={!customFrom || !customTo}
                       onClick={() => { setDateRange(`${customFrom}_to_${customTo}`); setPage(1); setIsDateDropdownOpen(false); }}
-                      className="w-full mt-2 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded font-medium text-sm transition-colors"
+                      className="w-full mt-2 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-lg font-semibold text-[13px] transition-colors shadow-sm"
                     >
                       Apply Custom
                     </button>
@@ -299,14 +299,14 @@ export const ReturnsApprovalsPage = () => {
 
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-100"
             >
               <Search className="h-4 w-4" />
               Search requests
             </button>
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-900/20 hover:bg-blue-500"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-sm shadow-blue-900/20 hover:bg-blue-500"
             >
               <Plus className="h-4 w-4" />
               New Return
@@ -334,13 +334,13 @@ export const ReturnsApprovalsPage = () => {
                   <button
                     key={item.key}
                     onClick={() => { setTab(item.key as any); setPage(1); }}
-                    className={`flex items-center whitespace-nowrap border-b-2 px-4 py-3.5 text-sm font-semibold transition-colors ${tab === item.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+                    className={`flex items-center whitespace-nowrap border-b-2 px-4 py-3 text-[13.5px] sm:text-[14px] font-semibold transition-colors ${tab === item.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
                       }`}
                   >
                     {item.label}
                     {item.count > 0 && (
                       <span
-                        className={`ml-2 rounded-full px-2 py-0.5 text-[11px] ${tab === item.key ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
+                        className={`ml-2 rounded-full px-2 py-0.5 text-[11.5px] font-bold ${tab === item.key ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
                           }`}
                       >
                         {item.count}
@@ -354,17 +354,17 @@ export const ReturnsApprovalsPage = () => {
               <div className="border-b border-slate-200 bg-white px-4 py-3">
                 <div className="flex flex-wrap items-center gap-3">
 
-                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 min-w-[160px]">
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13.5px] font-medium text-slate-600 min-w-[160px]">
                     <Building2 className="h-4 w-4 text-slate-400" />
-                    <select value={branchId} onChange={(e) => { setBranchId(e.target.value); setPage(1); }} className="bg-transparent outline-none w-full">
+                    <select value={branchId} onChange={(e) => { setBranchId(e.target.value); setPage(1); }} className="bg-transparent outline-none w-full text-[13.5px]">
                       <option value="">All Branches</option>
                       <option value="WH-001">Main Branch (WH-001)</option>
                     </select>
                   </div>
 
-                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 min-w-[140px]">
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13.5px] font-medium text-slate-600 min-w-[140px]">
                     <ListFilter className="h-4 w-4 text-slate-400" />
-                    <select value={status} onChange={(e) => { setStatus(e.target.value); setTab('all'); setPage(1); }} className="bg-transparent outline-none w-full">
+                    <select value={status} onChange={(e) => { setStatus(e.target.value); setTab('all'); setPage(1); }} className="bg-transparent outline-none w-full text-[13.5px]">
                       <option value="all">All Status</option>
                       <option value="pending">Pending</option>
                       <option value="completed">Approved</option>
@@ -375,48 +375,48 @@ export const ReturnsApprovalsPage = () => {
                     </select>
                   </div>
 
-                  <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm min-w-[200px]">
+                  <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13.5px] min-w-[200px]">
                     <Search className="h-4 w-4 text-slate-400" />
                     <input
                       type="text"
                       value={searchTerm}
                       onChange={(event) => setSearchTerm(event.target.value)}
                       placeholder="Search request ID, invoice no, customer..."
-                      className="w-full bg-transparent text-slate-700 placeholder:text-slate-400 outline-none"
+                      className="w-full bg-transparent text-[13.5px] text-slate-700 placeholder:text-slate-400 outline-none"
                     />
                   </div>
 
-                  <button type="button" className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition">
+                  <button type="button" className="atlas-btn flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-sm hover:bg-blue-700 transition cursor-pointer">
                     <ListFilter className="h-4 w-4" />
                     Filter
                   </button>
 
-                  <button type="button" onClick={() => { setSearchTerm(''); setDateRange(''); setBranchId(''); setStatus('all'); setTab('all'); setPage(1); }} className="rounded-xl border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+                  <button type="button" onClick={() => { setSearchTerm(''); setDateRange(''); setBranchId(''); setStatus('all'); setTab('all'); setPage(1); }} className="atlas-btn-sm rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer">
                     Clear
                   </button>
                 </div>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-100 text-left">
-                  <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                <table className="min-w-full divide-y divide-slate-100 text-left text-[13.5px] sm:text-[14px] text-slate-700 whitespace-nowrap">
+                  <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[12px] sm:text-[12.5px]">
                     <tr>
-                      <th className="px-4 py-3">#</th>
-                      <th className="px-4 py-3">Request ID</th>
-                      <th className="px-4 py-3">Invoice No.</th>
-                      <th className="px-4 py-3">Customer</th>
-                      <th className="px-4 py-3">Items</th>
-                      <th className="px-4 py-3">Reason</th>
-                      <th className="px-4 py-3">Amount</th>
-                      <th className="px-4 py-3">Date</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Action</th>
+                      <th className="px-4 py-3.5">#</th>
+                      <th className="px-4 py-3.5">Request ID</th>
+                      <th className="px-4 py-3.5">Invoice No.</th>
+                      <th className="px-4 py-3.5">Customer</th>
+                      <th className="px-4 py-3.5">Items</th>
+                      <th className="px-4 py-3.5">Reason</th>
+                      <th className="px-4 py-3.5">Amount</th>
+                      <th className="px-4 py-3.5">Date</th>
+                      <th className="px-4 py-3.5">Status</th>
+                      <th className="px-4 py-3.5 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {isLoading ? (
                       <tr>
-                        <td colSpan={10} className="px-4 py-12 text-center text-slate-600">
+                        <td colSpan={10} className="px-4 py-12 text-center text-slate-600 text-[14px]">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
                             Loading returns...
@@ -427,19 +427,19 @@ export const ReturnsApprovalsPage = () => {
                       <tr>
                         <td colSpan={10} className="px-4 py-12 text-center">
                           <div className="space-y-2 text-slate-700">
-                            <p className="font-medium text-red-700">Unable to load return requests</p>
-                            <p className="text-sm text-slate-600">{(error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'The approval service is unavailable.'}</p>
-                            <button type="button" onClick={() => refetch()} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50">Retry</button>
+                            <p className="font-semibold text-red-700 text-[14.5px]">Unable to load return requests</p>
+                            <p className="text-[13.5px] text-slate-600">{(error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'The approval service is unavailable.'}</p>
+                            <button type="button" onClick={() => refetch()} className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-1.5 text-[13.5px] font-semibold text-red-700 hover:bg-red-100 transition-colors">Retry</button>
                           </div>
                         </td>
                       </tr>
                     ) : rows.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="px-4 py-12 text-center text-slate-600">
+                        <td colSpan={10} className="px-4 py-12 text-center text-slate-600 text-[14px]">
                           <div className="space-y-2">
                             <RotateCcw className="mx-auto h-8 w-8 text-blue-600" />
-                            <p className="font-medium">No return requests found</p>
-                            <p className="text-sm text-slate-500">Try adjusting your search or filters.</p>
+                            <p className="font-semibold">No return requests found</p>
+                            <p className="text-[13.5px] text-slate-500">Try adjusting your search or filters.</p>
                           </div>
                         </td>
                       </tr>
@@ -456,20 +456,20 @@ export const ReturnsApprovalsPage = () => {
                             className={`cursor-pointer transition ${isSelected ? 'bg-slate-100' : 'hover:bg-slate-50'}`}
                             onClick={() => setSelectedId(request.id)}
                           >
-                            <td className="px-4 py-3 text-sm text-slate-600">{index + 1}</td>
-                            <td className="px-4 py-3 text-sm font-semibold text-slate-700">{getRequestNumber(request)}</td>
-                            <td className="px-4 py-3 text-sm text-slate-700">{getInvoiceNumber(request)}</td>
-                            <td className="px-4 py-3 text-sm text-slate-700">{getCustomerName(request)}</td>
-                            <td className="px-4 py-3 text-sm text-slate-600">{rowItems.length}</td>
-                            <td className="px-4 py-3 text-sm text-slate-600">{request.reason || 'Return'}</td>
-                            <td className="px-4 py-3 text-sm font-medium text-slate-700">{formatMoney(rowAmount)}</td>
-                            <td className="px-4 py-3 text-sm text-slate-600">{request.created_at ? new Date(request.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${badgePalette[status] || badgePalette.pending}`}>
+                            <td className="px-4 py-3.5 text-slate-500 font-medium">{index + 1}</td>
+                            <td className="px-4 py-3.5 font-bold text-blue-600">{getRequestNumber(request)}</td>
+                            <td className="px-4 py-3.5 text-slate-700 font-medium">{getInvoiceNumber(request)}</td>
+                            <td className="px-4 py-3.5 text-slate-900 font-medium">{getCustomerName(request)}</td>
+                            <td className="px-4 py-3.5 text-slate-600">{rowItems.length}</td>
+                            <td className="px-4 py-3.5 text-slate-600">{request.reason || 'Return'}</td>
+                            <td className="px-4 py-3.5 font-bold text-slate-900">{formatMoney(rowAmount)}</td>
+                            <td className="px-4 py-3.5 text-slate-600">{request.created_at ? new Date(request.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                            <td className="px-4 py-3.5">
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11.5px] font-bold uppercase tracking-wider ${badgePalette[status] || badgePalette.pending}`}>
                                 {status}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-right">
+                            <td className="px-4 py-3.5 text-right">
                               <button
                                 type="button"
                                 onClick={(event) => {
@@ -477,7 +477,7 @@ export const ReturnsApprovalsPage = () => {
                                   setSelectedId(request.id);
                                   setIsModalOpen(true);
                                 }}
-                                className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
                                 aria-label="Review request"
                               >
                                 <Eye className="h-4 w-4" />
@@ -491,10 +491,10 @@ export const ReturnsApprovalsPage = () => {
                 </table>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 gap-4">
+              <div className="flex flex-col sm:flex-row items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-3.5 text-[13.5px] text-slate-600 gap-4">
                 <div className="flex items-center gap-4">
-                  <span>Showing {Math.min((page - 1) * limit + 1, totalCount) || 0} to {Math.min(page * limit, totalCount)} of {totalCount} requests</span>
-                  <div className="flex items-center gap-2 border-l border-slate-300 pl-4">
+                  <span>Showing <span className="font-semibold text-slate-900">{Math.min((page - 1) * limit + 1, totalCount) || 0}</span> to <span className="font-semibold text-slate-900">{Math.min(page * limit, totalCount)}</span> of <span className="font-semibold text-slate-900">{totalCount}</span> requests</span>
+                  <div className="flex items-center gap-2 border-l border-slate-300 pl-4 font-medium">
                     <span>Entries per page:</span>
                     <input
                       type="number"
@@ -508,12 +508,12 @@ export const ReturnsApprovalsPage = () => {
                           setPage(1);
                         }
                       }}
-                      className="w-16 rounded border border-slate-300 px-2 py-1 text-center outline-none focus:border-blue-500"
+                      className="w-16 rounded border border-slate-300 px-2 py-1 text-center outline-none focus:border-blue-500 font-medium text-[13px]"
                     />
                     <select
                       value={limit}
                       onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-                      className="rounded border border-slate-300 px-2 py-1 outline-none focus:border-blue-500"
+                      className="rounded border border-slate-300 px-2 py-1 outline-none focus:border-blue-500 font-medium text-[13px]"
                     >
                       <option value={10}>10</option>
                       <option value={20}>20</option>
@@ -598,29 +598,29 @@ export const ReturnsApprovalsPage = () => {
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                           <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Return Items</h3>
                           <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
-                            <table className="min-w-full divide-y divide-sky-800 text-left text-sm">
-                              <thead className="bg-slate-100 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                            <table className="min-w-full divide-y divide-slate-200 text-left text-[13.5px] sm:text-[14px]">
+                              <thead className="bg-slate-100 text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500">
                                 <tr>
-                                  <th className="px-3 py-2">#</th>
-                                  <th className="px-3 py-2">Product</th>
-                                  <th className="px-3 py-2 text-center">Qty</th>
-                                  <th className="px-3 py-2 text-right">Price</th>
-                                  <th className="px-3 py-2 text-right">Total</th>
+                                  <th className="px-3.5 py-2.5">#</th>
+                                  <th className="px-3.5 py-2.5">Product</th>
+                                  <th className="px-3.5 py-2.5 text-center">Qty</th>
+                                  <th className="px-3.5 py-2.5 text-right">Price</th>
+                                  <th className="px-3.5 py-2.5 text-right">Total</th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y divide-sky-800 bg-slate-50">
+                              <tbody className="divide-y divide-slate-200 bg-slate-50">
                                 {selectedItems.length === 0 ? (
                                   <tr>
-                                    <td colSpan={5} className="px-3 py-4 text-center text-slate-600">No item data returned by the backend.</td>
+                                    <td colSpan={5} className="px-3.5 py-4 text-center text-slate-600 font-medium">No item data returned by the backend.</td>
                                   </tr>
                                 ) : (
                                   selectedItems.map((item, index) => (
                                     <tr key={`${item.itemCode || 'line'}-${index}`}>
-                                      <td className="px-3 py-2 text-slate-600">{index + 1}</td>
-                                      <td className="px-3 py-2 text-slate-800">{item.itemName || item.itemCode || 'Item'}</td>
-                                      <td className="px-3 py-2 text-center text-slate-700">{item.quantity || 0}</td>
-                                      <td className="px-3 py-2 text-right text-slate-700">{formatMoney(item.unitPrice || 0)}</td>
-                                      <td className="px-3 py-2 text-right text-slate-800">{formatMoney(getLineTotalFromItem(item))}</td>
+                                      <td className="px-3.5 py-2.5 text-slate-600 font-medium">{index + 1}</td>
+                                      <td className="px-3.5 py-2.5 text-slate-800 font-semibold">{item.itemName || item.itemCode || 'Item'}</td>
+                                      <td className="px-3.5 py-2.5 text-center text-slate-700 font-medium">{item.quantity || 0}</td>
+                                      <td className="px-3.5 py-2.5 text-right text-slate-700 font-medium">{formatMoney(item.unitPrice || 0)}</td>
+                                      <td className="px-3.5 py-2.5 text-right text-slate-900 font-bold">{formatMoney(getLineTotalFromItem(item))}</td>
                                     </tr>
                                   ))
                                 )}
@@ -631,12 +631,12 @@ export const ReturnsApprovalsPage = () => {
 
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                           <div className="flex items-center justify-between gap-3">
-                            <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Requested Amount</h3>
-                            <span className="text-xl font-bold text-slate-900">{formatMoney(selectedAmount)}</span>
+                            <h3 className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500">Requested Amount</h3>
+                            <span className="text-xl sm:text-2xl font-black text-slate-900">{formatMoney(selectedAmount)}</span>
                           </div>
-                          <div className="mt-3 text-sm text-slate-700">
-                            <p className="mb-2 font-medium text-slate-600">Reason for Return</p>
-                            <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-700">{selectedRequest.reason || 'No reason was provided by the backend.'}</p>
+                          <div className="mt-3 text-[13.5px] sm:text-[14px] text-slate-700">
+                            <p className="mb-2 font-semibold text-slate-600">Reason for Return</p>
+                            <p className="rounded-lg border border-slate-200 bg-white p-3 text-slate-800 font-medium">{selectedRequest.reason || 'No reason was provided by the backend.'}</p>
                           </div>
                         </div>
                       </div>
@@ -644,8 +644,8 @@ export const ReturnsApprovalsPage = () => {
                       {/* Right Column */}
                       <div className="space-y-4">
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Approval Workflow</h3>
-                          <div className="mt-4 space-y-3 text-sm">
+                          <h3 className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500">Approval Workflow</h3>
+                          <div className="mt-4 space-y-3">
                             <WorkflowRow title="Request Submitted" time={selectedRequest.created_at ? new Date(selectedRequest.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} done />
                             <WorkflowRow title="Pending Review" time={canApprove ? 'Admin/Manager approval queue' : 'Access restricted'} done={normalizeStatus(selectedRequest.status) !== 'rejected' && normalizeStatus(selectedRequest.status) !== 'completed'} />
                             <WorkflowRow title="Approved / Rejected" time={selectedRequest.updated_at ? new Date(selectedRequest.updated_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Awaiting decision'} done={['completed', 'rejected', 'failed'].includes(normalizeStatus(selectedRequest.status))} />
@@ -653,8 +653,8 @@ export const ReturnsApprovalsPage = () => {
                         </div>
 
                         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4">
-                          <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-600">Reviewer Notes</h3>
-                          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                          <h3 className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500">Reviewer Notes</h3>
+                          <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 text-[13.5px] sm:text-[14px] font-medium text-slate-800">
                             {selectedRequest.payload?.reviewerComment || 'No reviewer comment was returned by the backend yet.'}
                           </div>
                         </div>
@@ -674,7 +674,7 @@ export const ReturnsApprovalsPage = () => {
                               type="button"
                               disabled={!canApprove || approveMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
                               onClick={() => handleApprove(selectedRequest.id)}
-                              className="flex-1 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-900/20 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 transition"
+                              className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-[14px] sm:text-[14.5px] font-bold text-white shadow-sm shadow-emerald-900/20 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 transition"
                             >
                               {approveMutation.isPending ? 'Approving...' : 'Approve'}
                             </button>
@@ -682,14 +682,14 @@ export const ReturnsApprovalsPage = () => {
                               type="button"
                               disabled={!canApprove || rejectMutation.isPending || normalizeStatus(selectedRequest.status) !== 'pending'}
                               onClick={() => handleReject(selectedRequest.id)}
-                              className="flex-1 rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-rose-900/20 hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-50 transition"
+                              className="flex-1 rounded-xl bg-rose-600 px-4 py-3 text-[14px] sm:text-[14.5px] font-bold text-white shadow-sm shadow-rose-900/20 hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50 transition"
                             >
                               {rejectMutation.isPending ? 'Rejecting...' : 'Reject'}
                             </button>
                           </div>
 
                           {!canApprove && (
-                            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[13px] sm:text-[13.5px] text-amber-800 font-medium">
                               Admin or Manager access is required to approve or reject return requests.
                             </div>
                           )}
@@ -698,7 +698,7 @@ export const ReturnsApprovalsPage = () => {
                     </div>
                   </>
                 ) : (
-                  <div className="flex h-full min-h-[320px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-600">
+                  <div className="flex h-full min-h-[320px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-[14px] sm:text-[15px] font-medium text-slate-600">
                     Select a return request to review its details.
                   </div>
                 )}
@@ -720,40 +720,40 @@ const MetricTile = ({ title, value, change, tone, icon }: { title: string; value
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-slate-600">{title}</p>
-          <p className="mt-3 text-3xl font-bold tracking-tight text-slate-900">{value}</p>
+          <p className="atlas-card-title text-[13px] sm:text-[13.5px] font-bold uppercase tracking-wider text-slate-500">{title}</p>
+          <p className="mt-1 atlas-kpi-val text-2xl sm:text-[27px] font-black tracking-tight text-slate-900">{value}</p>
         </div>
         <div className={`rounded-xl p-2.5 ${palette[tone]}`}>{icon}</div>
       </div>
       <div className="mt-4 flex items-center justify-between gap-2">
-        <span className="inline-flex items-center rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-slate-600">Live</span>
-        <span className="text-xs text-blue-600">{change}</span>
+        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[12px] font-bold text-slate-700">Live</span>
+        <span className="text-[12.5px] sm:text-[13px] font-semibold text-blue-700">{change}</span>
       </div>
     </div>
   );
 };
 
 const InfoRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-    <span className="text-xs font-medium uppercase tracking-[0.14em] text-blue-600">{label}</span>
-    <span className="max-w-[180px] text-right text-sm font-medium text-slate-800 break-words">{value}</span>
+  <div className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+    <span className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500">{label}</span>
+    <span className="max-w-[200px] text-right text-[13.5px] sm:text-[14px] font-semibold text-slate-800 break-words">{value}</span>
   </div>
 );
 
 const WorkflowRow = ({ title, time, done }: { title: string; time: string; done: boolean }) => (
   <div className="flex items-start gap-3">
-    <div className={`relative mt-1 flex h-5 w-5 items-center justify-center rounded-full ${done ? 'bg-blue-500 text-white' : 'bg-sky-900 text-blue-600'}`}>
+    <div className={`relative mt-1 flex h-5 w-5 items-center justify-center rounded-full ${done ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
       <span className="h-2.5 w-2.5 rounded-full bg-current" />
     </div>
-    <div className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="flex-1 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5">
       <div className="flex items-center justify-between gap-3">
-        <div className="font-medium text-slate-800">{title}</div>
-        <span className="text-[10px] uppercase tracking-[0.12em] text-blue-600">{done ? 'Done' : 'Pending'}</span>
+        <div className="text-[13.5px] sm:text-[14px] font-bold text-slate-800">{title}</div>
+        <span className="text-[11.5px] sm:text-[12px] font-bold uppercase tracking-wider text-blue-700">{done ? 'Done' : 'Pending'}</span>
       </div>
-      <div className="mt-1 text-xs text-blue-600">{time}</div>
+      <div className="mt-1 text-[12.5px] text-slate-500 font-medium">{time}</div>
     </div>
   </div>
 );

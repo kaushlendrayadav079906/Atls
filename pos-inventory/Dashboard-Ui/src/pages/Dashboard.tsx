@@ -308,10 +308,10 @@ export const Dashboard = () => {
         {/* ROW 1: Heading, Branch Selector, Date Pills */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-[22px] font-bold tracking-tight text-slate-900 leading-none">
+            <h1 className="atlas-page-title text-[28px] sm:text-[32px] font-bold tracking-tight text-slate-900 leading-none">
               Retail Operations Dashboard
             </h1>
-            <p className="mt-1.5 text-[12px] text-slate-500">
+            <p className="atlas-page-subtitle text-sm sm:text-[15px] text-slate-500 mt-1.5">
               Real-time overview of your business performance, inventory, and operations.
             </p>
           </div>
@@ -658,7 +658,7 @@ export const Dashboard = () => {
               <div className="mb-3.5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <TrendingUp size={16} className="text-blue-500" />
-                  <span className="text-[14px] font-bold text-slate-900">Sales Overview</span>
+                  <span className="text-[16px] font-bold text-slate-900">Sales Overview</span>
                   {errorTrend ? (
                     <span className="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">ERROR</span>
                   ) : trendPoints.length > 0 ? (
@@ -779,7 +779,7 @@ export const Dashboard = () => {
               <div className="mb-3.5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ShoppingBag size={16} className="text-purple-500" />
-                  <span className="text-[14px] font-bold text-slate-900">Orders Overview</span>
+                  <span className="text-[16px] font-bold text-slate-900">Orders Overview</span>
                   {errorOrdersTrend ? (
                     <span className="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">ERROR</span>
                   ) : ordersPoints.length > 0 ? (
@@ -893,7 +893,7 @@ export const Dashboard = () => {
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText size={16} className="text-blue-500" />
-                <span className="text-[14px] font-bold text-slate-900">Recent Sales</span>
+                <span className="text-[16px] font-bold text-slate-900">Recent Sales</span>
                 {errorSales ? (
                   <span className="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">ERROR</span>
                 ) : recentSalesList.length > 0 ? (
@@ -908,14 +908,14 @@ export const Dashboard = () => {
                   <span className="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">OFFLINE</span>
                 )}
               </div>
-              <Link to="/sales" className="text-[11.5px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
+              <Link to="/sales" className="text-[13px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
                 View all <ChevronRight size={13} />
               </Link>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[11.5px]">
-                <thead className="border-b border-slate-100 text-[10px] font-semibold text-slate-400">
+              <table className="w-full text-left text-[13px] sm:text-[13.5px]">
+                <thead className="border-b border-slate-100 text-[11.5px] font-bold uppercase tracking-wider text-slate-500">
                   <tr>
                     <th className="pb-2">Invoice</th>
                     <th className="pb-2">Customer</th>
@@ -980,7 +980,7 @@ export const Dashboard = () => {
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Package size={16} className="text-emerald-500" />
-                <span className="text-[14px] font-bold text-slate-900">Top Products</span>
+                <span className="text-[16px] font-bold text-slate-900">Top Products</span>
                 {errorProducts ? (
                   <span className="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">ERROR</span>
                 ) : topProductsList.length > 0 ? (
@@ -995,14 +995,14 @@ export const Dashboard = () => {
                   <span className="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">OFFLINE</span>
                 )}
               </div>
-              <Link to="/products" className="text-[11.5px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
+              <Link to="/products" className="text-[13px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5">
                 View all <ChevronRight size={13} />
               </Link>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[11.5px]">
-                <thead className="border-b border-slate-100 text-[10px] font-semibold text-slate-400">
+              <table className="w-full text-left text-[13px] sm:text-[13.5px]">
+                <thead className="border-b border-slate-100 text-[11.5px] font-bold uppercase tracking-wider text-slate-500">
                   <tr>
                     <th className="pb-2 w-6">#</th>
                     <th className="pb-2">Product</th>

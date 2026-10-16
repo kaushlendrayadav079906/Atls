@@ -31,67 +31,67 @@ export const IncomingPaymentsPage: React.FC = () => {
             <ArrowLeft size={16} className="text-slate-600" />
           </Link>
           <div>
-            <h1 className="text-[22px] font-black text-slate-900">Incoming Payments</h1>
-            <p className="text-[12px] text-slate-500">Customer payments and cash/bank settlements from SAP Business One.</p>
+            <h1 className="atlas-page-title text-[28px] sm:text-[32px] font-bold text-slate-900">Incoming Payments</h1>
+            <p className="atlas-page-subtitle text-sm sm:text-[15px] text-slate-500">Customer payments and cash/bank settlements from SAP Business One.</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Link
             to="/reports/payment"
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-1.5 text-[11.5px] font-semibold text-slate-700 shadow-2xs transition"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 text-[13px] sm:text-[13.5px] font-semibold text-slate-700 shadow-2xs transition"
           >
-            <Receipt size={13} />
+            <Receipt size={15} />
             <span>Payments Report</span>
           </Link>
           <button
             onClick={fetchPayments}
-            className="flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 text-[11.5px] font-semibold shadow-2xs transition"
+            className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-[13px] sm:text-[13.5px] font-semibold shadow-2xs transition"
           >
-            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             <span>Refresh</span>
           </button>
         </div>
       </div>
 
       <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs">
-        <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
-          <ArrowDownToLine size={18} className="text-purple-600" />
-          <h2 className="text-[14px] font-bold text-slate-800">Recent Customer Receipts</h2>
+        <div className="flex items-center gap-2.5 mb-4 pb-2.5 border-b border-slate-100">
+          <ArrowDownToLine size={20} className="text-purple-600" />
+          <h2 className="text-[16px] font-bold text-slate-900">Recent Customer Receipts</h2>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-[12px]">
-            <thead className="border-b border-slate-100 text-[10.5px] font-semibold text-slate-400">
+          <table className="w-full text-left text-[13.5px] sm:text-[14px]">
+            <thead className="border-b border-slate-100 text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="pb-2">Receipt No.</th>
-                <th className="pb-2">Date</th>
-                <th className="pb-2">Customer</th>
-                <th className="pb-2">Status</th>
-                <th className="pb-2 text-right">Amount</th>
+                <th className="pb-2.5">Receipt No.</th>
+                <th className="pb-2.5">Date</th>
+                <th className="pb-2.5">Customer</th>
+                <th className="pb-2.5">Status</th>
+                <th className="pb-2.5 text-right">Amount</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 text-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400">Loading incoming payments...</td>
+                  <td colSpan={5} className="py-8 text-center text-slate-400 text-sm">Loading incoming payments...</td>
                 </tr>
               ) : payments.length > 0 ? (
                 payments.map((p, idx) => (
                   <tr key={idx} className="hover:bg-slate-50 transition">
-                    <td className="py-2.5 font-mono text-[11px] font-semibold text-blue-600">{p.refNo}</td>
-                    <td className="py-2.5 text-slate-500">{p.date}</td>
-                    <td className="py-2.5 font-semibold text-slate-800">{p.customer}</td>
-                    <td className="py-2.5">
-                      <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[9.5px] font-bold text-emerald-700">
+                    <td className="py-3 font-mono text-[12px] font-semibold text-blue-600">{p.refNo}</td>
+                    <td className="py-3 text-slate-500 text-[12.5px]">{p.date}</td>
+                    <td className="py-3 font-semibold text-slate-800">{p.customer}</td>
+                    <td className="py-3">
+                      <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
                         {p.status || 'Completed'}
                       </span>
                     </td>
-                    <td className="py-2.5 text-right font-bold text-slate-900">₹{Number(p.amount).toLocaleString('en-IN')}</td>
+                    <td className="py-3 text-right font-bold text-slate-900">₹{Number(p.amount).toLocaleString('en-IN')}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400">No incoming payments recorded in this period.</td>
+                  <td colSpan={5} className="py-8 text-center text-slate-400 text-sm">No incoming payments recorded in this period.</td>
                 </tr>
               )}
             </tbody>

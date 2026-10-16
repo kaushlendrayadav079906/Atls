@@ -44,11 +44,11 @@ export const ProductionOrderDetailModal: React.FC<ModalProps> = ({ productionOrd
               <Factory size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
                 Production Order #{productionOrderNo}
               </h2>
               {data && (
-                <div className="text-sm text-slate-500 mt-0.5">
+                <div className="text-[14px] text-slate-500 font-medium mt-0.5">
                   {data.item_code} - {data.item_name}
                 </div>
               )}
@@ -89,24 +89,24 @@ export const ProductionOrderDetailModal: React.FC<ModalProps> = ({ productionOrd
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
                   <div className="flex items-center gap-4">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium ${
+                    <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-[13px] sm:text-[13.5px] font-bold ${
                       data.status === 'Closed' ? 'bg-green-100 text-green-700' :
                       data.status === 'Released' ? 'bg-yellow-100 text-yellow-700' :
                       data.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
                       'bg-blue-100 text-blue-700'
                     }`}>
-                      {data.status === 'Closed' && <CheckCircle size={14} className="mr-1.5" />}
-                      {data.status === 'Cancelled' && <XCircle size={14} className="mr-1.5" />}
-                      {data.status === 'Released' && <Package size={14} className="mr-1.5" />}
-                      {data.status === 'Planned' && <Clock size={14} className="mr-1.5" />}
+                      {data.status === 'Closed' && <CheckCircle size={15} className="mr-1.5" />}
+                      {data.status === 'Cancelled' && <XCircle size={15} className="mr-1.5" />}
+                      {data.status === 'Released' && <Package size={15} className="mr-1.5" />}
+                      {data.status === 'Planned' && <Clock size={15} className="mr-1.5" />}
                       {data.status || 'Unknown'}
                     </span>
-                    <span className="text-sm text-slate-500 font-medium border-l border-slate-200 pl-4">
+                    <span className="text-[13.5px] text-slate-500 font-semibold border-l border-slate-200 pl-4">
                       Type: {data.production_type || 'N/A'}
                     </span>
                   </div>
-                  <div className="text-sm font-medium text-slate-700">
-                    Production Progress: <span className="text-blue-600">{data.production_percentage}%</span>
+                  <div className="text-[14px] font-bold text-slate-700">
+                    Production Progress: <span className="text-blue-600 font-black">{data.production_percentage}%</span>
                   </div>
                 </div>
 
@@ -125,22 +125,22 @@ export const ProductionOrderDetailModal: React.FC<ModalProps> = ({ productionOrd
                   )}
                 </div>
                 
-                <div className="grid grid-cols-4 gap-4 mt-5 text-sm">
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <div className="text-slate-500 mb-1">Planned Qty</div>
-                    <div className="font-semibold text-slate-900 text-lg">{data.planned_qty}</div>
+                <div className="grid grid-cols-4 gap-4 mt-5">
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500 mb-1">Planned Qty</div>
+                    <div className="font-black text-slate-900 text-2xl">{data.planned_qty}</div>
                   </div>
-                  <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100">
-                    <div className="text-blue-600 mb-1">Produced Qty</div>
-                    <div className="font-semibold text-blue-900 text-lg">{data.produced_qty}</div>
+                  <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                    <div className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-blue-600 mb-1">Produced Qty</div>
+                    <div className="font-black text-blue-900 text-2xl">{data.produced_qty}</div>
                   </div>
-                  <div className="bg-orange-50/50 p-3 rounded-lg border border-orange-100">
-                    <div className="text-orange-600 mb-1">Pending Qty</div>
-                    <div className="font-semibold text-orange-900 text-lg">{data.pending_qty}</div>
+                  <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100">
+                    <div className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-orange-600 mb-1">Pending Qty</div>
+                    <div className="font-black text-orange-900 text-2xl">{data.pending_qty}</div>
                   </div>
-                  <div className="bg-red-50/50 p-3 rounded-lg border border-red-100">
-                    <div className="text-red-600 mb-1">Rejected Qty</div>
-                    <div className="font-semibold text-red-900 text-lg">{data.rejected_qty}</div>
+                  <div className="bg-red-50/50 p-4 rounded-xl border border-red-100">
+                    <div className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-red-600 mb-1">Rejected Qty</div>
+                    <div className="font-black text-red-900 text-2xl">{data.rejected_qty}</div>
                   </div>
                 </div>
               </div>
@@ -149,12 +149,12 @@ export const ProductionOrderDetailModal: React.FC<ModalProps> = ({ productionOrd
               <div className="flex items-center gap-6 border-b border-slate-200">
                 <button
                   onClick={() => setActiveTab('overview')}
-                  className={`pb-3 text-sm font-medium transition-colors relative ${
+                  className={`pb-3.5 text-[14px] sm:text-[14.5px] font-bold transition-colors relative ${
                     activeTab === 'overview' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <FileTextIcon size={16} />
+                    <FileTextIcon size={18} />
                     Overview
                   </div>
                   {activeTab === 'overview' && (
@@ -163,12 +163,12 @@ export const ProductionOrderDetailModal: React.FC<ModalProps> = ({ productionOrd
                 </button>
                 <button
                   onClick={() => setActiveTab('components')}
-                  className={`pb-3 text-sm font-medium transition-colors relative ${
+                  className={`pb-3.5 text-[14px] sm:text-[14.5px] font-bold transition-colors relative ${
                     activeTab === 'components' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <Layers size={16} />
+                    <Layers size={18} />
                     Components
                   </div>
                   {activeTab === 'components' && (
@@ -199,8 +199,8 @@ export const ProductionOrderDetailModal: React.FC<ModalProps> = ({ productionOrd
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                   {data.components?.length > 0 ? (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm whitespace-nowrap">
-                        <thead className="bg-slate-50 text-slate-500 font-medium">
+                      <table className="w-full text-left text-[13.5px] sm:text-[14px] whitespace-nowrap">
+                        <thead className="bg-slate-50 text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500">
                           <tr>
                             <th className="px-5 py-3 w-12">#</th>
                             <th className="px-5 py-3">Component</th>
@@ -257,12 +257,12 @@ const FileTextIcon = ({ size }: { size: number }) => (
 
 const DetailRow = ({ label, value, icon }: { label: string, value: string | number, icon?: React.ReactNode }) => (
   <tr>
-    <td className="px-6 py-3 bg-slate-50/50 text-slate-500 font-medium w-1/3 border-r border-slate-100">
+    <td className="px-6 py-3.5 bg-slate-50/50 text-[13px] sm:text-[13.5px] font-bold uppercase tracking-wider text-slate-500 w-1/3 border-r border-slate-100">
       <div className="flex items-center gap-2">
         {icon} {label}
       </div>
     </td>
-    <td className="px-6 py-3 font-medium text-slate-900">{value}</td>
+    <td className="px-6 py-3.5 text-[14px] font-semibold text-slate-900">{value}</td>
   </tr>
 );
 

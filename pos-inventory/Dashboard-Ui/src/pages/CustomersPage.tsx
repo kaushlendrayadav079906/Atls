@@ -151,15 +151,15 @@ export const CustomersPage = () => {
       <div className="space-y-6 max-w-[1500px] mx-auto pb-8">
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
           <div>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">Customers</h1>
-            <p className="mt-1 text-sm text-slate-600">Manage your customers and view purchase history</p>
+            <h1 className="mt-2 atlas-page-title text-[28px] sm:text-[32px] font-bold tracking-tight text-slate-900">Customers</h1>
+            <p className="mt-1.5 atlas-page-subtitle text-sm sm:text-[15px] text-slate-500">Manage your customers and view purchase history</p>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="relative date-dropdown-container z-50 hidden sm:block">
               <button 
                 onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-                className="flex items-center gap-2 px-4 py-2 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors font-medium text-sm"
+                className="flex items-center gap-2 px-4 py-2 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors font-semibold text-[13.5px]"
               >
                 <Calendar className="w-4 h-4 text-slate-500" />
                 {range === 'all_time' ? 'All Dates (Total)' :
@@ -218,14 +218,14 @@ export const CustomersPage = () => {
 
             <button
               type="button"
-              className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm"
+              className="atlas-btn-sm inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm cursor-pointer"
             >
               <Download className="mr-2 h-4 w-4" />
               Export
             </button>
             <button
               type="button"
-              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-900/30 hover:bg-blue-500"
+              className="atlas-btn inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-xs sm:text-[13px] font-semibold text-white shadow-sm shadow-blue-900/30 hover:bg-blue-500 cursor-pointer"
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Customer
@@ -260,17 +260,17 @@ export const CustomersPage = () => {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-100 text-left">
-                <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              <table className="min-w-full divide-y divide-slate-100 text-left text-[13.5px] sm:text-[14px] text-slate-700">
+                <thead className="bg-slate-50 text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500">
                   <tr>
-                    <th className="px-4 py-3">#</th>
-                    <th className="px-4 py-3">Customer</th>
-                    <th className="px-4 py-3">Phone</th>
-                    <th className="px-4 py-3">Email</th>
-                    <th className="px-4 py-3">Customer Type</th>
-                    <th className="px-4 py-3">Lifetime Value</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
+                    <th className="px-4 py-3.5">#</th>
+                    <th className="px-4 py-3.5">Customer</th>
+                    <th className="px-4 py-3.5">Phone</th>
+                    <th className="px-4 py-3.5">Email</th>
+                    <th className="px-4 py-3.5">Customer Type</th>
+                    <th className="px-4 py-3.5">Lifetime Value</th>
+                    <th className="px-4 py-3.5">Status</th>
+                    <th className="px-4 py-3.5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -282,9 +282,9 @@ export const CustomersPage = () => {
                     <tr>
                       <td colSpan={8} className="px-4 py-14 text-center">
                         <div className="space-y-2">
-                          <p className="text-sm font-medium text-red-300">Could not load customers</p>
+                          <p className="text-base font-semibold text-red-600">Could not load customers</p>
                           <p className="text-sm text-slate-600">{(error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'The customer service is unavailable.'}</p>
-                          <button type="button" onClick={() => refetch()} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-500/20">Retry</button>
+                          <button type="button" onClick={() => refetch()} className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-1.5 text-sm font-semibold text-red-700 hover:bg-red-500/20">Retry</button>
                         </div>
                       </td>
                     </tr>
@@ -295,29 +295,29 @@ export const CustomersPage = () => {
                   ) : (
                     paginatedCustomers.map((customer, index) => (
                       <tr onClick={() => setSelectedCardCode(customer.cardCode || null)} key={`${customer.cardCode ?? 'customer'}-${index}`} className={`transition ${currentCardCode === customer.cardCode ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
-                        <td className="px-4 py-3 text-sm text-slate-600">{offset + index + 1}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3.5 text-[13px] text-slate-500">{offset + index + 1}</td>
+                        <td className="px-4 py-3.5">
                           <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-100 font-semibold text-xs">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-bold text-[12.5px]">
                               {initials(customer.cardName)}
                             </div>
                             <div>
-                              <div className="font-semibold text-slate-900">{customer.cardName || 'Unknown customer'}</div>
-                              <div className="text-xs text-blue-600">{customer.cardCode || '—'}</div>
+                              <div className="font-bold text-slate-900 text-[14.5px]">{customer.cardName || 'Unknown customer'}</div>
+                              <div className="text-[12px] font-semibold text-blue-600">{customer.cardCode || '—'}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-sm text-slate-700">{customer.phone || '—'}</td>
-                        <td className="px-4 py-3 text-sm text-slate-600">{customer.email || '—'}</td>
-                        <td className="px-4 py-3 text-sm text-slate-700">{customer.cardType || 'Retail'}</td>
-                        <td className="px-4 py-3 text-sm font-medium text-slate-700">{formatMoney(customer.lifetimeValue || 0)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${customer.status === 'Active' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{customer.status || 'Active'}</span>
+                        <td className="px-4 py-3.5 text-[13.5px] text-slate-700">{customer.phone || '—'}</td>
+                        <td className="px-4 py-3.5 text-[13.5px] text-slate-600">{customer.email || '—'}</td>
+                        <td className="px-4 py-3.5 text-[13.5px] text-slate-700">{customer.cardType || 'Retail'}</td>
+                        <td className="px-4 py-3.5 text-[14px] font-bold text-slate-900">{formatMoney(customer.lifetimeValue || 0)}</td>
+                        <td className="px-4 py-3.5">
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[12px] font-semibold ${customer.status === 'Active' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>{customer.status || 'Active'}</span>
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-2 opacity-60 hover:opacity-100 transition-opacity">
-                            <button onClick={(e) => { e.stopPropagation(); setSelectedCardCode(customer.cardCode || null); setIsModalOpen(true); }} className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors" aria-label="View Details"><Eye className="h-4 w-4" /></button>
-                            <button className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" aria-label="Edit"><Edit className="h-4 w-4" /></button>
+                            <button onClick={(e) => { e.stopPropagation(); setSelectedCardCode(customer.cardCode || null); setIsModalOpen(true); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" aria-label="View Details"><Eye className="h-4.5 w-4.5" /></button>
+                            <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" aria-label="Edit"><Edit className="h-4.5 w-4.5" /></button>
                           </div>
                         </td>
                       </tr>
@@ -590,14 +590,14 @@ const StatCard = ({ title, value, change, tone, icon, loading }: StatCardProps) 
   <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-sm font-medium text-slate-500">{title}</p>
-        <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">{loading ? <span className="inline-block h-7 w-20 animate-pulse rounded-lg bg-slate-100" /> : value}</p>
+        <p className="text-[13px] sm:text-[13.5px] font-semibold uppercase tracking-wider text-slate-500">{title}</p>
+        <p className="mt-1 text-[26px] sm:text-[28px] font-extrabold tracking-tight text-slate-900">{loading ? <span className="inline-block h-8 w-24 animate-pulse rounded-lg bg-slate-100" /> : value}</p>
       </div>
-      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${toneClasses[tone]}`}>{icon}</div>
+      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${toneClasses[tone]}`}>{icon}</div>
     </div>
     <div className="mt-4 flex items-center justify-between gap-2">
-      <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">+12.5%</span>
-      <span className="text-xs text-slate-400">{change}</span>
+      <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[12px] font-bold text-slate-600">+12.5%</span>
+      <span className="text-[12.5px] text-slate-400 font-medium">{change}</span>
     </div>
   </div>
 );
@@ -606,16 +606,16 @@ const InfoRow = ({ icon, label, value }: { icon: React.ReactNode; label: string;
   <div className="flex items-start gap-3">
     <div className="mt-0.5 text-blue-600">{icon}</div>
     <div className="min-w-0 flex-1">
-      <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-blue-600">{label}</div>
-      <div className="mt-1 break-words text-sm text-slate-800">{value}</div>
+      <div className="text-[12px] font-bold uppercase tracking-[0.12em] text-blue-600">{label}</div>
+      <div className="mt-1 break-words text-[14.5px] font-medium text-slate-800">{value}</div>
     </div>
   </div>
 );
 
 const MiniStat = ({ label, value, accent }: { label: string; value: string; accent: 'emerald' | 'amber' }) => (
-  <div className={`rounded-xl border ${accent === 'emerald' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'} p-3`}>
-    <div className="text-[11px] uppercase tracking-[0.12em] text-slate-600">{label}</div>
-    <div className="mt-2 text-2xl font-bold text-slate-900">{value}</div>
+  <div className={`rounded-xl border ${accent === 'emerald' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'} p-3.5`}>
+    <div className="text-[12px] font-bold uppercase tracking-[0.12em] text-slate-600">{label}</div>
+    <div className="mt-1.5 text-2xl sm:text-[26px] font-extrabold text-slate-900">{value}</div>
   </div>
 );
 

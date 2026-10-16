@@ -222,25 +222,25 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         } ${className}`}
     >
       {/* Panel Header - Google Gemini Signature Gradient Style */}
-      <div className="flex items-center justify-between border-b border-indigo-100/90 px-4 py-2.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-purple-50/90 shrink-0">
+      <div className="flex items-center justify-between border-b border-indigo-100/90 px-4 py-3 bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-purple-50/90 shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs">
-            <Sparkles size={14} className="animate-pulse" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs">
+            <Sparkles size={16} className="animate-pulse" />
           </div>
           <div>
-            <span className="text-[13.5px] font-black bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            <span className="text-[15px] sm:text-[16px] font-black bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
               ATLAS AI Assistant
             </span>
-            <div className="text-[8.5px] font-bold text-indigo-500 tracking-wider uppercase">
+            <div className="text-[10px] sm:text-[11px] font-bold text-indigo-600 tracking-wider uppercase">
               Business Intelligence
             </div>
           </div>
           {isFinance ? (
-            <span className="rounded-full bg-purple-50 border border-purple-200/90 px-2.5 py-0.5 text-[9px] font-black text-purple-700 tracking-wider shadow-2xs">
+            <span className="rounded-full bg-purple-50 border border-purple-200/90 px-2.5 py-0.5 text-[11px] font-bold text-purple-700 tracking-wider shadow-2xs">
               FINANCE MODE
             </span>
           ) : (
-            <span className="rounded-full bg-white/90 border border-indigo-200/80 px-2 py-0.5 text-[9px] font-bold text-indigo-700 tracking-wide shadow-2xs">
+            <span className="rounded-full bg-white/90 border border-indigo-200/80 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700 tracking-wide shadow-2xs">
               READ-ONLY SAP
             </span>
           )}
@@ -249,24 +249,24 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         <div className="flex items-center gap-1 text-slate-400">
           <button
             onClick={onClose}
-            className="p-1 hover:text-slate-700 hover:bg-white/80 rounded-lg transition cursor-pointer"
+            className="p-1.5 hover:text-slate-700 hover:bg-white/80 rounded-lg transition cursor-pointer"
             title="Minimize / Collapse"
           >
-            <Minus size={14} />
+            <Minus size={16} />
           </button>
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-1 hover:text-slate-700 hover:bg-white/80 rounded-lg transition cursor-pointer"
+            className="p-1.5 hover:text-slate-700 hover:bg-white/80 rounded-lg transition cursor-pointer"
             title="Fullscreen / Expand"
           >
-            <Maximize2 size={13} />
+            <Maximize2 size={15} />
           </button>
           <button
             onClick={onClose}
-            className="p-1 hover:text-slate-700 hover:bg-white/80 rounded-lg transition cursor-pointer"
+            className="p-1.5 hover:text-slate-700 hover:bg-white/80 rounded-lg transition cursor-pointer"
             title="Close"
           >
-            <X size={14} />
+            <X size={16} />
           </button>
         </div>
       </div>
@@ -275,15 +275,15 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
       <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-4 flex flex-col gap-3.5 bg-gradient-to-b from-indigo-50/20 via-white to-purple-50/20">
         {/* Top Assistant Greeting */}
         <div className="flex items-start gap-2.5">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs">
-            <Sparkles size={13} />
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs">
+            <Sparkles size={15} />
           </div>
-          <div className="rounded-2xl rounded-tl-xs bg-white border border-indigo-100/90 p-3 text-[12px] text-slate-700 shadow-2xs leading-relaxed max-w-[90%]">
-            <span className="font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          <div className="rounded-2xl rounded-tl-xs bg-white border border-indigo-100/90 p-3.5 text-[13.5px] sm:text-[14px] text-slate-700 shadow-2xs leading-relaxed max-w-[90%]">
+            <span className="font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent text-[14px] sm:text-[14.5px]">
               {isFinance ? "Hello! I'm your ATLAS Finance Assistant." : "Hello! I'm your ATLAS AI Assistant."}
             </span>
-            <p className="mt-1 text-[11.5px] text-slate-500">I can help you with:</p>
-            <ul className="mt-1 list-disc list-inside text-[11.5px] text-slate-600 space-y-0.5">
+            <p className="mt-1.5 text-[13px] sm:text-[13.5px] text-slate-500 font-medium">I can help you with:</p>
+            <ul className="mt-1 list-disc list-inside text-[13px] sm:text-[13.5px] text-slate-600 space-y-1">
               {isFinance ? (
                 <>
                   <li>Sales, purchases and payments</li>
@@ -307,7 +307,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
 
         {/* Date Pill Divider */}
         <div className="flex justify-center my-1">
-          <span className="rounded-full bg-indigo-50 border border-indigo-100/80 px-3 py-0.5 text-[10px] font-bold text-indigo-600">
+          <span className="rounded-full bg-indigo-50 border border-indigo-100/80 px-3 py-1 text-[11.5px] sm:text-[12px] font-bold text-indigo-600">
             Today
           </span>
         </div>
@@ -316,21 +316,21 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
         {chatHistory.map((msg, i) => (
           <div key={i} className={`flex items-start gap-2.5 ${msg.role === 'user' ? 'justify-end' : ''}`}>
             {msg.role !== 'user' && (
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs">
-                <Sparkles size={13} />
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs">
+                <Sparkles size={15} />
               </div>
             )}
             <div
-              className={`rounded-2xl p-3 text-[12px] leading-relaxed max-w-[88%] shadow-xs ${msg.role === 'user'
-                ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-tr-xs'
-                : 'bg-white text-slate-800 border border-indigo-100/90 rounded-tl-xs shadow-2xs'
+              className={`rounded-2xl p-3.5 text-[13.5px] sm:text-[14px] leading-relaxed max-w-[88%] shadow-xs ${msg.role === 'user'
+                ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-tr-xs font-medium'
+                : 'bg-white text-slate-800 border border-indigo-100/90 rounded-tl-xs shadow-2xs font-normal'
                 }`}
             >
               <FormattedMessage content={msg.content} isUser={msg.role === 'user'} />
               <AIChatRenderer structuredData={msg.structured_data} />
             </div>
             {msg.role === 'user' && (
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[10px] font-bold text-white shadow-xs">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[11px] font-bold text-white shadow-xs">
                 {user?.name ? user.name.split(' ').filter(Boolean).map((n: string) => n[0]).slice(0, 2).join('').toUpperCase() : 'KK'}
               </div>
             )}
@@ -339,11 +339,11 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
 
         {loadingChat && (
           <div className="flex items-start gap-2.5">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs animate-pulse">
-              <Sparkles size={13} />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-xs animate-pulse">
+              <Sparkles size={15} />
             </div>
-            <div className="rounded-2xl rounded-tl-xs bg-white border border-indigo-100/90 p-2.5 text-[11px] text-indigo-700 font-medium shadow-2xs flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 animate-ping" />
+            <div className="rounded-2xl rounded-tl-xs bg-white border border-indigo-100/90 p-3 text-[13px] text-indigo-700 font-semibold shadow-2xs flex items-center gap-2">
+              <div className="h-2.5 w-2.5 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 animate-ping" />
               ATLAS AI is analyzing business records...
             </div>
           </div>
@@ -356,9 +356,9 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
           <button
             key={prompt}
             onClick={() => handleSendChat(prompt)}
-            className="rounded-xl border border-indigo-200/80 bg-white/95 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 hover:border-indigo-400 px-2.5 py-1 text-[10.5px] font-medium text-slate-700 hover:text-indigo-950 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 group"
+            className="rounded-xl border border-indigo-200/80 bg-white/95 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 hover:border-indigo-400 px-3 py-1.5 text-[12px] sm:text-[12.5px] font-semibold text-slate-700 hover:text-indigo-950 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 group"
           >
-            <Sparkles size={10} className="text-indigo-500 group-hover:rotate-12 transition-transform shrink-0" />
+            <Sparkles size={12} className="text-indigo-500 group-hover:rotate-12 transition-transform shrink-0" />
             <span>{prompt}</span>
           </button>
         ))}
@@ -366,23 +366,23 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
 
       {/* Bottom Fixed Message Input */}
       <div className="p-3 bg-white border-t border-indigo-100/90 shrink-0">
-        <div className="flex items-center gap-2 rounded-2xl border border-indigo-200/90 bg-slate-50/50 p-1.5 shadow-xs focus-within:border-indigo-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+        <div className="flex items-center gap-2 rounded-2xl border border-indigo-200/90 bg-slate-50/50 p-2 shadow-xs focus-within:border-indigo-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
           <input
             type="text"
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSendChat()}
             placeholder={isFinance ? "Ask anything about your finance data..." : "Ask anything about your business..."}
-            className="flex-1 bg-transparent px-2.5 text-[12px] text-slate-800 outline-none placeholder:text-slate-400"
+            className="flex-1 bg-transparent px-3 py-1 text-[14px] sm:text-[14.5px] font-medium text-slate-800 outline-none placeholder:text-slate-400"
 
           />
           <button
             onClick={() => handleSendChat()}
             disabled={loadingChat || !chatInput.trim()}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white disabled:opacity-40 transition cursor-pointer shadow-xs"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white disabled:opacity-40 transition cursor-pointer shadow-xs"
             title="Send message"
           >
-            <Send size={13} />
+            <Send size={15} />
           </button>
         </div>
       </div>

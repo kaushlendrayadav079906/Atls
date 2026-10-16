@@ -80,10 +80,10 @@ export const InvoiceDetail = () => {
         <div className="border-b border-slate-200 p-6 sm:p-8 bg-slate-50/50">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 mb-2">Invoice Details</h1>
+              <h1 className="atlas-page-title text-[28px] sm:text-[32px] md:text-[34px] font-bold text-slate-900 mb-2">Invoice Details</h1>
               <div className="flex items-center flex-wrap gap-3">
-                <span className="text-lg font-medium text-blue-600">{invoice.saleId}</span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200">
+                <span className="text-xl font-bold text-blue-600">{invoice.saleId}</span>
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
                   {invoice.syncStatus === 'synced' ? 'Completed' : invoice.syncStatus}
                 </span>
               </div>
@@ -91,17 +91,17 @@ export const InvoiceDetail = () => {
             
             <div className="grid grid-cols-2 sm:text-right gap-x-8 gap-y-4">
               <div>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Date & Time</p>
-                <div className="flex items-center sm:justify-end text-sm text-slate-900 font-medium">
-                  <Calendar size={14} className="mr-1.5 text-slate-500" />
+                <p className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Date & Time</p>
+                <div className="flex items-center sm:justify-end text-[14px] text-slate-900 font-semibold">
+                  <Calendar size={16} className="mr-1.5 text-slate-500" />
                   {invoice.createdAt ? new Date(invoice.createdAt).toLocaleString() : '-'}
                 </div>
               </div>
               <div>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Payment Method</p>
-                <div className="flex items-center sm:justify-end text-sm text-slate-900 font-medium capitalize">
-                  <CreditCard size={14} className="mr-1.5 text-slate-500" />
-                  Cash/Card {/* We would pull this from real data if available in SaleDetail */}
+                <p className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Payment Method</p>
+                <div className="flex items-center sm:justify-end text-[14px] text-slate-900 font-semibold capitalize">
+                  <CreditCard size={16} className="mr-1.5 text-slate-500" />
+                  Cash/Card
                 </div>
               </div>
             </div>
@@ -112,67 +112,66 @@ export const InvoiceDetail = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 border-b border-slate-200 divide-y sm:divide-y-0 sm:divide-x divide-slate-200">
           <div className="p-6 sm:p-8">
             <div className="flex items-center gap-2 mb-4">
-              <User className="text-slate-500" size={18} />
-              <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Customer Information</h3>
+              <User className="text-slate-500" size={20} />
+              <h3 className="text-[13px] sm:text-[13.5px] font-bold text-slate-900 uppercase tracking-wider">Customer Information</h3>
             </div>
             {invoice.customer ? (
               <div>
-                <p className="font-medium text-slate-900 text-base">{invoice.customer}</p>
-                {/* Normally we'd have phone/email here if returned in SaleDetail */}
-                <p className="text-sm text-slate-500 mt-1">Customer ID: {invoice.customer}</p>
+                <p className="font-bold text-slate-900 text-base">{invoice.customer}</p>
+                <p className="text-[13.5px] text-slate-500 font-medium mt-1">Customer ID: {invoice.customer}</p>
               </div>
             ) : (
-              <p className="text-sm text-slate-500 italic">Walk-in Customer</p>
+              <p className="text-[14px] text-slate-500 italic">Walk-in Customer</p>
             )}
           </div>
           
           <div className="p-6 sm:p-8">
             <div className="flex items-center gap-2 mb-4">
-              <Building2 className="text-slate-500" size={18} />
-              <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">Branch Details</h3>
+              <Building2 className="text-slate-500" size={20} />
+              <h3 className="text-[13px] sm:text-[13.5px] font-bold text-slate-900 uppercase tracking-wider">Branch Details</h3>
             </div>
             <div>
-              <p className="font-medium text-slate-900 text-base">Branch</p>
-              <p className="text-sm text-slate-500 mt-1">System default branch context</p>
+              <p className="font-bold text-slate-900 text-base">Branch</p>
+              <p className="text-[13.5px] text-slate-500 font-medium mt-1">System default branch context</p>
             </div>
           </div>
         </div>
 
         {/* Line Items */}
         <div className="p-6 sm:p-8">
-          <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4">Items ({invoice.items?.length || 0})</h3>
+          <h3 className="text-[15px] font-bold text-slate-900 uppercase tracking-wider mb-4">Items ({invoice.items?.length || 0})</h3>
           
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="min-w-full divide-y divide-slate-200">
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200 text-[13.5px] sm:text-[14px]">
               <thead className="bg-slate-50">
                 <tr>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-12">#</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">SKU</th>
-                  <th scope="col" className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">Qty</th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Unit Price</th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Total</th>
+                  <th scope="col" className="px-4 py-3 text-left text-[12px] sm:text-[12.5px] font-bold text-slate-500 uppercase tracking-wider w-12">#</th>
+                  <th scope="col" className="px-4 py-3 text-left text-[12px] sm:text-[12.5px] font-bold text-slate-500 uppercase tracking-wider">Product</th>
+                  <th scope="col" className="px-4 py-3 text-left text-[12px] sm:text-[12.5px] font-bold text-slate-500 uppercase tracking-wider">SKU</th>
+                  <th scope="col" className="px-4 py-3 text-center text-[12px] sm:text-[12.5px] font-bold text-slate-500 uppercase tracking-wider w-24">Qty</th>
+                  <th scope="col" className="px-4 py-3 text-right text-[12px] sm:text-[12.5px] font-bold text-slate-500 uppercase tracking-wider">Unit Price</th>
+                  <th scope="col" className="px-4 py-3 text-right text-[12px] sm:text-[12.5px] font-bold text-slate-500 uppercase tracking-wider">Total</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-200">
                 {invoice.items?.map((item, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/50">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-slate-500 font-medium">
                       {idx + 1}
                     </td>
-                    <td className="px-4 py-3 text-sm font-medium text-slate-900">
+                    <td className="px-4 py-3 font-semibold text-slate-900">
                       {item.ItemDescription || item.ItemCode || 'Unknown Item'}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-slate-500 font-medium">
                       {item.ItemCode}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-900 text-center font-medium">
+                    <td className="px-4 py-3 whitespace-nowrap text-slate-900 text-center font-bold">
                       {item.Quantity}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-600 text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-slate-600 text-right font-medium">
                       {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(item.Price || item.UnitPrice || 0)}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900 text-right">
+                    <td className="px-4 py-3 whitespace-nowrap font-bold text-slate-900 text-right">
                       {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(item.LineTotal || 0)}
                     </td>
                   </tr>
@@ -193,27 +192,27 @@ export const InvoiceDetail = () => {
             </div>
             
             <div className="w-full sm:w-80 space-y-3">
-              <div className="flex justify-between text-sm text-slate-600">
+              <div className="flex justify-between text-[13.5px] sm:text-[14px] text-slate-600 font-medium">
                 <span>Subtotal</span>
-                <span className="font-medium">
+                <span className="font-bold text-slate-900">
                   {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(invoice.total)}
                 </span>
               </div>
-              <div className="flex justify-between text-sm text-slate-600">
+              <div className="flex justify-between text-[13.5px] sm:text-[14px] text-slate-600 font-medium">
                 <span>Discount</span>
-                <span className="font-medium text-red-600">
+                <span className="font-bold text-red-600">
                   - {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(0)}
                 </span>
               </div>
-              <div className="flex justify-between text-sm text-slate-600">
+              <div className="flex justify-between text-[13.5px] sm:text-[14px] text-slate-600 font-medium">
                 <span>Tax</span>
-                <span className="font-medium">
+                <span className="font-bold text-slate-900">
                   {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(0)}
                 </span>
               </div>
               <div className="pt-3 mt-3 border-t border-slate-200 flex justify-between items-center">
                 <span className="text-base font-bold text-slate-900 uppercase tracking-wider">Grand Total</span>
-                <span className="text-xl font-bold text-blue-600">
+                <span className="text-2xl font-black text-blue-700">
                   {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(invoice.total)}
                 </span>
               </div>

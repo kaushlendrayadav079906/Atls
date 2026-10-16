@@ -1,5 +1,5 @@
+import React, { useState, useEffect } from 'react';
 import {
-  BarChart3,
   Bell,
   ChevronDown,
   ChevronRight,
@@ -7,70 +7,75 @@ import {
   LayoutDashboard,
   Menu,
   Package,
-  RotateCcw,
   Search,
   Settings,
-  ShoppingCart,
-  Users,
   Factory,
   PanelLeftClose,
   PanelLeftOpen,
   Sparkles,
-  Landmark,
+  Mail,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSystemHealth } from '../hooks/useSystemHealth';
 import { GlobalSearchModal } from './GlobalSearchModal';
 import { AIAssistantPanel, type AIAssistantContext } from './AIAssistantPanel';
+import { DraggableChatbotLauncher } from './DraggableChatbotLauncher';
+import { AtlasGlobalFooter } from './AtlasGlobalFooter';
 import { useAIAssistant } from '../contexts/AIAssistantContext';
 import atlasLogo from '../assets/LOGO.png';
 
-const navItems = [
+interface NavSubItem {
+  name: string;
+  path: string;
+  badge?: string;
+  category?: 'Production' | 'Financial';
+}
+
+interface NavSectionItem {
+  name: string;
+  path: string;
+  icon: React.ElementType;
+  badge?: string;
+  subItems?: NavSubItem[];
+}
+
+const navItems: NavSectionItem[] = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { name: 'Point of Sale', path: '/pos', icon: ShoppingCart },
-  { name: 'Products', path: '/products', icon: Package },
   {
-    name: 'Sales & Invoices',
-    path: '/sales',
-    icon: FileText,
+    name: 'Product',
+    path: '/product',
+    icon: Package,
     subItems: [
+      { name: 'Products & Stock', path: '/products' },
+      { name: 'Point of Sale', path: '/pos' },
       { name: 'Sales Orders', path: '/sales-orders' },
-      { name: 'Invoices', path: '/sales' },
-      { name: 'Purchase Orders', path: '/purchase-orders' }
-    ]
+      { name: 'Sales Invoices', path: '/sales' },
+      { name: 'Purchase Orders', path: '/purchase-orders' },
+      { name: 'Customers', path: '/customers' },
+      { name: 'Returns & Approvals', path: '/returns', badge: '5' },
+    ],
   },
-  { name: 'Customers', path: '/customers', icon: Users },
-  { name: 'Returns & Approvals', path: '/returns', icon: RotateCcw, badge: '5' },
   {
-    name: 'Production',
-    path: '/production',
+    name: 'Solutions',
+    path: '/solutions',
     icon: Factory,
     subItems: [
-      { name: 'Overview', path: '/production' },
-      { name: 'Production Orders', path: '/production/orders' },
-      { name: 'Item-wise Production', path: '/production/item-wise' },
-      { name: 'Production Rejection', path: '/production/rejection' },
-      { name: 'Date-wise Production', path: '/production/date-wise' },
-      { name: 'Reports', path: '/production/reports' },
-    ]
+      { name: 'Production Overview', path: '/production', category: 'Production' },
+      { name: 'Production Orders', path: '/production/orders', category: 'Production' },
+      { name: 'Item-wise Production', path: '/production/item-wise', category: 'Production' },
+      { name: 'Production Rejection', path: '/production/rejection', category: 'Production' },
+      { name: 'Date-wise Production', path: '/production/date-wise', category: 'Production' },
+      { name: 'Production Reports', path: '/production/reports', category: 'Production' },
+      { name: 'Finance Overview', path: '/finance', category: 'Financial' },
+      { name: 'Purchase Invoices', path: '/finance/purchase-invoices', category: 'Financial' },
+      { name: 'Incoming Payments', path: '/finance/incoming-payments', category: 'Financial' },
+      { name: 'Outgoing Payments', path: '/finance/outgoing-payments', category: 'Financial' },
+      { name: 'Customer Analysis', path: '/finance/customer-analysis', category: 'Financial' },
+      { name: 'Supplier Analysis', path: '/finance/supplier-analysis', category: 'Financial' },
+      { name: 'Profitability Reports', path: '/finance/profitability-reports', category: 'Financial' },
+    ],
   },
-  {
-    name: 'Financial',
-    path: '/finance',
-    icon: Landmark,
-    subItems: [
-      { name: 'Finance Overview', path: '/finance' },
-      { name: 'Purchase Invoices', path: '/finance/purchase-invoices' },
-      { name: 'Incoming Payments', path: '/finance/incoming-payments' },
-      { name: 'Outgoing Payments', path: '/finance/outgoing-payments' },
-      { name: 'Customer Analysis', path: '/finance/customer-analysis' },
-      { name: 'Supplier Analysis', path: '/finance/supplier-analysis' },
-      { name: 'Profitability Reports', path: '/finance/profitability-reports' },
-    ]
-  },
-  { name: 'Atlas Analytics', path: '/analytics', icon: BarChart3 },
   {
     name: 'Reports',
     path: '/reports',
@@ -84,6 +89,7 @@ const navItems = [
       { name: 'AI Generated Reports', path: '/reports/ai' },
     ],
   },
+  { name: 'Contact', path: '/contact', icon: Mail },
   { name: 'Settings', path: '/settings', icon: Settings },
 ];
 
@@ -103,25 +109,45 @@ export const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
-  const [reportsExpanded, setReportsExpanded] = useState(
-    location.pathname.startsWith('/reports')
-  );
-  const [salesExpanded, setSalesExpanded] = useState(
-    location.pathname.startsWith('/sales')
-  );
-  const [productionExpanded, setProductionExpanded] = useState(
-    location.pathname.startsWith('/production')
-  );
-  const [financeExpanded, setFinanceExpanded] = useState(
-    location.pathname.startsWith('/finance')
-  );
+
+  const isProductActive =
+    location.pathname === '/product' ||
+    location.pathname === '/products' ||
+    location.pathname.startsWith('/products/') ||
+    location.pathname === '/pos' ||
+    location.pathname === '/sales-orders' ||
+    location.pathname === '/sales' ||
+    location.pathname.startsWith('/sales/') ||
+    location.pathname === '/purchase-orders' ||
+    location.pathname === '/customers' ||
+    location.pathname === '/returns';
+
+  const isSolutionsActive =
+    location.pathname === '/solutions' ||
+    location.pathname.startsWith('/production') ||
+    location.pathname.startsWith('/finance');
+
+  const isReportsActive =
+    location.pathname.startsWith('/reports') ||
+    location.pathname === '/analytics';
+
+  const [productExpanded, setProductExpanded] = useState(isProductActive);
+  const [solutionsExpanded, setSolutionsExpanded] = useState(isSolutionsActive);
+  const [reportsExpanded, setReportsExpanded] = useState(isReportsActive);
+
+  useEffect(() => {
+    if (isProductActive) setProductExpanded(true);
+    if (isSolutionsActive) setSolutionsExpanded(true);
+    if (isReportsActive) setReportsExpanded(true);
+  }, [location.pathname, isProductActive, isSolutionsActive, isReportsActive]);
 
   const { isSapConnected } = useSystemHealth();
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const { isOpen: aiOpen, setIsOpen: setAiOpen } = useAIAssistant();
 
   const getPageContext = (pathname: string): AIAssistantContext => {
-    if (pathname === '/products') return 'products';
+    if (pathname === '/product' || pathname === '/products' || pathname.startsWith('/products/')) return 'products';
+    if (pathname === '/solutions') return 'production';
     if (pathname === '/customers') return 'customers';
     if (pathname === '/pos') return 'pos';
     if (pathname === '/sales-orders') return 'sales_orders';
@@ -129,6 +155,7 @@ export const Layout = () => {
     if (pathname === '/sales' || pathname.startsWith('/sales/')) return 'invoices';
     if (pathname === '/returns') return 'returns';
     if (pathname === '/analytics') return 'analytics';
+    if (pathname === '/contact') return 'dashboard';
     if (pathname === '/settings') return 'settings';
 
     if (pathname === '/production/orders') return 'production_orders';
@@ -219,8 +246,73 @@ export const Layout = () => {
           </button>
         </div>
 
-        {/* Right side: SAP Status, Notifications & User Avatar */}
-        <div className="flex items-center gap-3.5">
+        {/* Right side: 3 Main Navbar Sections + SAP Status, Notifications & User Avatar */}
+        <div className="flex items-center gap-3 sm:gap-3.5">
+          {/* 3 Main Navbar Sections (Product, Solutions, Reports) */}
+          <nav className="hidden md:flex items-center gap-1.5 lg:gap-2">
+            <NavLink
+              to="/product"
+              className={({ isActive }) => {
+                const active = isActive || isProductActive;
+                return `relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-[14.5px] font-semibold transition-all duration-150 ${
+                  active
+                    ? 'bg-blue-50 text-blue-600 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                }`;
+              }}
+            >
+              <Package size={16} />
+              <span>Product</span>
+            </NavLink>
+
+            <NavLink
+              to="/solutions"
+              className={({ isActive }) => {
+                const active = isActive || isSolutionsActive;
+                return `relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-[14.5px] font-semibold transition-all duration-150 ${
+                  active
+                    ? 'bg-indigo-50 text-indigo-600 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                }`;
+              }}
+            >
+              <Factory size={16} />
+              <span>Solutions</span>
+            </NavLink>
+
+            <NavLink
+              to="/reports"
+              className={({ isActive }) => {
+                const active = isActive || isReportsActive;
+                return `relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-[14.5px] font-semibold transition-all duration-150 ${
+                  active
+                    ? 'bg-blue-50 text-blue-600 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                }`;
+              }}
+            >
+              <FileText size={16} />
+              <span>Reports</span>
+            </NavLink>
+
+            <NavLink
+              to="/contact"
+              className={({ isActive }) => {
+                const active = isActive || location.pathname === '/contact';
+                return `relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-[14.5px] font-semibold transition-all duration-150 ${
+                  active
+                    ? 'bg-blue-50 text-blue-600 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                }`;
+              }}
+            >
+              <Mail size={16} />
+              <span>Contact</span>
+            </NavLink>
+          </nav>
+
+          <div className="hidden md:block h-5 w-px bg-slate-200" />
+
           {/* SAP status pill */}
           <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1 shadow-2xs">
             <span className={`h-2 w-2 rounded-full ${isSapConnected === false ? 'bg-red-500' : isSapConnected === true ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`} />
@@ -318,38 +410,28 @@ export const Layout = () => {
           <div style={{ backgroundColor: SIDEBAR_BORDER }} className="mx-4 h-px" />
 
           {/* Nav */}
-          <nav className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
-            {navItems.filter(item => {
-              if (item.name === 'Atlas Analytics' || item.name === 'AI Assistant') {
-                return false; // Based on strict requested nav structure
-              }
-              return true;
-            }).map((item) => {
-              const hasSubItems = !!item.subItems;
+          <nav className={`flex-1 overflow-y-auto ${sidebarCollapsed ? 'px-2' : 'px-4'} py-3 space-y-1.5`}>
+            {navItems.map((item) => {
+              const hasSubItems = !!item.subItems && item.subItems.length > 0;
               const isActiveParent = hasSubItems && (
-                (item.name === 'Reports' && location.pathname.startsWith('/reports')) ||
-                (item.name === 'Sales & Invoices' && location.pathname.startsWith('/sales')) ||
-                (item.name === 'Production' && location.pathname.startsWith('/production')) ||
-                (item.name === 'Financial' && location.pathname.startsWith('/finance'))
+                (item.name === 'Product' && isProductActive) ||
+                (item.name === 'Solutions' && isSolutionsActive) ||
+                (item.name === 'Reports' && isReportsActive)
               );
-              const isExpanded = item.name === 'Reports' ? reportsExpanded :
-                (item.name === 'Sales & Invoices' ? salesExpanded :
-                  (item.name === 'Production' ? productionExpanded :
-                    (item.name === 'Financial' ? financeExpanded : false)));
+              const isExpanded =
+                item.name === 'Product'
+                  ? productExpanded
+                  : item.name === 'Solutions'
+                  ? solutionsExpanded
+                  : item.name === 'Reports'
+                  ? reportsExpanded
+                  : false;
 
               return (
-                <div key={item.name}>
+                <div key={item.name} className={sidebarCollapsed ? 'flex justify-center' : undefined}>
                   {hasSubItems ? (
-                    /* Accordion trigger */
-                    <button
-                      onClick={() => {
-                        if (sidebarCollapsed) setSidebarCollapsed(false);
-                        if (item.name === 'Reports') setReportsExpanded(!reportsExpanded);
-                        if (item.name === 'Sales & Invoices') setSalesExpanded(!salesExpanded);
-                        if (item.name === 'Production') setProductionExpanded(!productionExpanded);
-                        if (item.name === 'Financial') setFinanceExpanded(!financeExpanded);
-                      }}
-
+                    /* Section Parent Item (Navigates to Landing Page + Expands) */
+                    <div
                       style={{
                         backgroundColor: isActiveParent ? SIDEBAR_ACTIVE_BG : undefined,
                         color: isActiveParent ? COLOR_PRIMARY : TEXT_SECONDARY,
@@ -360,38 +442,77 @@ export const Layout = () => {
                       onMouseLeave={(e) => {
                         if (!isActiveParent) e.currentTarget.style.backgroundColor = 'transparent';
                       }}
-                      title={sidebarCollapsed ? item.name : undefined}
-                      className={`group relative flex w-full items-center rounded-lg py-[9px] text-[13.5px] font-medium transition-colors ${sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'
-                        }`}
+                      className={`group relative flex items-center transition-all duration-150 ${
+                        sidebarCollapsed
+                          ? 'h-10 w-10 justify-center rounded-xl p-0'
+                          : 'w-full justify-between rounded-lg py-[9px] px-3 text-[14.5px] font-semibold'
+                      }`}
                     >
-                      {isActiveParent && (
-                        <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full" style={{ backgroundColor: COLOR_PRIMARY }} />
+                      {!sidebarCollapsed && isActiveParent && (
+                        <span
+                          className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full"
+                          style={{ backgroundColor: COLOR_PRIMARY }}
+                        />
                       )}
-                      <div className="flex items-center gap-2.5">
+                      <NavLink
+                        to={item.path}
+                        onClick={() => {
+                          if (sidebarCollapsed) setSidebarCollapsed(false);
+                          setSidebarOpen(false);
+                          if (item.name === 'Product') setProductExpanded(true);
+                          if (item.name === 'Solutions') setSolutionsExpanded(true);
+                          if (item.name === 'Reports') setReportsExpanded(true);
+                        }}
+                        title={sidebarCollapsed ? item.name : undefined}
+                        className={`flex items-center ${
+                          sidebarCollapsed ? 'h-full w-full justify-center' : 'flex-1 gap-2.5 overflow-hidden'
+                        } text-inherit no-underline`}
+                      >
                         <item.icon
-                          size={17}
+                          size={18}
                           style={{ color: isActiveParent ? COLOR_PRIMARY : TEXT_MUTED }}
-                          className="transition-colors group-hover:text-[#155EEF]"
+                          className="transition-colors group-hover:text-[#155EEF] shrink-0"
                         />
-                        {!sidebarCollapsed && <span className="whitespace-nowrap">{item.name}</span>}
-                      </div>
+                        {!sidebarCollapsed && (
+                          <span className="whitespace-nowrap font-medium text-inherit">{item.name}</span>
+                        )}
+                      </NavLink>
+
                       {!sidebarCollapsed && (
-                        <ChevronDown
-                          size={14}
-                          style={{ color: isActiveParent ? COLOR_PRIMARY : TEXT_MUTED }}
-                          className={`transition-transform duration-200 group-hover:text-[#155EEF] ${isExpanded ? 'rotate-180' : ''}`}
-                        />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (item.name === 'Product') setProductExpanded(!productExpanded);
+                            if (item.name === 'Solutions') setSolutionsExpanded(!solutionsExpanded);
+                            if (item.name === 'Reports') setReportsExpanded(!reportsExpanded);
+                          }}
+                          className="p-1 rounded hover:bg-slate-200/50 transition-colors ml-1 cursor-pointer"
+                          title={`Toggle ${item.name} submenu`}
+                        >
+                          <ChevronDown
+                            size={14}
+                            style={{ color: isActiveParent ? COLOR_PRIMARY : TEXT_MUTED }}
+                            className={`transition-transform duration-200 group-hover:text-[#155EEF] ${
+                              isExpanded ? 'rotate-180' : ''
+                            }`}
+                          />
+                        </button>
                       )}
-                    </button>
+                    </div>
                   ) : (
-                    /* Standard nav link */
+                    /* Standard single nav link (Dashboard, Settings) */
                     <NavLink
                       to={item.path}
                       end={item.path === '/'}
                       onClick={() => setSidebarOpen(false)}
                       title={sidebarCollapsed ? item.name : undefined}
                       className={() =>
-                        `group relative flex items-center rounded-lg py-[9px] text-[13.5px] font-medium transition-colors ${sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'
+                        `group relative flex items-center transition-all duration-150 ${
+                          sidebarCollapsed
+                            ? 'h-10 w-10 justify-center rounded-xl p-0'
+                            : 'w-full justify-between rounded-lg py-[9px] px-3 text-[14.5px] font-semibold'
                         }`
                       }
                       style={({ isActive }) => ({
@@ -413,21 +534,27 @@ export const Layout = () => {
                     >
                       {({ isActive }) => (
                         <>
-                          <div className="flex items-center gap-2.5">
+                          <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
                             <item.icon
-                              size={17}
+                              size={18}
                               style={{ color: isActive ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : TEXT_MUTED }}
                               className="transition-colors"
                             />
                             {!sidebarCollapsed && <span className="whitespace-nowrap">{item.name}</span>}
                           </div>
                           {item.badge && !sidebarCollapsed && (
-                            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white shadow-xs" style={{ backgroundColor: COLOR_BADGE }}>
+                            <span
+                              className="flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white shadow-xs"
+                              style={{ backgroundColor: COLOR_BADGE }}
+                            >
                               {item.badge}
                             </span>
                           )}
                           {item.badge && sidebarCollapsed && (
-                            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full" style={{ backgroundColor: COLOR_BADGE }} />
+                            <span
+                              className="absolute right-1 top-1 h-2 w-2 rounded-full"
+                              style={{ backgroundColor: COLOR_BADGE }}
+                            />
                           )}
                         </>
                       )}
@@ -436,28 +563,52 @@ export const Layout = () => {
 
                   {/* Sub-menu rendering */}
                   {isExpanded && !sidebarCollapsed && item.subItems && (
-                    <div className="mt-1 mb-2 ml-7 flex flex-col space-y-0.5 border-l" style={{ borderColor: SIDEBAR_BORDER }}>
-                      {item.subItems.map((sub) => (
-                        <NavLink
-                          key={sub.name}
-                          to={sub.path}
-                          onClick={() => setSidebarOpen(false)}
-                          className={() =>
-                            `group flex items-center gap-2 px-3 py-1.5 text-[12.5px] font-medium transition-colors`
-                          }
-                          style={({ isActive }) => ({
-                            color: isActive ? COLOR_PRIMARY : TEXT_SECONDARY,
-                            backgroundColor: isActive ? SIDEBAR_ACTIVE_BG : 'transparent',
-                            borderRadius: '0 6px 6px 0',
-                            marginLeft: '-1px',
-                            borderLeft: isActive ? `2px solid ${COLOR_PRIMARY}` : '2px solid transparent'
-                          })}
-                        >
-                          {() => (
-                            <span className="whitespace-nowrap">{sub.name}</span>
-                          )}
-                        </NavLink>
-                      ))}
+                    <div
+                      className="mt-1 mb-2 ml-7 flex flex-col space-y-0.5 border-l"
+                      style={{ borderColor: SIDEBAR_BORDER }}
+                    >
+                      {item.subItems.map((sub, idx) => {
+                        const showCategoryHeader =
+                          sub.category &&
+                          (idx === 0 || item.subItems![idx - 1].category !== sub.category);
+
+                        return (
+                          <React.Fragment key={sub.name}>
+                            {showCategoryHeader && (
+                              <div className="px-3 pt-2.5 pb-1 text-[11px] font-bold tracking-wider text-slate-400 uppercase select-none">
+                                {sub.category}
+                              </div>
+                            )}
+                            <NavLink
+                              key={sub.name}
+                              to={sub.path}
+                              onClick={() => setSidebarOpen(false)}
+                              className="group flex items-center justify-between px-3 py-1.5 text-[13.5px] sm:text-[14px] font-medium transition-colors"
+                              style={({ isActive }) => ({
+                                color: isActive ? COLOR_PRIMARY : TEXT_SECONDARY,
+                                backgroundColor: isActive ? SIDEBAR_ACTIVE_BG : 'transparent',
+                                borderRadius: '0 6px 6px 0',
+                                marginLeft: '-1px',
+                                borderLeft: isActive ? `2px solid ${COLOR_PRIMARY}` : '2px solid transparent',
+                              })}
+                            >
+                              {() => (
+                                <>
+                                  <span className="whitespace-nowrap">{sub.name}</span>
+                                  {sub.badge && (
+                                    <span
+                                      className="flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold text-white shadow-2xs"
+                                      style={{ backgroundColor: COLOR_BADGE }}
+                                    >
+                                      {sub.badge}
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </NavLink>
+                          </React.Fragment>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -495,31 +646,47 @@ export const Layout = () => {
         </aside>
 
         {/* ── Main area ── */}
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-slate-50 relative">
-          <div className="flex-1 overflow-auto w-full p-4 sm:p-5 flex flex-col lg:flex-row gap-6 items-start transition-all duration-300">
-            <div className="flex-1 min-w-0 w-full">
-              <Outlet />
-            </div>
+        {(() => {
+          const isFullBleedPage =
+            location.pathname === '/contact' ||
+            location.pathname === '/product' ||
+            location.pathname === '/solutions' ||
+            location.pathname === '/reports';
 
-            <AIAssistantPanel
-              pageContext={getPageContext(location.pathname)}
-              isOpen={aiOpen}
-              onClose={() => setAiOpen(false)}
-            />
-          </div>
+          return (
+            <main className="flex min-w-0 flex-1 flex-col overflow-hidden relative bg-[#f0f6ff]">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden w-full flex flex-col transition-all duration-300">
+                <div
+                  className={`flex-1 w-full flex flex-col lg:flex-row ${
+                    isFullBleedPage ? 'p-0' : 'p-4 sm:p-5 gap-6'
+                  } items-start transition-all duration-300`}
+                >
+                  <div className="flex-1 min-w-0 w-full">
+                    <Outlet />
+                  </div>
 
-          {/* Floating AI Button across all pages when assistant panel is closed */}
-          {!aiOpen && (
-            <button
-              onClick={() => setAiOpen(true)}
-              className="fixed right-5 bottom-6 z-40 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 px-4 py-2.5 text-[12px] font-semibold text-white shadow-[0_4px_20px_rgba(99,102,241,0.35)] transition-all cursor-pointer hover:shadow-[0_6px_25px_rgba(99,102,241,0.5)] hover:scale-[1.02] active:scale-[0.98]"
-              title="Open ATLAS AI Assistant"
-            >
-              <Sparkles size={16} />
-              <span>Open ATLAS AI Assistant</span>
-            </button>
-          )}
-        </main>
+                  {aiOpen && (
+                    <div className={isFullBleedPage ? 'p-4 sm:p-6 shrink-0 w-full lg:w-auto' : 'shrink-0'}>
+                      <AIAssistantPanel
+                        pageContext={getPageContext(location.pathname)}
+                        isOpen={aiOpen}
+                        onClose={() => setAiOpen(false)}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* ── ATLAS Global Footer (Full-Width Light Blue Design across all pages) ── */}
+                <AtlasGlobalFooter />
+              </div>
+
+              {/* Draggable Floating AI Assistant Launcher across all pages when panel is closed */}
+              {!aiOpen && (
+                <DraggableChatbotLauncher onOpen={() => setAiOpen(true)} />
+              )}
+            </main>
+          );
+        })()}
       </div>
 
       {/* Global Command Palette / Search Modal */}

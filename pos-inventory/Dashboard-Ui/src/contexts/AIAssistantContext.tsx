@@ -44,7 +44,8 @@ export type AIAssistantPageContext =
   | 'finance_profitability_reports';
 
 export function getPageContextFromPathname(pathname: string): AIAssistantPageContext {
-  if (pathname === '/products' || pathname.startsWith('/products/')) return 'products';
+  if (pathname === '/product' || pathname === '/products' || pathname.startsWith('/products/')) return 'products';
+  if (pathname === '/solutions') return 'production';
   if (pathname === '/customers') return 'customers';
   if (pathname === '/pos') return 'pos';
   if (pathname === '/sales-orders') return 'sales_orders';
@@ -52,6 +53,7 @@ export function getPageContextFromPathname(pathname: string): AIAssistantPageCon
   if (pathname === '/sales' || pathname.startsWith('/sales/')) return 'invoices';
   if (pathname === '/returns') return 'returns';
   if (pathname === '/analytics') return 'analytics';
+  if (pathname === '/contact') return 'dashboard';
   if (pathname === '/settings') return 'settings';
 
   if (pathname === '/production/orders') return 'production_orders';

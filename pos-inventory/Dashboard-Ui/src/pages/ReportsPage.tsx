@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowRight,
@@ -14,10 +15,17 @@ import {
   ShoppingCart,
   TrendingUp,
   Warehouse,
+  CreditCard,
+  Sparkles,
+  Users,
+  Layers,
+  ShieldCheck,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import atlasLogo from '../assets/LOGO.png';
+import { useSystemHealth } from '../hooks/useSystemHealth';
 
 type ReportType = 'sales' | 'invoice' | 'payment' | 'inventory' | 'low-stock' | 'returns';
 type RangeKey = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all_time';
@@ -106,7 +114,9 @@ const writeRecentReports = (items: RecentReport[]) => {
 };
 
 export const ReportsPage = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
+  const { isSapConnected } = useSystemHealth();
   const [selectedReport, setSelectedReport] = useState<ReportType>('sales');
   const [range, setRange] = useState<RangeKey>('monthly');
   const [branch, setBranch] = useState(user?.branch_id || '');
@@ -123,6 +133,79 @@ export const ReportsPage = () => {
   const isAdmin = user?.role?.toLowerCase() === 'admin';
   const selectedMeta = REPORTS.find((item) => item.id === selectedReport) ?? REPORTS[0];
   const dateRangeLabel = RANGE_OPTIONS.find((item) => item.value === range)?.label ?? 'Custom';
+
+  const reportNavCards = [
+    {
+      title: 'Sales Reports',
+      path: '/reports/sales',
+      icon: TrendingUp,
+      iconBg: 'bg-blue-50',
+      iconColor: 'text-blue-600',
+      description: 'Comprehensive gross sales, order velocity, item and category sales performance.',
+      badge: 'Live',
+      badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    },
+    {
+      title: 'Invoice Reports',
+      path: '/reports/invoice',
+      icon: FileText,
+      iconBg: 'bg-purple-50',
+      iconColor: 'text-purple-600',
+      description: 'Tax invoice registry, payment status, GST summaries, and customer billing histories.',
+      badge: 'Live',
+      badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    },
+    {
+      title: 'Payment Reports',
+      path: '/reports/payment',
+      icon: CreditCard,
+      iconBg: 'bg-emerald-50',
+      iconColor: 'text-emerald-600',
+      description: 'Tender breakdowns, cashier reconciliation, UPI/card settlements, and bank audits.',
+      badge: 'Live',
+      badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    },
+    {
+      title: 'Inventory Reports',
+      path: '/reports/inventory',
+      icon: PackageSearch,
+      iconBg: 'bg-amber-50',
+      iconColor: 'text-amber-600',
+      description: 'Stock valuation, fast/slow moving items, warehouse movements, and reorder levels.',
+      badge: 'Live',
+      badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    },
+    {
+      title: 'Customer Reports',
+      path: '/reports/customer',
+      icon: Users,
+      iconBg: 'bg-cyan-50',
+      iconColor: 'text-cyan-600',
+      description: 'Customer purchase frequency, outstanding balances, account histories, and aging.',
+      badge: 'Beta',
+      badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
+    },
+    {
+      title: 'AI Generated Reports',
+      path: '/reports/ai',
+      icon: Sparkles,
+      iconBg: 'bg-indigo-50',
+      iconColor: 'text-indigo-600',
+      description: 'Automated executive narrative summaries and insights powered by ATLAS AI.',
+      badge: 'AI Assisted',
+      badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
+    },
+    {
+      title: 'Atlas Analytics',
+      path: '/analytics',
+      icon: BarChart3,
+      iconBg: 'bg-sky-50',
+      iconColor: 'text-sky-600',
+      description: 'Visual analytics, comparative period charts, multi-branch trends, and projections.',
+      badge: 'Interactive',
+      badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    },
+  ];
 
   const isSelectedReportSupported = ['sales', 'invoice', 'payment'].includes(selectedReport);
 
@@ -237,31 +320,159 @@ export const ReportsPage = () => {
   };
 
   return (
-    <div className="mx-auto max-w-[1500px] space-y-6 text-slate-100">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900">Reports & Exports</h1>
-          <p className="mt-1 text-sm text-slate-600">Generate and download operational reports for your business</p>
+    <div className="w-full min-h-screen bg-[#f0f6ff] text-slate-900 flex flex-col transition-all duration-300">
+      {/* ── Section A: Hero (Full-width edge-to-edge, Light Blue Enterprise Gradient) ── */}
+      <section className="relative w-full overflow-hidden border-b border-blue-200/90 bg-gradient-to-br from-blue-100 via-sky-50 to-indigo-100/70 px-6 sm:px-12 lg:px-16 xl:px-20 2xl:px-24 py-12 sm:py-16 shadow-xs">
+        {/* Ambient subtle light-blue glowing shapes */}
+        <div className="pointer-events-none absolute -right-20 -top-20 h-96 w-96 rounded-full bg-blue-300/30 blur-3xl" />
+        <div className="pointer-events-none absolute -left-20 -bottom-20 h-96 w-96 rounded-full bg-indigo-300/30 blur-3xl" />
+
+        <div className="relative z-10 max-w-5xl space-y-6">
+          {/* Logo & Section Badge */}
+          <div className="inline-flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/95 backdrop-blur-md border border-blue-200 shadow-xs">
+            <img
+              src={atlasLogo}
+              alt="ATLAS Logo"
+              className="h-9 w-9 object-contain drop-shadow-xs"
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-base font-black tracking-wider text-blue-700">ATLAS</span>
+              <span className="text-slate-500 text-xs font-semibold">• Reports Section</span>
+            </div>
+          </div>
+
+          {/* Headline */}
+          <h1 className="atlas-page-title text-3xl sm:text-4xl lg:text-[42px] font-extrabold text-slate-900">
+            Reports & Analytics <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700">Hub</span>
+          </h1>
+
+          {/* Description */}
+          <p className="atlas-body text-base sm:text-lg text-slate-600 max-w-3xl leading-relaxed">
+            Access specialized report modules for sales, invoices, tender payments, warehouse inventory, and customer intelligence, or generate customized multi-format exports.
+          </p>
+
+          {/* Action Buttons */}
+          <div className="pt-2 flex flex-wrap items-center gap-3.5">
+            <button
+              onClick={() => navigate('/analytics')}
+              className="inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[13.5px] sm:text-[14px] font-bold shadow-sm transition-all duration-150 cursor-pointer hover:shadow-md"
+            >
+              <BarChart3 size={16} />
+              <span>Atlas Analytics</span>
+            </button>
+
+            <button
+              onClick={() => {
+                const el = document.getElementById('custom-report-builder');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 text-[13.5px] sm:text-[14px] font-bold border border-blue-300 shadow-xs transition-all duration-150 cursor-pointer"
+            >
+              <Download size={16} />
+              <span>Custom Data Exports</span>
+            </button>
+
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('atls-toggle-ai', { detail: { open: true } }))}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/90 hover:bg-indigo-50 text-indigo-700 text-[13.5px] sm:text-[14px] font-bold border border-indigo-200 shadow-xs transition-all duration-150 cursor-pointer"
+            >
+              <Sparkles size={16} className="text-indigo-600" />
+              <span>Ask ATLAS AI</span>
+            </button>
+          </div>
+
+          {/* Verified System Status Pills */}
+          <div className="pt-3 flex flex-wrap items-center gap-3 text-xs text-slate-700">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/90 border border-blue-200/90 shadow-2xs">
+              <span className={`h-2 w-2 rounded-full ${isSapConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+              <span className="font-semibold text-[12px]">{isSapConnected ? 'SAP Business One Live Connected' : 'SAP Offline'}</span>
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/90 border border-blue-200/90 shadow-2xs">
+              <Layers size={13} className="text-blue-600" />
+              <span className="font-semibold text-[12px]">6 Report Modules + Visual Analytics</span>
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/90 border border-blue-200/90 shadow-2xs">
+              <ShieldCheck size={13} className="text-emerald-600" />
+              <span className="font-medium text-[12px]">On-Demand Multi-Format Data Exports</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Section B: Main Content (Full-width, Light Blue Background) ── */}
+      <section className="w-full py-10 sm:py-14 px-6 sm:px-12 lg:px-16 xl:px-20 2xl:px-24 space-y-8 bg-[#f0f6ff]">
+
+      {/* Reporting & Analytics Modules Grid */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="atlas-section-title text-lg sm:text-[21px] font-bold text-slate-900">Reporting & Analytics Modules</h2>
+          <span className="atlas-meta text-xs sm:text-sm text-slate-500 font-medium">6 Report Modules + Visual Analytics</span>
         </div>
 
-        <div className="flex items-center gap-3 self-end rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 shadow-sm">
-          <CalendarDays className="h-4 w-4 text-blue-600" />
-          <span>{dateRangeLabel}</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {reportNavCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <div
+                key={card.title}
+                onClick={() => navigate(card.path)}
+                className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs hover:shadow-md hover:border-blue-400 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col justify-between group"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-3 mb-2.5">
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${card.iconBg} ${card.iconColor} shadow-2xs group-hover:scale-105 transition-transform`}>
+                      <Icon size={18} />
+                    </div>
+                    {card.badge && (
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${card.badgeColor}`}>
+                        {card.badge}
+                      </span>
+                    )}
+                  </div>
+
+                  <h3 className="atlas-card-title text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                    {card.title}
+                  </h3>
+                  <p className="atlas-body-sm text-[13px] text-slate-500 mt-1 leading-relaxed">
+                    {card.description}
+                  </p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-blue-600 group-hover:text-blue-700">
+                  <span>Open {card.title}</span>
+                  <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-3 xl:grid-cols-[1.3fr_1.3fr_1.3fr_auto]">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      {/* Divider / Section Title for On-demand Report Builder */}
+      <div id="custom-report-builder" className="pt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between border-t border-blue-200/80">
+        <div>
+          <h2 className="atlas-section-title text-lg sm:text-[21px] font-bold tracking-tight text-slate-900">Custom Report Builder & Data Exports</h2>
+          <p className="mt-0.5 atlas-page-subtitle text-sm text-slate-500">Generate on-demand CSV / Excel data exports with custom date ranges and branch filters</p>
+        </div>
+
+        <div className="flex items-center gap-3 self-end rounded-xl border border-blue-200/90 bg-white px-3.5 py-2 text-xs text-slate-700 shadow-2xs">
+          <CalendarDays className="h-4 w-4 text-blue-600" />
+          <span className="font-semibold">{dateRangeLabel}</span>
+        </div>
+      </div>
+
+      <div className="grid gap-3 rounded-2xl border border-blue-200/80 bg-white p-4.5 shadow-xs md:grid-cols-3 xl:grid-cols-[1.3fr_1.3fr_1.3fr_auto]">
+        <div className="rounded-xl border border-blue-100 bg-slate-50/70 p-3">
           <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Date Range</label>
-          <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-100">
-            <CalendarDays className="h-4 w-4 text-blue-600" />
+          <div className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 text-sm text-slate-800 shadow-2xs">
+            <CalendarDays className="h-4 w-4 text-blue-600 shrink-0" />
             <select
               value={range}
               onChange={(event) => setRange(event.target.value as RangeKey)}
-              className="w-full bg-transparent text-sm text-slate-100 outline-none"
+              className="w-full bg-transparent text-sm text-slate-800 outline-none"
             >
               {RANGE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value} className="bg-slate-50 text-slate-200">
+                <option key={option.value} value={option.value} className="bg-white text-slate-800">
                   {option.label}
                 </option>
               ))}
@@ -269,32 +480,32 @@ export const ReportsPage = () => {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <div className="rounded-xl border border-blue-100 bg-slate-50/70 p-3">
           <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Branch</label>
-          <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-100">
-            <Warehouse className="h-4 w-4 text-blue-600" />
+          <div className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 text-sm text-slate-800 shadow-2xs">
+            <Warehouse className="h-4 w-4 text-blue-600 shrink-0" />
             <select
               value={branch}
               onChange={(event) => setBranch(event.target.value)}
               disabled={!isAdmin}
-              className="w-full bg-transparent text-sm text-slate-100 outline-none disabled:cursor-not-allowed"
+              className="w-full bg-transparent text-sm text-slate-800 outline-none disabled:cursor-not-allowed"
             >
-              <option value={user?.branch_id || ''} className="bg-slate-50">{user?.store_name || user?.branch_id || 'Current Branch'}</option>
+              <option value={user?.branch_id || ''} className="bg-white text-slate-800">{user?.store_name || user?.branch_id || 'Current Branch'}</option>
             </select>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <div className="rounded-xl border border-blue-100 bg-slate-50/70 p-3">
           <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Report Type</label>
-          <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-100">
-            <FileUp className="h-4 w-4 text-blue-600" />
+          <div className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 text-sm text-slate-800 shadow-2xs">
+            <FileUp className="h-4 w-4 text-blue-600 shrink-0" />
             <select
               value={selectedReport}
               onChange={(event) => setSelectedReport(event.target.value as ReportType)}
-              className="w-full bg-transparent text-sm text-slate-100 outline-none"
+              className="w-full bg-transparent text-sm text-slate-800 outline-none"
             >
               {reportTypeOptions.map((item) => (
-                <option key={item.value} value={item.value} className="bg-slate-50">
+                <option key={item.value} value={item.value} className="bg-white text-slate-800">
                   {item.label}
                 </option>
               ))}
@@ -306,7 +517,7 @@ export const ReportsPage = () => {
           type="button"
           onClick={handleGenerate}
           disabled={exportReport.isPending}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-900/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
         >
           <Download className="h-4 w-4" />
           {exportReport.isPending ? 'Exporting...' : 'Export'}
@@ -314,18 +525,18 @@ export const ReportsPage = () => {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.7fr)_320px]">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-blue-200/80 bg-white p-5 shadow-xs">
           <div className="mb-5 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-slate-600">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
               <FileText className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-slate-900">Report Builder</h2>
-              <p className="text-sm text-slate-500">Select a report type and configure the parameters below.</p>
+              <h2 className="atlas-section-title text-lg sm:text-[21px] font-bold text-slate-900">Report Builder</h2>
+              <p className="atlas-page-subtitle text-sm text-slate-500">Select a report type and configure the parameters below.</p>
             </div>
           </div>
 
-          <div className="mt-2 inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+          <div className="mt-2 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-700">
             {selectedMeta.supported ? 'Backend supported' : 'Currently unavailable'}
           </div>
 
@@ -340,19 +551,19 @@ export const ReportsPage = () => {
                   type="button"
                   onClick={() => setSelectedReport(item.id)}
                   className={[
-                    'flex min-h-[118px] flex-col items-start justify-between rounded-xl border p-4 text-left transition',
+                    'flex min-h-[118px] flex-col items-start justify-between rounded-xl border p-4 text-left transition cursor-pointer',
                     isSelected
-                      ? 'border-blue-500 bg-blue-500/10 shadow-sm shadow-blue-900/20'
-                      : 'border-slate-200 bg-slate-50 hover:border-slate-200',
+                      ? 'border-blue-500 bg-blue-50/70 shadow-xs'
+                      : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50',
                     !item.supported ? 'opacity-80' : '',
                   ].join(' ')}
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${isSelected ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600'}`}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div className="mt-3 w-full">
-                    <div className="text-lg font-semibold text-slate-900">{item.label}</div>
-                    <div className="mt-1 text-xs text-slate-500">{item.description}</div>
+                    <div className="atlas-card-title text-sm font-semibold text-slate-900">{item.label}</div>
+                    <div className="mt-1 atlas-body-sm text-xs text-slate-500">{item.description}</div>
                   </div>
                 </button>
               );
@@ -360,94 +571,94 @@ export const ReportsPage = () => {
           </div>
 
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-xl border border-blue-100 bg-slate-50/70 p-3">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Report Period</label>
-              <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2">
-                <CalendarDays className="h-4 w-4 text-blue-600" />
+              <div className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 shadow-2xs">
+                <CalendarDays className="h-4 w-4 text-blue-600 shrink-0" />
                 <input
                   type="date"
                   value={fromDate}
                   onChange={(event) => setFromDate(event.target.value)}
-                  className="w-full bg-transparent text-sm text-slate-100 outline-none"
+                  className="w-full bg-transparent text-sm text-slate-800 outline-none"
                 />
               </div>
               <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
                 <span>to</span>
-                <div className="h-px flex-1 bg-sky-800" />
+                <div className="h-px flex-1 bg-blue-200" />
               </div>
-              <div className="mt-2 flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2">
-                <CalendarDays className="h-4 w-4 text-blue-600" />
+              <div className="mt-2 flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 shadow-2xs">
+                <CalendarDays className="h-4 w-4 text-blue-600 shrink-0" />
                 <input
                   type="date"
                   value={toDate}
                   onChange={(event) => setToDate(event.target.value)}
-                  className="w-full bg-transparent text-sm text-slate-100 outline-none"
+                  className="w-full bg-transparent text-sm text-slate-800 outline-none"
                 />
               </div>
             </div>
 
             <div className="space-y-3">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="rounded-xl border border-blue-100 bg-slate-50/70 p-3">
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Group By</label>
-                <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2">
-                  <BarChart3 className="h-4 w-4 text-blue-600" />
-                  <select value={groupBy} onChange={(event) => setGroupBy(event.target.value)} className="w-full bg-transparent text-sm text-slate-100 outline-none">
-                    <option value="Date (Daily)" className="bg-slate-50">Date (Daily)</option>
-                    <option value="Branch" className="bg-slate-50">Branch</option>
-                    <option value="Customer" className="bg-slate-50">Customer</option>
+                <div className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 shadow-2xs">
+                  <BarChart3 className="h-4 w-4 text-blue-600 shrink-0" />
+                  <select value={groupBy} onChange={(event) => setGroupBy(event.target.value)} className="w-full bg-transparent text-sm text-slate-800 outline-none">
+                    <option value="Date (Daily)" className="bg-white text-slate-800">Date (Daily)</option>
+                    <option value="Branch" className="bg-white text-slate-800">Branch</option>
+                    <option value="Customer" className="bg-white text-slate-800">Customer</option>
                   </select>
-                  <ChevronDown className="h-4 w-4 text-blue-600" />
+                  <ChevronDown className="h-4 w-4 text-blue-600 shrink-0" />
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="rounded-xl border border-blue-100 bg-slate-50/70 p-3">
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Sales Type</label>
-                <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2">
-                  <ShoppingCart className="h-4 w-4 text-blue-600" />
-                  <select value={salesType} onChange={(event) => setSalesType(event.target.value)} className="w-full bg-transparent text-sm text-slate-100 outline-none">
-                    <option value="All Sales" className="bg-slate-50">All Sales</option>
-                    <option value="Cash" className="bg-slate-50">Cash</option>
-                    <option value="Card" className="bg-slate-50">Card</option>
+                <div className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 shadow-2xs">
+                  <ShoppingCart className="h-4 w-4 text-blue-600 shrink-0" />
+                  <select value={salesType} onChange={(event) => setSalesType(event.target.value)} className="w-full bg-transparent text-sm text-slate-800 outline-none">
+                    <option value="All Sales" className="bg-white text-slate-800">All Sales</option>
+                    <option value="Cash" className="bg-white text-slate-800">Cash</option>
+                    <option value="Card" className="bg-white text-slate-800">Card</option>
                   </select>
-                  <ChevronDown className="h-4 w-4 text-blue-600" />
+                  <ChevronDown className="h-4 w-4 text-blue-600 shrink-0" />
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="rounded-xl border border-blue-100 bg-slate-50/70 p-3">
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">Payment Method</label>
-                <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2">
-                  <TrendingUp className="h-4 w-4 text-blue-600" />
-                  <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="w-full bg-transparent text-sm text-slate-100 outline-none">
-                    <option value="All Payment Methods" className="bg-slate-50">All Payment Methods</option>
-                    <option value="Cash" className="bg-slate-50">Cash</option>
-                    <option value="Card" className="bg-slate-50">Card</option>
-                    <option value="Bank Transfer" className="bg-slate-50">Bank Transfer</option>
+                <div className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 shadow-2xs">
+                  <TrendingUp className="h-4 w-4 text-blue-600 shrink-0" />
+                  <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="w-full bg-transparent text-sm text-slate-800 outline-none">
+                    <option value="All Payment Methods" className="bg-white text-slate-800">All Payment Methods</option>
+                    <option value="Cash" className="bg-white text-slate-800">Cash</option>
+                    <option value="Card" className="bg-white text-slate-800">Card</option>
+                    <option value="Bank Transfer" className="bg-white text-slate-800">Bank Transfer</option>
                   </select>
-                  <ChevronDown className="h-4 w-4 text-blue-600" />
+                  <ChevronDown className="h-4 w-4 text-blue-600 shrink-0" />
                 </div>
               </div>
             </div>
           </div>
 
           <div className="mt-6 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
-              <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-100 px-2 py-1.5">
-                <input type="checkbox" defaultChecked className="h-4 w-4 accent-blue-500" />
+            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-700">
+              <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5 shadow-2xs cursor-pointer">
+                <input type="checkbox" defaultChecked className="h-4 w-4 accent-blue-600" />
                 <span>Include summary row and totals</span>
               </label>
-              <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-100 px-2 py-1.5">
-                <input type="checkbox" defaultChecked className="h-4 w-4 accent-blue-500" />
+              <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5 shadow-2xs cursor-pointer">
+                <input type="checkbox" defaultChecked className="h-4 w-4 accent-blue-600" />
                 <span>Add grand total and summary information</span>
               </label>
             </div>
 
             <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm text-slate-600">
-                <input type="checkbox" defaultChecked className="h-4 w-4 accent-blue-500" />
+              <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 shadow-2xs cursor-pointer">
+                <input type="checkbox" checked={outputFormat === 'csv'} onChange={() => setOutputFormat('csv')} className="h-4 w-4 accent-blue-600" />
                 CSV
               </label>
-              <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-100 px-2 py-1.5 text-sm text-slate-600">
-                <input type="checkbox" checked={outputFormat === 'xlsx'} onChange={() => setOutputFormat((current) => (current === 'csv' ? 'xlsx' : 'csv'))} className="h-4 w-4 accent-blue-500" />
+              <label className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700 shadow-2xs cursor-pointer">
+                <input type="checkbox" checked={outputFormat === 'xlsx'} onChange={() => setOutputFormat('xlsx')} className="h-4 w-4 accent-blue-600" />
                 XLSX
               </label>
             </div>
@@ -468,22 +679,22 @@ export const ReportsPage = () => {
           )}
 
           <div className="mt-6 flex justify-end">
-            <button
-              type="button"
-              onClick={handleGenerate}
-              disabled={exportReport.isPending}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-sm shadow-blue-900/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <ArrowRight className="h-4 w-4" />
-              {exportReport.isPending ? 'Generating...' : 'Generate Report'}
-            </button>
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={exportReport.isPending}
+                className="atlas-btn inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs sm:text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+              >
+                <ArrowRight className="h-4 w-4" />
+                {exportReport.isPending ? 'Generating...' : 'Generate Report'}
+              </button>
           </div>
         </div>
 
         <aside className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="mb-4 text-xl font-bold text-slate-900">About Reports</h3>
-            <ul className="space-y-3 text-sm text-slate-600">
+          <div className="rounded-2xl border border-blue-200/80 bg-white p-5 shadow-xs">
+            <h3 className="mb-3 atlas-card-title text-sm font-semibold text-slate-900">About Reports</h3>
+            <ul className="space-y-3 text-xs sm:text-[13px] text-slate-600">
               {[
                 'Reports show data based on your access level and branch permissions.',
                 'Real-time and historical data are refreshed from the active backend contract.',
@@ -498,8 +709,8 @@ export const ReportsPage = () => {
             </ul>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="mb-4 text-xl font-bold text-slate-900">Quick Reports</h3>
+          <div className="rounded-2xl border border-blue-200/80 bg-white p-5 shadow-xs">
+            <h3 className="mb-3 atlas-card-title text-sm font-semibold text-slate-900">Quick Reports</h3>
             <div className="space-y-2">
               {[
                 'Today\'s Sales Summary',
@@ -513,7 +724,7 @@ export const ReportsPage = () => {
                   key={label}
                   type="button"
                   onClick={() => setSelectedReport('sales')}
-                  className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-200 transition hover:border-slate-200"
+                  className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white hover:bg-blue-50 px-3 py-2 text-sm text-slate-700 font-medium transition cursor-pointer"
                 >
                   <span>{label}</span>
                   <ArrowRight className="h-4 w-4 text-blue-600" />
@@ -524,40 +735,40 @@ export const ReportsPage = () => {
         </aside>
       </div>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-2xl border border-blue-200/80 bg-white p-5 shadow-xs">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-bold text-slate-900">Recent Reports</h3>
-            <p className="text-sm text-slate-500">View and download previously generated reports.</p>
+            <h3 className="atlas-section-title text-base sm:text-[17px] font-semibold text-slate-900">Recent Reports</h3>
+            <p className="atlas-page-subtitle text-xs text-slate-500">View and download previously generated reports.</p>
           </div>
-          <button type="button" className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-600 hover:border-slate-200">
+          <button type="button" className="atlas-btn-sm rounded-lg border border-slate-200 bg-white hover:bg-blue-50 px-3 py-1.5 text-xs font-semibold text-slate-700 cursor-pointer shadow-2xs">
             View all
           </button>
         </div>
 
         <div className="overflow-hidden rounded-xl border border-slate-200">
-          <table className="min-w-full text-left text-sm text-slate-200">
-            <thead className="bg-slate-50 text-xs uppercase tracking-[0.18em] text-slate-600">
+          <table className="min-w-full text-left text-xs sm:text-[12.5px] text-slate-700">
+            <thead className="bg-slate-50 atlas-table-th">
               <tr>
-                <th className="px-4 py-3 font-medium">Report Name</th>
-                <th className="px-4 py-3 font-medium">Type</th>
-                <th className="px-4 py-3 font-medium">Period</th>
-                <th className="px-4 py-3 font-medium">Created Date</th>
-                <th className="px-4 py-3 font-medium">Requested By</th>
-                <th className="px-4 py-3 font-medium">Format</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium text-right">Action</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-700">Report Name</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-700">Type</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-700">Period</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-700">Created Date</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-700">Requested By</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-700">Format</th>
+                <th className="px-4 py-2.5 font-semibold text-slate-700">Status</th>
+                <th className="px-4 py-2.5 font-semibold text-right text-slate-700">Action</th>
               </tr>
             </thead>
             <tbody>
               {recentReports.map((report) => (
-                <tr key={report.id} className="border-t border-slate-200 bg-[#081d34] hover:bg-slate-50">
+                <tr key={report.id} className="border-t border-slate-200 bg-white hover:bg-blue-50/50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
                         {report.type === 'Sales' ? <ShoppingCart className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                       </div>
-                      <span className="font-medium text-slate-100">{report.name}</span>
+                      <span className="font-semibold text-slate-800">{report.name}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3">{report.type}</td>
@@ -571,7 +782,7 @@ export const ReportsPage = () => {
                     <span className="rounded bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">{report.status}</span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button type="button" className="rounded-md border border-slate-200 bg-slate-100 p-2 text-slate-600 hover:border-slate-200">
+                    <button type="button" className="rounded-md border border-slate-200 bg-white hover:bg-blue-50 p-2 text-slate-600 cursor-pointer shadow-2xs">
                       <Download className="h-4 w-4" />
                     </button>
                   </td>
@@ -580,6 +791,7 @@ export const ReportsPage = () => {
             </tbody>
           </table>
         </div>
+      </section>
       </section>
     </div>
   );

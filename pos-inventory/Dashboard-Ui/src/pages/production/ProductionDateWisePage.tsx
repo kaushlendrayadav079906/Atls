@@ -189,22 +189,22 @@ export const ProductionDateWisePage = () => {
       {/* HEADER */}
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <h1 className="text-[26px] font-bold leading-none tracking-tight text-slate-900">Date-wise Production</h1>
-          <p className="mt-1.5 text-[13px] text-slate-500">Analyze production output by date and selected period.</p>
+          <h1 className="atlas-page-title text-[28px] sm:text-[32px] md:text-[34px] font-bold leading-tight tracking-tight text-slate-900">Date-wise Production</h1>
+          <p className="mt-1.5 atlas-page-subtitle text-[14px] sm:text-[15px] text-slate-500 font-medium">Analyze production output by date and selected period.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700">
-            <Factory size={16} />
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13.5px] sm:text-[14px] font-semibold text-slate-700 shadow-sm">
+            <Factory size={18} className="text-blue-600" />
             {branchId ? `Branch: ${branchId}` : 'All Branches'}
           </div>
 
-          <div className="flex bg-white rounded-lg border border-slate-200 overflow-hidden text-[13px] font-medium">
+          <div className="flex bg-white rounded-xl border border-slate-200 overflow-hidden text-[13.5px] sm:text-[14px] font-semibold shadow-sm">
             {(['today', 'week', 'month', 'year', 'total'] as const).map((r) => (
               <button
                 key={r}
                 onClick={() => handleDateChange(r)}
-                className={`px-3 py-2 border-r border-slate-200 last:border-none transition-colors ${dateRange === r ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50'
+                className={`px-3.5 py-2 border-r border-slate-200 last:border-none transition-colors ${dateRange === r ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600 hover:bg-slate-50'
                   }`}
               >
                 {r.charAt(0).toUpperCase() + r.slice(1)}
@@ -212,13 +212,12 @@ export const ProductionDateWisePage = () => {
             ))}
           </div>
 
-
           <button
             onClick={handleRefresh}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-600 hover:bg-slate-50 transition"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition"
             title="Refresh Data"
           >
-            <RefreshCcw size={16} />
+            <RefreshCcw size={18} />
           </button>
         </div>
       </div>
@@ -265,14 +264,14 @@ export const ProductionDateWisePage = () => {
       )}
 
       {/* FILTER BAR */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center">
+      <div className="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center">
 
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-slate-700">Granularity:</label>
+        <div className="flex items-center gap-2.5">
+          <label className="text-[13.5px] sm:text-[14px] font-bold text-slate-700">Granularity:</label>
           <select
             value={granularity}
             onChange={(e) => { setGranularity(e.target.value as any); setPage(1); }}
-            className="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3.5 py-2 border border-slate-200 rounded-xl text-[13.5px] font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
           >
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
@@ -426,8 +425,8 @@ export const ProductionDateWisePage = () => {
       {/* DATE-WISE TABLE */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap min-w-[1000px]">
-            <thead className="bg-slate-50 text-slate-500 font-medium select-none">
+          <table className="w-full text-left text-[13.5px] sm:text-[14px] whitespace-nowrap min-w-[1000px]">
+            <thead className="bg-slate-50 text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500 select-none">
               <tr>
                 <th className="px-5 py-3 w-16">#</th>
                 <SortableHeader label="Date" field="date" currentSort={sortBy} sortOrder={sortOrder} onClick={handleSort} />
@@ -488,17 +487,17 @@ export const ProductionDateWisePage = () => {
         {/* PAGINATION */}
         {!isError && sortedItems.length > 0 && (
           <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
-            <div className="text-sm text-slate-500">
-              Showing <span className="font-medium text-slate-700">{((page - 1) * pageSize) + 1}</span> to <span className="font-medium text-slate-700">{Math.min(page * pageSize, sortedItems.length)}</span> of <span className="font-medium text-slate-700">{sortedItems.length}</span> records
+            <div className="text-[13.5px] sm:text-[14px] text-slate-500">
+              Showing <span className="font-bold text-slate-800">{((page - 1) * pageSize) + 1}</span> to <span className="font-bold text-slate-800">{Math.min(page * pageSize, sortedItems.length)}</span> of <span className="font-bold text-slate-800">{sortedItems.length}</span> records
             </div>
 
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500">Rows per page:</span>
+                <span className="text-[13.5px] sm:text-[14px] font-medium text-slate-500">Rows per page:</span>
                 <select
                   value={pageSize}
                   onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-                  className="px-2 py-1 bg-white border border-slate-200 rounded text-sm focus:outline-none"
+                  className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[13.5px] font-semibold text-slate-700 focus:outline-none"
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -507,21 +506,21 @@ export const ProductionDateWisePage = () => {
                 </select>
               </div>
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1.5 rounded bg-white border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-[13.5px] font-bold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition"
                 >
                   Previous
                 </button>
-                <div className="px-4 py-1.5 text-sm font-medium text-slate-700">
+                <div className="px-4 py-1.5 text-[13.5px] font-bold text-slate-800">
                   Page {page} of {totalPages}
                 </div>
                 <button
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages}
-                  className="px-3 py-1.5 rounded bg-white border border-slate-200 text-slate-600 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-[13.5px] font-bold hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition"
                 >
                   Next
                 </button>
@@ -562,12 +561,12 @@ const KpiCard = ({ title, value, icon, bgColor, loading }: {
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-medium text-slate-500 truncate">{title}</p>
+        <p className="atlas-card-title text-[13px] sm:text-[13.5px] font-bold uppercase tracking-wider text-slate-500 truncate">{title}</p>
         <div className="mt-1 flex items-baseline gap-2">
           {loading ? (
             <Skeleton className="h-7 w-20" />
           ) : (
-            <h3 className="text-2xl font-bold text-slate-900 truncate">
+            <h3 className="atlas-kpi-val text-2xl sm:text-[27px] font-black tracking-tight text-slate-900 truncate">
               {value}
             </h3>
           )}

@@ -21,11 +21,10 @@ import {
   User,
   X,
   Eye,
-  Edit,
-  Sparkles
+  Edit
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { AIAssistantPanel } from '../../components/AIAssistantPanel';
+import { useAIAssistant } from '../../contexts/AIAssistantContext';
 import { salesApi } from '../../api/sales';
 import { useDebounce } from '../../hooks/useDebounce';
 import type { DashboardRecentSalesPage, SaleDetail, DashboardRecentSale } from '../../types/sales';
@@ -139,45 +138,45 @@ export const InvoiceDetailPanel = ({ id, onClose, initialSale }: { id: number; o
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">{invoice.saleId}</h1>
-              <span className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border", 
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">{invoice.saleId}</h1>
+              <span className={cn("px-3 py-1 rounded-full text-[12px] font-bold uppercase tracking-wide border", 
                 isPending ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-emerald-50 text-emerald-600 border-emerald-200"
               )}>
                 {isPending ? 'Pending' : 'Completed'}
               </span>
             </div>
-            <p className="text-sm text-slate-500 mt-0.5">Sales Invoice</p>
+            <p className="text-[14px] text-slate-500 font-medium mt-0.5">Sales Invoice</p>
           </div>
         </div>
 
         {/* Info Grid */}
-        <div className="p-5 grid grid-cols-2 gap-y-4 gap-x-6 text-[13px] border-b border-slate-200">
+        <div className="p-5 grid grid-cols-2 gap-y-4 gap-x-6 text-[13.5px] sm:text-[14px] border-b border-slate-200">
           <div>
-            <div className="text-slate-500 mb-1">Invoice Date</div>
-            <div className="text-slate-900 font-medium flex items-center gap-1.5">
+            <div className="text-[12px] font-bold uppercase tracking-wider text-slate-500 mb-1">Invoice Date</div>
+            <div className="text-slate-900 font-semibold flex items-center gap-1.5">
               {invoice.createdAt ? new Date(invoice.createdAt).toLocaleString('en-IN', {
                 day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
               }) : '-'}
             </div>
           </div>
           <div>
-            <div className="text-slate-500 mb-1">Payment Method</div>
-            <div className="text-slate-900 font-medium flex items-center gap-1.5">
-              <CreditCard size={14} className="text-blue-600" />
+            <div className="text-[12px] font-bold uppercase tracking-wider text-slate-500 mb-1">Payment Method</div>
+            <div className="text-slate-900 font-semibold flex items-center gap-1.5">
+              <CreditCard size={15} className="text-blue-600" />
               N/A
             </div>
           </div>
           <div>
-            <div className="text-slate-500 mb-1">Customer</div>
-            <div className="text-slate-900 font-medium flex items-center gap-1.5">
-              <User size={14} className="text-blue-600" />
+            <div className="text-[12px] font-bold uppercase tracking-wider text-slate-500 mb-1">Customer</div>
+            <div className="text-slate-900 font-semibold flex items-center gap-1.5">
+              <User size={15} className="text-blue-600" />
               {invoice.customer || 'N/A'}
             </div>
           </div>
           <div>
-            <div className="text-slate-500 mb-1">Payment Status</div>
+            <div className="text-[12px] font-bold uppercase tracking-wider text-slate-500 mb-1">Payment Status</div>
             <div>
-              <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide border", 
+              <span className={cn("px-2.5 py-1 rounded-lg text-[12px] font-bold uppercase tracking-wide border", 
                 isPending ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-emerald-50 text-emerald-600 border-emerald-200"
               )}>
                 {isPending ? 'Pending' : 'Paid'}
@@ -185,20 +184,20 @@ export const InvoiceDetailPanel = ({ id, onClose, initialSale }: { id: number; o
             </div>
           </div>
           <div>
-            <div className="text-slate-500 mb-1">Contact</div>
-            <div className="text-slate-900 font-medium truncate">{invoice.customer || '-'}</div>
+            <div className="text-[12px] font-bold uppercase tracking-wider text-slate-500 mb-1">Contact</div>
+            <div className="text-slate-900 font-semibold truncate">{invoice.customer || '-'}</div>
           </div>
           <div>
-            <div className="text-slate-500 mb-1">Sales Person</div>
-            <div className="text-slate-900 font-medium">N/A</div>
+            <div className="text-[12px] font-bold uppercase tracking-wider text-slate-500 mb-1">Sales Person</div>
+            <div className="text-slate-900 font-semibold">N/A</div>
           </div>
           <div>
-            <div className="text-slate-500 mb-1">Branch</div>
-            <div className="text-slate-900 font-medium truncate">N/A</div>
+            <div className="text-[12px] font-bold uppercase tracking-wider text-slate-500 mb-1">Branch</div>
+            <div className="text-slate-900 font-semibold truncate">N/A</div>
           </div>
           <div>
-            <div className="text-slate-500 mb-1">Reference</div>
-            <div className="text-slate-900 font-medium">-</div>
+            <div className="text-[12px] font-bold uppercase tracking-wider text-slate-500 mb-1">Reference</div>
+            <div className="text-slate-900 font-semibold">-</div>
           </div>
         </div>
 
@@ -222,14 +221,14 @@ export const InvoiceDetailPanel = ({ id, onClose, initialSale }: { id: number; o
         {/* Items Table */}
         {activeTab === 'items' && (
           <div className="p-4">
-            <table className="w-full text-left text-[12px]">
+            <table className="w-full text-left text-[13.5px] sm:text-[14px]">
               <thead>
-                <tr className="text-slate-500 border-b border-slate-200">
-                  <th className="pb-2 font-medium w-8">#</th>
-                  <th className="pb-2 font-medium">Product</th>
-                  <th className="pb-2 font-medium text-center">Qty</th>
-                  <th className="pb-2 font-medium text-right">Price (₹)</th>
-                  <th className="pb-2 font-medium text-right">Total (₹)</th>
+                <tr className="text-slate-500 border-b border-slate-200 text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider">
+                  <th className="pb-2 w-8">#</th>
+                  <th className="pb-2">Product</th>
+                  <th className="pb-2 text-center">Qty</th>
+                  <th className="pb-2 text-right">Price (₹)</th>
+                  <th className="pb-2 text-right">Total (₹)</th>
                 </tr>
               </thead>
               <tbody className="text-slate-700">
@@ -307,19 +306,17 @@ export const SalesList = () => {
 
   const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
 
-  const [aiOpen, setAiOpen] = useState(false);
+  const { setPageFilters } = useAIAssistant();
 
   useEffect(() => {
-    const handler = (e: any) => {
-      if (e.detail?.open !== undefined) {
-        setAiOpen(e.detail.open);
-      } else {
-        setAiOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('atls-toggle-ai', handler);
-    return () => window.removeEventListener('atls-toggle-ai', handler);
-  }, []);
+    setPageFilters({
+      search: debouncedSearch,
+      quickFilter,
+      dateFrom,
+      dateTo,
+      page
+    });
+  }, [debouncedSearch, quickFilter, dateFrom, dateTo, page, setPageFilters]);
 
   const applyQuickFilter = (filter: QuickFilter) => {
     setQuickFilter(filter);
@@ -388,12 +385,12 @@ export const SalesList = () => {
 
   const getStatusBadge = (hasReturn: boolean, isPending: boolean = false) => {
     if (hasReturn) {
-      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-red-100 text-red-600 border border-red-500/30">Refunded</span>;
+      return <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[12px] font-bold uppercase tracking-wide bg-red-100 text-red-600 border border-red-500/30">Refunded</span>;
     }
     if (isPending) {
-      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-700 border border-amber-200">Pending</span>;
+      return <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[12px] font-bold uppercase tracking-wide bg-amber-50 text-amber-700 border border-amber-200">Pending</span>;
     }
-    return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-emerald-50 text-emerald-600 border border-emerald-200">Paid</span>;
+    return <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[12px] font-bold uppercase tracking-wide bg-emerald-50 text-emerald-600 border border-emerald-200">Paid</span>;
   };
 
   return (
@@ -405,8 +402,8 @@ export const SalesList = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Sales & Invoices</h1>
-            <p className="text-sm text-slate-500 mt-1">View, search and manage all sales invoices</p>
+            <h1 className="atlas-page-title text-[28px] sm:text-[32px] md:text-[34px] font-bold text-slate-900 tracking-tight">Sales & Invoices</h1>
+            <p className="atlas-page-subtitle text-[14px] sm:text-[15px] text-slate-500 font-medium mt-1">View, search and manage all sales invoices</p>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-slate-500 hidden sm:block">Dashboard {'>'} Sales & Invoices</span>
@@ -477,43 +474,43 @@ export const SalesList = () => {
 
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4 relative overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex items-center gap-4 relative overflow-hidden shadow-sm">
             <div className="h-12 w-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 border border-emerald-200">
-              <span className="text-xl font-bold">₹</span>
+              <span className="text-2xl font-black">₹</span>
             </div>
             <div>
-              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Gross Sales <span className="lowercase font-normal opacity-70">(Selected Period)</span></div>
-              <div className="text-xl font-bold text-slate-900">{fmt(data?.grossSales || 0)}</div>
+              <div className="atlas-card-title text-[13px] sm:text-[13.5px] font-bold text-slate-500 uppercase tracking-wider mb-1">Gross Sales <span className="lowercase font-normal opacity-70">(Selected Period)</span></div>
+              <div className="atlas-kpi-val text-2xl sm:text-[27px] font-black text-slate-900">{fmt(data?.grossSales || 0)}</div>
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4 relative overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex items-center gap-4 relative overflow-hidden shadow-sm">
             <div className="h-12 w-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 border border-blue-200">
-              <FileText size={20} />
+              <FileText size={24} />
             </div>
             <div>
-              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Invoices</div>
-              <div className="text-xl font-bold text-slate-900">{data?.total || 0}</div>
+              <div className="atlas-card-title text-[13px] sm:text-[13.5px] font-bold text-slate-500 uppercase tracking-wider mb-1">Total Invoices</div>
+              <div className="atlas-kpi-val text-2xl sm:text-[27px] font-black text-slate-900">{data?.total || 0}</div>
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4 relative overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex items-center gap-4 relative overflow-hidden shadow-sm">
             <div className="h-12 w-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 border border-emerald-200">
-              <CheckCircle2 size={20} />
+              <CheckCircle2 size={24} />
             </div>
             <div>
-              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Paid Invoices</div>
-              <div className="text-xl font-bold text-slate-900 flex items-baseline gap-1">{data?.paidInvoices || 0}</div>
+              <div className="atlas-card-title text-[13px] sm:text-[13.5px] font-bold text-slate-500 uppercase tracking-wider mb-1">Paid Invoices</div>
+              <div className="atlas-kpi-val text-2xl sm:text-[27px] font-black text-slate-900 flex items-baseline gap-1">{data?.paidInvoices || 0}</div>
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4 relative overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex items-center gap-4 relative overflow-hidden shadow-sm">
             <div className="h-12 w-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center flex-shrink-0 border border-amber-200">
-              <Clock size={20} />
+              <Clock size={24} />
             </div>
             <div>
-              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Pending / Due</div>
-              <div className="text-xl font-bold text-slate-900 flex items-baseline gap-1">{data?.pendingInvoices || 0}</div>
+              <div className="atlas-card-title text-[13px] sm:text-[13.5px] font-bold text-slate-500 uppercase tracking-wider mb-1">Pending / Due</div>
+              <div className="atlas-kpi-val text-2xl sm:text-[27px] font-black text-slate-900 flex items-baseline gap-1">{data?.pendingInvoices || 0}</div>
             </div>
           </div>
         </div>
@@ -561,8 +558,8 @@ export const SalesList = () => {
         {/* Table */}
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-1 flex flex-col min-h-[400px]">
           <div className="overflow-x-auto flex-1 ">
-            <table className="w-full text-left text-[13px] whitespace-nowrap">
-              <thead className="bg-white border-b border-slate-200 text-blue-600/70 font-semibold sticky top-0 z-10">
+            <table className="w-full text-left text-[13.5px] sm:text-[14px] whitespace-nowrap">
+              <thead className="bg-slate-50 border-b border-slate-200 text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-3 w-10 text-center"><input type="checkbox" className="rounded border-slate-200 bg-white text-blue-500" /></th>
                   <th className="px-4 py-3">Invoice No. <ArrowDown size={12} className="inline ml-1 opacity-50" /></th>
@@ -677,34 +674,6 @@ export const SalesList = () => {
           initialSale={data?.items?.find(s => s.docEntry === selectedSaleId)}
         />
       )}
-
-      {/* AI Assistant Right Panel */}
-      <AIAssistantPanel
-        pageContext="invoices"
-        pageFilters={{
-          search: debouncedSearch,
-          quickFilter,
-          dateFrom,
-          dateTo,
-          page
-        }}
-        isOpen={aiOpen}
-        onClose={() => setAiOpen(false)}
-        className="h-full rounded-none border-y-0 border-r-0 border-l"
-      />
-
-      {/* Floating AI Button when closed */}
-      {!aiOpen && (
-        <button
-          onClick={() => setAiOpen(true)}
-          className="fixed right-5 bottom-6 z-40 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 px-4 py-2.5 text-[12px] font-semibold text-white shadow-[0_4px_20px_rgba(99,102,241,0.35)] transition-all cursor-pointer hover:shadow-[0_6px_25px_rgba(99,102,241,0.5)] hover:scale-[1.02] active:scale-[0.98]"
-          title="Open ATLAS AI Assistant"
-        >
-          <Sparkles size={16} />
-          <span>Open ATLAS AI Assistant</span>
-        </button>
-      )}
-
     </div>
   );
 };

@@ -219,12 +219,12 @@ export const SalesReportPage = () => {
             <FileText className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Sales Report</h1>
-            <p className="mt-0.5 text-[13px] text-slate-500">View and export sales summary, items, and customer wise reports.</p>
+            <h1 className="atlas-page-title text-[28px] sm:text-[32px] font-bold tracking-tight text-slate-900">Sales Report</h1>
+            <p className="mt-1 atlas-page-subtitle text-sm sm:text-[15px] text-slate-500">View and export sales summary, items, and customer wise reports.</p>
           </div>
         </div>
         <button
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50 transition-colors cursor-pointer"
           disabled={loadingFeed || feedItems.length === 0}
           onClick={handleExport}
         >
@@ -234,12 +234,12 @@ export const SalesReportPage = () => {
       </div>
 
       {/* Filters */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-xl border border-slate-200 bg-white p-4.5 shadow-sm">
         <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-4">
           <div>
-            <label className="mb-1.5 block text-[11px] font-semibold text-slate-500">Date Range</label>
-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-900">
-              <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
+            <label className="mb-1.5 block text-[13px] font-semibold text-slate-600">Date Range</label>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-[13.5px] text-slate-900">
+              <CalendarDays className="h-4 w-4 text-blue-600" />
               <select value={range} onChange={(e) => setRange(e.target.value)} className="flex-1 bg-transparent outline-none">
                 <option value="daily">Today</option>
                 <option value="weekly">This Week</option>
@@ -345,14 +345,14 @@ export const SalesReportPage = () => {
           { title: 'Total Customers', val: overviewData ? `${overviewData.invoiceCount > 0 ? (overviewData.invoiceCount - 1) : 0}` : '0', color: 'text-blue-600', bg: 'bg-blue-50', icon: Users },
           { title: 'Avg. Order Value', val: overviewData ? money.format(overviewData.averageOrderValue) : '₹0.00', color: 'text-amber-500', bg: 'bg-amber-50', icon: ShoppingBag },
         ].map((card, i) => (
-          <div key={i} className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div key={i} className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${card.bg}`}>
               <card.icon className={`h-6 w-6 ${card.color}`} />
             </div>
             <div>
-              <p className="text-[12px] font-semibold text-slate-500 mb-0.5">{card.title}</p>
+              <p className="text-[13px] sm:text-[13.5px] font-semibold text-slate-500 mb-1">{card.title}</p>
               <div className="flex items-end gap-2">
-                <span className="text-[22px] font-bold text-slate-900 leading-none">
+                <span className="text-[25px] sm:text-[27px] font-extrabold text-slate-900 leading-none">
                   {loadingOverview ? '...' : card.val}
                 </span>
               </div>
@@ -365,22 +365,22 @@ export const SalesReportPage = () => {
       <div className="grid gap-5 lg:grid-cols-[1.8fr_1fr]">
 
         {/* Sales Overview (Composed Chart) */}
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col">
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <TrendingUp className="h-5 w-5 text-blue-600" />
-              <h3 className="font-bold text-slate-900">
+              <h3 className="text-[16px] sm:text-[17px] font-bold text-slate-900">
                 {appliedFilters.range === 'daily' ? "Today's Sales Overview" :
                   appliedFilters.range === 'weekly' ? "Weekly Sales Overview" :
                     appliedFilters.range === 'monthly' ? "Monthly Sales Overview" :
                       appliedFilters.range === 'yearly' ? "Yearly Sales Overview" : "Sales Overview"}
               </h3>
             </div>
-            <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 text-[11px] font-medium text-slate-500">
+            <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 text-[12px] font-semibold text-slate-600">
               {['daily', 'weekly', 'monthly', 'yearly', 'all_time'].map((p) => (
                 <button
                   key={p}
-                  className={`px-3 py-1.5 rounded-md transition-colors ${appliedFilters.range === p ? 'bg-blue-600 text-white font-semibold shadow-sm' : 'hover:text-slate-900'}`}
+                  className={`px-3 py-1.5 rounded-lg transition-colors ${appliedFilters.range === p ? 'bg-blue-600 text-white font-bold shadow-sm' : 'hover:text-slate-900'}`}
                   onClick={() => handleRangeChange(p)}
                 >
                   {p === 'daily' ? 'Today' : p === 'weekly' ? 'Week' : p === 'monthly' ? 'Month' : p === 'yearly' ? 'Year' : 'Total'}
@@ -542,15 +542,15 @@ export const SalesReportPage = () => {
               <button
                 key={tab}
                 onClick={() => { setActiveTab(tab); setPage(1); }}
-                className={`border-b-2 px-4 py-3.5 text-[13px] font-semibold transition-colors ${activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-900'
+                className={`border-b-2 px-5 py-4 text-[14px] font-semibold transition-colors cursor-pointer ${activeTab === tab ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-900'
                   }`}
               >
                 {tab}
               </button>
             ))}
           </div>
-          <button className="flex items-center gap-2 rounded border border-slate-200 px-3 py-1.5 text-[12px] font-medium text-slate-600 hover:bg-slate-50">
-            <Download className="h-3.5 w-3.5" />
+          <button className="flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer">
+            <Download className="h-4 w-4" />
             Download
           </button>
         </div>
@@ -559,45 +559,45 @@ export const SalesReportPage = () => {
           {activeTab === 'Sales Details' && (
             <>
               <div className="overflow-x-auto min-h-[300px]">
-                <table className="w-full min-w-[900px] text-left text-[13px]">
+                <table className="w-full min-w-[900px] text-left text-[13.5px] sm:text-[14px]">
                   <thead>
-                    <tr className="border-b border-slate-200 text-slate-500 bg-slate-50/50">
-                      <th className="px-4 py-3 font-semibold">#</th>
-                      <th className="px-4 py-3 font-semibold">Invoice No.</th>
-                      <th className="px-4 py-3 font-semibold">Date & Time</th>
-                      <th className="px-4 py-3 font-semibold">Customer</th>
-                      <th className="px-4 py-3 font-semibold">Items</th>
-                      <th className="px-4 py-3 font-semibold">Amount</th>
-                      <th className="px-4 py-3 font-semibold">Payment Method</th>
-                      <th className="px-4 py-3 font-semibold">Status</th>
-                      <th className="px-4 py-3 font-semibold text-center">Actions</th>
+                    <tr className="border-b border-slate-200 text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500 bg-slate-50/70">
+                      <th className="px-4 py-3.5">#</th>
+                      <th className="px-4 py-3.5">Invoice No.</th>
+                      <th className="px-4 py-3.5">Date & Time</th>
+                      <th className="px-4 py-3.5">Customer</th>
+                      <th className="px-4 py-3.5">Items</th>
+                      <th className="px-4 py-3.5">Amount</th>
+                      <th className="px-4 py-3.5">Payment Method</th>
+                      <th className="px-4 py-3.5">Status</th>
+                      <th className="px-4 py-3.5 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {loadingFeed ? (
-                      <tr><td colSpan={9} className="py-12 text-center text-slate-500">Loading details...</td></tr>
+                      <tr><td colSpan={9} className="py-12 text-center text-slate-500 text-sm">Loading details...</td></tr>
                     ) : feedItems.length === 0 ? (
-                      <tr><td colSpan={9} className="py-12 text-center text-slate-500">No invoices found for this period.</td></tr>
+                      <tr><td colSpan={9} className="py-12 text-center text-slate-500 text-sm">No invoices found for this period.</td></tr>
                     ) : (
                       feedItems.map((inv: any, i: number) => (
                         <tr key={i} className="group hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-3 text-slate-500">{(page - 1) * itemsPerPage + i + 1}</td>
-                          <td className="px-4 py-3 font-medium text-blue-600">INV-{inv.docNum || inv.saleId}</td>
-                          <td className="px-4 py-3 text-slate-600">{inv.docDate}</td>
-                          <td className="px-4 py-3 text-slate-900 font-medium">{inv.customerName || inv.customerCode || 'Walk-in'}</td>
+                          <td className="px-4 py-3 text-slate-400 text-[12.5px]">{(page - 1) * itemsPerPage + i + 1}</td>
+                          <td className="px-4 py-3 font-semibold text-blue-600">INV-{inv.docNum || inv.saleId}</td>
+                          <td className="px-4 py-3 text-slate-600 text-[13px]">{inv.docDate}</td>
+                          <td className="px-4 py-3 text-slate-900 font-semibold">{inv.customerName || inv.customerCode || 'Walk-in'}</td>
                           <td className="px-4 py-3 text-slate-600">{inv.items?.length || 0}</td>
-                          <td className="px-4 py-3 font-medium text-slate-900">{money.format(inv.total)}</td>
+                          <td className="px-4 py-3 font-bold text-slate-900">{money.format(inv.total)}</td>
                           <td className="px-4 py-3 text-slate-600">{inv.paymentMethod || 'Unknown'}</td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${inv.hasReturn ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+                            <span className={`inline-flex rounded-full px-2.5 py-1 text-[11.5px] font-bold ${inv.hasReturn ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'
                               }`}>
                               {inv.hasReturn ? 'Refunded' : 'Completed'}
                             </span>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex justify-center gap-2 text-slate-400">
-                              <button className="hover:text-blue-600 transition-colors"><Eye className="h-4 w-4" /></button>
-                              <button className="hover:text-slate-600 transition-colors"><MoreVertical className="h-4 w-4" /></button>
+                              <button className="hover:text-blue-600 transition-colors p-1"><Eye className="h-4 w-4" /></button>
+                              <button className="hover:text-slate-600 transition-colors p-1"><MoreVertical className="h-4 w-4" /></button>
                             </div>
                           </td>
                         </tr>
@@ -608,14 +608,14 @@ export const SalesReportPage = () => {
               </div>
 
               <div className="flex items-center justify-between border-t border-slate-200 p-4">
-                <span className="text-[12px] text-slate-500">
+                <span className="text-[13px] text-slate-500">
                   Showing {Math.min((page - 1) * itemsPerPage + 1, totalFeedItems)} to {Math.min(page * itemsPerPage, totalFeedItems)} of {totalFeedItems} invoices
                 </span>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setPage(Math.max(1, page - 1))}
                     disabled={page === 1}
-                    className="px-2 py-1 text-[12px] font-medium text-slate-500 hover:text-slate-900 disabled:opacity-50"
+                    className="px-2.5 py-1 text-[13px] font-semibold text-slate-500 hover:text-slate-900 disabled:opacity-50"
                   >
                     &lt;
                   </button>
@@ -625,7 +625,7 @@ export const SalesReportPage = () => {
                       <button
                         key={p}
                         onClick={() => setPage(p)}
-                        className={`h-7 w-7 rounded-md text-[12px] font-medium transition-colors ${p === page ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+                        className={`h-8 w-8 rounded-lg text-[13px] font-semibold transition-colors ${p === page ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
                       >
                         {p}
                       </button>
@@ -634,7 +634,7 @@ export const SalesReportPage = () => {
                   <button
                     onClick={() => setPage(Math.min(totalPages, page + 1))}
                     disabled={page >= totalPages}
-                    className="px-2 py-1 text-[12px] font-medium text-slate-500 hover:text-slate-900 disabled:opacity-50"
+                    className="px-2.5 py-1 text-[13px] font-semibold text-slate-500 hover:text-slate-900 disabled:opacity-50"
                   >
                     &gt;
                   </button>

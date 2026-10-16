@@ -35,6 +35,10 @@ import { OutgoingPaymentsPage } from './pages/finance/OutgoingPaymentsPage';
 import { CustomerAnalysisPage } from './pages/finance/CustomerAnalysisPage';
 import { SupplierAnalysisPage } from './pages/finance/SupplierAnalysisPage';
 import { ProfitabilityReportsPage } from './pages/finance/ProfitabilityReportsPage';
+import { ProductLandingPage } from './pages/ProductLandingPage';
+import { SolutionsLandingPage } from './pages/SolutionsLandingPage';
+import { ContactPage } from './pages/ContactPage';
+import { ReportPlaceholderPage } from './components/ReportPlaceholderPage';
 import { AIAssistantProvider } from './contexts/AIAssistantContext';
 
 const queryClient = new QueryClient({
@@ -81,6 +85,8 @@ function App() {
                 }
               >
                 <Route index element={<Dashboard />} />
+                <Route path="product" element={<ProductLandingPage />} />
+                <Route path="solutions" element={<SolutionsLandingPage />} />
                 <Route path="products" element={<ProductsStockPage />} />
                 <Route path="products/:id" element={<ProductsStockPage />} />
               <Route path="customers" element={<CustomersPage />} />
@@ -117,9 +123,27 @@ function App() {
                 <Route path="invoice" element={<InvoiceReportPage />} />
                 <Route path="payment" element={<PaymentReportPage />} />
                 <Route path="inventory" element={<InventoryReportPage />} />
-                <Route path="customer" element={<div className="p-8 text-slate-900">Customer Report - Building...</div>} />
-                <Route path="ai" element={<div className="p-8 text-slate-900">AI Report - Building...</div>} />
+                <Route
+                  path="customer"
+                  element={
+                    <ReportPlaceholderPage
+                      title="Customer Reports"
+                      description="In-depth customer retention, repeat purchase patterns, account aging, and lifetime value analytics are currently being mapped to your SAP Business One schema."
+                    />
+                  }
+                />
+                <Route
+                  path="ai"
+                  element={
+                    <ReportPlaceholderPage
+                      title="AI Generated Reports"
+                      description="Automated business intelligence narratives generated from your live SAP database. You can also ask queries directly using the ATLAS AI Assistant launcher."
+                      isAI={true}
+                    />
+                  }
+                />
               </Route>
+              <Route path="contact" element={<ContactPage />} />
               <Route path="settings" element={<SettingsUsersPage />} />
               {/* Fallback routes for "Coming soon" */}
               <Route path="*" element={<div className="p-8 text-center text-gray-500">Coming soon</div>} />

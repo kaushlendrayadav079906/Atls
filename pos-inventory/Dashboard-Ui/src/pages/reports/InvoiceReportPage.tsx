@@ -100,12 +100,12 @@ export const InvoiceReportPage = () => {
       {/* ── Page Header ──────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Invoice Report</h1>
-          <p className="mt-1.5 text-[14px] font-medium text-slate-500">
+          <h1 className="atlas-page-title text-[28px] sm:text-[32px] font-bold tracking-tight text-slate-900">Invoice Report</h1>
+          <p className="mt-1.5 atlas-page-subtitle text-sm sm:text-[15px] text-slate-500">
             View and analyze invoice details, payments and sales transactions.
           </p>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors w-fit">
+        <button className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4.5 py-2.5 text-[13.5px] font-semibold text-white shadow-sm hover:bg-blue-500 transition-colors w-fit cursor-pointer">
           <Download className="h-4 w-4" />
           Export
           <ChevronDown className="h-3.5 w-3.5 opacity-70" />
@@ -113,12 +113,12 @@ export const InvoiceReportPage = () => {
       </div>
 
       {/* ── Main Tabs ────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 mb-8 bg-slate-200/50 p-1 rounded-xl w-fit">
+      <div className="flex items-center gap-1 mb-8 bg-slate-200/50 p-1.5 rounded-xl w-fit">
         {['Invoice Report', 'Payment Report', 'Summary & Analytics'].map(tab => (
           <button
             key={tab}
             className={cn(
-              'px-5 py-2 text-[13px] font-semibold rounded-lg transition-all',
+              'px-5 py-2.5 text-[14px] font-semibold rounded-lg transition-all cursor-pointer',
               tab === 'Invoice Report'
                 ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/50'
                 : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
@@ -135,14 +135,14 @@ export const InvoiceReportPage = () => {
           <div key={i} className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)] hover:shadow-[0_4px_15px_-3px_rgba(6,81,237,0.1)] transition-shadow flex flex-col justify-between gap-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[12px] font-bold uppercase tracking-widest text-slate-500 mb-2">{card.title}</p>
-                <div className="text-2xl font-extrabold text-slate-900 tracking-tight">{card.val}</div>
+                <p className="text-[13px] sm:text-[13.5px] font-semibold uppercase tracking-wider text-slate-500 mb-1">{card.title}</p>
+                <div className="text-[25px] sm:text-[27px] font-extrabold text-slate-900 tracking-tight">{card.val}</div>
               </div>
-              <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', card.iconBg)}>
-                <card.icon className="h-5 w-5" />
+              <div className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl', card.iconBg)}>
+                <card.icon className="h-6 w-6" />
               </div>
             </div>
-            <div className="text-[12px]">
+            <div className="text-[12.5px]">
               {card.pct && (
                 <>
                   <span className={cn('font-bold', card.isUp ? 'text-emerald-600' : 'text-red-500')}>
@@ -228,12 +228,12 @@ export const InvoiceReportPage = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex-1 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 transition-colors shadow-sm">
+            <button className="atlas-btn flex-1 rounded-lg bg-blue-600 py-2 text-xs sm:text-[13px] font-semibold text-white hover:bg-blue-500 transition-colors shadow-sm cursor-pointer">
               Apply Filters
             </button>
             <button
               onClick={() => { setSearchTerm(''); setPage(1); }}
-              className="flex-1 rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+              className="atlas-btn-sm flex-1 rounded-lg border border-slate-200 bg-white py-2 text-xs sm:text-[13px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
             >
               Reset
             </button>
@@ -248,7 +248,7 @@ export const InvoiceReportPage = () => {
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={cn(
-              'px-4 py-2 text-[14px] font-bold rounded-lg transition-all relative',
+              'px-4 py-2 text-xs sm:text-[13px] font-semibold rounded-lg transition-all relative',
               activeTab === tab
                 ? 'text-blue-700 bg-blue-50/50'
                 : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
@@ -265,21 +265,21 @@ export const InvoiceReportPage = () => {
       {/* ── Table ────────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)] overflow-hidden flex flex-col">
         <div className="overflow-x-auto flex-1">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-slate-50/80 border-b border-slate-200/80">
+          <table className="w-full text-left text-[13.5px] sm:text-[14px] whitespace-nowrap">
+            <thead className="bg-slate-50/80 border-b border-slate-200/80 text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-5 py-4 text-center w-10 text-[11px] font-bold uppercase tracking-widest text-slate-500">#</th>
-                <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">Invoice No</th>
-                <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">Customer</th>
-                <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">Date &amp; Time</th>
-                <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">Amount</th>
-                <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">Payment Method</th>
-                <th className="px-5 py-4 text-center text-[11px] font-bold uppercase tracking-widest text-slate-500">Status</th>
-                <th className="px-5 py-4 text-center text-[11px] font-bold uppercase tracking-widest text-slate-500">Payment Status</th>
-                <th className="px-5 py-4 text-center text-[11px] font-bold uppercase tracking-widest text-slate-500">Actions</th>
+                <th className="px-4 py-3.5 text-center w-10">#</th>
+                <th className="px-4 py-3.5">Invoice No</th>
+                <th className="px-4 py-3.5">Customer</th>
+                <th className="px-4 py-3.5">Date &amp; Time</th>
+                <th className="px-4 py-3.5">Amount</th>
+                <th className="px-4 py-3.5">Payment Method</th>
+                <th className="px-4 py-3.5 text-center">Status</th>
+                <th className="px-4 py-3.5 text-center">Payment Status</th>
+                <th className="px-4 py-3.5 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody className="divide-y divide-slate-100 bg-white text-[13.5px] sm:text-[14px]">
               {isLoading ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-16 text-center">
@@ -302,27 +302,27 @@ export const InvoiceReportPage = () => {
 
                 return (
                   <tr key={sale.docEntry || idx} className="hover:bg-slate-50/60 transition-colors group">
-                    <td className="px-5 py-4 text-center text-[13px] font-medium text-slate-400">{rowIndex}</td>
-                    <td className="px-5 py-4 text-[13px] font-bold text-blue-600">{sale.saleId}</td>
-                    <td className="px-5 py-4 text-[14px] font-semibold text-slate-800">{sale.customerName || 'Walk-in'}</td>
+                    <td className="px-5 py-4 text-center text-[12.5px] font-medium text-slate-400">{rowIndex}</td>
+                    <td className="px-5 py-4 text-[13.5px] font-bold text-blue-600">{sale.saleId}</td>
+                    <td className="px-5 py-4 text-[14.5px] font-semibold text-slate-800">{sale.customerName || 'Walk-in'}</td>
                     <td className="px-5 py-4 text-[13px] font-medium text-slate-500">{sale.docDate}</td>
-                    <td className="px-5 py-4 text-[14px] font-extrabold text-slate-900">{fmt(sale.total)}</td>
-                    <td className="px-5 py-4 text-[13px] font-medium text-slate-600 capitalize">{sale.paymentMethod || 'Cash'}</td>
+                    <td className="px-5 py-4 text-[15px] font-extrabold text-slate-900">{fmt(sale.total)}</td>
+                    <td className="px-5 py-4 text-[13.5px] font-medium text-slate-600 capitalize">{sale.paymentMethod || 'Cash'}</td>
                     <td className="px-5 py-4 text-center">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-bold tracking-wide bg-emerald-50 text-emerald-700 border border-emerald-200/60">
                         Completed
                       </span>
                     </td>
                     <td className="px-5 py-4 text-center">
-                      <span className={cn('inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold tracking-wide border', pClass)}>
+                      <span className={cn('inline-flex items-center px-3 py-1 rounded-full text-[12px] font-bold tracking-wide border', pClass)}>
                         {paymentStatus}
                       </span>
                     </td>
                     <td className="px-5 py-4 text-center">
                       <div className="flex items-center justify-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                        <button onClick={(e) => { e.stopPropagation(); setSelectedSaleId(sale.docEntry!); }} className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"><Eye className="w-4 h-4" /></button>
-                        <button className="p-1 text-slate-400 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"><Download className="w-4 h-4" /></button>
-                        <button className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded transition-colors"><MoreVertical className="w-4 h-4" /></button>
+                        <button onClick={(e) => { e.stopPropagation(); setSelectedSaleId(sale.docEntry!); }} className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"><Eye className="w-4.5 h-4.5" /></button>
+                        <button className="p-1 text-slate-400 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"><Download className="w-4.5 h-4.5" /></button>
+                        <button className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded transition-colors"><MoreVertical className="w-4.5 h-4.5" /></button>
                       </div>
                     </td>
                   </tr>
@@ -333,8 +333,8 @@ export const InvoiceReportPage = () => {
         </div>
 
         {/* ── Pagination ───────────────────────────────────────────── */}
-        <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between">
-          <div className="text-sm text-slate-500">
+        <div className="border-t border-slate-200 bg-slate-50 px-4 py-3.5 flex items-center justify-between">
+          <div className="text-[13.5px] text-slate-500">
             Showing{' '}
             <span className="font-semibold text-slate-700">{data?.total ? offset + 1 : 0}</span>
             {' '}–{' '}

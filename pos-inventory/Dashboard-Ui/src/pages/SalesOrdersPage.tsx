@@ -5,11 +5,12 @@ import { useDebounce } from '../hooks/useDebounce';
 import {
   FileText, Clock, CheckCircle2, XCircle, Search, Filter, RotateCcw, 
   MoreVertical, Download, Plus, Eye, Edit, ChevronLeft, ChevronRight,
-  Calendar, ChevronDown, Sparkles
+  Calendar, ChevronDown
 } from 'lucide-react';
-import { AIAssistantPanel } from '../components/AIAssistantPanel';
+import { useAIAssistant } from '../contexts/AIAssistantContext';
 
 export default function SalesOrdersPage() {
+  const { setPageFilters } = useAIAssistant();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState('');
@@ -26,19 +27,16 @@ export default function SalesOrdersPage() {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
 
-  const [aiOpen, setAiOpen] = useState(false);
-
   useEffect(() => {
-    const handler = (e: any) => {
-      if (e.detail?.open !== undefined) {
-        setAiOpen(e.detail.open);
-      } else {
-        setAiOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('atls-toggle-ai', handler);
-    return () => window.removeEventListener('atls-toggle-ai', handler);
-  }, []);
+    setPageFilters({
+      search: debouncedSearch,
+      status: statusFilter,
+      customer: customerFilter,
+      quickFilter,
+      dateFrom,
+      dateTo
+    });
+  }, [debouncedSearch, statusFilter, customerFilter, quickFilter, dateFrom, dateTo, setPageFilters]);
   
   const applyQuickFilter = (filter: QuickFilter) => {
     setQuickFilter(filter);
@@ -171,20 +169,18 @@ export default function SalesOrdersPage() {
   };
 
   return (
-    <div className="p-6 w-full min-w-0 transition-all duration-300">
-      <div className="flex flex-col lg:flex-row gap-6 items-start w-full min-w-0">
-        <div className="flex-1 min-w-0 w-full space-y-6">
+    <div className="p-6 w-full min-w-0 space-y-6 transition-all duration-300">
           {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Sales Orders</h1>
-          <p className="text-slate-500 mt-1">Manage and track customer purchase orders from SAP Business One.</p>
+          <h1 className="atlas-page-title text-[28px] sm:text-[32px] md:text-[34px] font-bold text-slate-900">Sales Orders</h1>
+          <p className="atlas-page-subtitle text-[14px] sm:text-[15px] text-slate-500 mt-1">Manage and track customer purchase orders from SAP Business One.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative date-dropdown-container">
             <button 
               onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-              className="flex items-center gap-2 px-4 py-2 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors font-medium text-sm"
+              className="flex items-center gap-2 px-4 py-2.5 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors font-semibold text-[13.5px]"
             >
               <Calendar className="w-4 h-4 text-slate-500" />
               {quickFilter ? (
@@ -199,41 +195,41 @@ export default function SalesOrdersPage() {
               <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 shadow-lg rounded-lg py-1 z-50">
                 <button
                   onClick={() => { applyQuickFilter(''); setIsDateDropdownOpen(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                    quickFilter === '' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
+                  className={`w-full text-left px-4 py-2 text-[13.5px] transition-colors ${
+                    quickFilter === '' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50 font-medium'
                   }`}
                 >
                   All Dates (Total)
                 </button>
-                <div className="px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50">Quick Filters</div>
+                <div className="px-3 py-2 text-[11.5px] font-bold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50">Quick Filters</div>
                 {(['today', 'week', 'month', 'year'] as const).map(f => {
                   const label = f === 'today' ? 'Today' : `This ${f.charAt(0).toUpperCase() + f.slice(1)}`;
                   return (
                     <button
                       key={f}
                       onClick={() => { applyQuickFilter(f); setIsDateDropdownOpen(false); }}
-                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                        quickFilter === f ? 'bg-blue-50 text-blue-700 font-medium' : 'text-slate-700 hover:bg-slate-50'
+                      className={`w-full text-left px-4 py-2 text-[13.5px] transition-colors ${
+                        quickFilter === f ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50 font-medium'
                       }`}
                     >
                       {label}
                     </button>
                   );
                 })}
-                <div className="px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50 mt-1">Custom Range</div>
+                <div className="px-3 py-2 text-[11.5px] font-bold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50 mt-1">Custom Range</div>
                 <div className="p-3 flex flex-col gap-2">
                   <div>
-                    <label className="text-[11px] text-slate-500 mb-1 block">From</label>
-                    <input type="date" className="w-full text-sm border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+                    <label className="text-[12px] font-semibold text-slate-600 mb-1 block">From</label>
+                    <input type="date" className="w-full text-[13px] border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-blue-500" value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
                   </div>
                   <div>
-                    <label className="text-[11px] text-slate-500 mb-1 block">To</label>
-                    <input type="date" className="w-full text-sm border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={customTo} onChange={e => setCustomTo(e.target.value)} />
+                    <label className="text-[12px] font-semibold text-slate-600 mb-1 block">To</label>
+                    <input type="date" className="w-full text-[13px] border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-blue-500" value={customTo} onChange={e => setCustomTo(e.target.value)} />
                   </div>
                   <button 
                     disabled={!customFrom || !customTo}
                     onClick={() => { applyQuickFilter('custom'); setIsDateDropdownOpen(false); }}
-                    className="w-full mt-2 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded font-medium text-sm transition-colors"
+                    className="w-full mt-2 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-lg font-semibold text-[13px] transition-colors shadow-sm"
                   >
                     Apply Custom
                   </button>
@@ -241,16 +237,16 @@ export default function SalesOrdersPage() {
               </div>
             )}
           </div>
-          <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 bg-white">
+          <button className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 bg-white">
             <MoreVertical className="w-5 h-5" />
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 text-blue-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors font-semibold text-sm">
+          <button className="flex items-center gap-2 px-4 py-2.5 text-blue-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors font-semibold text-[13.5px]">
             <Download className="w-4 h-4" />
             Import from Excel
           </button>
           <button 
             onClick={() => alert("Create Sales Order backend operation is not currently implemented.")}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold text-sm shadow-sm"
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold text-[13.5px] shadow-sm"
           >
             <Plus className="w-4 h-4" />
             Create Sales Order
@@ -265,9 +261,9 @@ export default function SalesOrdersPage() {
             <FileText className="w-6 h-6" />
           </div>
           <div className="flex-1">
-            <p className="text-[13px] font-semibold text-slate-500">Total Sales Orders</p>
+            <p className="text-[13.5px] font-semibold text-slate-600">Total Sales Orders</p>
             {summaryLoading ? <div className="h-8 w-16 bg-slate-100 animate-pulse rounded mt-1"></div> : (
-              <h3 className="text-[28px] font-bold text-slate-900 leading-tight mt-1">{summary?.total_orders || 0}</h3>
+              <h3 className="text-[26px] sm:text-[28px] font-black text-slate-900 leading-tight mt-1">{summary?.total_orders || 0}</h3>
             )}
           </div>
         </div>
@@ -276,11 +272,11 @@ export default function SalesOrdersPage() {
             <Clock className="w-6 h-6" />
           </div>
           <div className="flex-1">
-            <p className="text-[13px] font-semibold text-slate-500">Pending Orders</p>
+            <p className="text-[13.5px] font-semibold text-slate-600">Pending Orders</p>
             {summaryLoading ? <div className="h-8 w-16 bg-slate-100 animate-pulse rounded mt-1"></div> : (
-              <h3 className="text-[28px] font-bold text-slate-900 leading-tight mt-1">{summary?.pending_orders || 0}</h3>
+              <h3 className="text-[26px] sm:text-[28px] font-black text-slate-900 leading-tight mt-1">{summary?.pending_orders || 0}</h3>
             )}
-            <p className="text-[11px] text-slate-400 mt-1">Awaiting delivery</p>
+            <p className="text-[12px] font-medium text-slate-400 mt-1">Awaiting delivery</p>
           </div>
         </div>
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
@@ -288,11 +284,11 @@ export default function SalesOrdersPage() {
             <CheckCircle2 className="w-6 h-6" />
           </div>
           <div className="flex-1">
-            <p className="text-[13px] font-semibold text-slate-500">Completed Orders</p>
+            <p className="text-[13.5px] font-semibold text-slate-600">Completed Orders</p>
             {summaryLoading ? <div className="h-8 w-16 bg-slate-100 animate-pulse rounded mt-1"></div> : (
-              <h3 className="text-[28px] font-bold text-slate-900 leading-tight mt-1">{summary?.completed_orders || 0}</h3>
+              <h3 className="text-[26px] sm:text-[28px] font-black text-slate-900 leading-tight mt-1">{summary?.completed_orders || 0}</h3>
             )}
-            <p className="text-[11px] text-slate-400 mt-1">Delivered & Invoiced</p>
+            <p className="text-[12px] font-medium text-slate-400 mt-1">Delivered & Invoiced</p>
           </div>
         </div>
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
@@ -300,11 +296,11 @@ export default function SalesOrdersPage() {
             <XCircle className="w-6 h-6" />
           </div>
           <div className="flex-1">
-            <p className="text-[13px] font-semibold text-slate-500">Cancelled Orders</p>
+            <p className="text-[13.5px] font-semibold text-slate-600">Cancelled Orders</p>
             {summaryLoading ? <div className="h-8 w-16 bg-slate-100 animate-pulse rounded mt-1"></div> : (
-              <h3 className="text-[28px] font-bold text-slate-900 leading-tight mt-1">{summary?.cancelled_orders || 0}</h3>
+              <h3 className="text-[26px] sm:text-[28px] font-black text-slate-900 leading-tight mt-1">{summary?.cancelled_orders || 0}</h3>
             )}
-            <p className="text-[11px] text-slate-400 mt-1">Cancelled by user</p>
+            <p className="text-[12px] font-medium text-slate-400 mt-1">Cancelled by user</p>
           </div>
         </div>
       </div>
@@ -313,19 +309,19 @@ export default function SalesOrdersPage() {
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block text-[12px] font-medium text-slate-700 mb-1">Customer</label>
+            <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Customer</label>
             <input 
                type="text" 
-               className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-blue-500" 
+               className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-800" 
                placeholder="All Customers" 
                value={customerFilter}
                onChange={(e) => setCustomerFilter(e.target.value)}
             />
           </div>
           <div>
-            <label className="block text-[12px] font-medium text-slate-700 mb-1">Status</label>
+            <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Status</label>
             <select 
-               className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-blue-500"
+               className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-700 bg-white"
                value={statusFilter}
                onChange={(e) => setStatusFilter(e.target.value)}
             >
@@ -336,26 +332,26 @@ export default function SalesOrdersPage() {
             </select>
           </div>
           <div>
-            <label className="block text-[12px] font-medium text-slate-700 mb-1">Buyer</label>
-            <input type="text" className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-blue-500" placeholder="All Buyers" disabled />
+            <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Buyer</label>
+            <input type="text" className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 bg-slate-50 text-slate-500" placeholder="All Buyers" disabled />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div>
-            <label className="block text-[12px] font-medium text-slate-700 mb-1">Branch</label>
-            <input type="text" className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none bg-slate-50" placeholder="Authorized Branch Only" disabled />
+            <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Branch</label>
+            <input type="text" className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none bg-slate-50 text-slate-500" placeholder="Authorized Branch Only" disabled />
           </div>
           <div>
-            <label className="block text-[12px] font-medium text-slate-700 mb-1">Warehouse</label>
-            <input type="text" className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 outline-none" placeholder="All Warehouses" disabled />
+            <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Warehouse</label>
+            <input type="text" className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none bg-slate-50 text-slate-500" placeholder="All Warehouses" disabled />
           </div>
           <div>
-            <label className="block text-[12px] font-medium text-slate-700 mb-1">Search</label>
+            <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Search</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input 
                 type="text" 
-                className="w-full text-sm border border-slate-200 rounded-lg pl-9 pr-3 py-2 outline-none focus:border-blue-500" 
+                className="w-full text-[13.5px] border border-slate-200 rounded-lg pl-9 pr-3.5 py-2.5 outline-none focus:border-blue-500 text-slate-800" 
                 placeholder="Search by PO number, customer..." 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -363,11 +359,11 @@ export default function SalesOrdersPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 justify-end">
-             <button onClick={() => setPage(1)} className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-4 py-2 rounded-lg transition-colors">
+             <button onClick={() => setPage(1)} className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[13.5px] px-4 py-2.5 rounded-lg transition-colors shadow-sm">
                <Filter className="w-4 h-4" />
                Apply Filters
              </button>
-             <button onClick={handleReset} className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-sm px-4 py-2 rounded-lg transition-colors">
+             <button onClick={handleReset} className="flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold text-[13.5px] px-4 py-2.5 rounded-lg transition-colors">
                <RotateCcw className="w-4 h-4" />
                Reset
              </button>
@@ -380,29 +376,29 @@ export default function SalesOrdersPage() {
          <div className="flex items-center justify-between p-4 border-b border-slate-200">
             <div className="flex items-center gap-2">
                <FileText className="w-5 h-5 text-blue-600" />
-               <h2 className="text-lg font-bold text-slate-900">Sales Orders ({ordersData?.total || 0})</h2>
+               <h2 className="text-[16px] sm:text-[17px] font-bold text-slate-900">Sales Orders ({ordersData?.total || 0})</h2>
             </div>
-            <button className="flex items-center gap-2 px-3 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg text-sm font-semibold transition-colors">
+            <button className="flex items-center gap-2 px-3.5 py-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg text-[13.5px] font-semibold transition-colors">
                <Download className="w-4 h-4" />
                Export
             </button>
          </div>
 
          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-               <thead className="bg-slate-50 border-b border-slate-200">
+            <table className="w-full text-left text-[13.5px] sm:text-[14px] whitespace-nowrap">
+               <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[12px] sm:text-[12.5px]">
                   <tr>
-                     <th className="px-4 py-3 font-semibold text-slate-500 text-[12px]"><input type="checkbox" className="rounded border-slate-300" /></th>
-                     <th className="px-4 py-3 font-semibold text-slate-500 text-[12px]">#</th>
-                     <th className="px-4 py-3 font-semibold text-slate-500 text-[12px]">SO No.</th>
-                     <th className="px-4 py-3 font-semibold text-slate-500 text-[12px]">Order Date</th>
-                     <th className="px-4 py-3 font-semibold text-slate-500 text-[12px]">Customer Code</th>
-                     <th className="px-4 py-3 font-semibold text-slate-500 text-[12px]">Customer Name</th>
-                     <th className="px-4 py-3 font-semibold text-slate-500 text-[12px] text-right">Total Amount</th>
-                     <th className="px-4 py-3 font-semibold text-slate-500 text-[12px] text-center">Status</th>
-                     <th className="px-4 py-3 font-semibold text-slate-500 text-[12px]">Expected Date</th>
-                     <th className="px-4 py-3 font-semibold text-slate-500 text-[12px]">Created By</th>
-                     <th className="px-4 py-3 font-semibold text-slate-500 text-[12px] text-center">Actions</th>
+                     <th className="px-4 py-3.5"><input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" /></th>
+                     <th className="px-4 py-3.5">#</th>
+                     <th className="px-4 py-3.5">SO No.</th>
+                     <th className="px-4 py-3.5">Order Date</th>
+                     <th className="px-4 py-3.5">Customer Code</th>
+                     <th className="px-4 py-3.5">Customer Name</th>
+                     <th className="px-4 py-3.5 text-right">Total Amount</th>
+                     <th className="px-4 py-3.5 text-center">Status</th>
+                     <th className="px-4 py-3.5">Expected Date</th>
+                     <th className="px-4 py-3.5">Created By</th>
+                     <th className="px-4 py-3.5 text-center">Actions</th>
                   </tr>
                </thead>
                <tbody className="divide-y divide-slate-100">
@@ -411,42 +407,42 @@ export default function SalesOrdersPage() {
                         <td colSpan={11} className="py-12">
                            <div className="flex flex-col items-center justify-center gap-3">
                               <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                              <div className="text-slate-500 text-sm font-medium">Loading purchase orders...</div>
+                              <div className="text-slate-500 text-[14px] font-medium">Loading purchase orders...</div>
                            </div>
                         </td>
                      </tr>
                   ) : isError ? (
                      <tr>
-                        <td colSpan={11} className="py-12 text-center text-red-500 font-medium">Unable to load purchase orders.</td>
+                        <td colSpan={11} className="py-12 text-center text-red-500 font-semibold text-[14px]">Unable to load purchase orders.</td>
                      </tr>
                   ) : ordersData?.items.length === 0 ? (
                      <tr>
-                        <td colSpan={11} className="py-12 text-center text-slate-500 font-medium">
+                        <td colSpan={11} className="py-12 text-center text-slate-500 font-medium text-[14px]">
                            No purchase orders found {quickFilter ? `for this ${quickFilter}` : ''}.
                         </td>
                      </tr>
                   ) : (
                      ordersData?.items.map((order, idx) => (
                         <tr key={order.doc_entry} className="hover:bg-slate-50 transition-colors">
-                           <td className="px-4 py-3"><input type="checkbox" className="rounded border-slate-300" /></td>
-                           <td className="px-4 py-3 text-slate-500">{(page - 1) * limit + idx + 1}</td>
-                           <td className="px-4 py-3 font-medium text-blue-600">{order.doc_num}</td>
-                           <td className="px-4 py-3 text-slate-600">{fmtDate(order.doc_date)}</td>
-                           <td className="px-4 py-3 text-slate-600">{order.card_code}</td>
-                           <td className="px-4 py-3 font-medium text-slate-900">{order.card_name}</td>
-                           <td className="px-4 py-3 font-bold text-slate-900 text-right">{fmt(order.doc_total)}</td>
-                           <td className="px-4 py-3 text-center">
-                              <span className={`px-2.5 py-1 text-[11px] font-bold rounded-full ${getStatusStyle(order.document_status, order.cancelled)}`}>
+                           <td className="px-4 py-3.5"><input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" /></td>
+                           <td className="px-4 py-3.5 text-slate-500">{order.doc_num ? (page - 1) * limit + idx + 1 : idx + 1}</td>
+                           <td className="px-4 py-3.5 font-semibold text-blue-600">{order.doc_num}</td>
+                           <td className="px-4 py-3.5 text-slate-600">{fmtDate(order.doc_date)}</td>
+                           <td className="px-4 py-3.5 text-slate-600 font-mono text-[13px]">{order.card_code}</td>
+                           <td className="px-4 py-3.5 font-medium text-slate-900">{order.card_name}</td>
+                           <td className="px-4 py-3.5 font-bold text-slate-900 text-right">{fmt(order.doc_total)}</td>
+                           <td className="px-4 py-3.5 text-center">
+                              <span className={`px-2.5 py-1 text-[12px] font-semibold rounded-full ${getStatusStyle(order.document_status, order.cancelled)}`}>
                                  {getStatusLabel(order.document_status, order.cancelled)}
                               </span>
                            </td>
-                           <td className="px-4 py-3 text-slate-600">{fmtDate(order.doc_due_date)}</td>
-                           <td className="px-4 py-3 text-slate-600">{order.sales_person_code || '-'}</td>
-                           <td className="px-4 py-3">
+                           <td className="px-4 py-3.5 text-slate-600">{fmtDate(order.doc_due_date)}</td>
+                           <td className="px-4 py-3.5 text-slate-600">{order.sales_person_code || '-'}</td>
+                           <td className="px-4 py-3.5">
                                <div className="flex items-center justify-center gap-2">
-                                 <button onClick={() => { setSelectedDocEntry(order.doc_entry); setActiveTab('overview'); setIsDrawerOpen(true); }} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Eye className="w-4 h-4" /></button>
-                                 <button title="Sales Order editing is not currently available" className="p-1 text-slate-400 hover:bg-slate-50 rounded cursor-not-allowed"><Edit className="w-4 h-4" /></button>
-                                 <button className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded"><MoreVertical className="w-4 h-4" /></button>
+                                 <button onClick={() => { setSelectedDocEntry(order.doc_entry); setActiveTab('overview'); setIsDrawerOpen(true); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"><Eye className="w-4 h-4" /></button>
+                                 <button title="Sales Order editing is not currently available" className="p-1.5 text-slate-400 hover:bg-slate-50 rounded cursor-not-allowed transition-colors"><Edit className="w-4 h-4" /></button>
+                                 <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded transition-colors"><MoreVertical className="w-4 h-4" /></button>
                               </div>
                            </td>
                         </tr>
@@ -457,15 +453,15 @@ export default function SalesOrdersPage() {
          </div>
 
          {/* Pagination */}
-         <div className="flex items-center justify-between p-4 border-t border-slate-200 text-sm">
-            <div className="text-slate-500 text-[13px]">
-               Showing {ordersData?.items.length ? (page - 1) * limit + 1 : 0} to {Math.min(page * limit, ordersData?.total || 0)} of {ordersData?.total || 0} orders
+         <div className="flex items-center justify-between p-4 border-t border-slate-200 text-[13.5px] text-slate-600">
+            <div>
+               Showing <span className="font-semibold text-slate-900">{ordersData?.items.length ? (page - 1) * limit + 1 : 0}</span> to <span className="font-semibold text-slate-900">{Math.min(page * limit, ordersData?.total || 0)}</span> of <span className="font-semibold text-slate-900">{ordersData?.total || 0}</span> orders
             </div>
             <div className="flex items-center gap-4">
-               <div className="flex items-center gap-2">
-                  <span className="text-slate-500 text-[13px]">Rows per page</span>
+               <div className="flex items-center gap-2 font-medium">
+                  <span>Rows per page</span>
                   <select 
-                     className="border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-700 bg-white"
+                     className="border border-slate-200 rounded-lg px-2 py-1 outline-none text-slate-700 bg-white font-medium text-[13px]"
                      value={limit}
                      onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
                   >
@@ -482,7 +478,7 @@ export default function SalesOrdersPage() {
                   >
                      <ChevronLeft className="w-4 h-4" />
                   </button>
-                  <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 text-white font-medium text-[13px]">
+                  <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 text-white font-semibold text-[13.5px]">
                      {page}
                   </button>
                   <button 
@@ -495,36 +491,7 @@ export default function SalesOrdersPage() {
                </div>
             </div>
          </div>
-      </div>
-    </div>
-
-    {/* AI Assistant Right Panel */}
-    <AIAssistantPanel
-        pageContext="sales_orders"
-        pageFilters={{
-          search: debouncedSearch,
-          status: statusFilter,
-          customer: customerFilter,
-          quickFilter,
-          dateFrom,
-          dateTo
-        }}
-        isOpen={aiOpen}
-        onClose={() => setAiOpen(false)}
-      />
-    </div>
-
-    {/* Floating AI Button when panel is closed */}
-    {!aiOpen && (
-      <button
-        onClick={() => setAiOpen(true)}
-        className="fixed right-5 bottom-6 z-40 flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 px-4 py-2.5 text-[12px] font-semibold text-white shadow-[0_4px_20px_rgba(99,102,241,0.35)] transition-all cursor-pointer hover:shadow-[0_6px_25px_rgba(99,102,241,0.5)] hover:scale-[1.02] active:scale-[0.98]"
-        title="Open ATLAS AI Assistant"
-      >
-        <Sparkles size={16} />
-        <span>Open ATLAS AI Assistant</span>
-      </button>
-    )}
+       </div>
 
       {/* Detail Modal Overlay */}
       {isDrawerOpen && (
@@ -546,9 +513,9 @@ export default function SalesOrdersPage() {
           >
         <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-3">
-            <h2 className="text-[18px] font-bold text-slate-900">Sales Order {detailData ? `#${detailData.doc_num}` : ''}</h2>
+            <h2 className="text-[20px] font-bold text-slate-900">Sales Order {detailData ? `#${detailData.doc_num}` : ''}</h2>
             {detailData && (
-              <span className={`px-2.5 py-1 text-[11px] font-bold rounded-full ${getStatusStyle(detailData.document_status, detailData.cancelled)}`}>
+              <span className={`px-2.5 py-1 text-[12px] font-semibold rounded-full ${getStatusStyle(detailData.document_status, detailData.cancelled)}`}>
                 {getStatusLabel(detailData.document_status, detailData.cancelled)}
               </span>
             )}
@@ -565,14 +532,14 @@ export default function SalesOrdersPage() {
           {detailLoading ? (
             <div className="flex flex-col items-center justify-center h-full gap-4">
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-              <div className="text-slate-500 font-medium text-sm">Loading purchase order details...</div>
+              <div className="text-slate-500 font-medium text-[14px]">Loading purchase order details...</div>
             </div>
           ) : detailError ? (
             <div className="flex flex-col items-center justify-center h-full gap-4">
-              <div className="text-red-500 font-medium text-sm">Unable to load Sales Order details.</div>
+              <div className="text-red-500 font-semibold text-[14px]">Unable to load Sales Order details.</div>
               <button 
                 onClick={() => queryClient.invalidateQueries({ queryKey: ['purchaseOrder', selectedDocEntry] })}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[13.5px] font-semibold transition-colors"
               >
                 Retry
               </button>
@@ -585,7 +552,7 @@ export default function SalesOrdersPage() {
                   <button 
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`py-4 text-sm font-semibold border-b-2 transition-colors ${
+                    className={`py-4 text-[14px] sm:text-[14.5px] font-semibold border-b-2 transition-colors ${
                       activeTab === tab 
                         ? 'border-blue-600 text-blue-600' 
                         : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -599,39 +566,39 @@ export default function SalesOrdersPage() {
               <div className="p-6">
                 {activeTab === 'overview' && (
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
-                    <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-4">Overview</h3>
+                    <h3 className="text-[17px] font-bold text-slate-900 border-b border-slate-100 pb-4">Overview</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                       <div>
-                        <div className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Customer</div>
-                        <div className="text-[14px] font-medium text-slate-900">{detailData.card_name}</div>
+                        <div className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Customer</div>
+                        <div className="text-[15px] font-medium text-slate-900">{detailData.card_name}</div>
                       </div>
                       <div>
-                        <div className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Order Date</div>
-                        <div className="text-[14px] font-medium text-slate-900">{fmtDate(detailData.doc_date)}</div>
+                        <div className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Order Date</div>
+                        <div className="text-[15px] font-medium text-slate-900">{fmtDate(detailData.doc_date)}</div>
                       </div>
                       <div>
-                        <div className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Expected Date</div>
-                        <div className="text-[14px] font-medium text-slate-900">{fmtDate(detailData.doc_due_date)}</div>
+                        <div className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Expected Date</div>
+                        <div className="text-[15px] font-medium text-slate-900">{fmtDate(detailData.doc_due_date)}</div>
                       </div>
                       <div>
-                        <div className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Status</div>
-                        <div className="text-[14px] font-medium text-slate-900">{getStatusLabel(detailData.document_status, detailData.cancelled)}</div>
+                        <div className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Status</div>
+                        <div className="text-[15px] font-medium text-slate-900">{getStatusLabel(detailData.document_status, detailData.cancelled)}</div>
                       </div>
                       <div>
-                        <div className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Amount</div>
-                        <div className="text-[14px] font-bold text-blue-600">{fmt(detailData.doc_total)}</div>
+                        <div className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Total Amount</div>
+                        <div className="text-[15px] font-bold text-blue-600">{fmt(detailData.doc_total)}</div>
                       </div>
                       <div>
-                        <div className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Branch</div>
-                        <div className="text-[14px] font-medium text-slate-900">{detailData.bpl_id || 'Not available'}</div>
+                        <div className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Branch</div>
+                        <div className="text-[15px] font-medium text-slate-900">{detailData.bpl_id || 'Not available'}</div>
                       </div>
                       <div>
-                        <div className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Buyer</div>
-                        <div className="text-[14px] font-medium text-slate-900">{detailData.agent_name || detailData.sales_person_code || 'Not available'}</div>
+                        <div className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Buyer</div>
+                        <div className="text-[15px] font-medium text-slate-900">{detailData.agent_name || detailData.sales_person_code || 'Not available'}</div>
                       </div>
                       <div className="col-span-2">
-                        <div className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Comments</div>
-                        <div className="text-[14px] font-medium text-slate-900 whitespace-pre-wrap">{detailData.comments || 'No comments'}</div>
+                        <div className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Comments</div>
+                        <div className="text-[15px] font-medium text-slate-900 whitespace-pre-wrap">{detailData.comments || 'No comments'}</div>
                       </div>
                     </div>
                   </div>
@@ -640,47 +607,47 @@ export default function SalesOrdersPage() {
                 {activeTab === 'items' && (
                   <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
                     <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-                       <h3 className="text-[14px] font-bold text-slate-800">Sales Order Lines</h3>
-                       <span className="text-[12px] font-medium text-slate-500">{detailData.document_lines.length} Items</span>
+                       <h3 className="text-[15px] font-bold text-slate-800">Sales Order Lines</h3>
+                       <span className="text-[13px] font-semibold text-slate-500">{detailData.document_lines.length} Items</span>
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm whitespace-nowrap">
+                      <table className="w-full text-left text-[13.5px] whitespace-nowrap">
                         <thead className="bg-white border-b border-slate-200">
                           <tr>
-                            <th className="px-4 py-3 font-bold text-slate-600 text-[11px] uppercase tracking-wider">#</th>
-                            <th className="px-4 py-3 font-bold text-slate-600 text-[11px] uppercase tracking-wider">SO No</th>
-                            <th className="px-4 py-3 font-bold text-slate-600 text-[11px] uppercase tracking-wider">Order Date</th>
-                            <th className="px-4 py-3 font-bold text-slate-600 text-[11px] uppercase tracking-wider">Party Name</th>
-                            <th className="px-4 py-3 font-bold text-slate-600 text-[11px] uppercase tracking-wider">Item Code</th>
-                            <th className="px-4 py-3 font-bold text-slate-600 text-[11px] uppercase tracking-wider">Item Name</th>
-                            <th className="px-4 py-3 font-bold text-slate-600 text-[11px] uppercase tracking-wider text-right">Rate</th>
-                            <th className="px-4 py-3 font-bold text-slate-600 text-[11px] uppercase tracking-wider text-right">Ordered Qty</th>
-                            <th className="px-4 py-3 font-bold text-slate-600 text-[11px] uppercase tracking-wider text-right text-emerald-600">Dispatch Qty</th>
-                            <th className="px-4 py-3 font-bold text-slate-600 text-[11px] uppercase tracking-wider text-right text-amber-600">Balance Qty</th>
-                            <th className="px-4 py-3 font-bold text-slate-600 text-[11px] uppercase tracking-wider text-right">Warehouse</th>
-                            <th className="px-4 py-3 font-bold text-slate-600 text-[11px] uppercase tracking-wider text-right">Line Total</th>
+                            <th className="px-4 py-3.5 font-bold text-slate-600 text-[12px] uppercase tracking-wider">#</th>
+                            <th className="px-4 py-3.5 font-bold text-slate-600 text-[12px] uppercase tracking-wider">SO No</th>
+                            <th className="px-4 py-3.5 font-bold text-slate-600 text-[12px] uppercase tracking-wider">Order Date</th>
+                            <th className="px-4 py-3.5 font-bold text-slate-600 text-[12px] uppercase tracking-wider">Party Name</th>
+                            <th className="px-4 py-3.5 font-bold text-slate-600 text-[12px] uppercase tracking-wider">Item Code</th>
+                            <th className="px-4 py-3.5 font-bold text-slate-600 text-[12px] uppercase tracking-wider">Item Name</th>
+                            <th className="px-4 py-3.5 font-bold text-slate-600 text-[12px] uppercase tracking-wider text-right">Rate</th>
+                            <th className="px-4 py-3.5 font-bold text-slate-600 text-[12px] uppercase tracking-wider text-right">Ordered Qty</th>
+                            <th className="px-4 py-3.5 font-bold text-slate-600 text-[12px] uppercase tracking-wider text-right text-emerald-600">Dispatch Qty</th>
+                            <th className="px-4 py-3.5 font-bold text-slate-600 text-[12px] uppercase tracking-wider text-right text-amber-600">Balance Qty</th>
+                            <th className="px-4 py-3.5 font-bold text-slate-600 text-[12px] uppercase tracking-wider text-right">Warehouse</th>
+                            <th className="px-4 py-3.5 font-bold text-slate-600 text-[12px] uppercase tracking-wider text-right">Line Total</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {detailData.document_lines.map((line: any, idx: number) => (
                             <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                              <td className="px-4 py-3 text-slate-500 font-medium">{idx + 1}</td>
-                              <td className="px-4 py-3 text-blue-600 font-medium">{detailData.doc_num}</td>
-                              <td className="px-4 py-3 text-slate-600">{fmtDate(detailData.doc_date)}</td>
-                              <td className="px-4 py-3 text-slate-900 truncate max-w-[150px]" title={detailData.card_name || ''}>{detailData.card_name}</td>
-                              <td className="px-4 py-3 text-blue-600 font-medium">{line.item_code}</td>
-                              <td className="px-4 py-3 text-slate-900 truncate max-w-[200px]" title={line.item_description}>{line.item_description}</td>
-                              <td className="px-4 py-3 font-medium text-slate-900 text-right">{fmt(line.price)}</td>
-                              <td className="px-4 py-3 font-bold text-slate-900 text-right">{line.quantity}</td>
-                              <td className="px-4 py-3 font-bold text-emerald-600 text-right">{line.dispatch_qty}</td>
-                              <td className="px-4 py-3 font-bold text-amber-600 text-right">{line.balance_qty}</td>
-                              <td className="px-4 py-3 font-medium text-slate-600 text-right">{line.warehouse_code || '-'}</td>
-                              <td className="px-4 py-3 font-bold text-slate-900 text-right">{fmt(line.line_total)}</td>
+                              <td className="px-4 py-3.5 text-slate-500 font-medium">{idx + 1}</td>
+                              <td className="px-4 py-3.5 text-blue-600 font-semibold">{detailData.doc_num}</td>
+                              <td className="px-4 py-3.5 text-slate-600">{fmtDate(detailData.doc_date)}</td>
+                              <td className="px-4 py-3.5 text-slate-900 truncate max-w-[150px] font-medium" title={detailData.card_name || ''}>{detailData.card_name}</td>
+                              <td className="px-4 py-3.5 text-blue-600 font-mono font-medium">{line.item_code}</td>
+                              <td className="px-4 py-3.5 text-slate-900 truncate max-w-[200px]" title={line.item_description}>{line.item_description}</td>
+                              <td className="px-4 py-3.5 font-medium text-slate-900 text-right">{fmt(line.price)}</td>
+                              <td className="px-4 py-3.5 font-bold text-slate-900 text-right">{line.quantity}</td>
+                              <td className="px-4 py-3.5 font-bold text-emerald-600 text-right">{line.dispatch_qty}</td>
+                              <td className="px-4 py-3.5 font-bold text-amber-600 text-right">{line.balance_qty}</td>
+                              <td className="px-4 py-3.5 font-medium text-slate-600 text-right">{line.warehouse_code || '-'}</td>
+                              <td className="px-4 py-3.5 font-bold text-slate-900 text-right">{fmt(line.line_total)}</td>
                             </tr>
                           ))}
                           {detailData.document_lines.length === 0 && (
                             <tr>
-                               <td colSpan={12} className="py-8 text-center text-slate-500">No items found in this purchase order.</td>
+                               <td colSpan={12} className="py-8 text-center text-slate-500 text-[14px]">No items found in this purchase order.</td>
                             </tr>
                           )}
                         </tbody>
@@ -691,23 +658,23 @@ export default function SalesOrdersPage() {
 
                 {activeTab === 'customer' && (
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
-                    <h3 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-4">Customer Information</h3>
+                    <h3 className="text-[17px] font-bold text-slate-900 border-b border-slate-100 pb-4">Customer Information</h3>
                     <div className="grid grid-cols-2 md:grid-cols-2 gap-6">
                       <div>
-                        <div className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Customer Code</div>
-                        <div className="text-[14px] font-medium text-blue-600">{detailData.card_code}</div>
+                        <div className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Customer Code</div>
+                        <div className="text-[15px] font-mono font-medium text-blue-600">{detailData.card_code}</div>
                       </div>
                       <div>
-                        <div className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Customer Name</div>
-                        <div className="text-[14px] font-medium text-slate-900">{detailData.card_name}</div>
+                        <div className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Customer Name</div>
+                        <div className="text-[15px] font-medium text-slate-900">{detailData.card_name}</div>
                       </div>
                       <div>
-                        <div className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Contact Information</div>
-                        <div className="text-[14px] font-medium text-slate-500">Not available</div>
+                        <div className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Contact Information</div>
+                        <div className="text-[15px] font-medium text-slate-500">Not available</div>
                       </div>
                       <div>
-                        <div className="text-[12px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Address</div>
-                        <div className="text-[14px] font-medium text-slate-500">Not available</div>
+                        <div className="text-[12px] font-bold text-slate-500 uppercase tracking-wider mb-1">Address</div>
+                        <div className="text-[15px] font-medium text-slate-500">Not available</div>
                       </div>
                     </div>
                   </div>
