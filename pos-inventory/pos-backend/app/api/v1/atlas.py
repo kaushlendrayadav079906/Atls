@@ -9,7 +9,7 @@ from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from app.core.config import settings
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_permission
 from app.core.cache import cache_get, cache_set
 from app.models.schemas import (
     AtlasOverview,
@@ -124,7 +124,7 @@ async def get_overview(
     customer: Optional[str] = Query(None, description="Filter by customer Code or Name"),
     category: Optional[str] = Query(None, description="Filter by product category"),
     payment_method: Optional[str] = Query(None, description="Filter by payment method"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("dashboard.view")),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
     start = from_date or date_from
@@ -172,7 +172,7 @@ async def get_sales_trends(
     customer: Optional[str] = Query(None, description="Filter by customer Code or Name"),
     category: Optional[str] = Query(None, description="Filter by product category"),
     payment_method: Optional[str] = Query(None, description="Filter by payment method"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("dashboard.view")),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
     start = from_date or date_from
@@ -202,7 +202,7 @@ async def get_sales_trends(
 @router.get("/inventory-summary", response_model=AtlasInventorySummary)
 async def get_inventory_summary(
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("dashboard.view")),
 ):
     if current_user.get("role") == "admin" and not branch:
         raise HTTPException(status_code=400, detail="Branch must be provided for inventory snapshot.")
@@ -263,7 +263,7 @@ async def get_branch_comparison(
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),
     date_from: Optional[str] = Query(None, description="Alias for from_date"),
     date_to: Optional[str] = Query(None, description="Alias for to_date"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("dashboard.view")),
 ):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Branch comparison is restricted to administrators.")
@@ -306,7 +306,7 @@ async def get_returns_summary(
     date_from: Optional[str] = Query(None, description="Alias for from_date"),
     date_to: Optional[str] = Query(None, description="Alias for to_date"),
     branch: Optional[str] = Query(None, description="Filter by SAP WarehouseCode"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("dashboard.view")),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
     start = from_date or date_from
@@ -356,7 +356,7 @@ async def get_top_customers(
     category: Optional[str] = Query(None, description="Filter by product category"),
     payment_method: Optional[str] = Query(None, description="Filter by payment method"),
     limit: int = Query(5, ge=1, le=50),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("dashboard.view")),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
     start = from_date or date_from
@@ -409,7 +409,7 @@ async def get_product_velocity(
     category: Optional[str] = Query(None, description="Filter by product category"),
     payment_method: Optional[str] = Query(None, description="Filter by payment method"),
     limit: int = Query(10, ge=1, le=100),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("dashboard.view")),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
     start = from_date or date_from

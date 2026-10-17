@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta
 from pydantic import BaseModel, Field
-from app.api.v1.auth import get_current_user
+from app.core.security import get_current_user, require_permission
 from app.services.sap.client import get_sap_client
 from app.services.sap.inventory_service import SAPInventoryService
 from app.services.sap.items_service import SAPItemsService
@@ -110,7 +110,7 @@ def calculate_status(current_stock: float, min_stock: float) -> str:
 @router.get("/overview", response_model=KPIOverviewResponse)
 async def get_inventory_overview(
     warehouse: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("reports.view"))
 ):
     try:
         raw_items = fetch_inventory_data(warehouse)
@@ -170,7 +170,7 @@ async def get_inventory_overview(
 @router.get("/distribution", response_model=StatusDistributionResponse)
 async def get_inventory_distribution(
     warehouse: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("reports.view"))
 ):
     try:
         raw_items = fetch_inventory_data(warehouse)
@@ -224,7 +224,7 @@ async def get_inventory_distribution(
 async def get_inventory_value_by_category(
     warehouse: Optional[str] = None,
     limit: int = Query(6, alias="limit"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("reports.view"))
 ):
     try:
         raw_items = fetch_inventory_data(warehouse)
@@ -279,7 +279,7 @@ async def get_inventory_value_by_category(
 async def get_inventory_movements(
     warehouse: Optional[str] = None,
     days: int = Query(7),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("reports.view"))
 ):
     import random
     from datetime import datetime, timedelta
@@ -318,7 +318,7 @@ async def get_inventory_products(
     category: Optional[str] = None,
     status: Optional[str] = None,
     search: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("reports.view"))
 ):
     try:
         raw_items = fetch_inventory_data(warehouse)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Bell,
   ChevronDown,
@@ -14,6 +14,7 @@ import {
   PanelLeftOpen,
   Sparkles,
   Mail,
+  LogOut,
 } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -30,6 +31,7 @@ interface NavSubItem {
   path: string;
   badge?: string;
   category?: 'Production' | 'Financial';
+  permission?: string;
 }
 
 interface NavSectionItem {
@@ -37,23 +39,25 @@ interface NavSectionItem {
   path: string;
   icon: React.ElementType;
   badge?: string;
+  permission?: string;
+  requireAdmin?: boolean;
   subItems?: NavSubItem[];
 }
 
 const navItems: NavSectionItem[] = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+  { name: 'Dashboard', path: '/', icon: LayoutDashboard, permission: 'dashboard.view' },
   {
     name: 'Product',
     path: '/product',
     icon: Package,
     subItems: [
-      { name: 'Products & Stock', path: '/products' },
-      { name: 'Point of Sale', path: '/pos' },
-      { name: 'Sales Orders', path: '/sales-orders' },
-      { name: 'Sales Invoices', path: '/sales' },
-      { name: 'Purchase Orders', path: '/purchase-orders' },
-      { name: 'Customers', path: '/customers' },
-      { name: 'Returns & Approvals', path: '/returns', badge: '5' },
+      { name: 'Products & Stock', path: '/products', permission: 'products.view' },
+      { name: 'Point of Sale', path: '/pos', permission: 'pos.access' },
+      { name: 'Sales Orders', path: '/sales-orders', permission: 'sales_orders.view' },
+      { name: 'Sales Invoices', path: '/sales', permission: 'invoices.view' },
+      { name: 'Purchase Orders', path: '/purchase-orders', permission: 'purchase_orders.view' },
+      { name: 'Customers', path: '/customers', permission: 'customers.view' },
+      { name: 'Returns & Approvals', path: '/returns', badge: '5', permission: 'returns.view' },
     ],
   },
   {
@@ -61,19 +65,19 @@ const navItems: NavSectionItem[] = [
     path: '/solutions',
     icon: Factory,
     subItems: [
-      { name: 'Production Overview', path: '/production', category: 'Production' },
-      { name: 'Production Orders', path: '/production/orders', category: 'Production' },
-      { name: 'Item-wise Production', path: '/production/item-wise', category: 'Production' },
-      { name: 'Production Rejection', path: '/production/rejection', category: 'Production' },
-      { name: 'Date-wise Production', path: '/production/date-wise', category: 'Production' },
-      { name: 'Production Reports', path: '/production/reports', category: 'Production' },
-      { name: 'Finance Overview', path: '/finance', category: 'Financial' },
-      { name: 'Purchase Invoices', path: '/finance/purchase-invoices', category: 'Financial' },
-      { name: 'Incoming Payments', path: '/finance/incoming-payments', category: 'Financial' },
-      { name: 'Outgoing Payments', path: '/finance/outgoing-payments', category: 'Financial' },
-      { name: 'Customer Analysis', path: '/finance/customer-analysis', category: 'Financial' },
-      { name: 'Supplier Analysis', path: '/finance/supplier-analysis', category: 'Financial' },
-      { name: 'Profitability Reports', path: '/finance/profitability-reports', category: 'Financial' },
+      { name: 'Production Overview', path: '/production', category: 'Production', permission: 'production.view' },
+      { name: 'Production Orders', path: '/production/orders', category: 'Production', permission: 'production.orders.view' },
+      { name: 'Item-wise Production', path: '/production/item-wise', category: 'Production', permission: 'production.view' },
+      { name: 'Production Rejection', path: '/production/rejection', category: 'Production', permission: 'production.view' },
+      { name: 'Date-wise Production', path: '/production/date-wise', category: 'Production', permission: 'production.view' },
+      { name: 'Production Reports', path: '/production/reports', category: 'Production', permission: 'production.reports.view' },
+      { name: 'Finance Overview', path: '/finance', category: 'Financial', permission: 'finance.view' },
+      { name: 'Purchase Invoices', path: '/finance/purchase-invoices', category: 'Financial', permission: 'finance.invoices.view' },
+      { name: 'Incoming Payments', path: '/finance/incoming-payments', category: 'Financial', permission: 'finance.payments.view' },
+      { name: 'Outgoing Payments', path: '/finance/outgoing-payments', category: 'Financial', permission: 'finance.payments.view' },
+      { name: 'Customer Analysis', path: '/finance/customer-analysis', category: 'Financial', permission: 'finance.view' },
+      { name: 'Supplier Analysis', path: '/finance/supplier-analysis', category: 'Financial', permission: 'finance.view' },
+      { name: 'Profitability Reports', path: '/finance/profitability-reports', category: 'Financial', permission: 'finance.reports.view' },
     ],
   },
   {
@@ -81,16 +85,16 @@ const navItems: NavSectionItem[] = [
     path: '/reports',
     icon: FileText,
     subItems: [
-      { name: 'Sales Reports', path: '/reports/sales' },
-      { name: 'Invoice Reports', path: '/reports/invoice' },
-      { name: 'Payment Reports', path: '/reports/payment' },
-      { name: 'Inventory Reports', path: '/reports/inventory' },
-      { name: 'Customer Reports', path: '/reports/customer' },
-      { name: 'AI Generated Reports', path: '/reports/ai' },
+      { name: 'Sales Reports', path: '/reports/sales', permission: 'reports.view' },
+      { name: 'Invoice Reports', path: '/reports/invoice', permission: 'reports.view' },
+      { name: 'Payment Reports', path: '/reports/payment', permission: 'reports.view' },
+      { name: 'Inventory Reports', path: '/reports/inventory', permission: 'reports.view' },
+      { name: 'Customer Reports', path: '/reports/customer', permission: 'reports.view' },
+      { name: 'AI Generated Reports', path: '/reports/ai', permission: 'reports.view' },
     ],
   },
   { name: 'Contact', path: '/contact', icon: Mail },
-  { name: 'Settings', path: '/settings', icon: Settings },
+  { name: 'Settings', path: '/settings', icon: Settings, requireAdmin: true },
 ];
 
 // ── Sidebar colour tokens ──────────────────────────────────────────────────
@@ -105,10 +109,22 @@ const COLOR_PRIMARY = '#155EEF';
 const COLOR_BADGE = '#EF3340';
 
 export const Layout = () => {
-  const { user } = useAuth();
+  const { user, isAdmin, hasPermission, canAccess, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const isProductActive =
     location.pathname === '/product' ||
@@ -140,6 +156,49 @@ export const Layout = () => {
     if (isSolutionsActive) setSolutionsExpanded(true);
     if (isReportsActive) setReportsExpanded(true);
   }, [location.pathname, isProductActive, isSolutionsActive, isReportsActive]);
+
+  // Dynamically compute visible navigation items and sub-items based on RBAC permissions
+  const visibleNavItems = useMemo(() => {
+    return navItems
+      .map((item) => {
+        if (item.requireAdmin && !isAdmin && !hasPermission('settings.view') && !hasPermission('users.manage')) {
+          return null;
+        }
+        if (item.permission && !hasPermission(item.permission)) {
+          return null;
+        }
+        if (item.name === 'Solutions') {
+          if (!canAccess('solutions')) {
+            return null;
+          }
+          if (item.subItems) {
+            const visibleSubItems = item.subItems.filter((sub) => {
+              if (!sub.permission) return true;
+              return hasPermission(sub.permission);
+            });
+            return { ...item, subItems: visibleSubItems };
+          }
+          return item;
+        }
+        if (item.subItems) {
+          const visibleSubItems = item.subItems.filter((sub) => {
+            if (!sub.permission) return true;
+            return hasPermission(sub.permission);
+          });
+          if (visibleSubItems.length === 0) {
+            return null;
+          }
+          return { ...item, subItems: visibleSubItems };
+        }
+        return item;
+      })
+      .filter((item): item is NavSectionItem => item !== null);
+  }, [isAdmin, hasPermission, canAccess]);
+
+  const showProductNav = visibleNavItems.some((item) => item.name === 'Product');
+  const showSolutionsNav = visibleNavItems.some((item) => item.name === 'Solutions') || canAccess('solutions');
+  const showReportsNav = visibleNavItems.some((item) => item.name === 'Reports') || hasPermission('reports.view');
+  const showSettingsNav = isAdmin || hasPermission('settings.view') || hasPermission('users.manage');
 
   const { isSapConnected } = useSystemHealth();
   const [searchModalOpen, setSearchModalOpen] = useState(false);
@@ -250,50 +309,56 @@ export const Layout = () => {
         <div className="flex items-center gap-3 sm:gap-3.5">
           {/* 3 Main Navbar Sections (Product, Solutions, Reports) */}
           <nav className="hidden md:flex items-center gap-1.5 lg:gap-2">
-            <NavLink
-              to="/product"
-              className={({ isActive }) => {
-                const active = isActive || isProductActive;
-                return `relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-[14.5px] font-semibold transition-all duration-150 ${
-                  active
-                    ? 'bg-blue-50 text-blue-600 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
-                }`;
-              }}
-            >
-              <Package size={16} />
-              <span>Product</span>
-            </NavLink>
+            {showProductNav && (
+              <NavLink
+                to="/product"
+                className={({ isActive }) => {
+                  const active = isActive || isProductActive;
+                  return `relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-[14.5px] font-semibold transition-all duration-150 ${
+                    active
+                      ? 'bg-blue-50 text-blue-600 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                  }`;
+                }}
+              >
+                <Package size={16} />
+                <span>Product</span>
+              </NavLink>
+            )}
 
-            <NavLink
-              to="/solutions"
-              className={({ isActive }) => {
-                const active = isActive || isSolutionsActive;
-                return `relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-[14.5px] font-semibold transition-all duration-150 ${
-                  active
-                    ? 'bg-indigo-50 text-indigo-600 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
-                }`;
-              }}
-            >
-              <Factory size={16} />
-              <span>Solutions</span>
-            </NavLink>
+            {showSolutionsNav && (
+              <NavLink
+                to="/solutions"
+                className={({ isActive }) => {
+                  const active = isActive || isSolutionsActive;
+                  return `relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-[14.5px] font-semibold transition-all duration-150 ${
+                    active
+                      ? 'bg-indigo-50 text-indigo-600 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                  }`;
+                }}
+              >
+                <Factory size={16} />
+                <span>Solutions</span>
+              </NavLink>
+            )}
 
-            <NavLink
-              to="/reports"
-              className={({ isActive }) => {
-                const active = isActive || isReportsActive;
-                return `relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-[14.5px] font-semibold transition-all duration-150 ${
-                  active
-                    ? 'bg-blue-50 text-blue-600 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
-                }`;
-              }}
-            >
-              <FileText size={16} />
-              <span>Reports</span>
-            </NavLink>
+            {showReportsNav && (
+              <NavLink
+                to="/reports"
+                className={({ isActive }) => {
+                  const active = isActive || isReportsActive;
+                  return `relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-[14.5px] font-semibold transition-all duration-150 ${
+                    active
+                      ? 'bg-blue-50 text-blue-600 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                  }`;
+                }}
+              >
+                <FileText size={16} />
+                <span>Reports</span>
+              </NavLink>
+            )}
 
             <NavLink
               to="/contact"
@@ -309,6 +374,23 @@ export const Layout = () => {
               <Mail size={16} />
               <span>Contact</span>
             </NavLink>
+
+            {showSettingsNav && (
+              <NavLink
+                to="/settings"
+                className={({ isActive }) => {
+                  const active = isActive || location.pathname.startsWith('/settings');
+                  return `relative flex items-center gap-2 px-3.5 py-2 rounded-lg text-[14.5px] font-semibold transition-all duration-150 ${
+                    active
+                      ? 'bg-blue-50 text-blue-600 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80'
+                  }`;
+                }}
+              >
+                <Settings size={16} />
+                <span>Settings</span>
+              </NavLink>
+            )}
           </nav>
 
           <div className="hidden md:block h-5 w-px bg-slate-200" />
@@ -344,24 +426,87 @@ export const Layout = () => {
             </span>
           </button>
 
-          {/* User Profile - Icon Only with Cursor Hover Tooltip */}
-          <div className="relative group pl-1.5 border-l border-slate-200">
-            <div
-              className="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-blue-600 hover:bg-blue-700 text-[11.5px] font-bold text-white shadow-2xs cursor-pointer transition-all duration-150 ring-2 ring-transparent group-hover:ring-blue-100"
-              title={`${user?.name || 'kaushlendra kamlesh kumar yadav'} (${user?.role || 'User'})`}
+          {/* User Profile - Icon with Hover & Click Menu containing Logout */}
+          <div
+            ref={userMenuRef}
+            className="relative group pl-1.5 border-l border-slate-200"
+            onMouseEnter={() => setUserDropdownOpen(true)}
+            onMouseLeave={() => setUserDropdownOpen(false)}
+          >
+            <button
+              type="button"
+              onClick={() => setUserDropdownOpen((prev) => !prev)}
+              className="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-blue-600 hover:bg-blue-700 text-[11.5px] font-bold text-white shadow-2xs cursor-pointer transition-all duration-150 ring-2 ring-transparent group-hover:ring-blue-100 focus:outline-hidden"
+              title={`${user?.name || 'User Profile'} (${user?.role || 'User'})`}
+              aria-label="User Profile"
+              aria-expanded={userDropdownOpen}
             >
-              {user?.name ? user.name.split(' ').filter(Boolean).map((n: string) => n[0]).slice(0, 2).join('').toUpperCase() : 'KK'}
-            </div>
+              {user?.name
+                ? user.name.split(' ').filter(Boolean).map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
+                : (user?.username ? user.username.slice(0, 2).toUpperCase() : 'KK')}
+            </button>
 
-            {/* Hover Tooltip displaying user login name */}
-            <div className="absolute right-0 top-full mt-2 hidden group-hover:flex flex-col items-start rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xl z-50 min-w-[210px] whitespace-nowrap animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
-              <div className="text-[12px] font-bold text-slate-800 leading-tight">
-                {user?.name || 'kaushlendra kamlesh kumar yadav'}
-              </div>
-              <div className="text-[10px] font-medium text-slate-500 mt-1 flex items-center gap-1.5">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span className="capitalize">{user?.role || 'User'}</span>
-                {user?.branch_id && <span className="text-slate-400">• {user.branch_id}</span>}
+            {/* Profile Menu Dropdown with Logout Option */}
+            <div
+              className={`absolute right-0 top-full pt-1.5 z-50 ${
+                userDropdownOpen ? 'block' : 'hidden group-hover:block'
+              } animate-in fade-in zoom-in-95 duration-150 min-w-[230px]`}
+            >
+              <div className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-xl ring-1 ring-black/5 whitespace-nowrap">
+                {/* User Details */}
+                <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-100">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[12px] font-bold text-white shadow-2xs">
+                    {user?.name
+                      ? user.name.split(' ').filter(Boolean).map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
+                      : (user?.username ? user.username.slice(0, 2).toUpperCase() : 'KK')}
+                  </div>
+                  <div className="overflow-hidden min-w-0 flex-1">
+                    <div
+                      className="text-[12.5px] font-bold text-slate-800 leading-tight truncate"
+                      title={user?.name || user?.username || 'User'}
+                    >
+                      {user?.name || user?.username || 'User'}
+                    </div>
+                    {user?.email && (
+                      <div className="text-[11px] text-slate-400 truncate mt-0.5" title={user.email}>
+                        {user.email}
+                      </div>
+                    )}
+                    <div className="text-[10px] font-medium text-slate-500 mt-1 flex items-center gap-1.5">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="capitalize font-semibold text-slate-700">{user?.role || 'User'}</span>
+                      {user?.branch_id && <span className="text-slate-400">• {user.branch_id}</span>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="pt-2 flex flex-col gap-1">
+                  {isAdmin && (
+                    <NavLink
+                      to="/settings"
+                      onClick={() => setUserDropdownOpen(false)}
+                      className="flex items-center gap-2 px-2.5 py-1.5 text-[12.5px] font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50/80 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <Settings size={14} className="text-slate-400" />
+                      <span>Settings</span>
+                    </NavLink>
+                  )}
+
+                  {/* Logout Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserDropdownOpen(false);
+                      logout();
+                    }}
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-[12.5px] font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer group/btn"
+                    id="user-logout-button"
+                  >
+                    <LogOut size={14} className="text-rose-500 group-hover/btn:translate-x-0.5 transition-transform" />
+                    <span>Logout</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -411,7 +556,7 @@ export const Layout = () => {
 
           {/* Nav */}
           <nav className={`flex-1 overflow-y-auto ${sidebarCollapsed ? 'px-2' : 'px-4'} py-3 space-y-1.5`}>
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const hasSubItems = !!item.subItems && item.subItems.length > 0;
               const isActiveParent = hasSubItems && (
                 (item.name === 'Product' && isProductActive) ||

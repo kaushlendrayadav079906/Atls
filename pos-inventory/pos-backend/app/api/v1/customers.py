@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.core.cache import cache_get, cache_set, cache_delete
 from app.core.rate_limiter import limiter
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_permission
 from app.core.config import settings
 
 # Cache TTLs for analytics endpoints (they're expensive SAP calls)
@@ -40,7 +40,7 @@ async def search_customers(
     request: Request,
     search: str = Query(None, description="Search term for customer name or code"),
     top: int = Query(10, ge=1, le=50),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("customers.view")),
 ):
     """
     Search SAP Business Partners by name or code.
@@ -175,7 +175,7 @@ async def get_customer_insights(
     range: str = Query("monthly"),
     branch: Optional[str] = Query(None),
     force_refresh: bool = Query(False, description="Bypass and evict the server-side cache"),
-    current_user: dict = {"sub": "test", "role": "admin"},
+    current_user: dict = Depends(require_permission("customers.view")),
 ):
     """Customer purchase insights: top customers, repeat vs new, CLV."""
     role = str(current_user.get("role") or "user").lower()
@@ -259,7 +259,7 @@ async def get_customer_insights(
 async def get_customer_profile(
     request: Request,
     card_code: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("customers.view")),
 ):
     """Get full customer profile from SAP."""
     from app.services.sap.business_partners_service import SAPBusinessPartnersService
@@ -347,7 +347,7 @@ async def get_customer_profile(
 async def get_customer_purchases(
     request: Request,
     card_code: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("customers.view")),
 ):
     """Get customer purchase history from SAP."""
     invoice_service = SAPInvoicesService()
@@ -388,7 +388,7 @@ async def get_customer_purchases(
 async def get_customer_returns(
     request: Request,
     card_code: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("customers.view")),
 ):
     """Get customer returns history from SAP."""
     from app.services.sap.returns_service import SAPReturnsService

@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, R
 from app.core.cache import cache_delete, cache_delete_prefix, DASHBOARD_SUMMARY_KEY, PRODUCTS_LIST_KEY
 from app.core.product_store import product_store
 from app.core.rate_limiter import limiter
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_permission
 from app.core.config import settings
 from app.models.schemas import (
     ReturnCreate,
@@ -160,7 +160,7 @@ def _parse_return_detail(doc: dict) -> ReturnDetail:
 async def lookup_invoice(
     request: Request,
     q: str = Query(..., min_length=1, description="Invoice DocNum, SaleId or barcode prefix"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("returns.create")),
 ):
     """Search for an original invoice to initiate a return or exchange."""
     q_stripped = q.strip()
@@ -272,7 +272,7 @@ async def create_return(
     request: Request,
     return_data: ReturnCreate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("returns.create")),
 ):
     """Process a return: creates a pending approval request."""
     branch = _normalize_branch(current_user.get("branch_id"))
@@ -333,7 +333,7 @@ async def create_exchange(
     request: Request,
     exchange_data: ExchangeCreate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("returns.create")),
 ):
     """Process an exchange: creates a pending approval request."""
     branch = _normalize_branch(current_user.get("branch_id"))
@@ -405,7 +405,7 @@ async def create_exchange(
 @limiter.limit(settings.RATE_LIMIT_GENERAL)
 async def list_returns(
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("returns.view")),
 ):
     """List recent returns for the current user's branch (last 50)."""
     loop = asyncio.get_running_loop()
@@ -433,7 +433,7 @@ async def list_returns(
 async def get_return(
     request: Request,
     doc_entry: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("returns.view")),
 ):
     """Get a specific return by SAP DocEntry."""
     loop = asyncio.get_running_loop()

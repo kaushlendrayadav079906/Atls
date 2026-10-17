@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { authApi } from '../api/endpoints';
 import { useAuth } from '../contexts/AuthContext';
 import posBg from '../assets/pos_bg_clear.jpg';
@@ -28,13 +28,15 @@ const featureItems = [
 ];
 
 export const Login = () => {
-  const [identifier, setIdentifier] = useState('kaushl2@gmail.com');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const intendedDestination = (location.state as { from?: string })?.from || '/';
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -51,12 +53,21 @@ export const Login = () => {
       const res = await authApi.login(data);
       if (res.user) {
         login(res.access_token, res.user);
-        navigate('/');
+        navigate(intendedDestination, { replace: true });
       }
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { detail?: string } } };
+      const axiosError = err as { response?: { status?: number; data?: { detail?: string } } };
+      const status = axiosError.response?.status;
+      const detail = (axiosError.response?.data?.detail || '').toLowerCase();
+
       if (!axiosError.response) {
-        setError('Connection error: Cannot reach the server. Please ensure the backend is running.');
+        setError('Connection error: Cannot reach the ATLAS backend. Please verify your connection.');
+      } else if (status === 401 && detail.includes('deactivated')) {
+        setError('Your employee account has been deactivated by an administrator. Please contact your manager or IT support.');
+      } else if (status === 401) {
+        setError('Invalid username/email or password. Please verify your credentials and try again.');
+      } else if (status !== undefined && status >= 500) {
+        setError('Server error: An unexpected error occurred on the authentication server. Please try again shortly.');
       } else {
         setError(axiosError.response.data?.detail || 'Login failed. Please check your credentials.');
       }

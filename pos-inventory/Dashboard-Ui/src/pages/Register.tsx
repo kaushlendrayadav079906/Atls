@@ -7,6 +7,8 @@ import {
     Lock,
     Mail,
     Moon,
+    Phone,
+    Briefcase,
     ShoppingBag,
     Sparkles,
     User
@@ -25,11 +27,21 @@ const benefitItems = [
   { title: 'Access real insights', subtitle: 'Make data driven decisions to grow your business', icon: Sparkles },
 ];
 
+const JOB_ROLE_SUGGESTIONS = [
+  'Cashier',
+  'Sales Executive',
+  'Inventory Manager',
+  'Accountant',
+  'Store Manager',
+];
+
 export const Register = () => {
   const [formData, setFormData] = useState({
     name: '',
     username: '',
     email: '',
+    phone: '',
+    job_role: '',
     password: '',
     confirmPassword: '',
     role: 'user',
@@ -54,15 +66,34 @@ export const Register = () => {
       return;
     }
 
+    const trimmedJobRole = formData.job_role.trim();
+    if (!trimmedJobRole) {
+      setError('Please enter your job role / designation');
+      return;
+    }
+
+    if (['admin', 'administrator', 'superadmin', 'system administrator'].includes(trimmedJobRole.toLowerCase())) {
+      setError('Administrator roles cannot be registered through public registration.');
+      return;
+    }
+
+    const cleanPhoneDigits = formData.phone.replace(/\D/g, '');
+    if (cleanPhoneDigits.length < 7 || cleanPhoneDigits.length > 15) {
+      setError('Please enter a valid phone number (7 to 15 digits, e.g. +91 98765 43210 or +1 555-0199)');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const payload = {
-        name: formData.name,
-        username: formData.username,
-        email: formData.email,
+        name: formData.name.trim(),
+        username: formData.username.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        job_role: trimmedJobRole,
         password: formData.password,
-        role: formData.role,
+        role: 'user',
       };
 
       const res = await authApi.register(payload);
@@ -232,20 +263,62 @@ export const Register = () => {
                   </div>
                 </div>
 
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-[14px] font-bold text-[#0b1f46]">Username <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500" />
+                      <input
+                        name="username"
+                        type="text"
+                        value={formData.username}
+                        onChange={handleChange}
+                        placeholder="Choose a username"
+                        className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-[14.5px] font-medium outline-none transition focus:border-[#0e6fe9] focus:ring-1 focus:ring-[#0e6fe9]"
+                        disabled={loading}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-[14px] font-bold text-[#0b1f46]">Phone Number <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500" />
+                      <input
+                        name="phone"
+                        type="tel"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        placeholder="+91 98765 43210"
+                        className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-[14.5px] font-medium outline-none transition focus:border-[#0e6fe9] focus:ring-1 focus:ring-[#0e6fe9]"
+                        disabled={loading}
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div>
-                  <label className="mb-1.5 block text-[14px] font-bold text-[#0b1f46]">Username <span className="text-red-500">*</span></label>
+                  <label className="mb-1.5 block text-[14px] font-bold text-[#0b1f46]">Job Role / Designation <span className="text-red-500">*</span></label>
                   <div className="relative">
-                    <User className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500" />
+                    <Briefcase className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500" />
                     <input
-                      name="username"
+                      name="job_role"
                       type="text"
-                      value={formData.username}
+                      list="job-role-suggestions"
+                      value={formData.job_role}
                       onChange={handleChange}
-                      placeholder="Choose a username"
+                      placeholder="Enter your job role / designation (e.g. Cashier, Store Manager)"
                       className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-[14.5px] font-medium outline-none transition focus:border-[#0e6fe9] focus:ring-1 focus:ring-[#0e6fe9]"
                       disabled={loading}
                       required
                     />
+                    <datalist id="job-role-suggestions">
+                      {JOB_ROLE_SUGGESTIONS.map((role) => (
+                        <option key={role} value={role} />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
 

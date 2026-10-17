@@ -19,7 +19,7 @@ from app.core.cache import (
 )
 from app.core.product_store import product_store
 from app.core.rate_limiter import limiter
-from app.core.security import get_current_user, require_admin, require_manager_or_admin
+from app.core.security import get_current_user, require_admin, require_manager_or_admin, require_permission
 from app.core.config import settings
 from app.models.schemas import ProductCreate, ProductUpdate, ProductResponse
 from app.services.sap.items_service import SAPItemsService
@@ -343,7 +343,7 @@ async def get_products(
     response: Response,
     search: Optional[str] = Query(None, max_length=100, description="Search term (name, barcode, or code)"),
     force_refresh: bool = Query(False, description="Bypass and evict the server-side cache"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("products.view")),
 ):
     """
     Get all products – served from in-memory cache when available (10 min TTL).
@@ -454,7 +454,7 @@ async def get_products(
 async def get_product_by_barcode(
     request: Request,
     barcode: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("products.view")),
 ):
     """Fetch a single product by barcode directly from SAP."""
     sap_service = SAPItemsService()
@@ -486,7 +486,7 @@ async def get_product_by_barcode(
 async def create_product(
     request: Request,
     product: ProductCreate,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_permission("products.create")),
 ):
     """Create a new product in SAP (admin only) and invalidate the products cache."""
     sap_service = SAPItemsService()
@@ -518,9 +518,9 @@ async def update_product(
     request: Request,
     item_code: str,
     product: ProductUpdate,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_permission("products.edit")),
 ):
-    """Update a product in SAP (admin only) and invalidate the products cache."""
+    """Update a product in SAP and invalidate the products cache."""
     sap_service = SAPItemsService()
     try:
         sap_service.update_item(item_code, product.model_dump(exclude_unset=True))
@@ -544,9 +544,9 @@ async def update_product(
 async def delete_product(
     request: Request,
     item_code: str,
-    current_user: dict = Depends(require_admin),
+    current_user: dict = Depends(require_permission("products.delete")),
 ):
-    """Soft-delete a product in SAP (admin only, freezes it) and invalidate the products cache."""
+    """Soft-delete a product in SAP (freezes it) and invalidate the products cache."""
     sap_service = SAPItemsService()
     try:
         sap_service.soft_delete_item(item_code)
@@ -576,7 +576,7 @@ async def _refresh_cache_background(sap_service: SAPItemsService):
 async def refresh_products_cache(
     request: Request,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(require_manager_or_admin),
+    current_user: dict = Depends(require_permission("products.edit")),
 ):
     """
     Trigger a background refresh of the products cache (manager/admin only).

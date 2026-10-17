@@ -50,20 +50,26 @@ const queryClient = new QueryClient({
   },
 });
 
+import { RequirePermission } from './components/RequirePermission';
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
-  
-  // DEV PREVIEW MODE - Bypass auth during local development phases
-  const DEV_PREVIEW = import.meta.env.DEV;
 
-  if (isLoading && !DEV_PREVIEW) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">Loading...</div>;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-500">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-t-transparent" />
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Loading session...</p>
+        </div>
+      </div>
+    );
   }
-  
-  if (!isAuthenticated && !DEV_PREVIEW) {
+
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
@@ -76,79 +82,81 @@ function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route 
-                path="/" 
+              <Route
+                path="/"
                 element={
                   <ProtectedRoute>
                     <Layout />
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<Dashboard />} />
-                <Route path="product" element={<ProductLandingPage />} />
-                <Route path="solutions" element={<SolutionsLandingPage />} />
-                <Route path="products" element={<ProductsStockPage />} />
-                <Route path="products/:id" element={<ProductsStockPage />} />
-              <Route path="customers" element={<CustomersPage />} />
-              <Route path="pos" element={<PosCheckoutPage />} />
-              <Route path="sales" element={<SalesList />} />
-              <Route path="sales-orders" element={<SalesOrdersPage />} />
-              <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
-              <Route path="sales/:id" element={<InvoiceDetail />} />
-              <Route path="returns" element={<ReturnsApprovalsPage />} />
-              <Route path="analytics" element={<AtlasAnalyticsPage />} />
-              <Route path="production">
-                <Route index element={<ProductionOverviewPage />} />
-                <Route path="orders" element={<ProductionOrdersPage />} />
-                <Route path="item-wise" element={<ProductionItemWisePage />} />
-                <Route path="rejection" element={<ProductionRejectionPage />} />
-                <Route path="date-wise" element={<ProductionDateWisePage />} />
-                <Route path="reports" element={<ProductionReportsPage />} />
+                <Route index element={<RequirePermission permission="dashboard.view"><Dashboard /></RequirePermission>} />
+                <Route path="product" element={<RequirePermission permission="products.view"><ProductLandingPage /></RequirePermission>} />
+                <Route path="solutions" element={<RequirePermission module="solutions"><SolutionsLandingPage /></RequirePermission>} />
+                <Route path="products" element={<RequirePermission permission="products.view"><ProductsStockPage /></RequirePermission>} />
+                <Route path="products/:id" element={<RequirePermission permission="products.view"><ProductsStockPage /></RequirePermission>} />
+                <Route path="customers" element={<RequirePermission permission="customers.view"><CustomersPage /></RequirePermission>} />
+                <Route path="pos" element={<RequirePermission permission="pos.access"><PosCheckoutPage /></RequirePermission>} />
+                <Route path="sales" element={<RequirePermission permission="invoices.view"><SalesList /></RequirePermission>} />
+                <Route path="sales-orders" element={<RequirePermission permission="sales_orders.view"><SalesOrdersPage /></RequirePermission>} />
+                <Route path="purchase-orders" element={<RequirePermission permission="purchase_orders.view"><PurchaseOrdersPage /></RequirePermission>} />
+                <Route path="sales/:id" element={<RequirePermission permission="invoices.view"><InvoiceDetail /></RequirePermission>} />
+                <Route path="returns" element={<RequirePermission permission="returns.view"><ReturnsApprovalsPage /></RequirePermission>} />
+                <Route path="analytics" element={<RequirePermission permission="dashboard.view"><AtlasAnalyticsPage /></RequirePermission>} />
+                <Route path="production">
+                  <Route index element={<RequirePermission permission="production.view"><ProductionOverviewPage /></RequirePermission>} />
+                  <Route path="orders" element={<RequirePermission permission="production.orders.view"><ProductionOrdersPage /></RequirePermission>} />
+                  <Route path="item-wise" element={<RequirePermission permission="production.view"><ProductionItemWisePage /></RequirePermission>} />
+                  <Route path="rejection" element={<RequirePermission permission="production.view"><ProductionRejectionPage /></RequirePermission>} />
+                  <Route path="date-wise" element={<RequirePermission permission="production.view"><ProductionDateWisePage /></RequirePermission>} />
+                  <Route path="reports" element={<RequirePermission permission="production.reports.view"><ProductionReportsPage /></RequirePermission>} />
+                </Route>
+                <Route path="finance">
+                  <Route index element={<RequirePermission permission="finance.view"><FinanceOverviewPage /></RequirePermission>} />
+                  <Route path="overview" element={<RequirePermission permission="finance.view"><FinanceOverviewPage /></RequirePermission>} />
+                  <Route path="purchase-invoices" element={<RequirePermission permission="finance.invoices.view"><PurchaseInvoicesPage /></RequirePermission>} />
+                  <Route path="incoming-payments" element={<RequirePermission permission="finance.payments.view"><IncomingPaymentsPage /></RequirePermission>} />
+                  <Route path="outgoing-payments" element={<RequirePermission permission="finance.payments.view"><OutgoingPaymentsPage /></RequirePermission>} />
+                  <Route path="customer-analysis" element={<RequirePermission permission="finance.view"><CustomerAnalysisPage /></RequirePermission>} />
+                  <Route path="supplier-analysis" element={<RequirePermission permission="finance.view"><SupplierAnalysisPage /></RequirePermission>} />
+                  <Route path="profitability-reports" element={<RequirePermission permission="finance.reports.view"><ProfitabilityReportsPage /></RequirePermission>} />
+                </Route>
+                <Route path="reports">
+                  <Route index element={<RequirePermission permission="reports.view"><ReportsPage /></RequirePermission>} />
+                  <Route path="sales" element={<RequirePermission permission="reports.view"><SalesReportPage /></RequirePermission>} />
+                  <Route path="invoice" element={<RequirePermission permission="reports.view"><InvoiceReportPage /></RequirePermission>} />
+                  <Route path="payment" element={<RequirePermission permission="reports.view"><PaymentReportPage /></RequirePermission>} />
+                  <Route path="inventory" element={<RequirePermission permission="reports.view"><InventoryReportPage /></RequirePermission>} />
+                  <Route
+                    path="customer"
+                    element={
+                      <RequirePermission permission="reports.view">
+                        <ReportPlaceholderPage
+                          title="Customer Reports"
+                          description="In-depth customer retention, repeat purchase patterns, account aging, and lifetime value analytics are currently being mapped to your SAP Business One schema."
+                        />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="ai"
+                    element={
+                      <RequirePermission permission="reports.view">
+                        <ReportPlaceholderPage
+                          title="AI Generated Reports"
+                          description="Automated business intelligence narratives generated from your live SAP database. You can also ask queries directly using the ATLAS AI Assistant launcher."
+                          isAI={true}
+                        />
+                      </RequirePermission>
+                    }
+                  />
+                </Route>
+                <Route path="contact" element={<ContactPage />} />
+                <Route path="settings" element={<RequirePermission requireAdmin={true}><SettingsUsersPage /></RequirePermission>} />
+                {/* Fallback routes for "Coming soon" */}
+                <Route path="*" element={<div className="p-8 text-center text-gray-500">Coming soon</div>} />
               </Route>
-              <Route path="finance">
-
-                <Route index element={<FinanceOverviewPage />} />
-                <Route path="overview" element={<FinanceOverviewPage />} />
-                <Route path="purchase-invoices" element={<PurchaseInvoicesPage />} />
-                <Route path="incoming-payments" element={<IncomingPaymentsPage />} />
-                <Route path="outgoing-payments" element={<OutgoingPaymentsPage />} />
-                <Route path="customer-analysis" element={<CustomerAnalysisPage />} />
-                <Route path="supplier-analysis" element={<SupplierAnalysisPage />} />
-                <Route path="profitability-reports" element={<ProfitabilityReportsPage />} />
-              </Route>
-              <Route path="reports">
-
-                <Route index element={<ReportsPage />} />
-                <Route path="sales" element={<SalesReportPage />} />
-                <Route path="invoice" element={<InvoiceReportPage />} />
-                <Route path="payment" element={<PaymentReportPage />} />
-                <Route path="inventory" element={<InventoryReportPage />} />
-                <Route
-                  path="customer"
-                  element={
-                    <ReportPlaceholderPage
-                      title="Customer Reports"
-                      description="In-depth customer retention, repeat purchase patterns, account aging, and lifetime value analytics are currently being mapped to your SAP Business One schema."
-                    />
-                  }
-                />
-                <Route
-                  path="ai"
-                  element={
-                    <ReportPlaceholderPage
-                      title="AI Generated Reports"
-                      description="Automated business intelligence narratives generated from your live SAP database. You can also ask queries directly using the ATLAS AI Assistant launcher."
-                      isAI={true}
-                    />
-                  }
-                />
-              </Route>
-              <Route path="contact" element={<ContactPage />} />
-              <Route path="settings" element={<SettingsUsersPage />} />
-              {/* Fallback routes for "Coming soon" */}
-              <Route path="*" element={<div className="p-8 text-center text-gray-500">Coming soon</div>} />
-            </Route>
-          </Routes>
+            </Routes>
         </AIAssistantProvider>
       </BrowserRouter>
       </AuthProvider>

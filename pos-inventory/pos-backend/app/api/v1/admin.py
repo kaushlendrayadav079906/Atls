@@ -43,6 +43,11 @@ from app.models.schemas import (
     BranchSummary,
     PaymentMethodSummary,
     ReturnReasonSummary,
+    PermissionItem,
+    RoleItem,
+    UserPermissionsResponse,
+    UserPermissionsUpdate,
+    SecurityAuditLogResponse,
 )
 from app.services import user_service
 from app.services.sap.warehouses_service import SAPWarehousesService
@@ -407,19 +412,36 @@ async def list_branches(current_user: dict = Depends(require_admin)):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# User Management
+# User & Permissions Management
 # ──────────────────────────────────────────────────────────────────────────────
 
 @router.get("/users", response_model=List[AdminUserResponse])
 async def list_users(current_user: dict = Depends(require_admin)):
-    """List all users with full admin details."""
+    """List all users with full admin details and effective permissions."""
     users = user_service.get_all_users()
     return [AdminUserResponse(**u) for u in users]
 
 
+@router.get("/users/{user_id}", response_model=AdminUserResponse)
+async def get_user_details(user_id: str, current_user: dict = Depends(require_admin)):
+    """Get single user profile with extended fields for administrators."""
+    user = user_service.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    return AdminUserResponse(**user)
+
+
 @router.post("/users", response_model=AdminUserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(user_data: AdminUserCreate, current_user: dict = Depends(require_admin)):
-    """Create a new user and assign them to a branch."""
+    """Create a new employee/user securely and assign role/branch."""
+    admin_id = current_user.get("user_id") or current_user.get("id")
+    phone = None
+    if user_data.phone:
+        try:
+            phone = user_service.normalize_phone_number(user_data.phone)
+        except ValueError as ve:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(ve))
+
     user = user_service.create_user(
         username=user_data.username,
         email=user_data.email,
@@ -428,6 +450,9 @@ async def create_user(user_data: AdminUserCreate, current_user: dict = Depends(r
         role=user_data.role,
         branch_id=user_data.branch_id,
         store_name=user_data.store_name,
+        phone=phone,
+        job_role=user_data.job_role,
+        admin_user_id=admin_id,
     )
     if not user:
         raise HTTPException(
@@ -443,12 +468,29 @@ async def update_user(
     user_data: AdminUserUpdate,
     current_user: dict = Depends(require_admin),
 ):
-    """Update any user field including branch assignment or password."""
+    """Update user profile, role, active status, or password with last-admin protection."""
+    admin_id = current_user.get("user_id") or current_user.get("id")
     updates = user_data.model_dump(exclude_none=True)
+    if "phone" in updates and updates["phone"]:
+        try:
+            updates["phone"] = user_service.normalize_phone_number(updates["phone"])
+        except ValueError as ve:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(ve))
+
     try:
-        user = user_service.update_user(user_id, updates)
+        user = user_service.update_user(user_id, updates, admin_user_id=admin_id)
     except ValueError as exc:
         reason = str(exc)
+        if reason == "CANNOT_DEMOTE_LAST_ADMIN":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security policy error: Cannot remove administrator role from the last active administrator.",
+            )
+        if reason == "CANNOT_DEACTIVATE_LAST_ADMIN":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security policy error: Cannot deactivate the last active administrator account.",
+            )
         if reason == "PASSWORD_MISMATCH":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect.")
         if reason == "PASSWORD_MISSING":
@@ -458,6 +500,7 @@ async def update_user(
         if reason == "EMAIL_EXISTS":
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists.")
         raise
+
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
     return AdminUserResponse(**user)
@@ -465,10 +508,91 @@ async def update_user(
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def deactivate_user(user_id: str, current_user: dict = Depends(require_admin)):
-    """Deactivate (soft-delete) a user so they can no longer log in."""
-    success = user_service.deactivate_user(user_id)
+    """Deactivate (soft-delete) a user with last-admin safety guard and session revocation."""
+    admin_id = current_user.get("user_id") or current_user.get("id")
+    try:
+        success = user_service.deactivate_user(user_id, admin_user_id=admin_id)
+    except ValueError as exc:
+        if str(exc) == "CANNOT_DEACTIVATE_LAST_ADMIN":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security policy error: Cannot deactivate the last remaining active administrator.",
+            )
+        raise
+
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+
+@router.post("/users/{user_id}/activate", response_model=AdminUserResponse)
+async def activate_user(user_id: str, current_user: dict = Depends(require_admin)):
+    """Reactivate a previously deactivated employee account."""
+    admin_id = current_user.get("user_id") or current_user.get("id")
+    success = user_service.activate_user(user_id, admin_user_id=admin_id)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    user = user_service.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    return AdminUserResponse(**user)
+
+
+@router.post("/users/{user_id}/revoke-sessions")
+async def revoke_user_sessions(user_id: str, current_user: dict = Depends(require_admin)):
+    """Terminate and invalidate all active session tokens for a user immediately."""
+    admin_id = current_user.get("user_id") or current_user.get("id")
+    success = user_service.revoke_user_sessions(user_id, admin_user_id=admin_id)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    return {"status": "ok", "message": "All active sessions for this user have been revoked."}
+
+
+@router.get("/users/{user_id}/permissions", response_model=UserPermissionsResponse)
+async def get_user_permissions(user_id: str, current_user: dict = Depends(require_admin)):
+    """Get the effective permissions and custom grant/revocation overrides for an employee."""
+    try:
+        return user_service.get_user_permissions(user_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+
+@router.put("/users/{user_id}/permissions", response_model=UserPermissionsResponse)
+async def set_user_permissions(
+    user_id: str,
+    payload: UserPermissionsUpdate,
+    current_user: dict = Depends(require_admin),
+):
+    """Update custom module/action permissions for an employee and invalidate stale sessions."""
+    admin_id = current_user.get("user_id") or current_user.get("id")
+    try:
+        user_service.set_user_permissions(user_id, payload.permissions, admin_user_id=admin_id)
+        return user_service.get_user_permissions(user_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+
+@router.get("/permissions", response_model=List[PermissionItem])
+async def list_permissions(current_user: dict = Depends(require_admin)):
+    """List the complete standard catalog of system module/action permissions."""
+    return user_service.get_all_permissions()
+
+
+@router.get("/roles", response_model=List[RoleItem])
+async def list_roles(current_user: dict = Depends(require_admin)):
+    """List all available system roles and their default permission sets."""
+    return user_service.get_all_roles()
+
+
+@router.get("/audit-logs", response_model=List[SecurityAuditLogResponse])
+async def list_audit_logs(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    current_user: dict = Depends(require_admin),
+):
+    """Retrieve security audit events log."""
+    logs = user_service.get_security_audit_logs(limit=limit, offset=offset)
+    return [SecurityAuditLogResponse(**log) for log in logs]
 
 
 # ──────────────────────────────────────────────────────────────────────────────

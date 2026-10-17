@@ -17,7 +17,24 @@ def client():
         patch("app.services.sap.client.SAPServiceLayerClient.login", return_value=True),
         patch("app.services.sap.items_service.SAPItemsService.get_items", return_value=[]),
     ):
-        app.dependency_overrides[get_current_user] = lambda: {"sub": "test"}
+        app.dependency_overrides[get_current_user] = lambda: {
+            "sub": "test",
+            "id": "test-id",
+            "username": "test",
+            "role": "user",
+            "is_active": True,
+            "token_version": 1,
+            "permissions": [
+                "dashboard.view",
+                "products.view",
+                "pos.access",
+                "pos.checkout",
+                "invoices.view",
+                "reports.view",
+                "reports.export",
+                "customers.view",
+            ],
+        }
         with TestClient(app) as test_client:
             yield test_client
 
@@ -125,7 +142,8 @@ def test_register_without_master_password(client):
             "role": "user",
             "sap_user_code": None,
             "branch_id": None,
-            "store_name": None,
+            "phone": "+919876543210",
+            "job_role": "Cashier",
         },
     ):
         response = client.post(
@@ -135,6 +153,8 @@ def test_register_without_master_password(client):
                 "email": "newuser@example.com",
                 "password": "StrongPass123!",
                 "name": "New User",
+                "phone": "+91 98765 43210",
+                "job_role": "Cashier",
                 "role": "user",
             },
         )

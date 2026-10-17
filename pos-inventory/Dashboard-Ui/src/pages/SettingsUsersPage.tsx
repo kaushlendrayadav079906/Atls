@@ -1,8 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PencilLine, Plus, Search, ShieldCheck, Trash2, UserRound } from 'lucide-react';
+import {
+  PencilLine,
+  Plus,
+  Search,
+  ShieldCheck,
+  Shield,
+  UserRound,
+  LogOut,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { apiClient } from '../api/client';
+import { adminApi } from '../api/endpoints';
 import { useAuth } from '../contexts/AuthContext';
+import { PermissionMatrixModal } from '../components/PermissionMatrixModal';
 
 interface BranchOption {
   id: string;
@@ -20,6 +34,8 @@ interface AdminUser {
   store_name?: string | null;
   is_active: boolean;
   created_at?: string | null;
+  phone?: string | null;
+  job_role?: string | null;
 }
 
 interface UserFormState {
@@ -30,6 +46,8 @@ interface UserFormState {
   role: 'admin' | 'manager' | 'operator' | 'user';
   branch_id: string;
   store_name: string;
+  phone: string;
+  job_role: string;
 }
 
 const roleOptions = [
@@ -63,6 +81,8 @@ const emptyForm = (): UserFormState => ({
   role: 'user',
   branch_id: '',
   store_name: '',
+  phone: '',
+  job_role: '',
 });
 
 const fetchUsers = async (): Promise<AdminUser[]> => {
@@ -84,8 +104,13 @@ export const SettingsUsersPage = () => {
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
+  const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<AdminUser | null>(null);
   const [form, setForm] = useState<UserFormState>(emptyForm());
   const [notice, setNotice] = useState('');
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [jumpPageInput, setJumpPageInput] = useState('');
 
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ['admin-users'],
@@ -112,6 +137,43 @@ export const SettingsUsersPage = () => {
       }),
     [search, users],
   );
+
+  const totalItems = filteredUsers.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const startIndex = (safeCurrentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+
+  const paginatedUsers = useMemo(
+    () => filteredUsers.slice(startIndex, endIndex),
+    [filteredUsers, startIndex, endIndex]
+  );
+
+  const pageNumbers = useMemo(() => {
+    const pages: (number | string)[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (safeCurrentPage <= 4) {
+        pages.push(1, 2, 3, 4, 5, '...', totalPages);
+      } else if (safeCurrentPage >= totalPages - 3) {
+        pages.push(1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, '...', safeCurrentPage - 1, safeCurrentPage, safeCurrentPage + 1, '...', totalPages);
+      }
+    }
+    return pages;
+  }, [totalPages, safeCurrentPage]);
+
+  const handleJumpSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const pageNum = parseInt(jumpPageInput, 10);
+    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
+      setCurrentPage(pageNum);
+      setJumpPageInput('');
+    }
+  };
 
   const createUser = useMutation({
     mutationFn: async (payload: Record<string, string | boolean | undefined>) => {
@@ -141,8 +203,12 @@ export const SettingsUsersPage = () => {
       setNotice('User updated successfully.');
     },
     onError: (error: unknown) => {
-      const message = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Unable to update user.';
-      setNotice(message);
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? '';
+      if (detail.includes('CANNOT_DEMOTE_LAST_ADMIN')) {
+        setNotice('Safety Guard: Cannot demote the last active administrator. Create another admin first.');
+      } else {
+        setNotice(detail || 'Unable to update user.');
+      }
     },
   });
 
@@ -153,10 +219,30 @@ export const SettingsUsersPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      setNotice('Status updated.');
+      setNotice('User account status updated.');
     },
     onError: (error: unknown) => {
-      const message = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Unable to update status.';
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? '';
+      if (detail.includes('CANNOT_DEACTIVATE_LAST_ADMIN')) {
+        setNotice('Safety Guard: Cannot deactivate the last active administrator.');
+      } else {
+        setNotice(detail || 'Unable to update user status.');
+      }
+    },
+  });
+
+  const revokeUserSessions = useMutation({
+    mutationFn: async (userId: string) => {
+      return await adminApi.revokeSessions(userId);
+    },
+    onSuccess: (data: { message?: string }) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setNotice(data.message || 'All sessions revoked successfully.');
+    },
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        'Failed to revoke sessions.';
       setNotice(message);
     },
   });
@@ -171,6 +257,8 @@ export const SettingsUsersPage = () => {
       role: form.role,
       branch_id: form.branch_id || undefined,
       store_name: form.store_name.trim() || undefined,
+      phone: form.phone.trim() || undefined,
+      job_role: form.job_role.trim() || undefined,
     });
   };
 
@@ -186,6 +274,8 @@ export const SettingsUsersPage = () => {
         role: editingUser.role,
         branch_id: editingUser.branch_id || undefined,
         store_name: editingUser.store_name || undefined,
+        phone: editingUser.phone?.trim() || undefined,
+        job_role: editingUser.job_role?.trim() || undefined,
       },
     });
   };
@@ -206,7 +296,7 @@ export const SettingsUsersPage = () => {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-8 text-slate-800">
+    <div className="w-full space-y-6 pb-8 text-slate-800">
       <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-950/20 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-blue-600">Administration</p>
@@ -240,7 +330,10 @@ export const SettingsUsersPage = () => {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <input
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Search user, email, branch..."
               className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
             />
@@ -267,8 +360,8 @@ export const SettingsUsersPage = () => {
                       Loading users…
                     </td>
                   </tr>
-                ) : filteredUsers.length > 0 ? (
-                  filteredUsers.map((member) => (
+                ) : paginatedUsers.length > 0 ? (
+                  paginatedUsers.map((member) => (
                     <tr key={member.id} className="hover:bg-slate-100/30">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -297,22 +390,50 @@ export const SettingsUsersPage = () => {
                       </td>
                       <td className="px-4 py-3 text-slate-600">{formatDate(member.created_at)}</td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setEditingUser(member)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-sky-800"
+                            onClick={() => setSelectedUserForPermissions(member)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50/80 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition shadow-2xs cursor-pointer"
+                            title="Configure module & action permissions"
                           >
-                            <PencilLine className="h-3.5 w-3.5" />
-                            Edit
+                            <Shield className="h-3.5 w-3.5 text-blue-600" />
+                            <span>Permissions</span>
                           </button>
                           <button
                             type="button"
-                            onClick={() => toggleUserStatus.mutate({ userId: member.id, isActive: !member.is_active })}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/80 px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-700"
+                            onClick={() => setEditingUser(member)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition shadow-2xs cursor-pointer"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <PencilLine className="h-3.5 w-3.5" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const action = member.is_active ? 'deactivate' : 'activate';
+                              if (window.confirm(`Are you sure you want to ${action} ${member.name}'s account?`)) {
+                                toggleUserStatus.mutate({ userId: member.id, isActive: !member.is_active });
+                              }
+                            }}
+                            className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold transition shadow-2xs cursor-pointer ${member.is_active
+                                ? 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                                : 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                              }`}
+                          >
                             {member.is_active ? 'Deactivate' : 'Activate'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`Revoke all active sessions and invalidating tokens for ${member.name}?`)) {
+                                revokeUserSessions.mutate(member.id);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition shadow-2xs cursor-pointer"
+                            title="Revoke all active sessions"
+                          >
+                            <LogOut className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </td>
@@ -327,6 +448,128 @@ export const SettingsUsersPage = () => {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* Pagination Bar */}
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100 pt-4 text-xs font-medium text-slate-600">
+          {/* Showing info and page size */}
+          <div className="flex items-center flex-wrap gap-3">
+            <span>
+              Showing <strong className="font-semibold text-slate-900">{totalItems === 0 ? 0 : startIndex + 1}</strong> to{' '}
+              <strong className="font-semibold text-slate-900">{endIndex}</strong> of{' '}
+              <strong className="font-semibold text-slate-900">{totalItems}</strong> users
+            </span>
+
+            <div className="flex items-center gap-1.5 text-slate-500">
+              <span>•</span>
+              <span>Show</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              >
+                <option value={10}>10 / page</option>
+                <option value={20}>20 / page</option>
+                <option value={50}>50 / page</option>
+                <option value={100}>100 / page</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Navigation Controls: Arrows, Page Numbers & Direct Page Jump */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1">
+              {/* First page arrow */}
+              <button
+                type="button"
+                onClick={() => setCurrentPage(1)}
+                disabled={safeCurrentPage <= 1}
+                title="First page"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </button>
+
+              {/* Previous page arrow */}
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safeCurrentPage <= 1}
+                title="Previous 10 entries"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+
+              {/* Numbered Page Buttons */}
+              {pageNumbers.map((p, idx) =>
+                typeof p === 'number' ? (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setCurrentPage(p)}
+                    className={`flex h-8 min-w-[32px] px-2 items-center justify-center rounded-lg text-xs font-bold transition cursor-pointer ${
+                      safeCurrentPage === p
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ) : (
+                  <span key={`ellipsis-${idx}`} className="px-1 text-slate-400 font-semibold select-none">
+                    ...
+                  </span>
+                )
+              )}
+
+              {/* Next page arrow */}
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safeCurrentPage >= totalPages}
+                title="Next 10 entries"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+
+              {/* Last page arrow */}
+              <button
+                type="button"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={safeCurrentPage >= totalPages}
+                title="Last page"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Jump to Page Input Form */}
+            <form onSubmit={handleJumpSubmit} className="flex items-center gap-1.5 ml-2">
+              <span className="text-slate-500 font-medium">Go to:</span>
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                value={jumpPageInput}
+                onChange={(e) => setJumpPageInput(e.target.value)}
+                placeholder={String(safeCurrentPage)}
+                className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-2 text-center text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                disabled={!jumpPageInput.trim()}
+                className="h-8 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 transition cursor-pointer"
+              >
+                Go
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -374,6 +617,15 @@ export const SettingsUsersPage = () => {
               <input value={form.store_name} onChange={(e) => setForm((current) => ({ ...current, store_name: e.target.value }))} className="input-style" placeholder="Main branch" />
             </Field>
 
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Phone">
+                <input value={form.phone} onChange={(e) => setForm((current) => ({ ...current, phone: e.target.value }))} className="input-style" placeholder="+91 98765 43210" />
+              </Field>
+              <Field label="Job Role / Designation">
+                <input value={form.job_role} onChange={(e) => setForm((current) => ({ ...current, job_role: e.target.value }))} className="input-style" placeholder="Cashier, Manager, etc." />
+              </Field>
+            </div>
+
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setIsCreateOpen(false)} className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm text-slate-700 hover:bg-slate-700">
                 Cancel
@@ -412,6 +664,15 @@ export const SettingsUsersPage = () => {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Phone">
+                <input value={editingUser.phone ?? ''} onChange={(event) => setEditingUser((current) => (current ? { ...current, phone: event.target.value } : current))} className="input-style" placeholder="+91 98765 43210" />
+              </Field>
+              <Field label="Job Role / Designation">
+                <input value={editingUser.job_role ?? ''} onChange={(event) => setEditingUser((current) => (current ? { ...current, job_role: event.target.value } : current))} className="input-style" placeholder="Cashier, Manager, etc." />
+              </Field>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Branch">
                 <select value={editingUser.branch_id ?? ''} onChange={(event) => setEditingUser((current) => (current ? { ...current, branch_id: event.target.value || null } : current))} className="input-style">
                   <option value="">Unassigned</option>
@@ -435,6 +696,15 @@ export const SettingsUsersPage = () => {
             </div>
           </div>
         </ModalShell>
+      )}
+
+      {selectedUserForPermissions && (
+        <PermissionMatrixModal
+          key={selectedUserForPermissions.id}
+          user={selectedUserForPermissions}
+          onClose={() => setSelectedUserForPermissions(null)}
+          onSuccessNotice={(msg) => setNotice(msg)}
+        />
       )}
     </div>
   );

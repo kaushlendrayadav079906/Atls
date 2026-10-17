@@ -2,7 +2,7 @@
 
 from typing import List
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import field_validator, Field
 
 
 class Settings(BaseSettings):
@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     REGISTER_MASTER_PASSWORD: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
+
+    # Initial Administrator Setup (Backend .env only, used strictly once during initial bootstrap if no active admin exists)
+    ADMIN_EMAIL: str = Field(default="")
+    ADMIN_PASSWORD: str = Field(default="", repr=False)
+    ADMIN_USERNAME: str = Field(default="")
+    ADMIN_NAME: str = Field(default="System Administrator")
     
     # SAP Business One Service Layer
     SAP_SERVICE_LAYER_URL: str

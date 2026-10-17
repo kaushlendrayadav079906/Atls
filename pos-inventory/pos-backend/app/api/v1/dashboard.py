@@ -16,7 +16,7 @@ from collections import defaultdict
 
 from app.core.cache import cache_get, cache_set, cache_delete, cache_delete_prefix, DASHBOARD_SUMMARY_KEY
 from app.core.rate_limiter import limiter
-from app.core.security import get_current_user, require_manager_or_admin
+from app.core.security import get_current_user, require_manager_or_admin, require_permission
 
 # Shared thread pool for blocking SAP calls
 _executor = ThreadPoolExecutor(max_workers=min(32, (_os.cpu_count() or 4) * 4))
@@ -537,7 +537,7 @@ async def get_dashboard_summary(
     request: Request,
     response: Response,
     force_refresh: bool = Query(False, description="Bypass and evict the server-side cache"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("dashboard.view")),
 ):
     """
     Today's sales summary (todayTotal + billCount).
@@ -667,7 +667,7 @@ async def _customer_search_fallback(search: Optional[str], top: int = 20) -> Lis
 async def search_customers(
     request: Request,
     search: str = Query(None, description="Search term for customer name or code"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("dashboard.view")),
 ):
     """Search for customers using SAP Business Partners."""
     try:
@@ -719,7 +719,7 @@ async def search_customers(
 @limiter.limit(settings.RATE_LIMIT_GENERAL)
 async def get_recent_sales(
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("dashboard.view")),
 ):
     """Return the 5 most recent invoices with details for receipt re-printing."""
     try:
@@ -752,7 +752,7 @@ async def get_recent_sales_feed(
     payment_method: Optional[str] = Query(None, description="Filter by payment method"),
     limit: int = Query(10, ge=1, le=50),
     offset: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("dashboard.view")),
 ):
     """Paginated recent sales feed for the operator dashboard."""
     effective_from = from_date or date_from
@@ -832,7 +832,7 @@ async def get_operator_dashboard(
     range: str = Query("daily", pattern="^(daily|weekly|monthly|yearly|all_time)$"),
     branch: Optional[str] = Query(None, description="Branch code for admin override"),
     force_refresh: bool = Query(False, description="Bypass and evict the server-side cache"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("dashboard.view")),
 ):
     """Branch-operator focused dashboard payload for POS operations.
 
@@ -943,7 +943,7 @@ async def get_operator_dashboard(
 @limiter.limit(settings.RATE_LIMIT_GENERAL)
 async def export_operator_reports(
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("reports.export")),
     range: str = Query("monthly", pattern="^(daily|weekly|monthly|yearly|all_time)$"),
     from_date: Optional[str] = Query(None, description="Custom start date (YYYY-MM-DD)"),
     to_date: Optional[str] = Query(None, description="Custom end date (YYYY-MM-DD)"),

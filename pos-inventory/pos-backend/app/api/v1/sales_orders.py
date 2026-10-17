@@ -2,7 +2,7 @@ import math
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, HTTPException, status
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_permission
 from app.schemas.sales_orders import (
     SalesOrderListResponse, 
     SalesOrderDetail, 
@@ -54,7 +54,7 @@ def list_sales_orders(
     warehouse_code: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("sales_orders.view"))
 ):
     try:
         skip = (page - 1) * limit
@@ -149,7 +149,7 @@ def get_sales_order_summary(
     branch_id: Optional[int] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("sales_orders.view"))
 ):
     try:
         filters = []
@@ -180,7 +180,7 @@ def get_sales_order_summary(
 @router.get("/{doc_entry}", response_model=SalesOrderDetail)
 def get_sales_order(
     doc_entry: int,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("sales_orders.view"))
 ):
     try:
         response = _service.get_sales_order(doc_entry)

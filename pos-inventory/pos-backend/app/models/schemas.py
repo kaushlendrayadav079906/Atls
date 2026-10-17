@@ -25,6 +25,8 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=72)
     name: str = Field(..., min_length=1, max_length=100)
+    phone: str = Field(..., min_length=7, max_length=30)
+    job_role: str = Field(..., min_length=2, max_length=100)
     master_password: Optional[str] = Field(None, min_length=0, max_length=255)
     role: str = Field("user", pattern="^(user|admin|operator|manager)$")
     branch_id: Optional[str] = None
@@ -41,6 +43,11 @@ class UserResponse(BaseModel):
     sap_user_code: Optional[str] = None
     branch_id: Optional[str] = None   # SAP WarehouseCode
     store_name: Optional[str] = None  # Display name for the branch/store
+    is_active: bool = True
+    token_version: int = 1
+    permissions: List[str] = []
+    phone: Optional[str] = None
+    job_role: Optional[str] = None
 
 
 class AccessTokenResponse(BaseModel):
@@ -51,7 +58,7 @@ class AccessTokenResponse(BaseModel):
 
 
 # ============================================================
-# Admin Models
+# Admin Models & Permission Management
 # ============================================================
 
 class AdminUserCreate(BaseModel):
@@ -63,6 +70,8 @@ class AdminUserCreate(BaseModel):
     role: str = Field("user", pattern="^(user|admin|operator|manager)$")
     branch_id: Optional[str] = None
     store_name: Optional[str] = None
+    phone: Optional[str] = None
+    job_role: Optional[str] = None
 
 
 class AdminUserUpdate(BaseModel):
@@ -77,6 +86,8 @@ class AdminUserUpdate(BaseModel):
     password: Optional[str] = Field(None, min_length=6, max_length=72)
     current_password: Optional[str] = Field(None, min_length=1, max_length=72)
     new_password: Optional[str] = Field(None, min_length=6, max_length=72)
+    phone: Optional[str] = None
+    job_role: Optional[str] = None
 
 
 class AdminUserResponse(BaseModel):
@@ -91,6 +102,52 @@ class AdminUserResponse(BaseModel):
     store_name: Optional[str] = None
     is_active: bool = True
     created_at: Optional[str] = None
+    token_version: int = 1
+    permissions: List[str] = []
+    phone: Optional[str] = None
+    job_role: Optional[str] = None
+
+
+class PermissionItem(BaseModel):
+    """Permission item model"""
+    id: str
+    module: str
+    action: str
+    description: Optional[str] = None
+
+
+class RoleItem(BaseModel):
+    """Role definition item"""
+    name: str
+    description: Optional[str] = None
+    permissions: List[str] = []
+
+
+class UserPermissionsResponse(BaseModel):
+    """User permissions detailed response"""
+    user_id: str
+    role: str
+    effective_permissions: List[str] = []
+    custom_grants: List[str] = []
+    custom_revocations: List[str] = []
+
+
+class UserPermissionsUpdate(BaseModel):
+    """User permissions update payload"""
+    permissions: List[str] = []
+
+
+class SecurityAuditLogResponse(BaseModel):
+    """Security audit log response item"""
+    id: str
+    user_id: Optional[str] = None
+    username: Optional[str] = None
+    action: str
+    resource_type: Optional[str] = None
+    resource_id: Optional[str] = None
+    details: Optional[str] = None
+    ip_address: Optional[str] = None
+    created_at: str
 
 
 # ============================================================

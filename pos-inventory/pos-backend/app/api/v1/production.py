@@ -5,7 +5,7 @@ import io
 import csv
 import logging
 
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_permission
 from app.api.v1.atlas import _get_permitted_branch
 from app.schemas.production import (
     ProductionSummaryResponse,
@@ -30,7 +30,7 @@ def get_production_summary(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     warehouse: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(require_permission("production.view")),
     service: SAPProductionService = Depends(get_production_service)
 ):
     if date_from and date_to and date_from > date_to:
@@ -56,7 +56,7 @@ def get_production_orders(
     priority: Optional[int] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(require_permission("production.orders.view")),
     service: SAPProductionService = Depends(get_production_service)
 ):
     if date_from and date_to and date_from > date_to:
@@ -87,7 +87,7 @@ def get_production_orders(
 @router.get("/orders/{production_order_no}", response_model=ProductionOrderDetail)
 def get_production_order_detail(
     production_order_no: int,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(require_permission("production.orders.view")),
     service: SAPProductionService = Depends(get_production_service)
 ):
     try:
@@ -113,7 +113,7 @@ def get_item_wise_production(
     date_to: Optional[str] = None,
     warehouse: Optional[str] = None,
     search: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(require_permission("production.reports.view")),
     service: SAPProductionService = Depends(get_production_service)
 ):
     permitted_warehouse = _get_permitted_branch(current_user, warehouse)
@@ -132,7 +132,7 @@ def get_production_rejection(
     date_to: Optional[str] = None,
     warehouse: Optional[str] = None,
     search: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(require_permission("production.reports.view")),
     service: SAPProductionService = Depends(get_production_service)
 ):
     permitted_warehouse = _get_permitted_branch(current_user, warehouse)
@@ -150,8 +150,8 @@ def get_date_wise_production(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     warehouse: Optional[str] = None,
-    granularity: str = Query("daily", regex="^(daily|weekly|monthly|yearly)$"),
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    granularity: str = Query("daily", pattern="^(daily|weekly|monthly|yearly)$"),
+    current_user: Dict[str, Any] = Depends(require_permission("production.reports.view")),
     service: SAPProductionService = Depends(get_production_service)
 ):
     permitted_warehouse = _get_permitted_branch(current_user, warehouse)
@@ -169,7 +169,7 @@ def get_status_distribution(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     warehouse: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(require_permission("production.reports.view")),
     service: SAPProductionService = Depends(get_production_service)
 ):
     permitted_warehouse = _get_permitted_branch(current_user, warehouse)
@@ -186,7 +186,7 @@ def get_warehouse_summary(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     warehouse: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(require_permission("production.reports.view")),
     service: SAPProductionService = Depends(get_production_service)
 ):
     permitted_warehouse = _get_permitted_branch(current_user, warehouse)
@@ -204,7 +204,7 @@ def export_production_report(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     warehouse: Optional[str] = None,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(require_permission("production.reports.view")),
     service: SAPProductionService = Depends(get_production_service)
 ):
     permitted_warehouse = _get_permitted_branch(current_user, warehouse)

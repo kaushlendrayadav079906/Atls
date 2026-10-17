@@ -19,12 +19,34 @@ def clean_dependencies():
 
 @pytest.fixture
 def admin_auth_headers():
-    token = create_access_token({"sub": "admin_user", "role": "admin", "branch_id": None})
+    from app.services.user_service import get_user_by_username, create_user
+    u = get_user_by_username("test_admin_auth")
+    if not u:
+        u = create_user(
+            username="test_admin_auth",
+            email="test_admin_auth@atlas.local",
+            password="SecureAdminPass123!",
+            name="Test Admin Auth",
+            role="admin",
+            branch_id="HQ",
+        )
+    token = create_access_token({"sub": u["username"], "role": "admin", "branch_id": None, "user_id": u["id"], "token_version": u.get("token_version", 1)})
     return {"Authorization": f"Bearer {token}"}
 
 @pytest.fixture
 def manager_auth_headers():
-    token = create_access_token({"sub": "manager_user", "role": "manager", "branch_id": "01"})
+    from app.services.user_service import get_user_by_username, create_user
+    u = get_user_by_username("test_manager_auth")
+    if not u:
+        u = create_user(
+            username="test_manager_auth",
+            email="test_manager_auth@atlas.local",
+            password="SecureManagerPass123!",
+            name="Test Manager Auth",
+            role="manager",
+            branch_id="01",
+        )
+    token = create_access_token({"sub": u["username"], "role": "manager", "branch_id": "01", "user_id": u["id"], "token_version": u.get("token_version", 1)})
     return {"Authorization": f"Bearer {token}"}
 
 @pytest.fixture

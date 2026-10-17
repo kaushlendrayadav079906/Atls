@@ -4,7 +4,7 @@ import asyncio
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from pydantic import BaseModel
-from app.core.security import get_current_user, require_admin
+from app.core.security import get_current_user, require_admin, require_permission
 from app.core.config import settings
 from app.services.sap.finance_service import SAPFinanceService
 
@@ -31,7 +31,7 @@ async def get_finance_overview(
     branch: Optional[str] = Query(None),
     from_date: Optional[str] = Query(None),
     to_date: Optional[str] = Query(None),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("finance.view")),
 ) -> Dict[str, Any]:
     """Retrieve financial overview KPIs, trends, top customers/suppliers, and recent payments."""
     target_branch = _get_permitted_branch(current_user, branch)
@@ -56,7 +56,7 @@ class RecordUpdateRequest(BaseModel):
 async def get_record_details(
     entity_type: str = Query(..., description="Entity type: invoice, purchase_invoice, incoming_payment, outgoing_payment, customer, supplier"),
     record_id: str = Query(..., description="DocEntry or CardCode"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("finance.view")),
 ) -> Dict[str, Any]:
     """Retrieve record details, document status, editable field allowlist, and locked fields with GAAP explanations."""
     user_role = str(current_user.get("role") or "user").lower()
@@ -77,7 +77,7 @@ async def get_record_details(
 @router.post("/validate-update")
 async def validate_record_update(
     request: RecordUpdateRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("finance.view")),
 ) -> Dict[str, Any]:
     """Validate proposed updates against field allowlist, data types, and document status without modifying SAP."""
     user_role = str(current_user.get("role") or "user").lower()
@@ -95,7 +95,7 @@ async def validate_record_update(
 async def submit_record_update(
     request: RecordUpdateRequest,
     req: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("finance.payments.view")),
 ) -> Dict[str, Any]:
     """Submit approved changes to SAP Service Layer with explicit confirmation, duplicate protection, and audit logging."""
     # SAFETY LOCK: Hard rejection of all SAP write operations when disabled by administrative policy
@@ -142,7 +142,7 @@ async def get_finance_audit_log(
     entity_type: Optional[str] = Query(None),
     record_id: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("finance.reports.view")),
 ) -> Dict[str, Any]:
     """Retrieve finance audit log history (available to Admin and Manager roles)."""
     user_role = str(current_user.get("role") or "user").lower()

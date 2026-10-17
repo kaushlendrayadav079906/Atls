@@ -65,6 +65,84 @@ INTERNAL_ROUTE_MAP = {
     "finance_profitability_reports": {"name": "Profitability Reports", "path": "/finance/profitability-reports"}
 }
 
+# Granular permission mapping for AI assistant tools
+TOOL_PERMISSIONS = {
+    # Analytical & Dashboard
+    "get_dashboard_summary": "dashboard.view",
+    "get_sales_trend": "dashboard.view",
+    "get_purchase_trend": "dashboard.view",
+    # Sales & Invoices
+    "get_sales_orders": "sales_orders.view",
+    "get_sales_invoices": "invoices.view",
+    # Purchases
+    "get_purchase_orders": "purchase_orders.view",
+    "get_purchase_invoices": "finance.invoices.view",
+    # Inventory & Products
+    "get_inventory_stock": "products.view",
+    "get_products": "products.view",
+    # Customers
+    "search_customers": "customers.view",
+    "get_customer_sales_ranking": "customers.view",
+    # Returns
+    "get_sales_returns": "returns.view",
+    "get_pending_approvals": "returns.view",
+    # Production
+    "get_production_summary": "production.view",
+    "get_production_orders": "production.orders.view",
+    "get_production_rejection": "production.view",
+    "get_production_item_wise": "production.view",
+    # Reports
+    "get_sales_report": "reports.view",
+    "get_invoice_report": "reports.view",
+    "get_payment_report": "reports.view",
+    "get_customer_report": "reports.view",
+    # Finance
+    "get_finance_summary": "finance.view",
+    "get_incoming_payments": "finance.payments.view",
+    "get_outgoing_payments": "finance.payments.view",
+    "get_supplier_purchase_ranking": "finance.view",
+    "get_accounts_receivable": "finance.view",
+    "get_accounts_payable": "finance.view",
+    "get_profitability_report": "finance.reports.view",
+    "inspect_finance_record": "finance.view",
+    "propose_record_update": "finance.view",
+    "submit_approved_record_update": "admin",
+    "get_finance_audit_log": "finance.reports.view",
+    "get_finance_admin_settings": "admin",
+    "refresh_finance_data": "finance.view",
+}
+
+MODULE_NAV_PERMISSIONS = {
+    "dashboard": "dashboard.view",
+    "pos": "pos.access",
+    "products": "products.view",
+    "sales": "invoices.view",
+    "sales_orders": "sales_orders.view",
+    "purchase_orders": "purchase_orders.view",
+    "customers": "customers.view",
+    "returns": "returns.view",
+    "analytics": "dashboard.view",
+    "production_overview": "production.view",
+    "production_orders": "production.orders.view",
+    "production_item_wise": "production.view",
+    "production_rejection": "production.view",
+    "production_date_wise": "production.view",
+    "production_reports": "production.reports.view",
+    "reports_sales": "reports.view",
+    "reports_invoice": "reports.view",
+    "reports_payment": "reports.view",
+    "reports_inventory": "reports.view",
+    "settings": "users.manage",
+    "finance_overview": "finance.view",
+    "finance_sales_invoices": "invoices.view",
+    "finance_purchase_invoices": "finance.invoices.view",
+    "finance_incoming_payments": "finance.payments.view",
+    "finance_outgoing_payments": "finance.payments.view",
+    "finance_customer_analysis": "finance.view",
+    "finance_supplier_analysis": "finance.view",
+    "finance_profitability_reports": "finance.reports.view",
+}
+
 def _get_permitted_branch(user: dict, requested_branch: Optional[str] = None) -> Optional[str]:
     """
     Enforce branch/warehouse access.
@@ -1100,6 +1178,27 @@ class AIAssistantService:
         supported_metrics = ("sales", "payments", "products")
         supported_group_by = ("branch", "payment_method", "date", "month", "product", "customer", "comparison", "invoice")
 
+        # Security check: Validate permission based on analytical metric
+        user_role = str(current_user.get("role") or "user").lower()
+        user_permissions = set(current_user.get("permissions") or [])
+
+        if user_role != "admin":
+            if metric == "sales" and not ({"dashboard.view", "invoices.view"} & user_permissions):
+                return {
+                    "error": "Access Denied: You do not have permission ('dashboard.view' or 'invoices.view') to analyze sales metrics. Please contact an administrator.",
+                    "meta": {"is_partial": False, "permission_denied": True}
+                }, None, None
+            if metric == "payments" and not ({"finance.view", "finance.payments.view", "reports.view"} & user_permissions):
+                return {
+                    "error": "Access Denied: You do not have permission ('finance.view' or 'reports.view') to analyze payment metrics. Please contact an administrator.",
+                    "meta": {"is_partial": False, "permission_denied": True}
+                }, None, None
+            if metric == "products" and "products.view" not in user_permissions:
+                return {
+                    "error": "Access Denied: You do not have permission ('products.view') to analyze product stock metrics. Please contact an administrator.",
+                    "meta": {"is_partial": False, "permission_denied": True}
+                }, None, None
+
         if metric not in supported_metrics:
             return {
                 "error": f"Unsupported metric '{metric}'. Supported metrics are: {', '.join(supported_metrics)}.",
@@ -1711,6 +1810,20 @@ class AIAssistantService:
                 return {
                     "error": f"Invalid date range: date_from ({date_from}) cannot be after date_to ({date_to}).",
                     "meta": {"is_partial": False}
+                }, None, None
+
+            # Security & Role-Based Authorization Enforcement
+            user_role = str(current_user.get("role") or "user").lower()
+            user_permissions = set(current_user.get("permissions") or [])
+            required_perm = TOOL_PERMISSIONS.get(tool_name)
+            if required_perm and user_role != "admin" and required_perm not in user_permissions:
+                logger.warning(
+                    f"AI Assistant tool access denied: user '{current_user.get('username')}' "
+                    f"(role={user_role}) missing required permission '{required_perm}' for tool '{tool_name}'"
+                )
+                return {
+                    "error": f"Access Denied: You do not have permission ('{required_perm}') to execute '{tool_name}'. Please contact an administrator.",
+                    "meta": {"is_partial": False, "permission_denied": True}
                 }, None, None
 
             # ──────────────────────────────────────────────────────────────────
@@ -2762,6 +2875,13 @@ class AIAssistantService:
                 route_info = INTERNAL_ROUTE_MAP.get(tgt)
                 if not route_info:
                     return {"error": f"Unknown module '{tgt}'"}, None, None
+
+                req_perm = MODULE_NAV_PERMISSIONS.get(tgt)
+                if req_perm and user_role != "admin" and req_perm not in user_permissions:
+                    return {
+                        "error": f"Access Denied: You do not have permission ('{req_perm}') to navigate to module '{tgt}'.",
+                        "meta": {"is_partial": False, "permission_denied": True}
+                    }, None, None
 
                 path = route_info["path"]
                 params = dict(args.get("params") or {})

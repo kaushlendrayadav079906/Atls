@@ -3,7 +3,7 @@
 import asyncio
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, Query, HTTPException
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_permission
 from app.services.sap.payments_report_service import SAPPaymentsReportService
 from app.api.v1.admin import _get_date_range_with_custom
 from pydantic import BaseModel
@@ -31,7 +31,7 @@ async def get_payments_overview(
     branch: Optional[str] = Query(None),
     customer: Optional[str] = Query(None),
     payment_method: Optional[str] = Query(None),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("reports.view")),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
     start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
@@ -57,7 +57,7 @@ async def get_payments_distribution(
     to_date: Optional[str] = Query(None),
     branch: Optional[str] = Query(None),
     customer: Optional[str] = Query(None),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("reports.view")),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
     start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)
@@ -85,7 +85,7 @@ async def get_payments_trend(
     branch: Optional[str] = Query(None),
     customer: Optional[str] = Query(None),
     payment_method: Optional[str] = Query(None),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("reports.view")),
 ):
     from datetime import datetime, timedelta
     from dateutil.relativedelta import relativedelta
@@ -161,7 +161,7 @@ async def get_payments_transactions(
     search: Optional[str] = Query(None),
     limit: int = Query(10),
     offset: int = Query(0),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("reports.view")),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
     start_date, end_date = _get_date_range_with_custom(range, from_date, to_date)

@@ -8,6 +8,11 @@ export interface UserResponse {
   role: string;
   branch_id?: string;
   store_name?: string;
+  is_active?: boolean;
+  token_version?: number;
+  permissions?: string[];
+  phone?: string | null;
+  job_role?: string | null;
 }
 
 export interface AccessTokenResponse {
@@ -450,6 +455,74 @@ export const financeApi = {
     return res.data;
   },
 };
+
+export interface PermissionItem {
+  id: string;
+  name: string;
+  module: string;
+  description?: string;
+}
+
+export interface RoleItem {
+  name: string;
+  description?: string;
+  permissions: string[];
+}
+
+export interface UserPermissionsResponse {
+  user_id: string;
+  role: string;
+  effective_permissions: string[];
+  custom_permissions?: string[];
+}
+
+export const adminApi = {
+  getUsers: async () => {
+    const res = await apiClient.get('/admin/users');
+    return res.data;
+  },
+  getUser: async (userId: string) => {
+    const res = await apiClient.get(`/admin/users/${userId}`);
+    return res.data;
+  },
+  createUser: async (payload: Record<string, any>) => {
+    const res = await apiClient.post('/admin/users', payload);
+    return res.data;
+  },
+  updateUser: async (userId: string, payload: Record<string, any>) => {
+    const res = await apiClient.put(`/admin/users/${userId}`, payload);
+    return res.data;
+  },
+  getPermissions: async (): Promise<PermissionItem[]> => {
+    const res = await apiClient.get('/admin/permissions');
+    return res.data;
+  },
+  getRoles: async (): Promise<RoleItem[]> => {
+    const res = await apiClient.get('/admin/roles');
+    return res.data;
+  },
+  getUserPermissions: async (userId: string): Promise<UserPermissionsResponse> => {
+    const res = await apiClient.get(`/admin/users/${userId}/permissions`);
+    return res.data;
+  },
+  setUserPermissions: async (userId: string, permissions: string[]) => {
+    const res = await apiClient.put(`/admin/users/${userId}/permissions`, { permissions });
+    return res.data;
+  },
+  revokeSessions: async (userId: string) => {
+    const res = await apiClient.post(`/admin/users/${userId}/revoke-sessions`);
+    return res.data;
+  },
+  activateUser: async (userId: string) => {
+    const res = await apiClient.put(`/admin/users/${userId}/activate`);
+    return res.data;
+  },
+  getAuditLogs: async (limit: number = 50) => {
+    const res = await apiClient.get('/admin/audit-logs', { params: { limit } });
+    return res.data;
+  },
+};
+
 
 
 

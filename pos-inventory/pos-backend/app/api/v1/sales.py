@@ -13,7 +13,7 @@ import time
 from app.core.cache import cache_delete, cache_delete_prefix, DASHBOARD_SUMMARY_KEY, PRODUCTS_LIST_KEY
 from app.core.product_store import product_store
 from app.core.rate_limiter import limiter
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_permission
 from app.core.config import settings
 from app.models.schemas import SaleCreate, SaleResponse, SaleDetail
 from app.services.sap.invoices_service import SAPInvoicesService
@@ -73,7 +73,7 @@ async def create_sale(
     request: Request,
     sale_data: SaleCreate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("pos.checkout")),
 ):
     """
     Create a new sale with synchronous SAP AR Invoice creation.
@@ -186,7 +186,7 @@ async def create_sale(
 @limiter.limit(settings.RATE_LIMIT_GENERAL)
 async def get_allowed_gst_values(
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("invoices.view")),
 ):
     """Return GST percentages currently allowed by SAP SalesTaxCodes."""
     try:
@@ -209,7 +209,7 @@ async def get_allowed_gst_values(
 @limiter.limit(settings.RATE_LIMIT_GENERAL)
 async def get_sales(
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("invoices.view")),
 ):
     """Get recent sales from SAP AR Invoices."""
     try:
@@ -256,7 +256,7 @@ async def get_sales(
 async def get_sale(
     request: Request,
     sale_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("invoices.view")),
 ):
     """Get a specific SAP AR Invoice by DocEntry or DocNum."""
     try:
@@ -304,7 +304,7 @@ async def cancel_sale(
     request: Request,
     sale_id: str,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("invoices.edit")),
 ):
     """Cancel/Void a specific SAP AR Invoice."""
     try:
