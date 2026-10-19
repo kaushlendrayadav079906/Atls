@@ -113,6 +113,22 @@ class Settings(BaseSettings):
     # When False, all SAP write operations (PATCH, POST, PUT, DELETE) are strictly blocked at the backend.
     # Set to False by default; requires explicit administrator authorization to re-enable.
     FINANCE_WRITEBACK_ENABLED: bool = False
+
+    # Email Service Configuration
+    EMAIL_PROVIDER: str = "console"  # "smtp", "console", "mock"
+    EMAIL_FROM_ADDRESS: str = "noreply@atlas.local"
+    EMAIL_FROM_NAME: str = "ATLAS Business Operations"
+    COMPANY_SIGNATURE: str = "ATLAS Operations & Accounts Team\nATLAS Retail & Manufacturing"
+
+    # SMTP Configuration (when EMAIL_PROVIDER="smtp")
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = Field(default="", repr=False)
+    SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
+    SMTP_TIMEOUT: float = 15.0
+
     
     class Config:
         env_file = ".env"

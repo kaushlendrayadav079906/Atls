@@ -14,6 +14,18 @@ describe('Route Registry Security and Validation', () => {
 
     const orders = resolveInternalRoute('production_orders');
     expect(orders?.path).toBe('/production/orders');
+
+    const finance = resolveInternalRoute('finance_overview');
+    expect(finance?.path).toBe('/finance');
+
+    const incoming = resolveInternalRoute('finance_incoming_payments');
+    expect(incoming?.path).toBe('/finance/incoming-payments');
+
+    const aiReports = resolveInternalRoute('reports_ai');
+    expect(aiReports?.path).toBe('/reports/ai');
+
+    const alias = resolveInternalRoute('/finance/overview');
+    expect(alias?.path).toBe('/finance');
   });
 
   it('safely attaches authorized filter parameters to registered routes', () => {
@@ -23,6 +35,12 @@ describe('Route Registry Security and Validation', () => {
     });
     expect(res).not.toBeNull();
     expect(res?.path).toBe('/products?search=AMIT000121&openDetails=true');
+
+    const finRes = resolveInternalRoute('finance_overview', {
+      range: 'monthly',
+      branch: 'SH',
+    });
+    expect(finRes?.path).toBe('/finance?range=monthly&branch=SH');
   });
 
   it('safely handles routes with existing query string', () => {

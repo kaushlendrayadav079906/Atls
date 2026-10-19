@@ -6,13 +6,21 @@ export interface TableColumn {
   type: TableColumnType;
 }
 
-export type TableChartType = 'bar' | 'line' | 'pie' | 'area';
+export type TableChartType = 'bar' | 'line' | 'pie' | 'area' | 'horizontal_bar';
+
+export interface TableChartSeriesItem {
+  dataKey: string;
+  name?: string;
+  color?: string;
+}
 
 export interface TableChartConfig {
   type: TableChartType;
   xKey: string;
-  series: string[];
-  defaultView?: 'chart' | 'results' | 'both';
+  series: (string | TableChartSeriesItem)[];
+  defaultView?: 'overview' | 'chart' | 'results' | 'flowchart' | 'both';
+  title?: string;
+  layout?: 'horizontal' | 'vertical';
 }
 
 export interface TableFilters {
@@ -24,6 +32,54 @@ export interface TableFilters {
   additional?: Record<string, any> | null;
 }
 
+export type FlowchartNodeType = 'start' | 'process' | 'decision' | 'end';
+
+export interface FlowchartNode {
+  id: string;
+  stepNumber: number;
+  title: string;
+  type: FlowchartNodeType;
+  badge?: string;
+  description: string;
+  route?: string;
+  routeLabel?: string;
+}
+
+export interface FlowchartEdge {
+  from: string;
+  to: string;
+  label?: string;
+  condition?: string;
+}
+
+export interface FlowchartData {
+  id: string;
+  title: string;
+  module: string;
+  description: string;
+  nodes: FlowchartNode[];
+  edges: FlowchartEdge[];
+}
+
+export interface FlowchartCard {
+  type: 'flowchart';
+  title?: string;
+  summary?: string;
+  flowchart: FlowchartData;
+  meta?: {
+    module?: string;
+    [key: string]: any;
+  };
+}
+
+export interface KPICardData {
+  label: string;
+  value: string | number;
+  change?: string;
+  isPositive?: boolean;
+  subtext?: string;
+}
+
 export interface StructuredTableResponse {
   type: 'table';
   title: string;
@@ -32,6 +88,9 @@ export interface StructuredTableResponse {
   rows: Array<Record<string, any>>;
   filters?: TableFilters | null;
   chart?: TableChartConfig | null;
+  flowchart?: FlowchartData | null;
+  insights?: string[] | null;
+  kpis?: KPICardData[] | null;
   meta?: {
     date_range?: string;
     branch_scope?: string;

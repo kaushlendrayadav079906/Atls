@@ -582,8 +582,8 @@ export const Dashboard = () => {
                 </span>
               ) : isRiskLive ? (
                 <span className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold ${(inventoryRisk?.length ?? 0) === 0
-                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                    : 'border-amber-300 bg-amber-50 text-amber-700'
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                  : 'border-amber-300 bg-amber-50 text-amber-700'
                   }`}>
                   {(inventoryRisk?.length ?? 0) === 0 ? 'Optimal' : 'Alert'}
                 </span>
@@ -1069,8 +1069,8 @@ export const Dashboard = () => {
 
             <div className="flex items-center gap-3">
               <div className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 shrink-0 ${isSapConnected === false
-                  ? 'border-amber-300 bg-amber-50/70 text-amber-700'
-                  : 'border-emerald-300 bg-emerald-50/70 text-emerald-700'
+                ? 'border-amber-300 bg-amber-50/70 text-amber-700'
+                : 'border-emerald-300 bg-emerald-50/70 text-emerald-700'
                 }`}>
                 <div className="text-[20px] font-bold leading-none">
                   {isSapConnected === false ? '84%' : '98%'}

@@ -296,7 +296,7 @@ export const SettingsUsersPage = () => {
   }
 
   return (
-    <div className="w-full space-y-6 pb-8 text-slate-800">
+    <div className="mx-auto max-w-7xl 2xl:max-w-[1440px] w-full space-y-6 pb-8 text-slate-800">
       <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-950/20 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-blue-600">Administration</p>
@@ -345,12 +345,12 @@ export const SettingsUsersPage = () => {
             <table className="min-w-full divide-y divide-slate-100 text-left text-[13.5px] sm:text-[14px]">
               <thead className="bg-slate-50 text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">Member</th>
-                  <th className="px-4 py-3">Role</th>
-                  <th className="px-4 py-3">Branch</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Created</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3 w-[26%]">Member</th>
+                  <th className="px-4 py-3 w-[14%]">Role</th>
+                  <th className="px-4 py-3 w-[16%]">Branch</th>
+                  <th className="px-4 py-3 w-[12%]">Status</th>
+                  <th className="px-4 py-3 w-[14%]">Created</th>
+                  <th className="px-4 py-3 text-right w-[18%]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">

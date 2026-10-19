@@ -809,10 +809,12 @@ export const Layout = () => {
               >
                 <div
                   className={`flex-1 w-full ${
-                    isFullBleedPage ? 'p-0' : 'p-4 sm:p-5'
+                    isFullBleedPage ? 'p-0' : 'p-4 sm:p-5 lg:p-6'
                   } transition-all duration-300`}
                 >
-                  <Outlet />
+                  <div className={isFullBleedPage ? 'w-full h-full' : 'w-full max-w-7xl 2xl:max-w-[1440px] mx-auto'}>
+                    <Outlet />
+                  </div>
                 </div>
 
                 {/* ── ATLAS Global Footer (Full-Width Light Blue Design across all pages) ── */}

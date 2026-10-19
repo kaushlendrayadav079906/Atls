@@ -23,6 +23,19 @@ from app.services.sap.warehouses_service import SAPWarehousesService
 from app.services.sap.finance_service import SAPFinanceService
 from app.services import approval_service
 from app.services.sap.client import SAPConnectionError
+from app.services.user_service import (
+    DEFAULT_ROLE_PERMISSIONS,
+    STANDARD_PERMISSIONS,
+    get_all_permissions,
+    get_all_roles,
+    get_effective_permissions,
+    get_user_by_username,
+    get_user_by_email,
+    get_all_users,
+)
+from app.core.nlp_pipeline import nlp_pipeline
+from app.core.capability_registry import get_all_capabilities
+from app.core.workflow_flows import get_workflow_flowchart
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +63,14 @@ INTERNAL_ROUTE_MAP = {
     "production_rejection": {"name": "Production Rejection", "path": "/production/rejection"},
     "production_date_wise": {"name": "Date-wise Production", "path": "/production/date-wise"},
     "production_reports": {"name": "Production Reports", "path": "/production/reports"},
+    "reports": {"name": "Reports Hub", "path": "/reports"},
+    "reports_overview": {"name": "Reports Hub", "path": "/reports"},
     "reports_sales": {"name": "Sales Reports", "path": "/reports/sales"},
     "reports_invoice": {"name": "Invoice Reports", "path": "/reports/invoice"},
     "reports_payment": {"name": "Payment Reports", "path": "/reports/payment"},
     "reports_inventory": {"name": "Inventory Reports", "path": "/reports/inventory"},
+    "reports_customer": {"name": "Customer Reports", "path": "/reports/customer"},
+    "reports_ai": {"name": "AI Generated Reports", "path": "/reports/ai"},
     "settings": {"name": "Settings", "path": "/settings"},
     "finance_overview": {"name": "Finance Overview", "path": "/finance"},
     "finance_sales_invoices": {"name": "Sales Invoices", "path": "/sales"},
@@ -62,7 +79,8 @@ INTERNAL_ROUTE_MAP = {
     "finance_outgoing_payments": {"name": "Outgoing Payments", "path": "/finance/outgoing-payments"},
     "finance_customer_analysis": {"name": "Customer Analysis", "path": "/finance/customer-analysis"},
     "finance_supplier_analysis": {"name": "Supplier Analysis", "path": "/finance/supplier-analysis"},
-    "finance_profitability_reports": {"name": "Profitability Reports", "path": "/finance/profitability-reports"}
+    "finance_profitability_reports": {"name": "Profitability Reports", "path": "/finance/profitability-reports"},
+    "contact": {"name": "Support & Contact", "path": "/contact"},
 }
 
 # Granular permission mapping for AI assistant tools
@@ -96,6 +114,7 @@ TOOL_PERMISSIONS = {
     "get_invoice_report": "reports.view",
     "get_payment_report": "reports.view",
     "get_customer_report": "reports.view",
+    "get_available_reports": "reports.view",
     # Finance
     "get_finance_summary": "finance.view",
     "get_incoming_payments": "finance.payments.view",
@@ -110,6 +129,64 @@ TOOL_PERMISSIONS = {
     "get_finance_audit_log": "finance.reports.view",
     "get_finance_admin_settings": "admin",
     "refresh_finance_data": "finance.view",
+    # Settings & User Intelligence
+    "get_admin_user_info": "users.manage",
+    "get_my_permissions": None,
+    # Workflow Process Flowcharts
+    "get_workflow_flowchart": None,
+    # Smart Email Assistant
+    "draft_email": None,
+}
+
+TOOL_TO_WORKFLOW_MAP = {
+    # Analytical & Dashboard
+    "get_dashboard_summary": "dashboard",
+    "get_sales_trend": "finance",
+    "get_purchase_trend": "finance",
+    "draft_email": "sales_pos",
+    # Sales & Invoices
+    "get_sales_orders": "sales_pos",
+    "get_sales_invoices": "invoices_returns",
+    # Purchases
+    "get_purchase_orders": "purchasing",
+    "get_purchase_invoices": "purchasing",
+    # Inventory & Products
+    "get_inventory_stock": "inventory",
+    "get_products": "inventory",
+    # Customers
+    "search_customers": "customers",
+    "get_customer_sales_ranking": "customers",
+    # Returns
+    "get_sales_returns": "invoices_returns",
+    "get_pending_approvals": "invoices_returns",
+    # Production
+    "get_production_summary": "production",
+    "get_production_orders": "production",
+    "get_production_rejection": "production",
+    "get_production_item_wise": "production",
+    # Reports
+    "get_sales_report": "sales_pos",
+    "get_invoice_report": "invoices_returns",
+    "get_payment_report": "payments",
+    "get_customer_report": "customers",
+    "get_available_reports": "reports",
+    # Finance
+    "get_finance_summary": "finance",
+    "get_incoming_payments": "payments",
+    "get_outgoing_payments": "payments",
+    "get_supplier_purchase_ranking": "purchasing",
+    "get_accounts_receivable": "finance",
+    "get_accounts_payable": "finance",
+    "get_profitability_report": "finance",
+    "inspect_finance_record": "finance",
+    "propose_record_update": "finance",
+    "submit_approved_record_update": "finance",
+    "get_finance_audit_log": "finance",
+    "get_finance_admin_settings": "finance",
+    "refresh_finance_data": "finance",
+    # Settings & User Intelligence
+    "get_admin_user_info": "settings_rbac",
+    "get_my_permissions": "settings_rbac",
 }
 
 MODULE_NAV_PERMISSIONS = {
@@ -128,10 +205,14 @@ MODULE_NAV_PERMISSIONS = {
     "production_rejection": "production.view",
     "production_date_wise": "production.view",
     "production_reports": "production.reports.view",
+    "reports": "reports.view",
+    "reports_overview": "reports.view",
     "reports_sales": "reports.view",
     "reports_invoice": "reports.view",
     "reports_payment": "reports.view",
     "reports_inventory": "reports.view",
+    "reports_customer": "reports.view",
+    "reports_ai": "reports.view",
     "settings": "users.manage",
     "finance_overview": "finance.view",
     "finance_sales_invoices": "invoices.view",
@@ -141,6 +222,7 @@ MODULE_NAV_PERMISSIONS = {
     "finance_customer_analysis": "finance.view",
     "finance_supplier_analysis": "finance.view",
     "finance_profitability_reports": "finance.reports.view",
+    "contact": None,
 }
 
 def _get_permitted_branch(user: dict, requested_branch: Optional[str] = None) -> Optional[str]:
@@ -301,13 +383,13 @@ class AIAssistantService:
                         "properties": {
                             "metric": {
                                 "type": "string",
-                                "enum": ["sales", "payments", "products"],
-                                "description": "Metric to analyze (default: sales)."
+                                "enum": ["sales", "payments", "products", "production_rejection", "production"],
+                                "description": "Metric to analyze (default: sales). Use 'production_rejection' for scrap/defect reports by item."
                             },
                             "group_by": {
                                 "type": "string",
-                                "enum": ["month", "branch", "payment_method", "customer", "product", "comparison", "invoice", "date"],
-                                "description": "Dimension to group by: 'month' for monthly revenue (e.g. past 6 months), 'branch' for warehouse breakdown, 'payment_method' for cash/card/UPI split, 'customer' for customer-wise sales, 'product' for top selling products, 'comparison' for period-over-period comparisons (this month vs last month, etc.), 'invoice' for recent invoices table, 'date' for daily period trend."
+                                "enum": ["month", "branch", "payment_method", "customer", "product", "comparison", "invoice", "date", "item", "status"],
+                                "description": "Dimension to group by: 'month' for monthly revenue, 'branch' for warehouse breakdown, 'payment_method' for cash/card/UPI, 'customer' for customer sales, 'product' for product sales, 'comparison' for period-over-period variance, 'invoice' for recent invoices, 'date' for daily trend, 'item' for production rejection by item."
                             },
                             "range": {
                                 "type": "string",
@@ -907,6 +989,67 @@ class AIAssistantService:
                         "properties": {}
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_admin_user_info",
+                    "description": "Administrative query to find employees, inspect user roles, assigned branches, permitted modules, and feature permissions (e.g. which employees can edit products). Strictly restricted to administrators and users with users.manage permission.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "search_query": {"type": "string", "description": "Search by username, email, or full name."},
+                            "role": {"type": "string", "enum": ["user", "operator", "manager", "admin"], "description": "Filter users by role."},
+                            "feature_permission": {"type": "string", "description": "Identify users who have a specific permission (e.g. 'products.edit', 'invoices.create', 'returns.approve')."}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_my_permissions",
+                    "description": "Self-service query allowing any authenticated user to inspect their own effective permissions and permitted dashboard modules.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_available_reports",
+                    "description": "List all business reports available in ATLAS, their readiness, description, and internal navigation routes.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "draft_email",
+                    "description": "Generate an intelligent, professional, context-verified business email draft (e.g. payment reminder, invoice follow-up, sales order update, purchase order, supplier communication, overdue payment, finance team notice) based on live verified SAP records. Does NOT send the email; returns a structured draft for user review and explicit confirmation.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "purpose": {
+                                "type": "string",
+                                "enum": ["payment_reminder", "invoice_followup", "sales_order_update", "purchase_order", "supplier_communication", "customer_support", "overdue_payment", "finance_team", "general"],
+                                "description": "Business purpose of the email."
+                            },
+                            "customer_name_or_code": {"type": "string", "description": "Customer name or CardCode (e.g. 'C00001', 'Amazon')."},
+                            "supplier_name_or_code": {"type": "string", "description": "Supplier name or CardCode (e.g. 'V00001', 'Acme Supplies')."},
+                            "invoice_doc_num": {"type": "string", "description": "Sales or purchase invoice reference number."},
+                            "order_doc_num": {"type": "string", "description": "Sales order or purchase order reference number."},
+                            "recipient_email": {"type": "string", "description": "Optional target recipient email if known or specified by user."},
+                            "additional_context": {"type": "string", "description": "Extra instructions, notes, or specific issue details to include in the draft."}
+                        },
+                        "required": ["purpose"]
+                    }
+                }
             }
         ]
 
@@ -941,6 +1084,16 @@ class AIAssistantService:
         week_start = today - timedelta(days=6)
         yesterday = today - timedelta(days=1)
 
+        nlp_analysis = nlp_pipeline.analyze_query(message, current_user, context)
+        intent_hint = ""
+        if nlp_analysis.suggested_tool:
+            intent_hint = (
+                f"\nNLP INTENT RECOGNITION CONTEXT:\n"
+                f"- Classified Intent: {nlp_analysis.intent_id}\n"
+                f"- Suggested Tool: {nlp_analysis.suggested_tool} with arguments {json.dumps(nlp_analysis.suggested_tool_args)}\n"
+                f"- Is Contextual Follow-Up: {nlp_analysis.is_follow_up}\n"
+            )
+
         # Ensure message is present
         if not message or not message.strip():
             return {
@@ -972,6 +1125,19 @@ class AIAssistantService:
             f"3. Never combine Sales Invoices with Purchase Orders or Credit Notes into one total.\n"
             f"4. If SAP returns 0 records, clearly state that no records match the filter; do not treat an empty response as an error, but distinguish API failures.\n"
             f"5. If SAP is disconnected or data is unavailable, state clearly that SAP Service Layer is offline. NEVER report an outage as zero sales or zero business activity.\n\n"
+            f"ADMIN & USER MANAGEMENT INTELLIGENCE RULES:\n"
+            f"1. When an administrator or user with 'users.manage' asks about employees, roles, or who has access to a feature (e.g., 'Which employees can edit products?'):\n"
+            f"   - Call get_admin_user_info(feature_permission='products.edit' or search_query=...).\n"
+            f"   - Summarize the permitted employees and offer navigation to Settings.\n"
+            f"   - For security, never disclose password hashes or private security tokens.\n"
+            f"2. When any employee asks about their own permissions or accessible modules (e.g., 'What can I access with my current permissions?', 'Show my permissions'):\n"
+            f"   - Call get_my_permissions().\n"
+            f"   - Provide a clear, empowering summary of their effective role and permitted modules.\n"
+            f"3. Never change user roles, permissions, passwords, or settings directly via chat. State that role changes require administrative access on the Settings > Users & Roles page.\n"
+            f"4. Difference between Sales Invoices and Incoming Payments: Sales Invoices record revenue earned, inventory reduction, and accounts receivable upon billing. Incoming Payments record cash or bank funds received to clear customer invoices or balances.\n"
+            f"5. When the user asks 'Show me all available reports', call get_available_reports().\n"
+            f"6. When the user asks 'Create a report showing production rejection by item', call get_analytical_table(metric='production_rejection', group_by='item') or get_production_rejection().\n"
+            f"{intent_hint}\n"
             f"SMART INTERNAL PAGE NAVIGATION & RECORD LOOKUP RULES:\n"
             f"1. When the user asks to open, view, or navigate to a page, catalog, report, or business record (e.g., 'Open product AMIT000121', 'Show the products catalog', 'Open Sales Orders', 'Show Finance Overview', 'Open Production Orders', 'Take me to the customer details page'):\n"
             f"   - Call navigate_to_module with the target module ID ('dashboard', 'products', 'sales', 'sales_orders', 'purchase_orders', 'customers', 'returns', 'analytics', 'production_orders', 'production_item_wise', 'production_rejection', 'reports_sales', 'reports_invoice', 'reports_payment', 'finance_overview', etc.).\n"
@@ -999,6 +1165,13 @@ class AIAssistantService:
             f"   - 'Refresh the Finance Overview' -> Call refresh_finance_data().\n"
             f"5. Document Status & GAAP Rules: Posted invoices, finalized payments, and reconciled ledger entries have strictly locked totals, taxes, and dates to preserve financial compliance. Explain this clearly and direct users to authorized credit notes or reversals when needed.\n"
             f"6. Never Invent Numbers: Every single figure, count, and growth % must come from structured tool output.\n"
+            f"SMART EMAIL ASSISTANT RULES:\n"
+            f"1. When the user asks to draft, prepare, or write an email (e.g., 'Draft a payment reminder for this customer', 'Prepare an email about this invoice', 'Email the supplier about the pending purchase order', 'Write a professional overdue payment follow-up', 'Summarize this customer account and draft an email', 'Explain the payment issue and prepare an email for the finance team'):\n"
+            f"   - Call draft_email(purpose=..., customer_name_or_code=..., invoice_doc_num=..., etc.).\n"
+            f"   - Use live verified details from context or SAP. Never invent figures, dates, or emails.\n"
+            f"   - In your chat answer: Present the verified summary (Customer, Invoice/Document, Outstanding amount, Due date, Suggested action) followed by the complete draft subject and body.\n"
+            f"   - Explain that the user can review, edit, and click 'Confirm & Send Email' to dispatch it.\n"
+            f"   - Explicitly remind that drafting an email does NOT send it automatically.\n"
         )
 
         messages = [{"role": "system", "content": system_prompt}]
@@ -1135,11 +1308,24 @@ class AIAssistantService:
             total_dur = (time.perf_counter() - chat_start_time) * 1000.0
             logger.info(f"[AI TIMING] Total chat request duration_ms={total_dur:.2f} cards={len(collected_cards)} has_nav={bool(nav_action)}")
 
+            if structured_payload and isinstance(structured_payload, dict):
+                structured_payload["suggested_follow_ups"] = nlp_analysis.suggested_follow_ups
+                structured_payload["intent_id"] = nlp_analysis.intent_id
+
             return {
                 "answer": final_text,
                 "conversation_id": conversation_id or str(uuid.uuid4()),
                 "branch_context": permitted_warehouse or default_wh,
-                "structured_data": structured_payload
+                "structured_data": structured_payload,
+                "suggested_follow_ups": nlp_analysis.suggested_follow_ups,
+                "intent_id": nlp_analysis.intent_id,
+                "context": {
+                    "last_metric": nlp_analysis.entities.metric or (context.get("last_metric") if context else None) or "sales",
+                    "last_range": nlp_analysis.entities.range or (context.get("last_range") if context else None) or "month",
+                    "last_branch": nlp_analysis.entities.branch or permitted_warehouse or (context.get("last_branch") if context else None),
+                    "last_tool": nlp_analysis.suggested_tool or (context.get("last_tool") if context else None),
+                    "last_module": nlp_analysis.capability.module if nlp_analysis.capability else (context.get("last_module") if context else None)
+                }
             }
 
         except openai.AuthenticationError as e:
@@ -1175,27 +1361,34 @@ class AIAssistantService:
         group_by = str(args.get("group_by") or "").strip().lower()
         limit = max(1, min(int(args.get("limit") or 20), 100))
 
-        supported_metrics = ("sales", "payments", "products")
-        supported_group_by = ("branch", "payment_method", "date", "month", "product", "customer", "comparison", "invoice")
+        supported_metrics = ("sales", "payments", "products", "production_rejection", "production")
+        supported_group_by = ("branch", "payment_method", "date", "month", "product", "customer", "comparison", "invoice", "item", "status")
 
         # Security check: Validate permission based on analytical metric
         user_role = str(current_user.get("role") or "user").lower()
         user_permissions = set(current_user.get("permissions") or [])
+        if not user_permissions and user_role in DEFAULT_ROLE_PERMISSIONS:
+            user_permissions = set(DEFAULT_ROLE_PERMISSIONS[user_role])
 
         if user_role != "admin":
             if metric == "sales" and not ({"dashboard.view", "invoices.view"} & user_permissions):
                 return {
-                    "error": "Access Denied: You do not have permission ('dashboard.view' or 'invoices.view') to analyze sales metrics. Please contact an administrator.",
+                    "error": "Forbidden / Access Denied: You do not have permission ('dashboard.view' or 'invoices.view') to analyze sales metrics. Please contact an administrator.",
                     "meta": {"is_partial": False, "permission_denied": True}
                 }, None, None
             if metric == "payments" and not ({"finance.view", "finance.payments.view", "reports.view"} & user_permissions):
                 return {
-                    "error": "Access Denied: You do not have permission ('finance.view' or 'reports.view') to analyze payment metrics. Please contact an administrator.",
+                    "error": "Forbidden / Access Denied: You do not have permission ('finance.view' or 'reports.view') to analyze payment metrics. Please contact an administrator.",
                     "meta": {"is_partial": False, "permission_denied": True}
                 }, None, None
             if metric == "products" and "products.view" not in user_permissions:
                 return {
-                    "error": "Access Denied: You do not have permission ('products.view') to analyze product stock metrics. Please contact an administrator.",
+                    "error": "Forbidden / Access Denied: You do not have permission ('products.view') to analyze product stock metrics. Please contact an administrator.",
+                    "meta": {"is_partial": False, "permission_denied": True}
+                }, None, None
+            if metric in ("production_rejection", "production") and not ({"production.view", "production.reports.view"} & user_permissions):
+                return {
+                    "error": "Forbidden / Access Denied: You do not have permission ('production.view') to analyze production rejection metrics. Please contact an administrator.",
                     "meta": {"is_partial": False, "permission_denied": True}
                 }, None, None
 
@@ -1299,12 +1492,21 @@ class AIAssistantService:
 
                     delta_sales = round(sales_a - sales_b, 2)
                     delta_count = count_a - count_b
-                    delta_pct = round(((sales_a - sales_b) / sales_b * 100), 1) if sales_b > 0 else (100.0 if sales_a > 0 else 0.0)
+                    if sales_b > 0:
+                        delta_pct = round(((sales_a - sales_b) / sales_b * 100), 1)
+                        pct_display = f"{'+' if delta_pct >= 0 else ''}{delta_pct}%"
+                        variance_explanation = f"Net variance is ₹{delta_sales:+,.2f} ({delta_pct:+,.1f}%)."
+                        growth_label = f"{'+' if delta_pct >= 0 else ''}{delta_pct}%"
+                    else:
+                        delta_pct = None
+                        pct_display = "N/A (Prev: ₹0.00)"
+                        variance_explanation = f"Net change is ₹{delta_sales:+,.2f}. Previous period recorded zero sales, so percentage variance cannot be calculated reliably."
+                        growth_label = "N/A"
 
                     rows = [
                         {"period": lbl_a, "sales": sales_a, "invoiceCount": count_a, "averageBill": avg_a},
                         {"period": lbl_b, "sales": sales_b, "invoiceCount": count_b, "averageBill": avg_b},
-                        {"period": f"Variance ({'+' if delta_pct >= 0 else ''}{delta_pct}%)", "sales": delta_sales, "invoiceCount": delta_count, "averageBill": round(avg_a - avg_b, 2)}
+                        {"period": f"Variance ({pct_display})", "sales": delta_sales, "invoiceCount": delta_count, "averageBill": round(avg_a - avg_b, 2)}
                     ]
                     columns = [
                         {"key": "period", "label": "Period / Timeline", "type": "string"},
@@ -1315,10 +1517,11 @@ class AIAssistantService:
                     chart_config = {
                         "type": "bar",
                         "xKey": "period",
-                        "series": ["sales"]
+                        "series": ["sales"],
+                        "defaultView": "both"
                     }
                     title = f"Period Comparison: {lbl_a} vs {lbl_b}"
-                    summary = f"{lbl_a} recorded ₹{sales_a:,.2f} ({count_a} invoices) compared to ₹{sales_b:,.2f} ({count_b} invoices) in {lbl_b}. Net variance is ₹{delta_sales:+,.2f} ({delta_pct:+,.1f}%)."
+                    summary = f"{lbl_a} recorded ₹{sales_a:,.2f} ({count_a} invoices) compared to ₹{sales_b:,.2f} ({count_b} invoices) in {lbl_b}. {variance_explanation}"
                     filters = {
                         "period": f"{lbl_a} vs {lbl_b}",
                         "dateFrom": d_from_a.strftime("%Y-%m-%d"),
@@ -1328,7 +1531,7 @@ class AIAssistantService:
                         "additional": {
                             lbl_a: f"₹{sales_a:,.2f} ({count_a} invoices)",
                             lbl_b: f"₹{sales_b:,.2f} ({count_b} invoices)",
-                            "Net Growth": f"{'+' if delta_pct >= 0 else ''}{delta_pct}%"
+                            "Net Growth": growth_label
                         }
                     }
                     nav = {"label": "Open Sales Reports", "route": "/reports/sales", "target_module": "reports_sales", "params": {"range": "month"}}
@@ -1388,10 +1591,16 @@ class AIAssistantService:
                     total_invoices = sum(r["invoiceCount"] for r in rows)
                     title = "Monthly Revenue (Past 6 Months)"
                     summary = f"Total revenue of ₹{total_sales:,.2f} across {total_invoices} invoices for the past 6 months ({month_labels[month_keys[0]]} to {month_labels[month_keys[-1]]})."
+                    if len(rows) >= 2:
+                        mom_diff = round(rows[-1]["sales"] - rows[-2]["sales"], 2)
+                        mom_pct = round((mom_diff / rows[-2]["sales"] * 100), 1) if rows[-2]["sales"] > 0 else 0.0
+                        trend_dir = "an increase" if mom_diff >= 0 else "a decrease"
+                        summary += f" Recent trend: {rows[-1]['month']} recorded ₹{rows[-1]['sales']:,.2f}, representing {trend_dir} of ₹{abs(mom_diff):,.2f} ({'+' if mom_pct >= 0 else ''}{mom_pct}%) compared to {rows[-2]['month']}."
                     chart_config = {
                         "type": "bar",
                         "xKey": "month",
-                        "series": ["sales"]
+                        "series": ["sales"],
+                        "defaultView": "both"
                     }
                     filters = {
                         "period": f"Past 6 months ({month_labels[month_keys[0]]} to {month_labels[month_keys[-1]]})",
@@ -1494,7 +1703,8 @@ class AIAssistantService:
                         chart_config = {
                             "type": "bar",
                             "xKey": "branch",
-                            "series": ["sales"]
+                            "series": ["sales"],
+                            "defaultView": "both"
                         } if rows else None
 
                         filters = {
@@ -1547,7 +1757,8 @@ class AIAssistantService:
                         chart_config = {
                             "type": "bar",
                             "xKey": "paymentMethod",
-                            "series": ["sales"]
+                            "series": ["sales"],
+                            "defaultView": "both"
                         } if rows else None
                         filters = {
                             "period": date_label,
@@ -1598,7 +1809,8 @@ class AIAssistantService:
                         chart_config = {
                             "type": "bar",
                             "xKey": "customerName",
-                            "series": ["sales"]
+                            "series": ["sales"],
+                            "defaultView": "both"
                         } if rows else None
                         filters = {
                             "period": date_label,
@@ -1684,7 +1896,8 @@ class AIAssistantService:
                         chart_config = {
                             "type": "bar",
                             "xKey": "date",
-                            "series": ["sales"]
+                            "series": ["sales"],
+                            "defaultView": "both"
                         } if rows else None
                         filters = {
                             "period": date_label,
@@ -1732,9 +1945,10 @@ class AIAssistantService:
                         title = f"{date_label} Top Products"
                         summary = f"Total product sales of ₹{total_sales:,.2f} across top {len(rows)} products for {date_label}." if rows else f"No product sales found for {date_label}."
                         chart_config = {
-                            "type": "bar",
+                            "type": "horizontal_bar",
                             "xKey": "itemName",
-                            "series": ["sales"]
+                            "series": ["sales"],
+                            "defaultView": "both"
                         } if rows else None
                         filters = {
                             "period": date_label,
@@ -1744,6 +1958,55 @@ class AIAssistantService:
                             "branch": target_branch or "All Branches"
                         }
                         nav = {"label": "Open Products Catalog", "route": "/products", "target_module": "products"}
+
+            elif metric in ("production_rejection", "production"):
+                d_from_str = d_from.strftime("%Y-%m-%d") if d_from else None
+                d_to_str = d_to.strftime("%Y-%m-%d") if d_to else None
+                rej_data = self.production_service.get_rejection_summary(
+                    warehouse=target_branch,
+                    date_from=d_from_str,
+                    date_to=d_to_str,
+                    search=args.get("search")
+                )
+                raw_items = rej_data.get("items") or []
+                sorted_items = sorted(raw_items, key=lambda x: x.get("rejected_qty", 0.0), reverse=True)[:limit]
+
+                title = f"Production Rejection by Item ({date_label})"
+                summary = f"Total scrap/rejected quantity: {rej_data.get('total_rejected', 0)} across {len(sorted_items)} manufactured items. Overall rejection rate: {rej_data.get('rejection_percentage', 0)}%." if sorted_items else f"No production rejection recorded for {date_label}."
+
+                columns = [
+                    {"key": "itemCode", "label": "Item Code", "type": "string"},
+                    {"key": "itemName", "label": "Item Description", "type": "string"},
+                    {"key": "producedQty", "label": "Produced Qty", "type": "number"},
+                    {"key": "rejectedQty", "label": "Rejected Qty", "type": "number"},
+                    {"key": "rejectionRate", "label": "Rejection %", "type": "percentage"},
+                    {"key": "warehouse", "label": "Warehouse", "type": "string"}
+                ]
+                rows = [
+                    {
+                        "itemCode": it.get("item_code"),
+                        "itemName": it.get("item_name") or it.get("item_code"),
+                        "producedQty": round(float(it.get("produced_qty") or 0.0), 2),
+                        "rejectedQty": round(float(it.get("rejected_qty") or 0.0), 2),
+                        "rejectionRate": round(float(it.get("rejection_percentage") or 0.0), 2),
+                        "warehouse": it.get("warehouse") or target_branch or "SH"
+                    }
+                    for it in sorted_items
+                ]
+                chart_config = {
+                    "type": "bar",
+                    "xKey": "itemCode",
+                    "series": ["rejectionRate"],
+                    "defaultView": "both"
+                } if rows else None
+                filters = {
+                    "period": date_label,
+                    "dateFrom": d_from_str,
+                    "dateTo": d_to_str,
+                    "groupBy": ["item"],
+                    "branch": target_branch or "All Branches"
+                }
+                nav = {"label": "Open Production Rejection", "route": "/production/rejection", "target_module": "production_rejection"}
 
         except SAPConnectionError as e:
             logger.error(f"SAP connection error in analytical table: {e}")
@@ -1758,6 +2021,36 @@ class AIAssistantService:
                 "meta": {"is_partial": False, "error": str(e)}
             }, None, None
 
+        from app.core.workflow_flows import get_workflow_flowchart
+        flowchart_key = "production" if metric in ("production_rejection", "production") else ("payments" if metric == "payments" else ("inventory" if metric == "products" else "sales"))
+        flowchart_data = get_workflow_flowchart(flowchart_key)
+
+        insights = []
+        kpis = []
+        if rows:
+            insights.append(f"Evaluated {len(rows)} data records for {date_label} across {target_branch or 'All Branches'}.")
+            if "sales" in rows[0]:
+                tot_s = sum(float(r.get("sales") or 0.0) for r in rows if isinstance(r.get("sales"), (int, float)))
+                kpis.append({"label": "Total Sales", "value": f"₹{tot_s:,.2f}", "isPositive": True})
+                if "invoiceCount" in rows[0]:
+                    tot_i = sum(int(r.get("invoiceCount") or 0) for r in rows if isinstance(r.get("invoiceCount"), (int, float)))
+                    kpis.append({"label": "Invoices", "value": tot_i})
+                lead_name = rows[0].get("itemName") or rows[0].get("customerName") or rows[0].get("branch") or rows[0].get("period")
+                if lead_name:
+                    kpis.append({"label": "Leading", "value": str(lead_name)[:20], "subtext": f"₹{float(rows[0]['sales']):,.2f}"})
+                top_lead = rows[0].get("branch") or rows[0].get("period") or rows[0].get("customerName") or "Top Category"
+                insights.append(f"Leading contribution: {top_lead} with ₹{float(rows[0]['sales']):,.2f}.")
+            elif "rejectionRate" in rows[0]:
+                tot_p = sum(float(r.get("producedQty") or 0.0) for r in rows if isinstance(r.get("producedQty"), (int, float)))
+                tot_r = sum(float(r.get("rejectedQty") or 0.0) for r in rows if isinstance(r.get("rejectedQty"), (int, float)))
+                overall_rate = round((tot_r / tot_p * 100), 2) if tot_p > 0 else 0.0
+                kpis.append({"label": "Overall Scrap Rate", "value": f"{overall_rate}%", "isPositive": False})
+                kpis.append({"label": "Total Produced", "value": f"{tot_p:,.0f}"})
+                kpis.append({"label": "Total Rejected", "value": f"{tot_r:,.0f}", "isPositive": False})
+                insights.append(f"Highest rejection item: {rows[0].get('itemCode')} ({rows[0].get('rejectionRate')}%) on {rows[0].get('rejectedQty')} rejected units.")
+            if group_by == "comparison":
+                insights.append(summary)
+
         card_raw = {
             "type": "table",
             "title": title,
@@ -1766,6 +2059,9 @@ class AIAssistantService:
             "rows": rows,
             "filters": filters,
             "chart": chart_config,
+            "flowchart": flowchart_data,
+            "insights": insights,
+            "kpis": kpis if kpis else None,
             "meta": {
                 "date_range": date_label,
                 "branch_scope": target_branch or "All Branches",
@@ -1792,7 +2088,7 @@ class AIAssistantService:
 
         return tool_resp, card, nav
 
-    def _execute_tool(
+    def _execute_tool_inner(
         self,
         tool_name: str,
         args: Dict[str, Any],
@@ -1815,6 +2111,9 @@ class AIAssistantService:
             # Security & Role-Based Authorization Enforcement
             user_role = str(current_user.get("role") or "user").lower()
             user_permissions = set(current_user.get("permissions") or [])
+            if not user_permissions and user_role in DEFAULT_ROLE_PERMISSIONS:
+                user_permissions = set(DEFAULT_ROLE_PERMISSIONS[user_role])
+
             required_perm = TOOL_PERMISSIONS.get(tool_name)
             if required_perm and user_role != "admin" and required_perm not in user_permissions:
                 logger.warning(
@@ -1822,12 +2121,33 @@ class AIAssistantService:
                     f"(role={user_role}) missing required permission '{required_perm}' for tool '{tool_name}'"
                 )
                 return {
-                    "error": f"Access Denied: You do not have permission ('{required_perm}') to execute '{tool_name}'. Please contact an administrator.",
+                    "error": f"Forbidden: You do not have permission ('{required_perm}') to execute '{tool_name}'. Please contact an administrator.",
                     "meta": {"is_partial": False, "permission_denied": True}
                 }, None, None
 
             # ──────────────────────────────────────────────────────────────────
-            # 0. get_analytical_table
+            # 0. get_workflow_flowchart
+            # ──────────────────────────────────────────────────────────────────
+            if tool_name == "get_workflow_flowchart":
+                from app.core.workflow_flows import get_workflow_flowchart
+                target_mod = str(args.get("module") or "sales").lower().strip()
+                flow = get_workflow_flowchart(target_mod)
+                if not flow:
+                    flow = get_workflow_flowchart("sales")
+                card = {
+                    "type": "flowchart",
+                    "title": flow["title"],
+                    "summary": flow["description"],
+                    "flowchart": flow,
+                    "meta": {"module": flow.get("module", target_mod)}
+                }
+                nav_route = flow["nodes"][-1].get("route") if flow.get("nodes") else "/"
+                nav_label = flow["nodes"][-1].get("routeLabel") or f"Open {flow['module']}"
+                nav = {"label": nav_label, "route": nav_route, "target_module": target_mod}
+                return {"flowchart": flow, "module": target_mod}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 1. get_analytical_table
             # ──────────────────────────────────────────────────────────────────
             if tool_name == "get_analytical_table":
                 return self._execute_analytical_table(args, permitted_warehouse, current_user)
@@ -1903,9 +2223,16 @@ class AIAssistantService:
                     "branch": target_branch or "All Branches"
                 }
 
+                from app.core.workflow_flows import get_workflow_flowchart
                 card = {
                     "type": "dashboard_summary",
                     "summary": summary_data,
+                    "flowchart": get_workflow_flowchart("dashboard"),
+                    "insights": [
+                        f"{date_label} total billed revenue: ₹{total_sales:,.2f} across {invoice_count} transactions.",
+                        f"Growth vs previous equivalent period: {'+' if growth >= 0 else ''}{growth}%.",
+                        f"Active inventory alerts: {low_stock_count} items below minimal reorder threshold."
+                    ],
                     "meta": {"date_range": date_label, "branch_scope": target_branch or "All"}
                 }
                 nav = {"label": "Open Dashboard", "route": "/", "target_module": "dashboard"}
@@ -1965,7 +2292,12 @@ class AIAssistantService:
                     search=args.get("search"),
                     limit=int(args.get("limit") or 20)
                 )
-                sinvs = res.get("sales_invoices", []) or res.get("invoices", [])
+                if isinstance(res, list):
+                    sinvs = res
+                    total_amt = sum(float(x.get("DocTotal") or x.get("total") or 0.0) for x in sinvs)
+                    res = {"sales_invoices": sinvs, "invoices": sinvs, "total_count": len(sinvs), "total_amount": total_amt, "period": r}
+                else:
+                    sinvs = res.get("sales_invoices", []) or res.get("invoices", [])
                 total_cnt = res.get("total_count", len(sinvs))
                 is_partial = total_cnt > len(sinvs)
                 res_meta = res.get("meta") or {}
@@ -1987,6 +2319,16 @@ class AIAssistantService:
                         {"key": "status", "label": "Status", "type": "string"}
                     ],
                     "rows": sinvs,
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "card_name",
+                        "series": [{"dataKey": "doc_total", "name": "Total Amount (₹)", "color": "#2563eb"}],
+                        "defaultView": "both"
+                    } if sinvs else None,
+                    "kpis": [
+                        {"label": "Total Amount", "value": f"₹{res.get('total_amount', 0.0):,.2f}", "isPositive": True},
+                        {"label": "Invoices", "value": total_cnt}
+                    ] if sinvs else None,
                     "meta": {
                         "date_range": res.get("period"),
                         "branch_scope": branch or "All Branches",
@@ -2109,6 +2451,12 @@ class AIAssistantService:
                             "type": "inventory_risk",
                             "items": risky,
                             "total_count": len(risky),
+                            "chart": {
+                                "type": "bar",
+                                "xKey": "ItemName",
+                                "series": ["QuantityOnStock", "MinimalStock"],
+                                "defaultView": "both"
+                            } if risky else None,
                             "meta": {"warehouse": target_wh, "is_low_stock": True}
                         }
                         nav = {"label": "Open Inventory", "route": "/products", "target_module": "products", "params": {"low_stock": "true"}}
@@ -2129,14 +2477,36 @@ class AIAssistantService:
             elif tool_name == "get_products":
                 top_selling = args.get("top_selling_only", False)
                 limit = int(args.get("limit") or 10)
+                ranking_by = args.get("ranking_by") or args.get("metric") or "sales_amount"
+                r = args.get("range", "month")
+                d_from, d_to, date_label = _resolve_date_range(r, args.get("date_from"), args.get("date_to"))
+                target_branch = args.get("branch") or permitted_warehouse
 
                 if top_selling:
                     # Calculate product velocity from recent invoices
-                    invoices = self.invoices_service.get_recent_invoices_with_lines(limit=100)
+                    invoices = self.invoices_service.get_recent_invoices_with_lines(limit=200)
                     product_counts = {}
                     for inv in invoices:
+                        inv_b = _normalize_branch(_extract_branch_from_invoice(inv))
+                        if current_user.get("role") != "admin" and target_branch and inv_b != target_branch:
+                            continue
+                        elif target_branch and inv_b and inv_b != target_branch:
+                            continue
+
+                        if d_from and d_to:
+                            doc_date_str = str(inv.get("DocDate", "")).split("T")[0]
+                            if doc_date_str:
+                                try:
+                                    inv_d = datetime.strptime(doc_date_str, "%Y-%m-%d").date()
+                                    if not (d_from <= inv_d <= d_to):
+                                        continue
+                                except Exception:
+                                    pass
+
                         for line in inv.get("DocumentLines") or []:
                             code = line.get("ItemCode")
+                            if not code:
+                                continue
                             name = line.get("ItemDescription") or code
                             qty = float(line.get("Quantity") or 0.0)
                             total = float(line.get("LineTotal") or 0.0)
@@ -2145,14 +2515,35 @@ class AIAssistantService:
                             product_counts[code]["quantitySold"] += qty
                             product_counts[code]["salesAmount"] += total
 
-                    sorted_products = sorted(product_counts.values(), key=lambda x: x["salesAmount"], reverse=True)[:limit]
+                    is_by_quantity = str(ranking_by).lower() in ("quantity", "quantity_sold", "units", "qty")
+                    sort_key = "quantitySold" if is_by_quantity else "salesAmount"
+                    ranking_label = "Quantity Sold (Units)" if is_by_quantity else "Revenue / Sales Amount (₹)"
+
+                    sorted_products = sorted(product_counts.values(), key=lambda x: x[sort_key], reverse=True)[:limit]
                     card = {
                         "type": "top_products",
                         "products": sorted_products,
-                        "meta": {"ranking_by": "sales_amount", "limit": limit}
+                        "chart": {
+                            "type": "horizontal_bar",
+                            "xKey": "itemName",
+                            "series": ["quantitySold" if is_by_quantity else "salesAmount"],
+                            "defaultView": "both"
+                        } if sorted_products else None,
+                        "meta": {
+                            "ranking_by": "quantity" if is_by_quantity else "sales_amount",
+                            "ranking_label": ranking_label,
+                            "limit": limit,
+                            "date_range": date_label,
+                            "branch_scope": target_branch or "All Branches"
+                        }
                     }
-                    nav = {"label": "View Products Catalog", "route": "/products", "target_module": "products"}
-                    return {"top_products": sorted_products}, card, nav
+                    nav = {"label": "Open Products Catalog", "route": "/products", "target_module": "products"}
+                    return {
+                        "top_products": sorted_products,
+                        "ranking_by": "quantity" if is_by_quantity else "sales_amount",
+                        "ranking_label": ranking_label,
+                        "period": date_label
+                    }, card, nav
                 else:
                     search = args.get("search", "")
                     items = self.items_service.get_items(search=search, top=limit)
@@ -2263,6 +2654,12 @@ class AIAssistantService:
                     "orders": orders,
                     "summary": summary,
                     "total_count": total,
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "item_name",
+                        "series": ["planned_qty", "produced_qty"],
+                        "defaultView": "both"
+                    } if orders else None,
                     "meta": {"warehouse": target_wh or "All", "status": status_filter or "all"}
                 }
                 nav = {"label": "Open Production Orders", "route": "/production/orders", "target_module": "production_orders"}
@@ -2282,6 +2679,12 @@ class AIAssistantService:
                 card = {
                     "type": "production_rejection",
                     "rejection_data": rej_summary,
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "item_name",
+                        "series": ["rejection_percentage"],
+                        "defaultView": "both"
+                    } if rej_summary.get("items") else None,
                     "meta": {"warehouse": target_wh or "All"}
                 }
                 nav = {"label": "View Production Rejection", "route": "/production/rejection", "target_module": "production_rejection"}
@@ -2341,6 +2744,12 @@ class AIAssistantService:
                     "total_sales": round(total_sales, 2),
                     "invoice_count": len(filtered),
                     "trend": trend_list,
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "label",
+                        "series": ["sales"],
+                        "defaultView": "both"
+                    } if trend_list else None,
                     "meta": {"date_range": date_label, "branch_scope": target_branch or "All"}
                 }
                 nav = {"label": "View Sales Reports", "route": "/reports/sales", "target_module": "reports_sales"}
@@ -2422,6 +2831,12 @@ class AIAssistantService:
                     "total_payments": round(total_amount, 2),
                     "payment_count": len(payments),
                     "distribution": distribution,
+                    "chart": {
+                        "type": "pie",
+                        "xKey": "method",
+                        "series": ["amount"],
+                        "defaultView": "both"
+                    } if distribution else None,
                     "meta": {"date_range": date_label}
                 }
                 nav = {"label": "View Payment Reports", "route": "/reports/payment", "target_module": "reports_payment"}
@@ -2606,7 +3021,12 @@ class AIAssistantService:
                     search=args.get("search"),
                     limit=int(args.get("limit") or 20)
                 )
-                pinvs = res.get("purchase_invoices", [])
+                if isinstance(res, list):
+                    pinvs = res
+                    total_amt = sum(float(x.get("doc_total") or x.get("DocTotal") or 0.0) for x in pinvs)
+                    res = {"purchase_invoices": pinvs, "total_count": len(pinvs), "total_amount": total_amt, "period": r}
+                else:
+                    pinvs = res.get("purchase_invoices", [])
                 card = {
                     "type": "table",
                     "title": f"Purchase Invoices ({res.get('period', r)})",
@@ -2619,6 +3039,16 @@ class AIAssistantService:
                         {"key": "status", "label": "Status", "type": "string"}
                     ],
                     "rows": pinvs,
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "card_name",
+                        "series": [{"dataKey": "doc_total", "name": "Total Amount (₹)", "color": "#ec4899"}],
+                        "defaultView": "both"
+                    } if pinvs else None,
+                    "kpis": [
+                        {"label": "Total Amount", "value": f"₹{res.get('total_amount', 0.0):,.2f}", "isPositive": True},
+                        {"label": "Invoices", "value": res.get('total_count', len(pinvs))}
+                    ] if pinvs else None,
                     "meta": {"date_range": res.get("period"), "branch_scope": branch or "All Branches"}
                 }
                 nav = {"label": "Open Purchase Invoices", "route": "/finance/purchase-invoices", "target_module": "finance_purchase_invoices"}
@@ -3128,6 +3558,212 @@ class AIAssistantService:
                 }
                 return {"refreshed": True, "timestamp": datetime.now().isoformat()}, card, None
 
+            # ──────────────────────────────────────────────────────────────────
+            # 25. get_admin_user_info
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_admin_user_info":
+                if user_role != "admin" and "users.manage" not in user_permissions:
+                    return {
+                        "error": "Forbidden: You do not have administrative permission ('users.manage') to view other user profiles or system roles. Please contact an administrator.",
+                        "meta": {"is_partial": False, "permission_denied": True}
+                    }, None, None
+
+                search_query = (args.get("search_query") or args.get("username") or args.get("email") or "").strip()
+                role_filter = (args.get("role") or "").strip().lower()
+                feature_perm = (args.get("feature_permission") or "").strip()
+
+                try:
+                    all_users = get_all_users()
+                except Exception as e:
+                    logger.error(f"Error fetching users in get_admin_user_info: {e}")
+                    all_users = []
+
+                matched_users = []
+                for u in all_users:
+                    if feature_perm:
+                        try:
+                            eff = get_effective_permissions(u["id"], u.get("role", "user"))
+                        except Exception:
+                            eff = DEFAULT_ROLE_PERMISSIONS.get(u.get("role", "user"), [])
+                        if feature_perm not in eff:
+                            continue
+
+                    if role_filter and str(u.get("role") or "").lower() != role_filter:
+                        continue
+
+                    if search_query:
+                        sq = search_query.lower()
+                        un = str(u.get("username") or "").lower()
+                        em = str(u.get("email") or "").lower()
+                        nm = str(u.get("name") or "").lower()
+                        if sq not in un and sq not in em and sq not in nm:
+                            continue
+
+                    matched_users.append({
+                        "id": u.get("id"),
+                        "username": u.get("username"),
+                        "name": u.get("name"),
+                        "email": u.get("email"),
+                        "role": u.get("role"),
+                        "job_role": u.get("job_role"),
+                        "branch_id": u.get("branch_id"),
+                        "store_name": u.get("store_name"),
+                        "is_active": u.get("is_active", True)
+                    })
+
+                summary_text = f"Found {len(matched_users)} user account(s)"
+                if feature_perm:
+                    summary_text += f" authorized with permission '{feature_perm}'"
+                if role_filter:
+                    summary_text += f" with role '{role_filter}'"
+                if search_query:
+                    summary_text += f" matching '{search_query}'"
+
+                card = {
+                    "type": "admin_users_info",
+                    "title": "Employee & Role Intelligence",
+                    "summary": summary_text,
+                    "users": matched_users[:25],
+                    "total_count": len(matched_users),
+                    "feature_permission": feature_perm or None,
+                    "meta": {"is_partial": len(matched_users) > 25}
+                }
+                nav = {"label": "Open Settings & Roles", "route": "/settings", "target_module": "settings"}
+                return {"summary": summary_text, "users": matched_users[:25], "total_count": len(matched_users)}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 26. get_my_permissions
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_my_permissions":
+                uid = str(current_user.get("id") or current_user.get("user_id") or "")
+                urole = str(current_user.get("role") or "user").lower()
+
+                if urole == "admin":
+                    eff_perms = [p["id"] for p in STANDARD_PERMISSIONS]
+                else:
+                    eff_perms = current_user.get("permissions")
+                    if not eff_perms and uid:
+                        try:
+                            eff_perms = get_effective_permissions(uid, urole)
+                        except Exception:
+                            eff_perms = DEFAULT_ROLE_PERMISSIONS.get(urole, [])
+                    elif not eff_perms:
+                        eff_perms = DEFAULT_ROLE_PERMISSIONS.get(urole, [])
+
+                perm_catalog = {p["id"]: p for p in STANDARD_PERMISSIONS}
+                modules_accessible = set()
+                permissions_grouped = {}
+
+                for pid in eff_perms:
+                    pinfo = perm_catalog.get(pid, {"module": pid.split(".")[0].capitalize(), "action": "access", "description": pid})
+                    mod = pinfo.get("module", "General")
+                    modules_accessible.add(mod)
+                    if mod not in permissions_grouped:
+                        permissions_grouped[mod] = []
+                    permissions_grouped[mod].append(pinfo.get("description", pid))
+
+                assigned_br = current_user.get("branch_id") or "All Branches"
+                card = {
+                    "type": "my_permissions",
+                    "title": f"My Effective Access Profile ({current_user.get('name', 'User')})",
+                    "role": urole,
+                    "assigned_branch": assigned_br,
+                    "modules_accessible": sorted(list(modules_accessible)),
+                    "permissions_grouped": permissions_grouped,
+                    "total_permissions": len(eff_perms)
+                }
+                resp = {
+                    "user_name": current_user.get("name"),
+                    "role": urole,
+                    "branch_id": current_user.get("branch_id"),
+                    "modules_accessible": sorted(list(modules_accessible)),
+                    "permissions_count": len(eff_perms)
+                }
+                return resp, card, None
+
+            # ──────────────────────────────────────────────────────────────────
+            # 27. get_available_reports
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "get_available_reports":
+                report_catalog = [
+                    {"id": "reports_sales", "title": "Sales Report", "description": "Category breakdowns, revenue velocity, item performance", "route": "/reports/sales", "supported": True, "permission": "reports.view"},
+                    {"id": "reports_invoice", "title": "Invoice Report", "description": "Document totals, taxes, settlement states", "route": "/reports/invoice", "supported": True, "permission": "reports.view"},
+                    {"id": "reports_payment", "title": "Payment Report", "description": "Breakdown of collections by Cash, Card, and UPI", "route": "/reports/payment", "supported": True, "permission": "reports.view"},
+                    {"id": "reports_inventory", "title": "Inventory Report", "description": "Warehouse stock valuation and categories", "route": "/reports/inventory", "supported": True, "permission": "reports.view"},
+                    {"id": "production_reports", "title": "Production Reports", "description": "Planned vs completed output, scrap rates, and efficiency", "route": "/production/reports", "supported": True, "permission": "production.reports.view"},
+                    {"id": "production_rejection", "title": "Production Rejection Report", "description": "Defect ratios and scrap breakdown by manufactured item", "route": "/production/rejection", "supported": True, "permission": "production.view"},
+                    {"id": "finance_profitability", "title": "Profitability Reports", "description": "Net sales, cost of goods, gross margin, and monthly profitability", "route": "/finance/profitability-reports", "supported": True, "permission": "finance.reports.view"},
+                    {"id": "finance_customer_analysis", "title": "Customer Analysis", "description": "Customer revenue ranking and outstanding receivables aging", "route": "/finance/customer-analysis", "supported": True, "permission": "finance.view"},
+                    {"id": "finance_supplier_analysis", "title": "Supplier Analysis", "description": "Vendor purchase volumes and outstanding payables liabilities", "route": "/finance/supplier-analysis", "supported": True, "permission": "finance.view"},
+                    {"id": "reports_customer", "title": "Customer Aging Report", "description": "Customer retention patterns and account aging (mapped to SAP schema)", "route": "/reports/customer", "supported": False, "permission": "reports.view"},
+                    {"id": "reports_ai", "title": "AI Generated Reports", "description": "Automated business intelligence narratives generated from live SAP database", "route": "/reports/ai", "supported": True, "permission": "reports.view"},
+                ]
+                accessible = []
+                for r in report_catalog:
+                    perm = r["permission"]
+                    if user_role == "admin" or perm in user_permissions:
+                        accessible.append(r)
+
+                card = {
+                    "type": "report_catalog",
+                    "title": "ATLAS Reports Directory",
+                    "summary": f"Found {len(accessible)} report(s) matching your authorization.",
+                    "reports": accessible
+                }
+                nav = {"label": "Open Reports Hub", "route": "/reports", "target_module": "reports"}
+                return {"reports": accessible, "total_available": len(accessible)}, card, nav
+
+            # ──────────────────────────────────────────────────────────────────
+            # 28. draft_email
+            # ──────────────────────────────────────────────────────────────────
+            elif tool_name == "draft_email":
+                from app.services.email import email_service
+                from app.models.schemas import EmailDraftRequest
+
+                purpose = str(args.get("purpose") or "payment_reminder")
+                req = EmailDraftRequest(
+                    purpose=purpose,
+                    customer_code=args.get("customer_name_or_code"),
+                    recipient_name=args.get("customer_name_or_code") or args.get("supplier_name_or_code"),
+                    supplier_code=args.get("supplier_name_or_code"),
+                    record_id=args.get("invoice_doc_num") or args.get("order_doc_num"),
+                    record_type="invoice" if args.get("invoice_doc_num") else ("sales_order" if args.get("order_doc_num") else None),
+                    recipient_email=args.get("recipient_email"),
+                    additional_notes=args.get("additional_context"),
+                )
+                draft_resp = email_service.generate_draft(req, current_user)
+                card = {
+                    "type": "email_draft",
+                    "draft_id": draft_resp.draft_id,
+                    "purpose": draft_resp.purpose,
+                    "recipient_email": draft_resp.recipient_email,
+                    "recipient_name": draft_resp.recipient_name,
+                    "cc": draft_resp.cc,
+                    "bcc": draft_resp.bcc,
+                    "subject": draft_resp.subject,
+                    "body": draft_resp.body,
+                    "business_context": draft_resp.business_context,
+                    "is_ready_to_send": draft_resp.is_ready_to_send,
+                    "validation_warnings": draft_resp.validation_warnings,
+                    "company_signature": draft_resp.company_signature,
+                    "meta": {
+                        "record_type": req.record_type,
+                        "record_id": req.record_id,
+                    }
+                }
+                return {
+                    "status": "draft_created",
+                    "draft_id": draft_resp.draft_id,
+                    "purpose": draft_resp.purpose,
+                    "recipient": draft_resp.recipient_email or "Not set (requires user input)",
+                    "recipient_name": draft_resp.recipient_name,
+                    "subject": draft_resp.subject,
+                    "body": draft_resp.body,
+                    "verified_context": draft_resp.business_context,
+                    "validation_warnings": draft_resp.validation_warnings,
+                    "note": "Complete draft generated for review. Email will only be dispatched upon clicking 'Confirm & Send Email'."
+                }, card, None
+
             else:
                 return {"error": f"Unknown tool '{tool_name}'"}, None, None
 
@@ -3142,3 +3778,25 @@ class AIAssistantService:
         except Exception as e:
             logger.error(f"Execution error in tool {tool_name}: {e}", exc_info=True)
             return {"error": f"Tool execution failed: {str(e)}"}, None, None
+
+    def _execute_tool(
+        self,
+        tool_name: str,
+        args: Dict[str, Any],
+        permitted_warehouse: Optional[str],
+        current_user: Dict[str, Any]
+    ) -> Tuple[Dict[str, Any], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+        """
+        Executes a single registered business tool against SAP or Postgres.
+        Automatically attaches verified process flowchart definitions if available.
+        Returns: (tool_context_for_llm, structured_card_for_ui, navigation_action)
+        """
+        tool_resp, card, nav = self._execute_tool_inner(tool_name, args, permitted_warehouse, current_user)
+        if card and isinstance(card, dict) and "flowchart" not in card:
+            wf_mod = TOOL_TO_WORKFLOW_MAP.get(tool_name)
+            if wf_mod:
+                try:
+                    card["flowchart"] = get_workflow_flowchart(wf_mod)
+                except Exception as ex:
+                    logger.warning(f"Failed attaching workflow flowchart for {tool_name}: {ex}")
+        return tool_resp, card, nav

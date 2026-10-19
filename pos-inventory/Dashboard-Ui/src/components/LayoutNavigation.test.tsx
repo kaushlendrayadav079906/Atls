@@ -33,6 +33,8 @@ describe('Layout Top Navigation and Sidebar RBAC Verification', () => {
       pageContext: 'dashboard',
       pageFilters: {},
       setPageFilters: vi.fn(),
+      selectedRecord: null,
+      setSelectedRecord: vi.fn(),
       handleSendChat: vi.fn(),
       chatScrollRef: { current: null },
     });

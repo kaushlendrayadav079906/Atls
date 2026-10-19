@@ -21,21 +21,21 @@ import {
   History,
   Settings,
   RefreshCw,
+  FileText,
+  FileSpreadsheet,
+  UserCheck,
 } from 'lucide-react';
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis
-} from 'recharts';
 import { RichTableChartRenderer } from './RichTableChartRenderer';
+import { BusinessFlowchartRenderer } from './BusinessFlowchartRenderer';
+import { EmailDraftCard } from './EmailDraftCard';
 
 const money = new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
   maximumFractionDigits: 2,
 });
+
+const numberFormatter = new Intl.NumberFormat('en-IN');
 
 export const AIChatRenderer = ({ structuredData }: { structuredData: any }) => {
   const navigate = useNavigate();
@@ -146,6 +146,16 @@ const SingleCardRenderer = ({ card, navigate }: { card: any; navigate: any }) =>
         return <RichTableChartRenderer data={card} />;
       }
 
+      // ── Process Flowchart ────────────────────────────────────────────────
+      case 'flowchart': {
+        return <BusinessFlowchartRenderer data={card.flowchart || card} />;
+      }
+
+      // ── Smart Email Assistant Draft ──────────────────────────────────────
+      case 'email_draft': {
+        return <EmailDraftCard card={card} />;
+      }
+
       // ── Navigation Action ────────────────────────────────────────────────
       case 'navigation': {
         return <NavigationActionCard nav={card} navigate={navigate} />;
@@ -230,72 +240,61 @@ const SingleCardRenderer = ({ card, navigate }: { card: any; navigate: any }) =>
       case 'sales_orders': {
         const orders = card.orders || [];
         const summary = card.summary;
+        const totalCount = card.total_count ?? orders.length;
+
+        const tableData = {
+          type: 'table' as const,
+          title: `Sales Orders (${totalCount})`,
+          summary: card.summary_text || `Live customer commitments from SAP Sales Orders (${orders.length} orders retrieved).`,
+          columns: [
+            { key: 'docNum', label: 'Order #', type: 'string' as const },
+            { key: 'customer', label: 'Customer', type: 'string' as const },
+            { key: 'docDate', label: 'Date', type: 'date' as const },
+            { key: 'status', label: 'Status', type: 'string' as const },
+            { key: 'total', label: 'Total Amount', type: 'currency' as const },
+          ],
+          rows: orders.map((ord: any) => ({
+            docNum: String(ord.DocNum || ord.doc_num || ord.DocEntry || ''),
+            customer: ord.CardName || ord.card_name || ord.CardCode || 'CASH',
+            docDate: ord.DocDate ? String(ord.DocDate).split('T')[0] : '-',
+            status: ord.Cancelled === 'tYES' || ord.cancelled === 'tYES' ? 'Cancelled' : (ord.DocumentStatus === 'bost_Close' || ord.document_status === 'bost_Close' ? 'Closed' : 'Open'),
+            total: Number(ord.DocTotal ?? ord.doc_total ?? 0),
+          })),
+          kpis: summary ? [
+            { label: 'Total Orders', value: summary.total_orders ?? totalCount },
+            { label: 'Pending Orders', value: summary.pending_orders ?? 0 },
+            { label: 'Completed Orders', value: summary.completed_orders ?? 0 },
+          ] : [
+            { label: 'Total Orders', value: totalCount },
+            { label: 'Total Value', value: money.format(orders.reduce((acc: number, o: any) => acc + (Number(o.DocTotal ?? o.doc_total ?? 0) || 0), 0)) }
+          ],
+          chart: orders.length > 0 ? {
+            type: 'bar' as const,
+            xKey: 'customer',
+            series: [{ dataKey: 'total', name: 'Order Total (₹)', color: '#2563eb' }],
+            defaultView: 'both' as const,
+          } : undefined,
+          insights: card.insights || (orders.length > 0 ? [
+            `Evaluated ${orders.length} customer sales orders totaling ${money.format(orders.reduce((acc: number, o: any) => acc + (Number(o.DocTotal ?? o.doc_total ?? 0) || 0), 0))}.`,
+            `Leading customer in this batch: ${orders[0].CardName || orders[0].card_name || 'Customer'}.`
+          ] : []),
+          meta: card.meta,
+        };
+
         return (
-          <div className="rounded-xl border border-indigo-100/90 bg-white p-2.5 shadow-2xs overflow-hidden">
-            <div className="text-[10.5px] font-bold text-slate-800 mb-1.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <ShoppingCart size={13} className="text-blue-600" />
-                Sales Orders ({card.total_count ?? orders.length})
-              </span>
-              <span className="rounded-full bg-blue-50 border border-blue-200/80 px-2 py-0.5 text-[8.5px] font-bold text-blue-700">SAP Orders</span>
+          <div className="flex flex-col gap-2">
+            <RichTableChartRenderer data={tableData} />
+            <div className="flex items-center gap-2 px-1">
+              <button
+                type="button"
+                onClick={() => navigate('/sales-orders')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/90 hover:bg-blue-100/90 border border-blue-200/80 text-[11px] font-bold text-blue-700 transition cursor-pointer shadow-3xs"
+              >
+                <ShoppingCart size={12} className="text-blue-600" />
+                <span>Open Sales Orders</span>
+                <ChevronRight size={11} className="text-blue-500" />
+              </button>
             </div>
-
-            {summary && (
-              <div className="grid grid-cols-3 gap-1 mb-2 text-[9px]">
-                <div className="bg-slate-50 p-1.5 rounded border border-slate-100 text-center">
-                  <div className="text-slate-400 text-[8px]">Total</div>
-                  <div className="font-bold text-slate-800">{summary.total_orders ?? orders.length}</div>
-                </div>
-                <div className="bg-amber-50/80 p-1.5 rounded border border-amber-200/60 text-center">
-                  <div className="text-amber-700 text-[8px]">Pending</div>
-                  <div className="font-bold text-amber-800">{summary.pending_orders ?? '-'}</div>
-                </div>
-                <div className="bg-emerald-50/80 p-1.5 rounded border border-emerald-200/60 text-center">
-                  <div className="text-emerald-700 text-[8px]">Completed</div>
-                  <div className="font-bold text-emerald-800">{summary.completed_orders ?? '-'}</div>
-                </div>
-              </div>
-            )}
-
-            {orders.length > 0 && (
-              <div className="overflow-x-auto max-h-[160px] scrollbar-thin rounded-lg border border-slate-100">
-                <table className="w-full text-left text-[9px] text-slate-600">
-                  <thead className="sticky top-0 bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
-                    <tr>
-                      <th className="p-1.5">Order #</th>
-                      <th className="p-1.5">Customer</th>
-                      <th className="p-1.5">Date</th>
-                      <th className="p-1.5">Status</th>
-                      <th className="p-1.5 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {orders.slice(0, 8).map((ord: any, i: number) => {
-                      const isCancelled = ord.Cancelled === 'tYES' || ord.cancelled === 'tYES';
-                      const isClosed = ord.DocumentStatus === 'bost_Close' || ord.document_status === 'bost_Close';
-                      const statusBadge = isCancelled ? (
-                        <span className="rounded bg-rose-50 text-rose-600 px-1 py-0.5 text-[8px] font-semibold">Cancelled</span>
-                      ) : isClosed ? (
-                        <span className="rounded bg-emerald-50 text-emerald-600 px-1 py-0.5 text-[8px] font-semibold">Closed</span>
-                      ) : (
-                        <span className="rounded bg-amber-50 text-amber-600 px-1 py-0.5 text-[8px] font-semibold">Open</span>
-                      );
-                      const docDateStr = ord.DocDate ? String(ord.DocDate).split('T')[0] : '-';
-                      return (
-                        <tr key={i} className="hover:bg-indigo-50/30 transition-colors">
-                          <td className="p-1.5 font-bold text-blue-700">{ord.DocNum || ord.doc_num || ord.DocEntry}</td>
-                          <td className="p-1.5 truncate max-w-[85px]" title={ord.CardName || ord.card_name}>{ord.CardName || ord.card_name || ord.CardCode}</td>
-                          <td className="p-1.5 text-slate-400">{docDateStr}</td>
-                          <td className="p-1.5">{statusBadge}</td>
-                          <td className="p-1.5 font-bold text-slate-800 text-right">{money.format(ord.DocTotal ?? ord.doc_total ?? 0)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {orders.length > 8 && <div className="text-[8px] text-slate-400 mt-1 italic">Showing top 8 of {orders.length}</div>}
             {renderMetaWarnings()}
           </div>
         );
@@ -305,71 +304,61 @@ const SingleCardRenderer = ({ card, navigate }: { card: any; navigate: any }) =>
       case 'purchase_orders': {
         const orders = card.orders || [];
         const summary = card.summary;
+        const totalCount = card.total_count ?? orders.length;
+
+        const tableData = {
+          type: 'table' as const,
+          title: `Purchase Orders (${totalCount})`,
+          summary: card.summary_text || `Live procurement commitments from SAP Purchase Orders (${orders.length} vendor orders retrieved).`,
+          columns: [
+            { key: 'docNum', label: 'PO #', type: 'string' as const },
+            { key: 'supplier', label: 'Supplier', type: 'string' as const },
+            { key: 'docDate', label: 'Date', type: 'date' as const },
+            { key: 'status', label: 'Status', type: 'string' as const },
+            { key: 'total', label: 'Total Amount', type: 'currency' as const },
+          ],
+          rows: orders.map((ord: any) => ({
+            docNum: String(ord.DocNum || ord.DocEntry || ''),
+            supplier: ord.CardName || ord.CardCode || 'Supplier',
+            docDate: ord.DocDate ? String(ord.DocDate).split('T')[0] : '-',
+            status: ord.Cancelled === 'tYES' ? 'Cancelled' : (ord.DocumentStatus === 'bost_Close' ? 'Received' : 'Pending'),
+            total: Number(ord.DocTotal || 0),
+          })),
+          kpis: summary ? [
+            { label: 'Total POs', value: summary.total_orders ?? totalCount },
+            { label: 'Pending', value: summary.pending_orders ?? 0 },
+            { label: 'Received', value: summary.received_orders ?? 0 },
+          ] : [
+            { label: 'Total POs', value: totalCount },
+            { label: 'Total Value', value: money.format(orders.reduce((acc: number, o: any) => acc + (Number(o.DocTotal) || 0), 0)) }
+          ],
+          chart: orders.length > 0 ? {
+            type: 'bar' as const,
+            xKey: 'supplier',
+            series: [{ dataKey: 'total', name: 'PO Total (₹)', color: '#8b5cf6' }],
+            defaultView: 'both' as const,
+          } : undefined,
+          insights: card.insights || (orders.length > 0 ? [
+            `Total vendor procurement in this batch: ${money.format(orders.reduce((acc: number, o: any) => acc + (Number(o.DocTotal) || 0), 0))} across ${orders.length} orders.`,
+            `Primary vendor: ${orders[0].CardName || orders[0].CardCode || 'Supplier'}.`
+          ] : []),
+          meta: card.meta,
+        };
+
         return (
-          <div className="rounded-xl border border-indigo-100/90 bg-white p-2.5 shadow-2xs overflow-hidden">
-            <div className="text-[10.5px] font-bold text-slate-800 mb-1.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Package size={13} className="text-purple-600" />
-                Purchase Orders ({card.total_count ?? orders.length})
-              </span>
-              <span className="rounded-full bg-purple-50 border border-purple-200/80 px-2 py-0.5 text-[8.5px] font-bold text-purple-700">Vendor POs</span>
+          <div className="flex flex-col gap-2">
+            <RichTableChartRenderer data={tableData} />
+            <div className="flex items-center gap-2 px-1">
+              <button
+                type="button"
+                onClick={() => navigate('/purchase-orders')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50/90 hover:bg-purple-100/90 border border-purple-200/80 text-[11px] font-bold text-purple-700 transition cursor-pointer shadow-3xs"
+              >
+                <Package size={12} className="text-purple-600" />
+                <span>Open Purchase Orders</span>
+                <ChevronRight size={11} className="text-purple-500" />
+              </button>
             </div>
-
-            {summary && (
-              <div className="grid grid-cols-3 gap-1 mb-2 text-[9px]">
-                <div className="bg-slate-50 p-1.5 rounded border border-slate-100 text-center">
-                  <div className="text-slate-400 text-[8px]">Total</div>
-                  <div className="font-bold text-slate-800">{summary.total_orders ?? orders.length}</div>
-                </div>
-                <div className="bg-amber-50/80 p-1.5 rounded border border-amber-200/60 text-center">
-                  <div className="text-amber-700 text-[8px]">Pending</div>
-                  <div className="font-bold text-amber-800">{summary.pending_orders ?? '-'}</div>
-                </div>
-                <div className="bg-emerald-50/80 p-1.5 rounded border border-emerald-200/60 text-center">
-                  <div className="text-emerald-700 text-[8px]">Received</div>
-                  <div className="font-bold text-emerald-800">{summary.received_orders ?? '-'}</div>
-                </div>
-              </div>
-            )}
-
-            {orders.length > 0 && (
-              <div className="overflow-x-auto max-h-[160px] scrollbar-thin rounded-lg border border-slate-100">
-                <table className="w-full text-left text-[9px] text-slate-600">
-                  <thead className="sticky top-0 bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
-                    <tr>
-                      <th className="p-1.5">PO #</th>
-                      <th className="p-1.5">Supplier</th>
-                      <th className="p-1.5">Date</th>
-                      <th className="p-1.5">Status</th>
-                      <th className="p-1.5 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {orders.slice(0, 8).map((ord: any, i: number) => {
-                      const isCancelled = ord.Cancelled === 'tYES';
-                      const isClosed = ord.DocumentStatus === 'bost_Close';
-                      const statusBadge = isCancelled ? (
-                        <span className="rounded bg-rose-50 text-rose-600 px-1 py-0.5 text-[8px] font-semibold">Cancelled</span>
-                      ) : isClosed ? (
-                        <span className="rounded bg-emerald-50 text-emerald-600 px-1 py-0.5 text-[8px] font-semibold">Received</span>
-                      ) : (
-                        <span className="rounded bg-amber-50 text-amber-600 px-1 py-0.5 text-[8px] font-semibold">Pending</span>
-                      );
-                      const docDateStr = ord.DocDate ? String(ord.DocDate).split('T')[0] : '-';
-                      return (
-                        <tr key={i} className="hover:bg-purple-50/30 transition-colors">
-                          <td className="p-1.5 font-bold text-purple-700">{ord.DocNum || ord.DocEntry}</td>
-                          <td className="p-1.5 truncate max-w-[85px]" title={ord.CardName}>{ord.CardName || ord.CardCode}</td>
-                          <td className="p-1.5 text-slate-400">{docDateStr}</td>
-                          <td className="p-1.5">{statusBadge}</td>
-                          <td className="p-1.5 font-bold text-slate-800 text-right">{money.format(ord.DocTotal || 0)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
             {renderMetaWarnings()}
           </div>
         );
@@ -378,45 +367,56 @@ const SingleCardRenderer = ({ card, navigate }: { card: any; navigate: any }) =>
       // ── 4. Sales Invoices ─────────────────────────────────────────────────
       case 'sales_invoices': {
         const invoices = card.orders || [];
+        const totalCount = card.total_count ?? invoices.length;
+        const totalBilled = card.total_amount !== undefined ? Number(card.total_amount) : invoices.reduce((acc: number, inv: any) => acc + (Number(inv.DocTotal) || 0), 0);
+
+        const tableData = {
+          type: 'table' as const,
+          title: `Sales Invoices (${totalCount})`,
+          summary: `Live Accounts Receivable invoices from SAP (${invoices.length} billed invoices retrieved).`,
+          columns: [
+            { key: 'docNum', label: 'Invoice #', type: 'string' as const },
+            { key: 'customer', label: 'Customer', type: 'string' as const },
+            { key: 'docDate', label: 'Date', type: 'date' as const },
+            { key: 'total', label: 'Total Amount', type: 'currency' as const },
+          ],
+          rows: invoices.map((inv: any) => ({
+            docNum: String(inv.DocNum || inv.DocEntry || ''),
+            customer: inv.CardName || inv.CardCode || 'CASH',
+            docDate: inv.DocDate ? String(inv.DocDate).split('T')[0] : '-',
+            total: Number(inv.DocTotal || 0),
+          })),
+          kpis: [
+            { label: 'Invoices Count', value: totalCount },
+            { label: 'Billed Revenue', value: money.format(totalBilled), isPositive: true },
+          ],
+          chart: invoices.length > 0 ? {
+            type: 'bar' as const,
+            xKey: 'customer',
+            series: [{ dataKey: 'total', name: 'Invoice Total (₹)', color: '#4f46e5' }],
+            defaultView: 'both' as const,
+          } : undefined,
+          insights: card.insights || (invoices.length > 0 ? [
+            `Total billed revenue: ${money.format(totalBilled)} across ${invoices.length} invoices.`,
+            `Leading invoice customer: ${invoices[0].CardName || invoices[0].CardCode || 'CASH'}.`
+          ] : []),
+          meta: card.meta,
+        };
+
         return (
-          <div className="rounded-xl border border-indigo-100/90 bg-white p-2.5 shadow-2xs overflow-hidden">
-            <div className="text-[10.5px] font-bold text-slate-800 mb-1.5 flex items-center justify-between">
-              <span>Sales Invoices ({card.total_count ?? invoices.length})</span>
-              <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[8.5px] font-bold text-indigo-600">AR Invoices</span>
+          <div className="flex flex-col gap-2">
+            <RichTableChartRenderer data={tableData} />
+            <div className="flex items-center gap-2 px-1">
+              <button
+                type="button"
+                onClick={() => navigate('/sales')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50/90 hover:bg-indigo-100/90 border border-indigo-200/80 text-[11px] font-bold text-indigo-700 transition cursor-pointer shadow-3xs"
+              >
+                <FileSpreadsheet size={12} className="text-indigo-600" />
+                <span>Open Sales Invoices</span>
+                <ChevronRight size={11} className="text-indigo-500" />
+              </button>
             </div>
-
-            {card.total_amount !== undefined && (
-              <div className="mb-2 p-1.5 rounded-lg bg-indigo-50/60 border border-indigo-100 flex items-center justify-between text-[10px]">
-                <span className="text-indigo-800 font-medium">Billed Revenue:</span>
-                <span className="text-indigo-950 font-bold">{money.format(card.total_amount)}</span>
-              </div>
-            )}
-
-            {invoices.length > 0 && (
-              <div className="overflow-x-auto max-h-[160px] scrollbar-thin rounded-lg border border-slate-100">
-                <table className="w-full text-left text-[9px] text-slate-600">
-                  <thead className="sticky top-0 bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
-                    <tr>
-                      <th className="p-1.5">Invoice #</th>
-                      <th className="p-1.5">Customer</th>
-                      <th className="p-1.5">Date</th>
-                      <th className="p-1.5 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {invoices.slice(0, 8).map((inv: any, i: number) => (
-                      <tr key={i} className="hover:bg-indigo-50/30 transition-colors">
-                        <td className="p-1.5 font-medium text-blue-600">{inv.DocNum || inv.DocEntry}</td>
-                        <td className="p-1.5 truncate max-w-[90px]">{inv.CardName || inv.CardCode || 'CASH'}</td>
-                        <td className="p-1.5 text-slate-400">{inv.DocDate ? String(inv.DocDate).split('T')[0] : '-'}</td>
-                        <td className="p-1.5 font-bold text-slate-800 text-right">{money.format(inv.DocTotal || 0)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {invoices.length > 8 && <div className="text-[8px] text-slate-400 mt-1 italic">Showing top 8 of {invoices.length}</div>}
             {renderMetaWarnings()}
           </div>
         );
@@ -425,40 +425,61 @@ const SingleCardRenderer = ({ card, navigate }: { card: any; navigate: any }) =>
       // ── 5. Inventory Risk & Low Stock ─────────────────────────────────────
       case 'inventory_risk': {
         const items = card.items || [];
-        return (
-          <div className="rounded-xl border border-amber-200/90 bg-white p-2.5 shadow-2xs overflow-hidden">
-            <div className="text-[10.5px] font-bold text-amber-950 mb-1.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <TriangleAlert size={13} className="text-amber-600" />
-                Low Stock Alert ({items.length} items)
-              </span>
-              <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[8.5px] font-bold">Action Needed</span>
-            </div>
+        const count = card.total_count ?? items.length;
 
-            {items.length > 0 && (
-              <div className="overflow-x-auto max-h-[160px] scrollbar-thin rounded-lg border border-amber-100">
-                <table className="w-full text-left text-[9px] text-slate-700">
-                  <thead className="sticky top-0 bg-amber-50 text-amber-900 font-semibold border-b border-amber-200/60">
-                    <tr>
-                      <th className="p-1.5">Item Code</th>
-                      <th className="p-1.5">Name</th>
-                      <th className="p-1.5 text-right">In Stock</th>
-                      <th className="p-1.5 text-right">Threshold</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-amber-100/60">
-                    {items.slice(0, 10).map((itm: any, i: number) => (
-                      <tr key={i} className="hover:bg-amber-50/40">
-                        <td className="p-1.5 font-bold text-slate-900">{itm.ItemCode || itm.item_code}</td>
-                        <td className="p-1.5 truncate max-w-[90px]">{itm.ItemName || itm.name}</td>
-                        <td className="p-1.5 text-right font-bold text-rose-600">{itm.QuantityOnStock ?? itm.in_stock ?? 0}</td>
-                        <td className="p-1.5 text-right text-slate-500">{itm.MinimalStock ?? itm.minimal_stock ?? 10}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        const tableData = {
+          type: 'table' as const,
+          title: `Low Stock Alert (${count} ${count === 1 ? 'item' : 'items'})`,
+          summary: card.summary || `Live stock alert from SAP warehouse records: ${items.length} product(s) at or below safety reorder threshold.`,
+          columns: [
+            { key: 'itemCode', label: 'Item Code', type: 'string' as const },
+            { key: 'name', label: 'Product Name', type: 'string' as const },
+            { key: 'inStock', label: 'Current Stock', type: 'number' as const },
+            { key: 'minStock', label: 'Min Threshold', type: 'number' as const },
+            { key: 'warehouse', label: 'Warehouse', type: 'string' as const },
+          ],
+          rows: items.map((itm: any) => ({
+            itemCode: itm.ItemCode || itm.item_code || '',
+            name: itm.ItemName || itm.name || itm.ItemCode || itm.item_code || '',
+            inStock: Number(itm.QuantityOnStock ?? itm.in_stock ?? 0),
+            minStock: Number(itm.MinimalStock ?? itm.minimal_stock ?? 10),
+            warehouse: itm.WarehouseCode || itm.warehouse || card.meta?.warehouse || 'SH',
+          })),
+          kpis: [
+            { label: 'Low Stock Items', value: count, isPositive: false, subtext: 'Action required' },
+            { label: 'Out of Stock (0 units)', value: items.filter((i: any) => Number(i.QuantityOnStock ?? i.in_stock ?? 0) <= 0).length, isPositive: false, subtext: 'Stockout risk' },
+            { label: 'Warehouse', value: card.meta?.warehouse || 'SH', subtext: 'Scope' }
+          ],
+          chart: items.length > 0 ? {
+            type: 'bar' as const,
+            xKey: 'name',
+            series: [
+              { dataKey: 'inStock', name: 'In Stock (Units)', color: '#ef4444' },
+              { dataKey: 'minStock', name: 'Min Threshold', color: '#94a3b8' },
+            ],
+            defaultView: 'both' as const,
+          } : undefined,
+          insights: card.insights || (items.length > 0 ? [
+            `Identified ${items.length} inventory products requiring replenishment in warehouse ${card.meta?.warehouse || 'SH'}.`,
+            `Lowest stock item is ${items[0].ItemName || items[0].name || items[0].ItemCode} with ${items[0].QuantityOnStock ?? items[0].in_stock ?? 0} units available.`
+          ] : ['All monitored products are currently above minimum safety stock thresholds.']),
+          meta: card.meta,
+        };
+
+        return (
+          <div className="flex flex-col gap-2">
+            <RichTableChartRenderer data={tableData} />
+            <div className="flex items-center gap-2 px-1">
+              <button
+                type="button"
+                onClick={() => navigate('/products?low_stock=true')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50/90 hover:bg-amber-100/90 border border-amber-200/80 text-[11px] font-bold text-amber-800 transition cursor-pointer shadow-3xs"
+              >
+                <TriangleAlert size={12} className="text-amber-600" />
+                <span>Open Low Stock Inventory</span>
+                <ChevronRight size={11} className="text-amber-500" />
+              </button>
+            </div>
             {renderMetaWarnings()}
           </div>
         );
@@ -485,40 +506,89 @@ const SingleCardRenderer = ({ card, navigate }: { card: any; navigate: any }) =>
       // ── 7. Top Selling Products ───────────────────────────────────────────
       case 'top_products': {
         const products = card.products || [];
-        return (
-          <div className="rounded-xl border border-indigo-100/90 bg-white p-2.5 shadow-2xs overflow-hidden">
-            <div className="text-[10.5px] font-bold text-slate-800 mb-1.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Sparkles size={13} className="text-amber-500" />
-                Top Performing Products
-              </span>
-              <span className="rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2 py-0.5 text-[8.5px] font-bold">Velocity</span>
-            </div>
+        const isQtyRanking = card.meta?.ranking_by === 'quantity';
+        const rankMetricLabel = isQtyRanking ? 'Quantity Sold (Units)' : 'Sales Revenue (₹)';
+        const topProduct = products[0];
+        const totalTopRevenue = products.reduce((acc: number, p: any) => acc + (Number(p.salesAmount) || 0), 0);
+        const totalTopQty = products.reduce((acc: number, p: any) => acc + (Number(p.quantitySold) || 0), 0);
+        const leadShare = totalTopRevenue > 0 && topProduct ? Math.round((Number(topProduct.salesAmount) / totalTopRevenue) * 100) : 0;
 
-            {products.length > 0 && (
-              <div className="overflow-x-auto max-h-[160px] scrollbar-thin rounded-lg border border-slate-100">
-                <table className="w-full text-left text-[9px] text-slate-600">
-                  <thead className="sticky top-0 bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
-                    <tr>
-                      <th className="p-1.5">Rank</th>
-                      <th className="p-1.5">Product</th>
-                      <th className="p-1.5 text-right">Sold Qty</th>
-                      <th className="p-1.5 text-right">Revenue</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {products.slice(0, 8).map((p: any, i: number) => (
-                      <tr key={i} className="hover:bg-slate-50">
-                        <td className="p-1.5 font-bold text-indigo-600">#{i + 1}</td>
-                        <td className="p-1.5 truncate max-w-[90px]" title={p.itemName}>{p.itemName || p.itemCode}</td>
-                        <td className="p-1.5 text-right font-medium text-slate-700">{p.quantitySold}</td>
-                        <td className="p-1.5 text-right font-bold text-slate-900">{money.format(p.salesAmount || 0)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        const tableData = {
+          type: 'table' as const,
+          title: card.title || (isQtyRanking ? 'Top Performing Products by Quantity' : 'Top Performing Products by Sales'),
+          summary: card.summary || `Top ${products.length} products ranked by ${isQtyRanking ? 'total units sold' : 'total sales revenue'}.`,
+          columns: [
+            { key: 'rank', label: 'Rank', type: 'string' as const },
+            { key: 'itemName', label: 'Product Name', type: 'string' as const },
+            { key: 'itemCode', label: 'Item Code', type: 'string' as const },
+            { key: 'quantitySold', label: 'Qty Sold', type: 'number' as const },
+            { key: 'salesAmount', label: 'Total Revenue', type: 'currency' as const },
+          ],
+          rows: products.map((p: any, i: number) => ({
+            rank: `#${i + 1}`,
+            itemName: p.itemName || p.itemCode,
+            itemCode: p.itemCode,
+            quantitySold: Number(p.quantitySold || 0),
+            salesAmount: Number(p.salesAmount || 0),
+          })),
+          kpis: card.kpis || [
+            {
+              label: isQtyRanking ? 'Top Product by Units' : 'Top Product by Revenue',
+              value: topProduct ? (topProduct.itemName || topProduct.itemCode) : '-',
+              subtext: isQtyRanking ? `${topProduct?.quantitySold || 0} units` : money.format(topProduct?.salesAmount || 0),
+              isPositive: true,
+            },
+            {
+              label: isQtyRanking ? 'Total Units Sold' : 'Total Top Revenue',
+              value: isQtyRanking ? numberFormatter.format(totalTopQty) : money.format(totalTopRevenue),
+              subtext: `Top ${products.length} catalog items`,
+            },
+            {
+              label: 'Leading Share',
+              value: `${leadShare}%`,
+              subtext: 'Of top products total',
+              isPositive: true,
+            }
+          ],
+          filters: {
+            period: card.meta?.date_range || 'Recent Invoices',
+            additional: {
+              'Ranking Metric': rankMetricLabel,
+              'Branch Scope': card.meta?.branch_scope || 'All Branches',
+              'Source': 'SAP Invoices'
+            }
+          },
+          chart: {
+            type: 'horizontal_bar' as const,
+            xKey: 'itemName',
+            series: [{
+              dataKey: isQtyRanking ? 'quantitySold' : 'salesAmount',
+              name: isQtyRanking ? 'Units Sold' : 'Revenue (₹)',
+              color: isQtyRanking ? '#06b6d4' : '#4f46e5'
+            }],
+            defaultView: 'both' as const
+          },
+          insights: card.insights || (topProduct ? [
+            `Leading item: ${topProduct.itemName || topProduct.itemCode} accounts for ${leadShare}% of top product revenue (${money.format(topProduct.salesAmount || 0)} across ${numberFormatter.format(topProduct.quantitySold || 0)} units).`,
+            `Total sales across the top ${products.length} products reached ${money.format(totalTopRevenue)} for ${card.meta?.date_range || 'recent period'}.`
+          ] : []),
+          meta: card.meta
+        };
+
+        return (
+          <div className="flex flex-col gap-2">
+            <RichTableChartRenderer data={tableData} />
+            <div className="flex items-center justify-between gap-2 px-1">
+              <button
+                type="button"
+                onClick={() => navigate('/products')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/90 hover:bg-blue-100/90 border border-blue-200/80 text-[11px] font-bold text-blue-700 transition cursor-pointer shadow-3xs"
+              >
+                <Package size={12} className="text-blue-600" />
+                <span>Open Products Catalog</span>
+                <ChevronRight size={11} className="text-blue-500" />
+              </button>
+            </div>
             {renderMetaWarnings()}
           </div>
         );
@@ -563,46 +633,66 @@ const SingleCardRenderer = ({ card, navigate }: { card: any; navigate: any }) =>
       // ── 9. Production Orders ──────────────────────────────────────────────
       case 'production_orders': {
         const orders = card.orders || [];
-        return (
-          <div className="rounded-xl border border-indigo-100/90 bg-white p-2.5 shadow-2xs overflow-hidden">
-            <div className="text-[10.5px] font-bold text-slate-800 mb-1.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Factory size={13} className="text-indigo-600" />
-                Production Orders ({card.total_count ?? orders.length})
-              </span>
-              <span className="rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2 py-0.5 text-[8.5px] font-bold">Batches</span>
-            </div>
+        const summary = card.summary || {};
+        const totalCount = card.total_count ?? orders.length;
 
-            {orders.length > 0 && (
-              <div className="overflow-x-auto max-h-[160px] scrollbar-thin rounded-lg border border-slate-100">
-                <table className="w-full text-left text-[9px] text-slate-600">
-                  <thead className="sticky top-0 bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
-                    <tr>
-                      <th className="p-1.5">Order #</th>
-                      <th className="p-1.5">Item</th>
-                      <th className="p-1.5">Status</th>
-                      <th className="p-1.5 text-right">Planned</th>
-                      <th className="p-1.5 text-right">Produced</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {orders.slice(0, 8).map((ord: any, i: number) => (
-                      <tr key={i} className="hover:bg-slate-50">
-                        <td className="p-1.5 font-bold text-indigo-700">{ord.production_order_no || ord.docNum || ord.DocNum}</td>
-                        <td className="p-1.5 truncate max-w-[85px]">{ord.item_name || ord.item_code || ord.ItemNo}</td>
-                        <td className="p-1.5">
-                          <span className={`px-1 py-0.5 rounded text-[8px] font-semibold ${ord.status === 'Closed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                            {ord.status || 'Active'}
-                          </span>
-                        </td>
-                        <td className="p-1.5 text-right text-slate-500">{ord.planned_qty || ord.PlannedQuantity || 0}</td>
-                        <td className="p-1.5 text-right font-bold text-emerald-600">{ord.produced_qty || ord.CompletedQuantity || 0}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+        const tableData = {
+          type: 'table' as const,
+          title: `Production Orders (${totalCount})`,
+          summary: card.summary_text || `Live SAP batch records: ${orders.length} production order(s) retrieved.`,
+          columns: [
+            { key: 'orderNo', label: 'Order #', type: 'string' as const },
+            { key: 'item', label: 'Item Name', type: 'string' as const },
+            { key: 'status', label: 'Status', type: 'string' as const },
+            { key: 'planned', label: 'Planned Qty', type: 'number' as const },
+            { key: 'produced', label: 'Produced Qty', type: 'number' as const },
+            { key: 'pending', label: 'Pending Qty', type: 'number' as const },
+            { key: 'dueDate', label: 'Due Date', type: 'date' as const },
+          ],
+          rows: orders.map((ord: any) => ({
+            orderNo: String(ord.production_order_no || ord.docNum || ord.DocNum || ''),
+            item: ord.item_name || ord.item_code || ord.ItemNo || 'Batch Item',
+            status: ord.status || 'Active',
+            planned: Number(ord.planned_qty || ord.PlannedQuantity || 0),
+            produced: Number(ord.produced_qty || ord.CompletedQuantity || 0),
+            pending: Number(ord.pending_qty ?? Math.max(0, (ord.planned_qty || ord.PlannedQuantity || 0) - (ord.produced_qty || ord.CompletedQuantity || 0))),
+            dueDate: ord.due_date ? String(ord.due_date).split('T')[0] : '-',
+          })),
+          kpis: [
+            { label: 'Total Orders', value: totalCount },
+            { label: 'Planned Batches', value: summary.planned_orders ?? orders.filter((o: any) => o.status === 'Planned' || o.status === 'Active').length },
+            { label: 'Completed', value: summary.completed_orders ?? orders.filter((o: any) => o.status === 'Closed').length },
+          ],
+          chart: orders.length > 0 ? {
+            type: 'bar' as const,
+            xKey: 'item',
+            series: [
+              { dataKey: 'planned', name: 'Planned Qty', color: '#6366f1' },
+              { dataKey: 'produced', name: 'Produced Qty', color: '#10b981' },
+            ],
+            defaultView: 'both' as const,
+          } : undefined,
+          insights: card.insights || (orders.length > 0 ? [
+            `Total planned production volume across these ${orders.length} batches is ${numberFormatter.format(orders.reduce((acc: number, o: any) => acc + Number(o.planned_qty || o.PlannedQuantity || 0), 0))} units.`,
+            `Total produced to date: ${numberFormatter.format(orders.reduce((acc: number, o: any) => acc + Number(o.produced_qty || o.CompletedQuantity || 0), 0))} units.`,
+          ] : ['No pending production orders found for the applied warehouse.']),
+          meta: card.meta,
+        };
+
+        return (
+          <div className="flex flex-col gap-2">
+            <RichTableChartRenderer data={tableData} />
+            <div className="flex items-center gap-2 px-1">
+              <button
+                type="button"
+                onClick={() => navigate('/production/orders')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50/90 hover:bg-indigo-100/90 border border-indigo-200/80 text-[11px] font-bold text-indigo-700 transition cursor-pointer shadow-3xs"
+              >
+                <Factory size={12} className="text-indigo-600" />
+                <span>Open Production Orders</span>
+                <ChevronRight size={11} className="text-indigo-500" />
+              </button>
+            </div>
             {renderMetaWarnings()}
           </div>
         );
@@ -612,47 +702,58 @@ const SingleCardRenderer = ({ card, navigate }: { card: any; navigate: any }) =>
       case 'production_rejection': {
         const rej = card.rejection_data || {};
         const items = rej.items || [];
+
+        const tableData = {
+          type: 'table' as const,
+          title: `Production Rejection & Scrap (${rej.rejection_percentage ?? 0}% Scrap)`,
+          summary: `SAP Quality & Scrap records: Total scrapped quantity is ${rej.total_rejection ?? 0} units across ${items.length} manufactured items.`,
+          columns: [
+            { key: 'item', label: 'Item', type: 'string' as const },
+            { key: 'produced', label: 'Produced Qty', type: 'number' as const },
+            { key: 'rejected', label: 'Rejected Qty', type: 'number' as const },
+            { key: 'scrapRate', label: 'Scrap Rate', type: 'percentage' as const },
+          ],
+          rows: items.map((itm: any) => ({
+            item: itm.item_name || itm.item_code || 'Item',
+            produced: Number(itm.produced_qty || 0),
+            rejected: Number(itm.rejected_qty || 0),
+            scrapRate: Number(itm.rejection_percentage || 0),
+          })),
+          kpis: [
+            { label: 'Overall Scrap Rate', value: `${rej.rejection_percentage ?? 0}%`, isPositive: false, subtext: 'Factory-wide' },
+            { label: 'Scrapped Units', value: numberFormatter.format(rej.total_rejection ?? 0), isPositive: false, subtext: 'Lost volume' },
+            { label: 'Total Produced', value: numberFormatter.format(rej.total_production ?? 0), subtext: 'Total batch units' },
+          ],
+          chart: items.length > 0 ? {
+            type: 'bar' as const,
+            xKey: 'item',
+            series: [
+              { dataKey: 'scrapRate', name: 'Scrap Rate (%)', color: '#f43f5e' },
+              { dataKey: 'rejected', name: 'Rejected Units', color: '#fb7185' },
+            ],
+            defaultView: 'both' as const,
+          } : undefined,
+          insights: card.insights || (items.length > 0 ? [
+            `Highest scrap rate: ${items[0].item_name || items[0].item_code} with ${items[0].rejection_percentage}% rejection (${items[0].rejected_qty} units lost).`,
+            `Overall factory scrap rate stands at ${rej.rejection_percentage ?? 0}%.`,
+          ] : ['No rejection or scrap records found.']),
+          meta: card.meta,
+        };
+
         return (
-          <div className="rounded-xl border border-rose-200/90 bg-white p-2.5 shadow-2xs overflow-hidden">
-            <div className="text-[10.5px] font-bold text-rose-950 mb-1.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <AlertCircle size={13} className="text-rose-600" />
-                Production Rejection & Scrap
-              </span>
-              <span className="rounded-full bg-rose-100 text-rose-800 px-2 py-0.5 text-[8.5px] font-bold">
-                {rej.rejection_percentage ?? 0}% Scrap
-              </span>
+          <div className="flex flex-col gap-2">
+            <RichTableChartRenderer data={tableData} />
+            <div className="flex items-center gap-2 px-1">
+              <button
+                type="button"
+                onClick={() => navigate('/production/rejection')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50/90 hover:bg-rose-100/90 border border-rose-200/80 text-[11px] font-bold text-rose-800 transition cursor-pointer shadow-3xs"
+              >
+                <AlertCircle size={12} className="text-rose-600" />
+                <span>Open Production Rejection</span>
+                <ChevronRight size={11} className="text-rose-500" />
+              </button>
             </div>
-
-            <div className="mb-2 p-1.5 rounded-lg bg-rose-50/70 border border-rose-100 flex items-center justify-between text-[10px]">
-              <span className="text-rose-800">Total Scrapped Quantity:</span>
-              <span className="text-rose-950 font-bold">{rej.total_rejection ?? 0} units</span>
-            </div>
-
-            {items.length > 0 && (
-              <div className="overflow-x-auto max-h-[140px] scrollbar-thin rounded-lg border border-rose-100">
-                <table className="w-full text-left text-[9px] text-slate-700">
-                  <thead className="sticky top-0 bg-rose-50 text-rose-900 font-semibold border-b border-rose-200/60">
-                    <tr>
-                      <th className="p-1.5">Item</th>
-                      <th className="p-1.5 text-right">Produced</th>
-                      <th className="p-1.5 text-right">Rejected</th>
-                      <th className="p-1.5 text-right">Scrap %</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-rose-100/60">
-                    {items.slice(0, 8).map((itm: any, i: number) => (
-                      <tr key={i} className="hover:bg-rose-50/40">
-                        <td className="p-1.5 truncate max-w-[85px] font-medium">{itm.item_name || itm.item_code}</td>
-                        <td className="p-1.5 text-right text-slate-500">{itm.produced_qty}</td>
-                        <td className="p-1.5 text-right font-bold text-rose-600">{itm.rejected_qty}</td>
-                        <td className="p-1.5 text-right font-bold text-rose-700">{itm.rejection_percentage}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
             {renderMetaWarnings()}
           </div>
         );
@@ -661,60 +762,106 @@ const SingleCardRenderer = ({ card, navigate }: { card: any; navigate: any }) =>
       // ── 11. Payment Report ────────────────────────────────────────────────
       case 'payment_report': {
         const dist = card.distribution || [];
-        return (
-          <div className="rounded-xl border border-indigo-100/90 bg-white p-2.5 shadow-2xs overflow-hidden">
-            <div className="text-[10.5px] font-bold text-slate-800 mb-1.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <CreditCard size={13} className="text-indigo-600" />
-                Payment Channels Breakdown
-              </span>
-              <span className="rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2 py-0.5 text-[8.5px] font-bold">
-                {money.format(card.total_payments || 0)}
-              </span>
-            </div>
+        const totalPayments = Number(card.total_payments || 0);
 
-            <div className="space-y-1.5 my-2">
-              {dist.map((d: any, i: number) => (
-                <div key={i} className="text-[9.5px]">
-                  <div className="flex justify-between font-medium text-slate-700 mb-0.5">
-                    <span>{d.method}</span>
-                    <span className="font-bold text-slate-900">{money.format(d.amount)} ({d.percentage}%)</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full"
-                      style={{ width: `${Math.min(100, Math.max(0, d.percentage))}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+        const tableData = {
+          type: 'table' as const,
+          title: `Payment Channels Breakdown`,
+          summary: card.summary || `Live collections distribution from SAP incoming payments totaling ${money.format(totalPayments)}.`,
+          columns: [
+            { key: 'method', label: 'Payment Method', type: 'string' as const },
+            { key: 'amount', label: 'Amount Collected', type: 'currency' as const },
+            { key: 'percentage', label: 'Share (%)', type: 'percentage' as const },
+          ],
+          rows: dist.map((d: any) => ({
+            method: d.method,
+            amount: Number(d.amount || 0),
+            percentage: Number(d.percentage || 0),
+          })),
+          kpis: [
+            { label: 'Total Collections', value: money.format(totalPayments), isPositive: true },
+            { label: 'Payment Channels', value: dist.length },
+            { label: 'Leading Method', value: dist[0] ? dist[0].method : '-', subtext: dist[0] ? `${dist[0].percentage}% share` : undefined },
+          ],
+          chart: dist.length > 0 ? {
+            type: 'pie' as const,
+            xKey: 'method',
+            series: ['amount'],
+            defaultView: 'both' as const,
+          } : undefined,
+          insights: card.insights || (dist.length > 0 ? [
+            `Top payment method is ${dist[0].method} collecting ${money.format(dist[0].amount)} (${dist[0].percentage}% of total revenue).`,
+            `Total payments analyzed: ${money.format(totalPayments)} across ${dist.length} channels.`,
+          ] : []),
+          meta: card.meta,
+        };
+
+        return (
+          <div className="flex flex-col gap-2">
+            <RichTableChartRenderer data={tableData} />
+            <div className="flex items-center gap-2 px-1">
+              <button
+                type="button"
+                onClick={() => navigate('/reports/payment')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50/90 hover:bg-indigo-100/90 border border-indigo-200/80 text-[11px] font-bold text-indigo-700 transition cursor-pointer shadow-3xs"
+              >
+                <CreditCard size={12} className="text-indigo-600" />
+                <span>Open Payment Reports</span>
+                <ChevronRight size={11} className="text-indigo-500" />
+              </button>
             </div>
             {renderMetaWarnings()}
           </div>
         );
       }
 
-      // ── 12. Sales Report with Mini Chart ──────────────────────────────────
+      // ── 12. Sales Report with Chart ───────────────────────────────────────
       case 'sales_report': {
         const trend = card.trend || [];
-        return (
-          <div className="rounded-xl border border-indigo-100/90 bg-white p-2.5 shadow-2xs overflow-hidden">
-            <div className="text-[10.5px] font-bold text-slate-800 mb-1 flex items-center justify-between">
-              <span>Sales Revenue Summary</span>
-              <span className="text-indigo-700 font-bold">{money.format(card.total_sales || 0)}</span>
-            </div>
+        const totalSales = Number(card.total_sales || 0);
 
-            {trend.length > 0 && (
-              <div className="h-[90px] w-full my-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={trend} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
-                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 8.5, fill: '#64748b' }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 8, fill: '#64748b' }} tickFormatter={(v) => `₹${v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v}`} />
-                    <Bar dataKey="sales" fill="#4f46e5" radius={[3, 3, 0, 0]} barSize={16} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+        const tableData = {
+          type: 'table' as const,
+          title: `Sales Revenue Summary`,
+          summary: `Sales revenue totaling ${money.format(totalSales)} across ${card.invoice_count || 0} invoices.`,
+          columns: [
+            { key: 'label', label: 'Period', type: 'string' as const },
+            { key: 'sales', label: 'Sales Revenue', type: 'currency' as const },
+          ],
+          rows: trend.map((t: any) => ({
+            label: t.label,
+            sales: Number(t.sales || 0),
+          })),
+          kpis: [
+            { label: 'Total Sales', value: money.format(totalSales), isPositive: true },
+            { label: 'Invoice Count', value: card.invoice_count || 0 },
+          ],
+          chart: trend.length > 0 ? {
+            type: 'bar' as const,
+            xKey: 'label',
+            series: [{ dataKey: 'sales', name: 'Sales Revenue (₹)', color: '#4f46e5' }],
+            defaultView: 'both' as const,
+          } : undefined,
+          insights: card.insights || (trend.length > 0 ? [
+            `Analyzed ${trend.length} sales periods totaling ${money.format(totalSales)}.`,
+          ] : []),
+          meta: card.meta,
+        };
+
+        return (
+          <div className="flex flex-col gap-2">
+            <RichTableChartRenderer data={tableData} />
+            <div className="flex items-center gap-2 px-1">
+              <button
+                type="button"
+                onClick={() => navigate('/reports/sales')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50/90 hover:bg-indigo-100/90 border border-indigo-200/80 text-[11px] font-bold text-indigo-700 transition cursor-pointer shadow-3xs"
+              >
+                <TrendingUp size={12} className="text-indigo-600" />
+                <span>Open Sales Reports</span>
+                <ChevronRight size={11} className="text-indigo-500" />
+              </button>
+            </div>
             {renderMetaWarnings()}
           </div>
         );
@@ -1161,6 +1308,175 @@ const SingleCardRenderer = ({ card, navigate }: { card: any; navigate: any }) =>
               <div className="text-[10.5px] font-bold">Finance Data Refreshed</div>
             </div>
             <span className="text-[8.5px] font-mono text-emerald-700">{card.refreshed_at?.slice(11, 19) || 'Just now'}</span>
+          </div>
+        );
+      }
+
+      // ── 24. Admin User & Role Intelligence ──────────────────────────────────
+      case 'admin_users_info':
+      case 'admin_user_info': {
+        const users = card.users || [];
+        return (
+          <div className="rounded-xl border border-indigo-100/90 bg-white p-2.5 shadow-2xs overflow-hidden">
+            <div className="text-[10.5px] font-bold text-slate-900 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Users size={13} className="text-indigo-600" />
+                Administrative User Directory ({card.total_matching ?? users.length})
+              </span>
+              <span className="rounded-full bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 text-[8.5px] font-bold text-indigo-700">
+                RBAC Access
+              </span>
+            </div>
+
+            {card.query && (
+              <div className="text-[9px] text-slate-500 mb-2">
+                Matching: <span className="font-semibold text-slate-700">{card.query}</span>
+                {card.feature_filter && <span> • Filtered by: <span className="font-semibold text-indigo-600">{card.feature_filter}</span></span>}
+              </div>
+            )}
+
+            {users.length > 0 ? (
+              <div className="overflow-x-auto max-h-[160px] scrollbar-thin rounded-lg border border-slate-100">
+                <table className="w-full text-left text-[9px] text-slate-600">
+                  <thead className="sticky top-0 bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                    <tr>
+                      <th className="p-1.5">User</th>
+                      <th className="p-1.5">Role</th>
+                      <th className="p-1.5">Branch</th>
+                      <th className="p-1.5 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {users.slice(0, 10).map((u: any, i: number) => (
+                      <tr key={i} className="hover:bg-indigo-50/30 transition-colors">
+                        <td className="p-1.5 font-bold text-slate-900">
+                          {u.full_name || u.username}
+                          <div className="text-[8px] font-normal text-slate-400 font-mono">{u.email || u.username}</div>
+                        </td>
+                        <td className="p-1.5">
+                          <span className="rounded bg-indigo-50 text-indigo-700 px-1 py-0.5 text-[8px] font-bold capitalize">
+                            {u.role}
+                          </span>
+                        </td>
+                        <td className="p-1.5 font-mono text-slate-500">{u.branch_id || 'All'}</td>
+                        <td className="p-1.5 text-right">
+                          <span className={`px-1 py-0.5 rounded text-[8px] font-semibold ${u.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {u.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-[9.5px] text-slate-500 p-2 text-center bg-slate-50 rounded-lg">
+                No employees found matching the specified criteria.
+              </div>
+            )}
+            {renderMetaWarnings()}
+          </div>
+        );
+      }
+
+      // ── 25. My Effective Permissions ─────────────────────────────────────────
+      case 'my_permissions': {
+        const perms = card.permissions || [];
+        const modules = card.permitted_modules || [];
+        return (
+          <div className="rounded-xl border border-indigo-100/90 bg-white p-2.5 shadow-2xs overflow-hidden">
+            <div className="text-[10.5px] font-bold text-slate-900 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <UserCheck size={13} className="text-emerald-600" />
+                My Account Authorization
+              </span>
+              <span className="rounded-full bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 text-[8.5px] font-bold text-emerald-700 uppercase">
+                {card.role || 'User'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5 mb-2 text-[9px]">
+              <div className="bg-slate-50 p-1.5 rounded border border-slate-100">
+                <span className="text-slate-400 block text-[8px]">Username</span>
+                <span className="font-bold text-slate-800 truncate block">{card.username}</span>
+              </div>
+              <div className="bg-slate-50 p-1.5 rounded border border-slate-100">
+                <span className="text-slate-400 block text-[8px]">Assigned Branch</span>
+                <span className="font-bold text-slate-800">{card.branch_id || 'All Branches'}</span>
+              </div>
+            </div>
+
+            {modules.length > 0 && (
+              <div className="mb-2">
+                <div className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Permitted Modules ({modules.length})
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {modules.map((m: string) => (
+                    <span key={m} className="rounded bg-indigo-50 border border-indigo-100 text-indigo-700 px-1.5 py-0.5 text-[8px] font-semibold capitalize">
+                      {m}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {perms.length > 0 && (
+              <div>
+                <div className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Effective Permissions ({perms.length})
+                </div>
+                <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto scrollbar-thin">
+                  {perms.map((p: string) => (
+                    <span key={p} className="rounded bg-slate-100 text-slate-700 px-1.5 py-0.5 text-[7.5px] font-mono">
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {renderMetaWarnings()}
+          </div>
+        );
+      }
+
+      // ── 26. Reports Hub Catalog ─────────────────────────────────────────────
+      case 'report_catalog': {
+        const reports = card.reports || [];
+        return (
+          <div className="rounded-xl border border-indigo-100/90 bg-white p-2.5 shadow-2xs overflow-hidden">
+            <div className="text-[10.5px] font-bold text-slate-900 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <FileText size={13} className="text-blue-600" />
+                Available Reports ({card.total_reports ?? reports.length})
+              </span>
+              <span className="rounded-full bg-blue-50 border border-blue-200/80 px-2 py-0.5 text-[8.5px] font-bold text-blue-700">
+                Reporting Hub
+              </span>
+            </div>
+
+            <div className="space-y-1.5 my-2 max-h-[180px] overflow-y-auto scrollbar-thin">
+              {reports.map((rep: any, i: number) => (
+                <div
+                  key={i}
+                  onClick={() => rep.route && navigate(rep.route)}
+                  className="p-2 rounded-lg border border-slate-100 bg-slate-50/60 hover:bg-indigo-50/60 hover:border-indigo-200 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="text-[10px] font-bold text-slate-900 group-hover:text-indigo-900">
+                      {rep.title}
+                    </div>
+                    <span className="text-[8px] font-mono text-indigo-600 font-semibold group-hover:underline flex items-center gap-0.5">
+                      Open <ChevronRight size={10} />
+                    </span>
+                  </div>
+                  <div className="text-[8.5px] text-slate-500 mt-0.5 line-clamp-1">
+                    {rep.description}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {renderMetaWarnings()}
           </div>
         );
       }

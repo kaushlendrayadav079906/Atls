@@ -265,11 +265,10 @@ def test_process_chat_sales_invoices(mock_invoices_service, mock_openai):
     
     mock_llm_instance.chat.completions.create.side_effect = [mock_response1, mock_response2]
     
-    mock_invoices_service.return_value.get_invoices_by_date.return_value = [{"DocEntry": 1, "U_Branch": "WH-01"}]
-    
     service = AIAssistantService()
+    service.finance_service.get_sales_invoices = MagicMock(return_value=[{"DocEntry": 1, "DocNum": 1, "DocTotal": 100, "DocDate": "2024-01-05", "U_Branch": "WH-01"}])
     user = {"name": "Test User", "role": "Admin", "branch_id": "WH-01"}
-    
+
     with patch('app.services.ai_service._get_permitted_branch', return_value="WH-01"):
         res = service.process_chat(message="Get sales", branch_id="WH-01", current_user=user)
         
@@ -1212,6 +1211,489 @@ def test_no_sap_write_operations_in_tools_schema():
                 assert name != "submit_approved_record_update", f"Forbidden tool {name} exposed in schema!"
             for kw in ["create", "delete", "drop", "insert"]:
                 assert kw not in name.lower(), f"Tool {name} contains forbidden write verb '{kw}'"
+
+
+def test_nlp_pipeline_intent_recognition():
+    """Verify that the NLP intelligence pipeline accurately recognizes business intents and extracts parameters."""
+    from app.core import nlp_pipeline
+
+    admin_user = {"username": "admin", "role": "admin", "permissions": ["users.manage", "dashboard.view", "products.view"]}
+
+    # 1. "Show me today's sales."
+    r1 = nlp_pipeline.analyze_query("Show me today's sales.", admin_user)
+    assert r1.intent_id == "dashboard.kpis"
+    assert r1.entities.range == "today"
+    assert r1.suggested_tool == "get_dashboard_summary"
+    assert r1.suggested_tool_args.get("range") == "today"
+
+    # 2. "Which products are running low on stock?"
+    r2 = nlp_pipeline.analyze_query("Which products are running low on stock?", admin_user)
+    assert r2.intent_id == "inventory.low_stock"
+    assert r2.entities.low_stock is True
+    assert r2.suggested_tool == "get_inventory_stock"
+    assert r2.suggested_tool_args.get("low_stock_only") is True
+
+    # 3. "Show pending production orders."
+    r3 = nlp_pipeline.analyze_query("Show pending production orders.", admin_user)
+    assert r3.intent_id == "production.orders"
+    assert r3.suggested_tool == "get_production_orders"
+    assert r3.suggested_tool_args.get("status") in ("pending", "open", "released", "Planned", "planned")
+
+    # 4. "Compare this month's sales with last month."
+    r4 = nlp_pipeline.analyze_query("Compare this month's sales with last month.", admin_user)
+    assert r4.intent_id == "dashboard.sales_trend"
+    assert r4.entities.range == "compare_last_month"
+    assert r4.suggested_tool == "get_analytical_table"
+
+    # 5. "Which customers have outstanding balances?"
+    r5 = nlp_pipeline.analyze_query("Which customers have outstanding balances?", admin_user)
+    assert r5.intent_id == "customers.receivables"
+    assert r5.suggested_tool == "get_accounts_receivable"
+
+    # 6. "Show purchase invoices for this supplier."
+    r6 = nlp_pipeline.analyze_query("Show purchase invoices for this supplier.", admin_user)
+    assert r6.intent_id == "finance.purchase_invoices"
+    assert r6.suggested_tool == "get_purchase_invoices"
+
+    # 7. "Create a report showing production rejection by item."
+    r7 = nlp_pipeline.analyze_query("Create a report showing production rejection by item.", admin_user)
+    assert r7.intent_id == "production.rejection"
+    assert r7.suggested_tool in ("get_analytical_table", "get_production_rejection")
+
+    # 8. "Find the customer with the highest sales."
+    r8 = nlp_pipeline.analyze_query("Find the customer with the highest sales.", admin_user)
+    assert r8.intent_id == "customers.ranking"
+    assert r8.suggested_tool == "get_customer_sales_ranking"
+
+    # 9. "Which employees can edit products?"
+    r9 = nlp_pipeline.analyze_query("Which employees can edit products?", admin_user)
+    assert r9.intent_id == "settings.user_lookup"
+    assert r9.suggested_tool == "get_admin_user_info"
+    assert r9.suggested_tool_args.get("feature_permission") == "products.edit"
+
+    # 10. "What can I access with my current permissions?"
+    r10 = nlp_pipeline.analyze_query("What can I access with my current permissions?", admin_user)
+    assert r10.intent_id == "settings.my_permissions"
+    assert r10.suggested_tool == "get_my_permissions"
+
+    # 11. "Show me all available reports."
+    r11 = nlp_pipeline.analyze_query("Show me all available reports.", admin_user)
+    assert r11.intent_id == "reports.catalog"
+    assert r11.suggested_tool == "get_available_reports"
+
+    # 12. "Open the inventory report."
+    r12 = nlp_pipeline.analyze_query("Open the inventory report.", admin_user)
+    assert r12.intent_id == "navigation.goto"
+    assert r12.suggested_tool == "navigate_to_module"
+
+
+def test_nlp_pipeline_contextual_follow_ups():
+    """Verify conversational context preservation across follow-up queries."""
+    from app.core import nlp_pipeline
+
+    user = {"username": "manager", "role": "manager", "permissions": ["dashboard.view"]}
+    context = {
+        "last_metric": "sales",
+        "last_range": "month",
+        "last_branch": "SH",
+        "last_tool": "get_analytical_table",
+        "last_module": "Dashboard"
+    }
+
+    # Follow-up: "Compare with last month"
+    res1 = nlp_pipeline.analyze_query("Compare with last month", user, context)
+    assert res1.is_follow_up is True
+    assert res1.entities.range == "compare_last_month"
+    assert res1.entities.metric == "sales"
+
+    # Follow-up: "Show the top five"
+    res2 = nlp_pipeline.analyze_query("Show the top five", user, context)
+    assert res2.is_follow_up is True
+    assert res2.entities.limit == 5
+
+    # Follow-up: "Only for this branch"
+    res3 = nlp_pipeline.analyze_query("Only for this branch", user, context)
+    assert res3.is_follow_up is True
+    assert res3.entities.branch == "SH"
+
+
+def test_capability_registry_integrity_and_rbac():
+    """Verify capability registry integrity, path validity, and RBAC filtering."""
+    from app.core.capability_registry import get_all_capabilities, get_capabilities_for_role
+
+    all_caps = get_all_capabilities()
+    assert len(all_caps) >= 12
+
+    for cap in all_caps:
+        assert cap.related_route.startswith("/")
+        assert cap.authorized_backend_tool
+        assert cap.is_read_only is True
+
+    # Admin gets all capabilities
+    admin_caps = get_capabilities_for_role("admin", [])
+    assert len(admin_caps) == len(all_caps)
+
+    # Regular employee without users.manage should NOT have settings.user_lookup
+    user_caps = get_capabilities_for_role("user", ["products.view", "dashboard.view"])
+    user_cap_ids = [c.capability_id for c in user_caps]
+    assert "settings.user_lookup" not in user_cap_ids
+    assert "settings.my_permissions" in user_cap_ids
+    assert "inventory.stock_levels" in user_cap_ids
+
+
+def test_admin_user_info_authorization_and_data():
+    """Verify get_admin_user_info RBAC: Admin authorized, non-admin forbidden, confidential fields masked."""
+    settings.OPENAI_API_KEY = "test_key"
+    with patch('app.services.ai_service.openai.OpenAI'):
+        service = AIAssistantService()
+
+        # Admin user: authorized
+        admin_user = {"username": "admin", "role": "admin", "permissions": ["users.manage"]}
+        resp_adm, card_adm, nav_adm = service._execute_tool(
+            "get_admin_user_info",
+            {"feature_permission": "products.edit"},
+            "SH",
+            admin_user
+        )
+        assert "error" not in resp_adm
+        assert card_adm is not None
+        assert card_adm["type"] == "admin_users_info"
+        assert nav_adm["route"] == "/settings"
+        # Ensure password hashes are never exposed
+        for u in resp_adm.get("users", []):
+            assert "password" not in u
+            assert "hashed_password" not in u
+
+        # Non-admin user without users.manage: forbidden
+        regular_user = {"username": "john", "role": "user", "permissions": ["products.view"]}
+        resp_reg, card_reg, nav_reg = service._execute_tool(
+            "get_admin_user_info",
+            {},
+            "SH",
+            regular_user
+        )
+        assert "Forbidden" in resp_reg.get("error", "")
+        assert card_reg is None
+
+
+def test_my_permissions_self_service():
+    """Verify get_my_permissions returns effective role, modules, and permissions for any authenticated employee."""
+    settings.OPENAI_API_KEY = "test_key"
+    with patch('app.services.ai_service.openai.OpenAI'):
+        service = AIAssistantService()
+
+        user = {
+            "id": "usr-123",
+            "name": "Alex Operator",
+            "role": "user",
+            "branch_id": "SH",
+            "permissions": ["products.view", "dashboard.view"]
+        }
+        resp, card, nav = service._execute_tool("get_my_permissions", {}, "SH", user)
+        assert resp["user_name"] == "Alex Operator"
+        assert resp["role"] == "user"
+        assert card is not None
+        assert card["type"] == "my_permissions"
+        assert "Products" in card["modules_accessible"] or "Dashboard" in card["modules_accessible"]
+
+
+def test_get_available_reports_catalog():
+    """Verify get_available_reports returns all 11 reports with proper routes and permissions."""
+    settings.OPENAI_API_KEY = "test_key"
+    with patch('app.services.ai_service.openai.OpenAI'):
+        service = AIAssistantService()
+
+        admin_user = {"username": "admin", "role": "admin"}
+        resp, card, nav = service._execute_tool("get_available_reports", {}, "SH", admin_user)
+
+        assert resp["total_available"] == 11
+        assert card is not None
+        assert card["type"] == "report_catalog"
+        routes = [r["route"] for r in resp["reports"]]
+        assert "/reports/sales" in routes
+        assert "/reports/inventory" in routes
+        assert "/production/rejection" in routes
+        assert "/finance/profitability-reports" in routes
+        assert "/reports/ai" in routes
+        assert nav["route"] == "/reports"
+
+
+@patch('app.services.ai_service.SAPProductionService')
+def test_analytical_table_production_rejection(mock_prod_service):
+    """Verify get_analytical_table supports production_rejection metric with deterministic scrap counts and bar chart."""
+    settings.OPENAI_API_KEY = "test_key"
+    with patch('app.services.ai_service.openai.OpenAI'):
+        service = AIAssistantService()
+
+        mock_prod_service.return_value.get_rejection_summary.return_value = {
+            "total_rejection": 45,
+            "rejection_percentage": 4.5,
+            "items": [
+                {"item_code": "ITM-001", "item_name": "Bearing Assembly", "produced_qty": 500, "rejected_qty": 30, "rejection_percentage": 6.0},
+                {"item_code": "ITM-002", "item_name": "Gear Housing", "produced_qty": 500, "rejected_qty": 15, "rejection_percentage": 3.0}
+            ]
+        }
+
+        admin_user = {"username": "admin", "role": "admin", "permissions": ["production.view"]}
+        resp, card, nav = service._execute_tool(
+            "get_analytical_table",
+            {"metric": "production_rejection", "group_by": "item", "range": "month"},
+            "SH",
+            admin_user
+        )
+
+        assert card is not None
+        assert card["type"] == "table"
+        assert "Production Rejection" in card["title"]
+        assert len(card["rows"]) == 2
+        assert card["rows"][0]["itemCode"] == "ITM-001"
+        assert card["rows"][0]["rejectedQty"] == 30
+        assert card["chart"]["type"] == "bar"
+        assert any(s in card["chart"]["series"] for s in ("rejectionRate", "rejectedQty"))
+        assert nav["route"] == "/production/rejection"
+
+
+def test_analytical_table_comparison_zero_previous_period():
+    """Verify that when previous period sales is zero, comparison handles it safely without division by zero or fake percentage."""
+    settings.OPENAI_API_KEY = "test_key"
+    with patch('app.services.ai_service.openai.OpenAI'):
+        service = AIAssistantService()
+
+        # Invoices only for current period, empty for previous period
+        service.invoices_service.get_invoices_by_date = MagicMock(side_effect=[
+            [{"DocTotal": "50000.00", "DocDate": "2026-10-10", "U_BCode": "SH"}],  # Current
+            []  # Previous (zero sales)
+        ])
+
+        admin_user = {"username": "admin", "role": "admin"}
+        resp, card, nav = service._execute_tool(
+            "get_analytical_table",
+            {"metric": "sales", "group_by": "comparison", "range": "compare_last_month"},
+            "SH",
+            admin_user
+        )
+
+        assert card is not None
+        assert "Period Comparison" in card["title"]
+        assert "zero sales" in card["summary"]
+        assert "reliably" in card["summary"]
+        # Third row is variance row
+        var_row = card["rows"][2]
+        assert "N/A" in var_row["period"]
+        assert card["filters"]["additional"]["Net Growth"] == "N/A"
+
+
+def test_nlp_top_products_ranking_follow_up():
+    """Verify multi-turn conversation flow: top 5 products -> compare their quantity -> only this month."""
+    from app.core.nlp_pipeline import analyze_query
+
+    user = {"username": "manager", "role": "manager", "permissions": ["products.view", "dashboard.view"]}
+
+    # Turn 1: Top 5 products by sales
+    q1 = analyze_query("Show me the top five products by sales", user)
+    assert q1.intent_id == "inventory.top_products"
+    assert q1.entities.limit == 5
+    assert q1.entities.metric == "sales"
+    assert q1.suggested_tool == "get_products"
+    assert q1.suggested_tool_args["ranking_by"] == "sales"
+
+    # Turn 2: Compare their quantity sold
+    ctx1 = {
+        "last_tool": "get_products",
+        "last_intent": "inventory.top_products",
+        "last_limit": 5,
+        "last_metric": "sales",
+        "last_range": "month"
+    }
+    q2 = analyze_query("Compare their quantity sold", user, context=ctx1)
+    assert q2.is_follow_up is True
+    assert q2.intent_id == "inventory.top_products"
+    assert q2.entities.limit == 5
+    assert q2.entities.metric == "quantity"
+    assert q2.suggested_tool_args["ranking_by"] == "quantity"
+
+    # Turn 3: Only this month
+    ctx2 = {
+        "last_tool": "get_products",
+        "last_intent": "inventory.top_products",
+        "last_limit": 5,
+        "last_metric": "quantity",
+        "last_range": "past_6_months"
+    }
+    q3 = analyze_query("Only this month", user, context=ctx2)
+    assert q3.is_follow_up is True
+    assert q3.intent_id == "inventory.top_products"
+    assert q3.entities.range == "month"
+    assert q3.entities.metric == "quantity"
+    assert q3.suggested_tool_args["range"] == "month"
+
+
+def test_get_products_quantity_vs_sales_ranking():
+    """Verify get_products sorts correctly by quantity vs salesAmount and returns metadata."""
+    settings.OPENAI_API_KEY = "test_key"
+    with patch('app.services.ai_service.openai.OpenAI'):
+        service = AIAssistantService()
+
+        # Item A has high revenue but low qty; Item B has high qty but low revenue
+        mock_invoices = [
+            {
+                "DocEntry": 1,
+                "DocDate": "2026-10-15",
+                "U_BCode": "SH",
+                "DocumentLines": [
+                    {"ItemCode": "ITEM-A", "ItemDescription": "Luxury Part A", "Quantity": 2.0, "LineTotal": 20000.0},
+                    {"ItemCode": "ITEM-B", "ItemDescription": "Common Part B", "Quantity": 100.0, "LineTotal": 5000.0}
+                ]
+            }
+        ]
+        service.invoices_service.get_recent_invoices_with_lines = MagicMock(return_value=mock_invoices)
+
+        admin_user = {"username": "admin", "role": "admin"}
+
+        # 1. Rank by sales amount (default)
+        resp_sales, card_sales, _ = service._execute_tool(
+            "get_products",
+            {"top_selling_only": True, "ranking_by": "sales_amount", "limit": 5},
+            "SH",
+            admin_user
+        )
+        assert resp_sales["top_products"][0]["itemCode"] == "ITEM-A"
+        assert card_sales["meta"]["ranking_by"] == "sales_amount"
+
+        # 2. Rank by quantity sold
+        resp_qty, card_qty, _ = service._execute_tool(
+            "get_products",
+            {"top_selling_only": True, "ranking_by": "quantity", "limit": 5},
+            "SH",
+            admin_user
+        )
+        assert resp_qty["top_products"][0]["itemCode"] == "ITEM-B"
+        assert card_qty["meta"]["ranking_by"] == "quantity"
+        assert "Quantity" in card_qty["meta"]["ranking_label"]
+
+
+def test_get_workflow_flowchart_tool_and_modules():
+    """Verify get_workflow_flowchart returns validated structured flowchart for all 11 ATLAS modules."""
+    from app.services.ai_service import AIAssistantService
+    from app.core.workflow_flows import SUPPORTED_WORKFLOW_MODULES
+
+    service = AIAssistantService()
+    user = {"username": "manager", "role": "manager", "permissions": ["dashboard.view"]}
+
+    for mod in SUPPORTED_WORKFLOW_MODULES:
+        tool_resp, card, nav = service._execute_tool(
+            "get_workflow_flowchart",
+            {"module": mod},
+            "SH",
+            user
+        )
+        assert card is not None
+        assert card["type"] == "flowchart"
+        flow = card["flowchart"]
+        assert "nodes" in flow
+        assert len(flow["nodes"]) >= 3
+        assert len(flow["edges"]) >= 2
+        for node in flow["nodes"]:
+            assert "id" in node
+            assert "stepNumber" in node
+            assert "title" in node
+            assert "type" in node
+            assert node["type"] in ("start", "process", "decision", "end")
+        for edge in flow["edges"]:
+            assert "from" in edge
+            assert "to" in edge
+        assert nav is not None
+        assert "route" in nav
+
+
+def test_flowchart_nlp_intent_and_follow_up():
+    """Verify NLP recognizes process questions and contextual 'show me the process flowchart' follow-ups."""
+    from app.core.nlp_pipeline import nlp_pipeline
+
+    user = {"role": "admin"}
+
+    # Standalone process question
+    res1 = nlp_pipeline.analyze_query("How does a sale work in ATLAS?", user)
+    assert res1.intent_id == "workflow.flowchart"
+    assert res1.suggested_tool == "get_workflow_flowchart"
+    assert res1.suggested_tool_args["module"] in ("sales", "sales_pos")
+
+    # Contextual follow-up
+    prev_ctx = {"last_module": "production", "last_tool": "get_production_orders"}
+    res2 = nlp_pipeline.analyze_query("Show me the process flowchart", user, context=prev_ctx)
+    assert res2.intent_id == "workflow.flowchart"
+    assert res2.suggested_tool == "get_workflow_flowchart"
+    assert res2.suggested_tool_args["module"] in ("production", "production_orders")
+    assert res2.is_follow_up is True
+
+
+def test_automatic_flowchart_attachment_to_tool_cards():
+    """Verify tools automatically attach verified workflow flowcharts to their cards."""
+    from app.services.ai_service import AIAssistantService
+
+    service = AIAssistantService()
+    user = {"username": "admin", "role": "admin"}
+
+    # Mock sales orders
+    service.sales_orders_service.get_sales_order_summary = MagicMock(return_value={"total": 5})
+    service.sales_orders_service.list_sales_orders = MagicMock(return_value={"value": [{"DocNum": 1}], "odata.count": 1})
+
+    _, card_so, _ = service._execute_tool("get_sales_orders", {"limit": 5}, "SH", user)
+    assert card_so is not None
+    assert "flowchart" in card_so
+    assert "Sales" in card_so["flowchart"]["module"]
+
+    # Mock inventory stock
+    service.inventory_service.get_warehouse_stock = MagicMock(return_value=[{"ItemCode": "ITEM-1", "QuantityOnStock": 5.0}])
+    _, card_inv, _ = service._execute_tool("get_inventory_stock", {"warehouse": "SH"}, "SH", user)
+    assert card_inv is not None
+    assert "flowchart" in card_inv
+    assert "Product" in card_inv["flowchart"]["module"] or "Inventory" in card_inv["flowchart"]["module"]
+
+
+def test_analytical_tool_charts_and_kpis():
+    """Verify backend tools return validated chart configs, KPIs, and data structures for chat rendering."""
+    from app.services.ai_service import AIAssistantService
+
+    service = AIAssistantService()
+    user = {"username": "admin", "role": "admin", "permissions": ["dashboard.view", "products.view", "production.view"]}
+
+    # 1. Low stock inventory chart
+    service.inventory_service.get_warehouse_stock = MagicMock(return_value=[
+        {"ItemCode": "ITEM-1", "ItemName": "Widget A", "QuantityOnStock": 2.0, "ItemWarehouseInfoCollection": [{"WarehouseCode": "SH", "MinimalStock": 10.0}]}
+    ])
+    _, card_risk, _ = service._execute_tool("get_inventory_stock", {"low_stock_only": True, "warehouse": "SH"}, "SH", user)
+    assert card_risk["type"] == "inventory_risk"
+    assert card_risk["chart"] is not None
+    assert card_risk["chart"]["type"] == "bar"
+    assert card_risk["chart"]["defaultView"] == "both"
+    assert "QuantityOnStock" in card_risk["chart"]["series"]
+
+    # 2. Production orders chart
+    service.production_service.get_production_orders = MagicMock(return_value=([
+        {"production_order_no": "PO-1", "item_name": "Assembly X", "planned_qty": 100, "produced_qty": 40}
+    ], 1))
+    service.production_service.get_production_summary = MagicMock(return_value={"planned_orders": 1})
+    _, card_prod, _ = service._execute_tool("get_production_orders", {"warehouse": "SH"}, "SH", user)
+    assert card_prod["type"] == "production_orders"
+    assert card_prod["chart"] is not None
+    assert card_prod["chart"]["type"] == "bar"
+    assert card_prod["chart"]["defaultView"] == "both"
+    assert "planned_qty" in card_prod["chart"]["series"]
+
+    # 3. Top products chart
+    service.invoices_service.get_recent_invoices_with_lines = MagicMock(return_value=[
+        {"DocumentLines": [{"ItemCode": "P1", "ItemDescription": "Prod 1", "Quantity": 10, "LineTotal": 5000}]}
+    ])
+    _, card_top, _ = service._execute_tool("get_products", {"top_selling_only": True, "limit": 5}, "SH", user)
+    assert card_top["type"] == "top_products"
+    assert card_top["chart"] is not None
+    assert card_top["chart"]["type"] == "horizontal_bar"
+    assert card_top["chart"]["defaultView"] == "both"
+
+
+
+
 
 
 

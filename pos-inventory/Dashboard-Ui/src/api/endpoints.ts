@@ -221,6 +221,9 @@ export interface AIAssistantChatResponse {
   conversation_id: string;
   branch_context: string;
   structured_data?: any;
+  suggested_follow_ups?: string[];
+  intent_id?: string;
+  context?: Record<string, any>;
 }
 
 export const aiAssistantApi = {
@@ -522,6 +525,103 @@ export const adminApi = {
     return res.data;
   },
 };
+
+// ── Smart Email Assistant Interfaces & API ────────────────────────────────────
+
+export interface EmailDraftPayload {
+  purpose?: string;
+  recipient_email?: string;
+  recipient_name?: string;
+  customer_code?: string;
+  supplier_code?: string;
+  record_type?: string;
+  record_id?: string;
+  prompt?: string;
+  additional_notes?: string;
+  context_data?: Record<string, any>;
+}
+
+export interface EmailDraftResponse {
+  draft_id: string;
+  purpose: string;
+  recipient_email: string;
+  recipient_name: string;
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  body: string;
+  business_context?: Record<string, any>;
+  verified_context?: Record<string, any>;
+  suggested_follow_ups?: string[];
+  is_ready_to_send?: boolean;
+  validation_warnings?: string[];
+  company_signature?: string;
+}
+
+export interface EmailSendPayload {
+  draft_id?: string;
+  recipient_email: string;
+  recipient_name?: string;
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  body: string;
+  purpose?: string;
+  record_type?: string;
+  record_id?: string;
+  business_context?: Record<string, any>;
+  idempotency_key?: string;
+  confirmed: boolean;
+}
+
+export interface EmailSendResponse {
+  success: boolean;
+  status: string;
+  provider: string;
+  message_id: string;
+  recipient_email: string;
+  subject: string;
+  sent_at: string;
+  audit_id: string;
+  details?: Record<string, any>;
+}
+
+export interface EmailAuditLogItem {
+  id: string;
+  user_id?: string;
+  username?: string;
+  recipient_email: string;
+  recipient_name?: string;
+  subject: string;
+  purpose: string;
+  record_type?: string;
+  record_id?: string;
+  status: string;
+  provider: string;
+  provider_message_id?: string;
+  error_message?: string;
+  created_at: string;
+}
+
+export const emailApi = {
+  generateDraft: async (payload: EmailDraftPayload): Promise<EmailDraftResponse> => {
+    const res = await apiClient.post<EmailDraftResponse>('/email/draft', payload);
+    return res.data;
+  },
+  sendEmail: async (payload: EmailSendPayload): Promise<EmailSendResponse> => {
+    const res = await apiClient.post<EmailSendResponse>('/email/send', payload);
+    return res.data;
+  },
+  getAuditLogs: async (params?: { limit?: number; offset?: number; recipient?: string; record_id?: string }): Promise<EmailAuditLogItem[]> => {
+    const res = await apiClient.get<EmailAuditLogItem[]>('/email/audit-logs', { params });
+    return res.data;
+  },
+  getSettings: async () => {
+    const res = await apiClient.get('/email/settings');
+    return res.data;
+  },
+};
+
 
 
 

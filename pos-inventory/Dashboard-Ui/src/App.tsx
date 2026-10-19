@@ -157,8 +157,8 @@ function App() {
                 <Route path="*" element={<div className="p-8 text-center text-gray-500">Coming soon</div>} />
               </Route>
             </Routes>
-        </AIAssistantProvider>
-      </BrowserRouter>
+          </AIAssistantProvider>
+        </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
   );

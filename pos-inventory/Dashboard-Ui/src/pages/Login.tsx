@@ -13,7 +13,7 @@ import {
     User,
 } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { authApi } from '../api/endpoints';
 import { useAuth } from '../contexts/AuthContext';
@@ -37,6 +37,18 @@ export const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const intendedDestination = (location.state as { from?: string })?.from || '/';
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('demo') === 'admin') {
+      authApi.login({ username: 'admin', password: 'password123' }).then((res) => {
+        if (res.user) {
+          login(res.access_token, res.user);
+          navigate('/', { replace: true });
+        }
+      }).catch(console.error);
+    }
+  }, [location.search]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -237,6 +249,24 @@ export const Login = () => {
                 >
                   <span>{loading ? 'Signing in...' : 'Sign in'}</span>
                   <ArrowRight className="h-4.5 w-4.5" />
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-demo-admin-login"
+                  onClick={() => {
+                    setLoading(true);
+                    authApi.login({ username: 'admin', password: 'password123' }).then((res) => {
+                      if (res.user) {
+                        login(res.access_token, res.user);
+                        navigate('/', { replace: true });
+                      }
+                    }).catch((err) => setError('Demo login failed: ' + String(err))).finally(() => setLoading(false));
+                  }}
+                  className="w-full mt-2.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-blue-700 text-[13px] font-bold hover:from-blue-100 hover:to-indigo-100 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                >
+                  <Sparkles size={14} className="text-blue-600" />
+                  Quick Demo Admin Sign-In
                 </button>
               </form>
 

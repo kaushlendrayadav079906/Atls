@@ -1,6 +1,6 @@
 """Pydantic models for API request/response validation"""
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from pydantic import BaseModel, Field, EmailStr
 
 
@@ -721,9 +721,12 @@ class TableColumn(BaseModel):
 
 
 class TableChartConfig(BaseModel):
-    type: str = Field("bar", pattern="^(bar|line|pie|area)$")
+    type: str = Field("bar", pattern="^(bar|line|pie|area|horizontal_bar)$")
     xKey: str
-    series: List[str]
+    series: List[Union[str, Dict[str, Any]]]
+    defaultView: Optional[str] = "both"
+    title: Optional[str] = None
+    layout: Optional[str] = None
 
 
 class TableFilters(BaseModel):
@@ -743,6 +746,87 @@ class StructuredTableResponse(BaseModel):
     rows: List[Dict[str, Any]]
     filters: TableFilters
     chart: Optional[TableChartConfig] = None
+    flowchart: Optional[Dict[str, Any]] = None
+    insights: Optional[List[str]] = None
+    kpis: Optional[List[Dict[str, Any]]] = None
     meta: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+
+
+# ============================================================
+# Smart Email Assistant Models
+# ============================================================
+
+class EmailDraftRequest(BaseModel):
+    purpose: str = "payment_reminder"
+    recipient_email: Optional[str] = None
+    recipient_name: Optional[str] = None
+    customer_code: Optional[str] = None
+    supplier_code: Optional[str] = None
+    record_type: Optional[str] = None  # "invoice", "sales_order", "purchase_order", "payment", "custom"
+    record_id: Optional[str] = None
+    prompt: Optional[str] = None
+    additional_notes: Optional[str] = None
+    context_data: Optional[Dict[str, Any]] = None
+
+
+class EmailDraftResponse(BaseModel):
+    draft_id: str
+    purpose: str
+    recipient_email: str
+    recipient_name: str
+    cc: List[str] = Field(default_factory=list)
+    bcc: List[str] = Field(default_factory=list)
+    subject: str
+    body: str
+    business_context: Dict[str, Any]
+    is_ready_to_send: bool
+    validation_warnings: List[str] = Field(default_factory=list)
+    company_signature: str
+
+
+class EmailSendRequest(BaseModel):
+    draft_id: Optional[str] = None
+    recipient_email: str
+    recipient_name: Optional[str] = None
+    cc: Optional[List[str]] = Field(default_factory=list)
+    bcc: Optional[List[str]] = Field(default_factory=list)
+    subject: str
+    body: str
+    purpose: str = "general"
+    record_type: Optional[str] = None
+    record_id: Optional[str] = None
+    business_context: Optional[Dict[str, Any]] = None
+    idempotency_key: Optional[str] = None
+    confirmed: bool = False
+
+
+class EmailSendResponse(BaseModel):
+    success: bool
+    status: str  # "accepted_by_provider", "sent", "failed"
+    provider: str
+    message_id: str
+    recipient_email: str
+    subject: str
+    sent_at: str
+    audit_id: str
+    details: Optional[Dict[str, Any]] = None
+
+
+class EmailAuditLogItem(BaseModel):
+    id: str
+    user_id: Optional[str] = None
+    username: Optional[str] = None
+    recipient_email: str
+    recipient_name: Optional[str] = None
+    subject: str
+    purpose: str
+    record_type: Optional[str] = None
+    record_id: Optional[str] = None
+    status: str
+    provider: str
+    provider_message_id: Optional[str] = None
+    error_message: Optional[str] = None
+    created_at: str
+
 

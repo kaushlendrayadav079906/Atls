@@ -412,6 +412,69 @@ describe('AIChatRenderer Integration and Backward Compatibility', () => {
     expect(html).toContain('Oct 2026');
     expect(html).toContain('1,50,000.00');
   });
+  it('renders top_products card through interactive workspace with catalog button and tabs', () => {
+    const topProductsCard = {
+      type: 'top_products',
+      title: 'Top Performing Products by Quantity',
+      products: [
+        { itemCode: 'ITM-001', itemName: 'Bearing Assembly', quantitySold: 250, salesAmount: 125000 },
+        { itemCode: 'ITM-002', itemName: 'Gear Housing', quantitySold: 180, salesAmount: 90000 }
+      ],
+      meta: {
+        ranking_by: 'quantity',
+        ranking_label: 'Quantity Sold (Units)',
+        limit: 5,
+        date_range: 'This Month'
+      }
+    };
+
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <AIChatRenderer structuredData={topProductsCard} />
+      </MemoryRouter>
+    );
+
+    // Header & ranking info
+    expect(html).toContain('Top Performing Products by Quantity');
+    expect(html).toContain('Quantity Sold (Units)');
+    expect(html).toContain('Bearing Assembly');
+    expect(html).toContain('ITM-001');
+    expect(html).toContain('Gear Housing');
+
+    // Action button to catalog
+    expect(html).toContain('Open Products Catalog');
+
+    // Workspace tabs and export
+    expect(html).toContain('Chart');
+    expect(html).toContain('Results');
+    expect(html).toContain('Both');
+    expect(html).toContain('Export');
+  });
+
+  it('renders pagination controls when rows exceed default page size (8)', () => {
+    const manyRowsData: StructuredTableResponse = {
+      type: 'table',
+      title: 'Monthly Invoices List',
+      summary: '12 invoices retrieved.',
+      columns: [
+        { key: 'docNum', label: 'Doc #', type: 'string' },
+        { key: 'amount', label: 'Amount', type: 'currency' }
+      ],
+      rows: Array.from({ length: 12 }, (_, i) => ({
+        docNum: `INV-100${i + 1}`,
+        amount: (i + 1) * 1000
+      })),
+      chart: null
+    };
+
+    const html = renderToStaticMarkup(<RichTableChartRenderer data={manyRowsData} />);
+
+    // Pagination elements
+    expect(html).toContain('Page 1 of 2');
+    expect(html).toContain('Showing 1-8 of 12');
+    expect(html).toContain('Previous');
+    expect(html).toContain('Next');
+  });
 });
 
 describe('FormattedMessage Markdown and Bullets', () => {
@@ -430,5 +493,209 @@ describe('FormattedMessage Markdown and Bullets', () => {
     const html = renderToStaticMarkup(<FormattedMessage content={content} />);
     expect(html).toContain('Date Range: Past 6 months');
     expect(html).toContain('Metric: Total Sales (₹)');
+  });
+});
+
+describe('Analytical User Examples (A through E)', () => {
+  it('Example A: renders Top Products by sales with horizontal bar chart, table, KPIs, and insights', () => {
+    const topProducts = {
+      type: 'top_products',
+      title: 'Top Performing Products by Sales',
+      summary: 'Top 5 products ranked by total sales revenue.',
+      products: [
+        { itemCode: 'ITM-001', itemName: 'Bearing Assembly', quantitySold: 250, salesAmount: 125000 },
+        { itemCode: 'ITM-002', itemName: 'Gear Housing', quantitySold: 180, salesAmount: 90000 },
+        { itemCode: 'ITM-003', itemName: 'Shaft 20mm', quantitySold: 150, salesAmount: 60000 },
+        { itemCode: 'ITM-004', itemName: 'Flange Coupling', quantitySold: 120, salesAmount: 48000 },
+        { itemCode: 'ITM-005', itemName: 'V-Belt B42', quantitySold: 100, salesAmount: 35000 }
+      ],
+      meta: {
+        ranking_by: 'sales_amount',
+        ranking_label: 'Sales Revenue (₹)',
+        limit: 5,
+        date_range: 'Past Month',
+        branch_scope: 'SH'
+      }
+    };
+
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <AIChatRenderer structuredData={topProducts} />
+      </MemoryRouter>
+    );
+
+    // Answer table and metrics
+    expect(html).toContain('Top Performing Products by Sales');
+    expect(html).toContain('Bearing Assembly');
+    expect(html).toContain('Gear Housing');
+    expect(html).toContain('Shaft 20mm');
+    expect(html).toContain('1,25,000.00');
+    expect(html).toContain('Open Products Catalog');
+    expect(html).toContain('Leading item: Bearing Assembly');
+    // Views
+    expect(html).toContain('Both');
+    expect(html).toContain('Chart');
+    expect(html).toContain('Results');
+  });
+
+  it('Example B: renders Sales trends for past 6 months with monthly breakdown and metrics', () => {
+    const trendData: StructuredTableResponse = {
+      type: 'table',
+      title: 'Monthly Revenue (Past 6 Months)',
+      summary: 'Total revenue of ₹7,50,000.00 across 320 invoices. Recent trend: Oct 2026 recorded an increase of ₹45,000.00 (+12.5%).',
+      columns: [
+        { key: 'month', label: 'Month', type: 'string' },
+        { key: 'sales', label: 'Total Sales (₹)', type: 'currency' },
+        { key: 'invoiceCount', label: 'Invoice Count', type: 'number' }
+      ],
+      rows: [
+        { month: 'May 2026', sales: 90000, invoiceCount: 42 },
+        { month: 'Jun 2026', sales: 110000, invoiceCount: 50 },
+        { month: 'Jul 2026', sales: 125000, invoiceCount: 55 },
+        { month: 'Aug 2026', sales: 130000, invoiceCount: 58 },
+        { month: 'Sep 2026', sales: 140000, invoiceCount: 60 },
+        { month: 'Oct 2026', sales: 155000, invoiceCount: 65 }
+      ],
+      kpis: [
+        { label: 'Total Sales', value: '₹7,50,000.00', isPositive: true },
+        { label: 'Invoices', value: 320 },
+        { label: 'Latest Month', value: '₹1,55,000.00' }
+      ],
+      chart: {
+        type: 'line',
+        xKey: 'month',
+        series: ['sales'],
+        defaultView: 'both'
+      },
+      insights: [
+        'Evaluated 6 monthly records showing steady sequential revenue growth.',
+        'Peak revenue month was Oct 2026 with ₹1,55,000.00 billed.'
+      ],
+      filters: {
+        period: 'Past 6 Months',
+        branch: 'All Branches'
+      }
+    };
+
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <AIChatRenderer structuredData={trendData} />
+      </MemoryRouter>
+    );
+
+    expect(html).toContain('Monthly Revenue (Past 6 Months)');
+    expect(html).toContain('May 2026');
+    expect(html).toContain('Oct 2026');
+    expect(html).toContain('7,50,000.00');
+    expect(html).toContain('Peak revenue month was Oct 2026');
+    expect(html).toContain('Both');
+    expect(html).toContain('Chart');
+  });
+
+  it('Example C: renders Low-stock products with safety thresholds and alert KPIs', () => {
+    const lowStockCard = {
+      type: 'inventory_risk',
+      total_count: 3,
+      items: [
+        { ItemCode: 'RM-STEEL-01', ItemName: 'Cold Rolled Steel Sheet', QuantityOnStock: 4, MinimalStock: 25, WarehouseCode: 'SH' },
+        { ItemCode: 'BLT-M8-50', ItemName: 'Hex Bolt M8x50 Grade 8.8', QuantityOnStock: 0, MinimalStock: 100, WarehouseCode: 'SH' },
+        { ItemCode: 'NUT-M8', ItemName: 'Hex Nut M8 Zinc Plated', QuantityOnStock: 8, MinimalStock: 100, WarehouseCode: 'SH' }
+      ],
+      meta: {
+        warehouse: 'SH',
+        is_low_stock: true
+      }
+    };
+
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <AIChatRenderer structuredData={lowStockCard} />
+      </MemoryRouter>
+    );
+
+    expect(html).toContain('Low Stock Alert (3 items)');
+    expect(html).toContain('Cold Rolled Steel Sheet');
+    expect(html).toContain('Hex Bolt M8x50 Grade 8.8');
+    expect(html).toContain('Open Low Stock Inventory');
+    expect(html).toContain('Out of Stock (0 units)');
+    expect(html).toContain('Both');
+    expect(html).toContain('Chart');
+  });
+
+  it('Example D: renders Pending production orders with planned vs produced and link', () => {
+    const prodOrdersCard = {
+      type: 'production_orders',
+      total_count: 2,
+      orders: [
+        { production_order_no: 'PO-2026-101', item_name: 'Motor Assembly 1HP', status: 'Planned', planned_qty: 100, produced_qty: 40, pending_qty: 60, due_date: '2026-10-25' },
+        { production_order_no: 'PO-2026-102', item_name: 'Stator Core Pack', status: 'Planned', planned_qty: 250, produced_qty: 150, pending_qty: 100, due_date: '2026-10-28' }
+      ],
+      summary: {
+        planned_orders: 2,
+        completed_orders: 0
+      },
+      meta: {
+        warehouse: 'SH',
+        status: 'pending'
+      }
+    };
+
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <AIChatRenderer structuredData={prodOrdersCard} />
+      </MemoryRouter>
+    );
+
+    expect(html).toContain('Production Orders (2)');
+    expect(html).toContain('Motor Assembly 1HP');
+    expect(html).toContain('Stator Core Pack');
+    expect(html).toContain('PO-2026-101');
+    expect(html).toContain('Open Production Orders');
+    expect(html).toContain('Both');
+    expect(html).toContain('Chart');
+  });
+
+  it('Example E: renders Period comparison with current, previous, and percentage variance', () => {
+    const compData: StructuredTableResponse = {
+      type: 'table',
+      title: 'Period Comparison: This Month (October 2026) vs Last Month (September 2026)',
+      summary: 'This Month recorded ₹2,48,780.00 (65 invoices) compared to ₹1,20,000.00 (35 invoices) in Last Month. Net variance is +₹1,28,780.00 (+107.3%).',
+      columns: [
+        { key: 'period', label: 'Period / Timeline', type: 'string' },
+        { key: 'sales', label: 'Total Sales (₹)', type: 'currency' },
+        { key: 'invoiceCount', label: 'Invoices', type: 'number' },
+        { key: 'averageBill', label: 'Average Bill (₹)', type: 'currency' }
+      ],
+      rows: [
+        { period: 'This Month (October 2026)', sales: 248780, invoiceCount: 65, averageBill: 3827.38 },
+        { period: 'Last Month (September 2026)', sales: 120000, invoiceCount: 35, averageBill: 3428.57 },
+        { period: 'Variance (+107.3%)', sales: 128780, invoiceCount: 30, averageBill: 398.81 }
+      ],
+      chart: {
+        type: 'bar',
+        xKey: 'period',
+        series: ['sales'],
+        defaultView: 'both'
+      },
+      filters: {
+        period: 'This Month vs Last Month',
+        branch: 'SH'
+      }
+    };
+
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <AIChatRenderer structuredData={compData} />
+      </MemoryRouter>
+    );
+
+    expect(html).toContain('Period Comparison');
+    expect(html).toContain('This Month (October 2026)');
+    expect(html).toContain('Last Month (September 2026)');
+    expect(html).toContain('Variance (+107.3%)');
+    expect(html).toContain('2,48,780.00');
+    expect(html).toContain('1,28,780.00');
+    expect(html).toContain('Both');
+    expect(html).toContain('Chart');
   });
 });

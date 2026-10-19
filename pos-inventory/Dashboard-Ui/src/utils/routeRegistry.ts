@@ -178,8 +178,104 @@ export const INTERNAL_ROUTES: InternalRoute[] = [
     supportedFilters: ['warehouse', 'category'],
   },
   {
+    id: 'finance_overview',
+    name: 'Finance Overview',
+    path: '/finance',
+    module: 'finance',
+    description: 'Executive financial summary, revenue vs purchases, incoming vs outgoing payments, and live cash position',
+    supportedFilters: ['range', 'branch', 'from_date', 'to_date'],
+  },
+  {
+    id: 'finance_purchase_invoices',
+    name: 'Purchase Invoices',
+    path: '/finance/purchase-invoices',
+    module: 'finance',
+    description: 'Vendor AP purchase invoices, tax breakdowns, and pending payment dues',
+    supportedFilters: ['search', 'vendor', 'status', 'from_date', 'to_date'],
+  },
+  {
+    id: 'finance_incoming_payments',
+    name: 'Incoming Payments',
+    path: '/finance/incoming-payments',
+    module: 'finance',
+    description: 'Customer payment receipts across cash, card, UPI, and bank transfers',
+    supportedFilters: ['search', 'customer', 'payment_method', 'from_date', 'to_date'],
+  },
+  {
+    id: 'finance_outgoing_payments',
+    name: 'Outgoing Payments',
+    path: '/finance/outgoing-payments',
+    module: 'finance',
+    description: 'Disbursements to vendors and operational payment settlements',
+    supportedFilters: ['search', 'vendor', 'payment_method', 'from_date', 'to_date'],
+  },
+  {
+    id: 'finance_customer_analysis',
+    name: 'Customer Analysis',
+    path: '/finance/customer-analysis',
+    module: 'finance',
+    description: 'Receivables aging, outstanding customer balances, and top revenue drivers',
+    supportedFilters: ['search', 'range'],
+  },
+  {
+    id: 'finance_supplier_analysis',
+    name: 'Supplier Analysis',
+    path: '/finance/supplier-analysis',
+    module: 'finance',
+    description: 'Accounts payable aging, top vendors by purchase spend, and procurement trends',
+    supportedFilters: ['search', 'range'],
+  },
+  {
+    id: 'finance_profitability_reports',
+    name: 'Profitability Reports',
+    path: '/finance/profitability-reports',
+    module: 'finance',
+    description: 'Gross margin by category, branch profit contribution, and net operational earnings',
+    supportedFilters: ['range', 'branch', 'from_date', 'to_date'],
+  },
+  {
+    id: 'reports_customer',
+    name: 'Customer Reports',
+    path: '/reports/customer',
+    module: 'reports',
+    description: 'Customer retention, repeat purchase patterns, account aging, and lifetime value analytics',
+    supportedFilters: ['range', 'customer', 'branch'],
+  },
+  {
+    id: 'reports_ai',
+    name: 'AI Generated Reports',
+    path: '/reports/ai',
+    module: 'reports',
+    description: 'Automated natural-language business intelligence narratives and AI insights from SAP data',
+    supportedFilters: ['range', 'branch'],
+  },
+  {
+    id: 'product_landing',
+    name: 'Product Overview',
+    path: '/product',
+    module: 'landing',
+    description: 'ATLAS Retail OS product features and POS platform architecture overview',
+    supportedFilters: [],
+  },
+  {
+    id: 'solutions_landing',
+    name: 'Solutions & Workflows',
+    path: '/solutions',
+    module: 'landing',
+    description: 'Enterprise retail, inventory, and SAP ERP integration capabilities',
+    supportedFilters: [],
+  },
+  {
+    id: 'contact',
+    name: 'Contact & Support',
+    path: '/contact',
+    module: 'support',
+    description: 'System support, ATLAS engineering contact, and help resources',
+    supportedFilters: [],
+  },
+  {
     id: 'settings',
-    name: 'Settings',
+    name: 'Settings & Users',
     path: '/settings',
     module: 'settings',
     description: 'System configuration, user accounts, store and warehouse management',
@@ -200,9 +296,20 @@ export function resolveInternalRoute(
   // Split query string if routeIdOrPath already contains ?
   const [baseInputPath, existingQuery] = routeIdOrPath.split('?');
 
+  // Canonical route aliases
+  const ROUTE_ALIASES: Record<string, string> = {
+    '/finance/overview': '/finance',
+    'finance': '/finance',
+    'settings_users': '/settings',
+    'users': '/settings',
+  };
+
+  const lookupKey = ROUTE_ALIASES[routeIdOrPath] || ROUTE_ALIASES[baseInputPath] || routeIdOrPath;
+  const lookupBase = ROUTE_ALIASES[baseInputPath] || baseInputPath;
+
   // Match by id or by exact path or base path
   const target = INTERNAL_ROUTES.find(
-    (r) => r.id === routeIdOrPath || r.path === routeIdOrPath || r.path === baseInputPath
+    (r) => r.id === lookupKey || r.path === lookupKey || r.path === lookupBase || r.id === routeIdOrPath || r.path === routeIdOrPath || r.path === baseInputPath
   );
 
   if (!target) {

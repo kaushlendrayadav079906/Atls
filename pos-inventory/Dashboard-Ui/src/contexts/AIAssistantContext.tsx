@@ -8,6 +8,9 @@ export interface ChatMessage {
   content: string;
   structured_data?: any;
   isInitialDemo?: boolean;
+  suggested_follow_ups?: string[];
+  intent_id?: string;
+  context?: Record<string, any>;
 }
 
 export type AIAssistantPageContext =
@@ -99,7 +102,9 @@ interface AIAssistantContextType {
   pageContext: AIAssistantPageContext;
   pageFilters: Record<string, any>;
   setPageFilters: React.Dispatch<React.SetStateAction<Record<string, any>>>;
-  handleSendChat: (overridePrompt?: string) => Promise<void>;
+  selectedRecord: Record<string, any> | null;
+  setSelectedRecord: React.Dispatch<React.SetStateAction<Record<string, any> | null>>;
+  handleSendChat: (overridePrompt?: string, customContext?: Record<string, any>) => Promise<void>;
   chatScrollRef: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -114,6 +119,7 @@ export const AIAssistantProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [loadingChat, setLoadingChat] = useState(false);
   const [pageFilters, setPageFilters] = useState<Record<string, any>>({});
+  const [selectedRecord, setSelectedRecord] = useState<Record<string, any> | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const pageContext = getPageContextFromPathname(location.pathname);
@@ -145,10 +151,19 @@ export const AIAssistantProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
 
     const handlePrompt = (e: any) => {
-      const prompt = e.detail;
-      if (prompt) {
-        setIsOpen(true);
-        handleSendChat(prompt);
+      const detail = e.detail;
+      if (!detail) return;
+      setIsOpen(true);
+      if (typeof detail === 'string') {
+        handleSendChat(detail);
+      } else if (typeof detail === 'object') {
+        if (detail.record) {
+          setSelectedRecord(detail.record);
+        }
+        handleSendChat(detail.prompt || detail.message, {
+          selected_record: detail.record,
+          ...detail.context,
+        });
       }
     };
 
@@ -160,7 +175,7 @@ export const AIAssistantProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
   }, []);
 
-  const handleSendChat = async (overridePrompt?: string) => {
+  const handleSendChat = async (overridePrompt?: string, customContext?: Record<string, any>) => {
     const msgToSend = (overridePrompt || chatInput).trim();
     if (!msgToSend || loadingChat) return;
 
@@ -181,7 +196,9 @@ export const AIAssistantProvider: React.FC<{ children: React.ReactNode }> = ({ c
           context: {
             page: pageContext,
             pathname: location.pathname,
+            ...(selectedRecord ? { selected_record: selectedRecord } : {}),
             ...pageFilters,
+            ...customContext,
           },
         },
         {
@@ -201,6 +218,9 @@ export const AIAssistantProvider: React.FC<{ children: React.ReactNode }> = ({ c
           role: 'assistant',
           content: data.answer,
           structured_data: data.structured_data,
+          suggested_follow_ups: data.suggested_follow_ups || data.structured_data?.suggested_follow_ups,
+          intent_id: data.intent_id,
+          context: data.context,
         },
       ]);
     } catch (err: any) {
@@ -254,6 +274,8 @@ export const AIAssistantProvider: React.FC<{ children: React.ReactNode }> = ({ c
         pageContext,
         pageFilters,
         setPageFilters,
+        selectedRecord,
+        setSelectedRecord,
         handleSendChat,
         chatScrollRef,
       }}

@@ -132,6 +132,8 @@ STANDARD_PERMISSIONS: List[Dict[str, str]] = [
     {"id": "users.manage", "module": "Settings", "action": "users_manage", "description": "Create, edit, activate, deactivate users"},
     {"id": "roles.manage", "module": "Settings", "action": "roles_manage", "description": "Manage user role assignments"},
     {"id": "permissions.manage", "module": "Settings", "action": "permissions_manage", "description": "Manage granular module and action permissions"},
+    # Email Communications
+    {"id": "email.send", "module": "Email", "action": "send", "description": "Draft, approve, and dispatch operational emails to customers and vendors"},
 ]
 
 DEFAULT_ROLE_PERMISSIONS: Dict[str, List[str]] = {
@@ -200,6 +202,7 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, List[str]] = {
         "finance.reports.view",
         "reports.view",
         "reports.export",
+        "email.send",
     ],
     "admin": [p["id"] for p in STANDARD_PERMISSIONS],
 }
@@ -429,6 +432,32 @@ def init_user_storage() -> None:
                     ip_address VARCHAR(50) NULL,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
+                """
+            )
+
+            # 7. Email Audit Logs Table
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS email_audit_logs (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT NULL,
+                    username VARCHAR(100) NULL,
+                    recipient_email VARCHAR(255) NOT NULL,
+                    recipient_name VARCHAR(255) NULL,
+                    subject VARCHAR(500) NOT NULL,
+                    purpose VARCHAR(100) NOT NULL,
+                    record_type VARCHAR(50) NULL,
+                    record_id VARCHAR(100) NULL,
+                    status VARCHAR(50) NOT NULL,
+                    provider VARCHAR(50) NOT NULL,
+                    provider_message_id VARCHAR(255) NULL,
+                    error_message TEXT NULL,
+                    idempotency_key VARCHAR(128) NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_email_audit_recipient ON email_audit_logs (recipient_email);
+                CREATE INDEX IF NOT EXISTS idx_email_audit_created ON email_audit_logs (created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_email_audit_idempotency ON email_audit_logs (idempotency_key);
                 """
             )
 
