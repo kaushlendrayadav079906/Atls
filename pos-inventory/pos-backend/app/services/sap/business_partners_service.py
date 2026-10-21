@@ -63,32 +63,64 @@ class SAPBusinessPartnersService:
             logger.error(f"Error fetching customer {card_code}: {str(e)}")
             raise
     
-    def search_customers(self, search_term: Optional[str] = None, top: int = 100) -> List[Dict[str, Any]]:
+    def search_customers(
+        self,
+        search_term: Optional[str] = None,
+        card_type: Optional[str] = None,
+        status: Optional[str] = None,
+        top: int = 100
+    ) -> List[Dict[str, Any]]:
         """
-        Search for customers
+        Search for Business Partners (Customers / Suppliers)
         
         Args:
             search_term: Search in CardCode or CardName
+            card_type: cCustomer, cSupplier or None
+            status: Active, Frozen or None
             top: Maximum results
             
         Returns:
             List of Business Partners
         """
         try:
-            params = {
-                "$top": top,
-                "$filter": f"CardType eq '{self.default_card_type}'",
-            }
-            
+            filters = []
+            if card_type:
+                ct = card_type.strip()
+                if ct in ("cCustomer", "cSupplier", "sCustomer", "sSupplier"):
+                    filters.append(f"CardType eq '{ct}'")
+                elif ct.lower() in ("customer", "customers"):
+                    filters.append("CardType eq 'cCustomer'")
+                elif ct.lower() in ("supplier", "suppliers", "vendor", "vendors"):
+                    filters.append("CardType eq 'cSupplier'")
+            else:
+                filters.append(f"CardType eq '{self.default_card_type}'")
+
+            if status:
+                s_low = status.lower()
+                if s_low in ("active", "valid", "tyes"):
+                    filters.append("Valid eq 'tYES'")
+                elif s_low in ("frozen", "inactive"):
+                    filters.append("Frozen eq 'tYES'")
+
             if search_term:
-                search_filter = f"(contains(CardCode, '{search_term}') or contains(CardName, '{search_term}'))"
-                params["$filter"] += f" and {search_filter}"
-            
-            response = self.client.get("BusinessPartners", params)
+                clean_term = search_term.strip().replace("'", "''")
+                filters.append(f"(substringof('{clean_term}', CardCode) or substringof('{clean_term}', CardName))")
+
+            filter_str = " and ".join(filters) if filters else ""
+            query_parts = [
+                f"$top={top}",
+                "$select=CardCode,CardName,CardType,Phone1,EmailAddress,Cellular,Valid,Frozen",
+                "$orderby=CardCode asc"
+            ]
+            if filter_str:
+                query_parts.append(f"$filter={filter_str}")
+
+            endpoint = f"/BusinessPartners?{'&'.join(query_parts)}"
+            response = self.client.get(endpoint)
             return response.get("value", [])
             
         except Exception as e:
-            logger.error(f"Error searching customers: {str(e)}")
+            logger.error(f"Error searching business partners: {str(e)}")
             raise
 
     def create_customer(self, customer_data: Dict[str, Any]) -> Dict[str, Any]:

@@ -1,31 +1,22 @@
 import {
     AlertCircle,
     ArrowRight,
-    Check,
+    ChevronDown,
     Eye,
     EyeOff,
     Globe,
     Lock,
     Mail,
     Moon,
-    ShoppingBag,
     Sparkles,
-    User,
 } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { authApi } from '../api/endpoints';
 import { useAuth } from '../contexts/AuthContext';
-import posBg from '../assets/pos_bg_clear.jpg';
-
-const featureItems = [
-  { label: 'Manage Sales & Invoices', description: 'Fast, accurate and reliable', icon: ShoppingBag },
-  { label: 'Track Inventory in Real Time', description: 'Always in control', icon: Sparkles },
-  { label: 'Grow Your Business', description: 'Data driven insights', icon: Check },
-  { label: 'Secure and Role Based Access', description: 'Your data stays protected', icon: Check },
-  { label: 'Multi-Branch Support', description: 'Built for growing retailers', icon: Globe },
-];
+import atlasLogo from '../assets/LOGO.png';
+import loginBg from '../assets/login_city_bg.jpg';
 
 export const Login = () => {
   const [identifier, setIdentifier] = useState('');
@@ -41,7 +32,7 @@ export const Login = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('demo') === 'admin') {
-      authApi.login({ username: 'admin', password: 'password123' }).then((res) => {
+      authApi.login({ username: 'admin', password: 'Admin@123' }).then((res) => {
         if (res.user) {
           login(res.access_token, res.user);
           navigate('/', { replace: true });
@@ -81,7 +72,7 @@ export const Login = () => {
       } else if (status !== undefined && status >= 500) {
         setError('Server error: An unexpected error occurred on the authentication server. Please try again shortly.');
       } else {
-        setError(axiosError.response.data?.detail || 'Login failed. Please check your credentials.');
+        setError(axiosError.response?.data?.detail || 'Login failed. Please check your credentials.');
       }
     } finally {
       setLoading(false);
@@ -91,248 +82,203 @@ export const Login = () => {
   return (
     <div className="h-screen w-full overflow-hidden bg-[#edf3f8] text-slate-900 font-sans flex">
       
-      {/* Left Sidebar */}
+      {/* Left Sidebar - Expanded to cover more on the right */}
       <aside 
-        className="relative hidden lg:flex flex-col justify-between h-full w-[40%] text-slate-900 px-10 py-12"
-        style={{ clipPath: 'polygon(0 0, 85% 0, 100% 100%, 0% 100%)' }}
+        className="relative hidden lg:flex flex-col justify-between h-full w-[56%] xl:w-[63%] 2xl:w-[66%] text-white px-10 xl:px-14 py-12"
+        style={{ clipPath: 'polygon(0 0, 88% 0, 100% 100%, 0% 100%)' }}
       >
         <div className="absolute inset-0 z-0">
-          <img src={posBg} className="h-full w-full object-cover" alt="" />
-          <div className="absolute inset-0 bg-[#0a1e3a]/50" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#071324]/90 via-transparent to-transparent" />
+          <img src={loginBg} className="h-full w-full object-cover object-center" alt="ATLAS City Highway Operations" />
+          {/* Subtle gradient so the illuminated city, skyscrapers, and glowing highway overpasses remain fully visible */}
+          <div className="absolute inset-0 bg-[#060e20]/25" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#050c1b]/80 via-transparent to-[#050c1b]/40" />
         </div>
         
-        <div className="relative z-10 flex flex-col h-full">
+        <div className="relative z-10 flex flex-col h-full justify-between">
           <div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#0e6fe9] shadow-lg">
-                <div className="relative h-6 w-6">
-                  <div className="absolute left-0 top-0 h-4 w-2 rounded-full bg-white rotate-[-40deg]" />
-                  <div className="absolute right-0 top-0 h-4 w-2 rounded-full bg-white rotate-[40deg]" />
-                  <div className="absolute inset-x-1 bottom-0 h-1.5 rounded-full bg-sky-200" />
-                </div>
-              </div>
+            {/* Header Brand */}
+            <div className="flex items-center gap-4">
+              <img src={atlasLogo} alt="ATLAS" className="h-16 w-auto xl:h-20 object-contain drop-shadow-2xl shrink-0" />
               <div>
-                <div className="text-[32px] font-black leading-none tracking-tight">Atls</div>
-                <div className="text-[14px] font-medium tracking-wide text-slate-700">POS Inventory</div>
+                <div className="text-[36px] xl:text-[44px] font-black leading-none tracking-wider text-white drop-shadow-md">ATLAS</div>
+                <div className="text-[14px] xl:text-[15px] font-semibold tracking-wide text-sky-300 mt-1.5 drop-shadow-xs">Atlas Technosoft Pvt. Ltd.</div>
               </div>
             </div>
             
-            <div className="mt-12">
-              <div className="text-[22px] font-bold tracking-tight text-slate-900/95 leading-snug">
-                Smart Retail Operations <br />for a Better Tomorrow
+            {/* Value Proposition */}
+            <div className="mt-10 max-w-lg">
+              <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/40 bg-slate-950/50 px-3.5 py-1 text-[12px] font-semibold text-sky-200 backdrop-blur-md mb-4 shadow-md">
+                <Sparkles className="h-3.5 w-3.5 text-sky-300" />
+                <span>Next-Gen Enterprise Suite</span>
               </div>
-
-              <div className="mt-8 space-y-6">
-                {featureItems.map(({ label, description, icon: Icon }) => (
-                  <div key={label} className="flex items-center gap-4 text-slate-900/90">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10">
-                      <Icon className="h-5 w-5 text-slate-700" />
-                    </div>
-                    <div>
-                      <div className="text-[15px] font-semibold leading-tight text-slate-900">{label}</div>
-                      <div className="text-[12px] text-slate-500 mt-0.5">{description}</div>
-                    </div>
-                  </div>
-                ))}
+              <div className="text-[30px] xl:text-[36px] font-black tracking-tight text-white leading-tight drop-shadow-lg">
+                Smart Operations <br />
+                <span className="bg-gradient-to-r from-sky-200 via-blue-100 to-indigo-200 bg-clip-text text-transparent">
+                  for a Better Tomorrow
+                </span>
               </div>
+              <p className="mt-4 text-[15px] font-medium text-slate-200/90 leading-relaxed max-w-[420px] drop-shadow-sm">
+                Unified sales, real-time inventory tracking, and enterprise-grade multi-branch control.
+              </p>
             </div>
           </div>
 
-          <div className="mt-auto pb-4">
-            <div className="text-[18px] font-medium italic text-slate-500 leading-snug">
-              “All your store operations, <br />in one powerful platform.”
+          <div className="pt-4">
+            <div className="rounded-xl border border-white/15 bg-slate-950/50 px-4 py-3 backdrop-blur-md shadow-lg max-w-md">
+              <div className="text-[13.5px] font-medium italic text-slate-100 leading-snug drop-shadow-xs">
+                “All your store operations, sales, and inventory unified in one powerful platform.”
+              </div>
             </div>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full relative z-10 -ml-[5%] lg:ml-0">
+      <main className="flex-1 flex flex-col h-full relative z-10 overflow-y-auto">
         
         {/* Header Options */}
-        <header className="absolute top-4 right-6 flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm text-slate-600 shadow-sm">
-            <Globe className="h-4 w-4" />
-            <span className="font-medium">English</span>
-            <svg viewBox="0 0 20 20" className="h-4 w-4 fill-current" aria-hidden="true"><path d="M5.25 7.5 10 12.25 14.75 7.5H5.25Z" /></svg>
+        <header className="absolute top-4 right-8 flex items-center gap-3 z-30">
+          <div className="flex items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-sm font-semibold text-slate-700 shadow-sm border border-slate-200/80 hover:bg-slate-50 transition cursor-pointer">
+            <Globe className="h-4 w-4 text-slate-500" />
+            <span>English</span>
+            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
           </div>
-          <button className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm">
+          <button className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm border border-slate-200/80 hover:bg-slate-50 transition cursor-pointer" title="Toggle Theme">
             <Moon className="h-4 w-4" />
           </button>
         </header>
 
-        <div className="flex-1 flex items-center justify-center px-4 lg:px-0">
-          <div className="flex flex-col xl:flex-row items-center justify-center gap-6 w-full max-w-[900px]">
-            
-            {/* Login Card */}
-            <div className="w-full max-w-[440px] rounded-3xl bg-white p-8 shadow-[0_10px_40px_rgba(0,0,0,0.06)]">
-              <div className="flex flex-col items-center text-center">
-                <div className="flex items-center gap-3">
-                  <div className="text-[#0e6fe9]">
-                    {/* SVG Logo */}
-                    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M20 0C8.954 0 0 8.954 0 20C0 31.046 8.954 40 20 40C31.046 40 40 31.046 40 20C40 8.954 31.046 0 20 0Z" fill="#EDF3FF"/>
-                      <path d="M15.5 11L11 20L15.5 29H18L13.5 20L18 11H15.5Z" fill="#0E6FE9"/>
-                      <path d="M24.5 11L29 20L24.5 29H22L26.5 20L22 11H24.5Z" fill="#0E6FE9"/>
-                    </svg>
-                  </div>
-                  <div className="flex flex-col items-start">
-                    <span className="text-[26px] font-black tracking-tight text-[#0c1f3d] leading-none">Atls</span>
-                    <span className="text-[12.5px] font-bold text-[#0c1f3d]">POS Inventory</span>
-                  </div>
+        {/* Login Card moved to the Right Side */}
+        <div className="flex-1 flex items-center justify-center lg:justify-end px-6 sm:px-12 lg:pr-12 xl:pr-20 py-10">
+          <div className="w-full max-w-[450px] rounded-3xl bg-white p-8 sm:p-9 shadow-[0_15px_50px_rgba(0,0,0,0.08)] border border-slate-100/90">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50/80 p-1.5 border border-blue-100 shadow-xs">
+                  <img src={atlasLogo} alt="ATLAS" className="h-9 w-9 object-contain" />
                 </div>
-
-                <h1 className="mt-6 text-[30px] sm:text-[32px] font-black tracking-tight text-[#0b1f46]">Welcome Back</h1>
-                <p className="mt-2 text-[14.5px] sm:text-[15px] font-medium text-slate-500 max-w-[320px]">
-                  Sign in to access your POS Inventory dashboard and manage your retail operations.
-                </p>
+                <div className="flex flex-col items-start">
+                  <span className="text-[26px] font-black tracking-wider text-[#0c1f3d] leading-none">ATLAS</span>
+                </div>
               </div>
 
-              {error && (
-                <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700 font-medium">
-                  <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
-                  <span>{error}</span>
+              <h1 className="mt-6 text-[30px] sm:text-[32px] font-black tracking-tight text-[#0b1f46]">Welcome Back</h1>
+              <p className="mt-2 text-[14.5px] sm:text-[15px] font-medium text-slate-500 max-w-[340px]">
+                Sign in to access your ATLAS dashboard and manage your operations.
+              </p>
+            </div>
+
+            {error && (
+              <div className="mt-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700 font-medium animate-in fade-in">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="mt-7 space-y-4.5">
+              <div>
+                <label className="mb-1.5 block text-[13.5px] font-bold text-[#0b1f46]">Email or Username</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    type="text"
+                    placeholder="Enter your email or username"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3 pl-11 pr-4 text-[14.5px] font-medium text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                    disabled={loading}
+                    required
+                  />
                 </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-                <div>
-                  <label className="mb-1.5 block text-[14px] font-bold text-[#0b1f46]">Email or Username</label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500" />
-                    <input
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      type="text"
-                      placeholder="Enter your email or username"
-                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-[14.5px] font-medium outline-none transition focus:border-[#0e6fe9] focus:ring-1 focus:ring-[#0e6fe9]"
-                      disabled={loading}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-[14px] font-bold text-[#0b1f46]">Password</label>
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500" />
-                    <input
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-11 text-[14.5px] outline-none transition focus:border-[#0e6fe9] focus:ring-1 focus:ring-[#0e6fe9] font-medium tracking-widest placeholder:tracking-normal"
-                      disabled={loading}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-600"
-                    >
-                      {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-[14px] font-semibold text-[#0b1f46]">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="h-4.5 w-4.5 rounded border-slate-300 text-[#0e6fe9] focus:ring-[#0e6fe9]" defaultChecked />
-                    <span>Remember me</span>
-                  </label>
-                  <Link to="/register" className="text-[#0e6fe9] hover:underline font-bold">Forgot password?</Link>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0c6ce8] py-3.5 text-[15.5px] font-bold text-white transition hover:bg-[#0b5fd0] disabled:opacity-70 shadow-sm"
-                >
-                  <span>{loading ? 'Signing in...' : 'Sign in'}</span>
-                  <ArrowRight className="h-4.5 w-4.5" />
-                </button>
-
-                <button
-                  type="button"
-                  id="btn-demo-admin-login"
-                  onClick={() => {
-                    setLoading(true);
-                    authApi.login({ username: 'admin', password: 'password123' }).then((res) => {
-                      if (res.user) {
-                        login(res.access_token, res.user);
-                        navigate('/', { replace: true });
-                      }
-                    }).catch((err) => setError('Demo login failed: ' + String(err))).finally(() => setLoading(false));
-                  }}
-                  className="w-full mt-2.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-blue-700 text-[13px] font-bold hover:from-blue-100 hover:to-indigo-100 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
-                >
-                  <Sparkles size={14} className="text-blue-600" />
-                  Quick Demo Admin Sign-In
-                </button>
-              </form>
-
-              <div className="mt-6 flex items-center justify-center gap-4">
-                <div className="h-px flex-1 bg-slate-200" />
-                <span className="text-[12px] font-bold uppercase tracking-wider text-slate-500">Or continue with</span>
-                <div className="h-px flex-1 bg-slate-200" />
               </div>
 
-              <div className="mt-6 grid grid-cols-3 gap-3">
-                {['Google', 'Microsoft', 'SSO'].map((label) => (
+              <div>
+                <label className="mb-1.5 block text-[13.5px] font-bold text-[#0b1f46]">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3 pl-11 pr-11 text-[14.5px] outline-none transition focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 font-medium tracking-widest placeholder:tracking-normal text-slate-800"
+                    disabled={loading}
+                    required
+                  />
                   <button
-                    key={label}
-                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 text-[14px] font-bold text-slate-600 transition hover:bg-slate-50"
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
                   >
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-black text-[#0b1f46]">
-                      {label.charAt(0)}
-                    </span>
-                    {label}
+                    {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
                   </button>
-                ))}
+                </div>
               </div>
 
-              <div className="mt-8 text-center text-[14px] font-medium text-slate-500">
-                Don’t have an account?{' '}
-                <Link to="/register" className="font-bold text-[#0e6fe9] hover:underline">Create account</Link>
-              </div>
-            </div>
-
-            {/* Registration Promo Card (Right) */}
-            <div className="hidden xl:block w-[320px] rounded-3xl bg-white p-8 shadow-[0_10px_40px_rgba(0,0,0,0.06)] border border-slate-100">
-              <h2 className="text-[24px] font-black tracking-tight text-[#0b1f46]">New to Atls?</h2>
-              <p className="mt-2 text-[14px] font-medium text-slate-500">Create your account to get started.</p>
-
-              <div className="mt-8 space-y-6">
-                {[
-                  { title: 'Set up your store details', subtitle: 'Get your account ready', icon: User },
-                  { title: 'Start managing sales', subtitle: 'Track invoices and payments', icon: ShoppingBag },
-                  { title: 'Monitor inventory', subtitle: 'Keep stock in sync', icon: Check },
-                  { title: 'Access insights', subtitle: 'Make data driven decisions', icon: Sparkles },
-                ].map(({ title, subtitle, icon: Icon }) => (
-                  <div key={title} className="flex items-start gap-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#edf3ff] text-[#0e6fe9]">
-                      <Icon className="h-4.5 w-4.5" />
-                    </div>
-                    <div className="pt-0.5">
-                      <div className="text-[14.5px] font-bold text-[#0b1f46]">{title}</div>
-                      <div className="mt-0.5 text-[13px] font-medium text-slate-500">{subtitle}</div>
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between text-[13.5px] font-semibold text-[#0b1f46] pt-1">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" defaultChecked />
+                  <span className="text-slate-600">Remember me</span>
+                </label>
+                <Link to="/register" className="text-blue-600 hover:underline font-bold">Forgot password?</Link>
               </div>
 
-              <Link
-                to="/register"
-                className="mt-10 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-[#edf3ff] bg-white py-3.5 text-[14.5px] font-bold text-[#0e6fe9] transition hover:bg-[#edf3ff]"
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 text-[15px] font-bold text-white transition hover:from-blue-700 hover:to-indigo-700 disabled:opacity-70 shadow-md shadow-blue-500/20 cursor-pointer"
               >
-                <User className="h-4.5 w-4.5" />
-                <span>Create Account</span>
+                <span>{loading ? 'Signing in...' : 'Sign In'}</span>
                 <ArrowRight className="h-4.5 w-4.5" />
-              </Link>
+              </button>
+
+              <button
+                type="button"
+                id="btn-demo-admin-login"
+                onClick={() => {
+                  setLoading(true);
+                  authApi.login({ username: 'admin', password: 'Admin@123' }).then((res) => {
+                    if (res.user) {
+                      login(res.access_token, res.user);
+                      navigate('/', { replace: true });
+                    }
+                  }).catch((err) => setError('Demo login failed: ' + String(err))).finally(() => setLoading(false));
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-blue-700 text-[13px] font-bold hover:from-blue-100 hover:to-indigo-100 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+              >
+                <Sparkles size={14} className="text-blue-600" />
+                Quick Demo Admin Sign-In
+              </button>
+            </form>
+
+            <div className="mt-6 flex items-center justify-center gap-4">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-[11.5px] font-bold uppercase tracking-wider text-slate-400">Or continue with</span>
+              <div className="h-px flex-1 bg-slate-200" />
             </div>
 
+            <div className="mt-5 grid grid-cols-3 gap-3">
+              {['Google', 'Microsoft', 'SSO'].map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-[13.5px] font-bold text-slate-600 transition hover:bg-slate-50 hover:border-slate-300 cursor-pointer shadow-2xs"
+                >
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[11px] font-black text-[#0b1f46]">
+                    {label.charAt(0)}
+                  </span>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-7 text-center text-[13.5px] font-medium text-slate-500">
+              Don’t have an account?{' '}
+              <Link to="/register" className="font-bold text-blue-600 hover:underline">Create account</Link>
+            </div>
           </div>
         </div>
       </main>
     </div>
   );
 };
+

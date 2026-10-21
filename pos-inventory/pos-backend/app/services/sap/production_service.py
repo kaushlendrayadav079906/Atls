@@ -55,14 +55,25 @@ class SAPProductionService:
     ) -> str:
         filters = []
         if search:
-            # SAP doesn't support complex substring searches easily across multiple fields without a performance hit,
-            # but we can do a simple eq or startswith if required, or skip it. Let's try substringof or startswith.
-            search = search.replace("'", "''")
-            filters.append(f"(contains(DocumentNumber, '{search}') or contains(ItemNo, '{search}') or contains(ProductDescription, '{search}'))")
+            s_clean = search.strip()
+            safe_search = s_clean.replace("'", "''")
+            if s_clean.isdigit():
+                filters.append(f"(DocumentNumber eq {int(s_clean)} or substringof('{safe_search}', ItemNo) or substringof('{safe_search}', ProductDescription))")
+            else:
+                filters.append(f"(substringof('{safe_search}', ItemNo) or substringof('{safe_search}', ProductDescription))")
         
         if status:
-            if status.lower() in ("pending", "open"):
+            s_low = status.lower()
+            if s_low in ("pending", "open"):
                 filters.append("(ProductionOrderStatus eq 'boposPlanned' or ProductionOrderStatus eq 'boposReleased')")
+            elif s_low in ("planned", "boposplanned"):
+                filters.append("ProductionOrderStatus eq 'boposPlanned'")
+            elif s_low in ("released", "boposreleased", "in_progress"):
+                filters.append("ProductionOrderStatus eq 'boposReleased'")
+            elif s_low in ("closed", "completed", "boposclosed"):
+                filters.append("ProductionOrderStatus eq 'boposClosed'")
+            elif s_low in ("cancelled", "canceled", "boposcancelled"):
+                filters.append("ProductionOrderStatus eq 'boposCancelled'")
             else:
                 clean_status = status[5:] if status.startswith("bopos") else status
                 filters.append(f"ProductionOrderStatus eq 'bopos{clean_status}'")

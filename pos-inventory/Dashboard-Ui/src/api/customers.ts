@@ -75,9 +75,17 @@ export const customersApi = {
     return res.data;
   },
 
-  searchCustomers: async (search?: string): Promise<DashboardCustomer[]> => {
+  searchCustomers: async (params?: { search?: string; card_type?: string; status?: string } | string): Promise<DashboardCustomer[]> => {
+    const queryParams: Record<string, string> = {};
+    if (typeof params === 'string') {
+      if (params.trim()) queryParams.search = params.trim();
+    } else if (params) {
+      if (params.search?.trim()) queryParams.search = params.search.trim();
+      if (params.card_type) queryParams.card_type = params.card_type;
+      if (params.status) queryParams.status = params.status;
+    }
     const res = await apiClient.get<DashboardCustomer[]>('/dashboard/customers', {
-      params: search ? { search } : {},
+      params: queryParams,
     });
     return res.data;
   },

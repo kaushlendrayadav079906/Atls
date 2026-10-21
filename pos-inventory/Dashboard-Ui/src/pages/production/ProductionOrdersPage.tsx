@@ -12,8 +12,10 @@ import {
   Search,
   Eye,
   Filter,
+  Download,
 } from 'lucide-react';
 import { getProductionSummary, getProductionOrders } from '../../api/production';
+import { commonApi } from '../../api/common';
 import { useAuth } from '../../contexts/AuthContext';
 import { ProductionOrderDetailModal } from './ProductionOrderDetailModal';
 
@@ -21,6 +23,7 @@ type DateRange = 'today' | 'week' | 'month' | 'year' | 'total';
 
 export const ProductionOrdersPage = () => {
   const { user } = useAuth();
+  const branchId = user?.branch_id;
 
   // States
   const [dateRange, setDateRange] = useState<DateRange>('total');
@@ -29,13 +32,19 @@ export const ProductionOrdersPage = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [warehouseFilter, setWarehouseFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
   const [viewOrderId, setViewOrderId] = useState<number | null>(null);
 
-  const branchId = user?.branch_id || '';
+  // Fetch verified SAP filter options
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options'],
+    queryFn: () => commonApi.getFilterOptions(),
+    staleTime: 300_000,
+  });
 
   // Debounce search
   useEffect(() => {
@@ -86,17 +95,16 @@ export const ProductionOrdersPage = () => {
     setDebouncedSearch('');
     setStatusFilter('');
     setTypeFilter('');
+    setWarehouseFilter('');
     setPriorityFilter('');
-    setDateRange('today');
-    undefined;
-    undefined;
+    setDateRange('total');
     setPage(1);
   };
 
   const queryFilters = {
     date_from,
     date_to,
-    warehouse: branchId,
+    warehouse: warehouseFilter || undefined,
   };
 
   const tableFilters = {
@@ -111,7 +119,7 @@ export const ProductionOrdersPage = () => {
 
   // Queries
   const { data: summary, isLoading: loadingSummary, isError: errorSummary, refetch: refetchSummary } = useQuery({
-    queryKey: ['production', 'summary', branchId, date_from, date_to],
+    queryKey: ['production', 'summary', warehouseFilter, date_from, date_to],
     queryFn: () => getProductionSummary(queryFilters),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
@@ -125,6 +133,32 @@ export const ProductionOrdersPage = () => {
   const handleRefresh = () => {
     refetchSummary();
     refetchOrders();
+  };
+
+  const handleExportCSV = () => {
+    const items = ordersData?.items || [];
+    if (items.length === 0) return;
+    const headers = ["Order No", "Item Code", "Item Name", "Order Date", "Warehouse", "Planned Qty", "Produced Qty", "Pending Qty", "Prod %", "Status"];
+    const rows = items.map(o => [
+      o.production_order_no,
+      `"${o.item_code}"`,
+      `"${(o.item_name || '').replace(/"/g, '""')}"`,
+      o.posting_date || '',
+      `"${o.warehouse || ''}"`,
+      o.planned_qty,
+      o.produced_qty,
+      o.pending_qty,
+      o.production_percentage,
+      o.status
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `production_orders_${new Date().toISOString().substring(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -215,22 +249,36 @@ export const ProductionOrdersPage = () => {
       )}
 
       {/* FILTER BAR */}
-      <div className="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center">
+      <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-2xs border border-slate-200/90 flex flex-wrap gap-3.5 items-center">
         <div className="flex-1 min-w-[220px] relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={19} />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
           <input
             type="text"
-            placeholder="Search Order No, Item Code or Name..."
+            placeholder="Search Order No, Item Code or Description..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl text-[14px] sm:text-[14.5px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
+            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-[13.5px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs transition-colors"
           />
+        </div>
+
+        {/* Warehouse Selector */}
+        <div className="relative min-w-[170px]">
+          <select
+            value={warehouseFilter}
+            onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1); }}
+            className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-[13px] font-semibold text-slate-700 bg-white focus:outline-none focus:border-blue-500 shadow-2xs transition-colors cursor-pointer"
+          >
+            <option value="">All Warehouses</option>
+            {filterOptions?.warehouses?.map((w) => (
+              <option key={w.code} value={w.code}>{w.name} ({w.code})</option>
+            ))}
+          </select>
         </div>
 
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="px-3.5 py-2.5 border border-slate-200 rounded-xl text-[13.5px] sm:text-[14px] font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+          className="px-3.5 py-2 border border-slate-200 rounded-xl text-[13px] font-semibold text-slate-700 bg-white focus:outline-none focus:border-blue-500 shadow-2xs transition-colors cursor-pointer"
         >
           <option value="">All Statuses</option>
           <option value="Planned">Planned</option>
@@ -242,7 +290,7 @@ export const ProductionOrdersPage = () => {
         <select
           value={typeFilter}
           onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
-          className="px-3.5 py-2.5 border border-slate-200 rounded-xl text-[13.5px] sm:text-[14px] font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+          className="px-3.5 py-2 border border-slate-200 rounded-xl text-[13px] font-semibold text-slate-700 bg-white focus:outline-none focus:border-blue-500 shadow-2xs transition-colors cursor-pointer"
         >
           <option value="">All Types</option>
           <option value="Standard">Standard</option>
@@ -252,9 +300,17 @@ export const ProductionOrdersPage = () => {
 
         <button
           onClick={handleResetFilters}
-          className="px-4 py-2.5 text-[13.5px] sm:text-[14px] font-bold text-slate-700 hover:bg-slate-50 border border-slate-200 rounded-xl shadow-sm transition-colors"
+          className="px-3.5 py-2 text-[13px] font-bold text-slate-700 hover:bg-slate-50 border border-slate-200 rounded-xl shadow-2xs transition-colors cursor-pointer"
         >
-          Reset Filters
+          Reset
+        </button>
+
+        <button
+          onClick={handleExportCSV}
+          className="flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl shadow-2xs transition-colors cursor-pointer ml-auto"
+        >
+          <Download size={14} />
+          <span>Export CSV</span>
         </button>
       </div>
 

@@ -56,6 +56,8 @@ export const CustomersPage = () => {
   const [activeTab, setActiveTab] = useState('Profile');
   const [modalPage, setModalPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [cardTypeFilter, setCardTypeFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [range, setRange] = useState<(typeof rangeOptions)[number]['value'] | string>('monthly');
   const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState('');
@@ -80,21 +82,16 @@ export const CustomersPage = () => {
   });
 
   const { data: customers = [], isLoading, isError, error, refetch } = useQuery<CustomerListItem[]>({
-    queryKey: ['customers-list', debouncedSearch],
-    queryFn: () => customersApi.searchCustomers(debouncedSearch || undefined),
+    queryKey: ['customers-list', debouncedSearch, cardTypeFilter, statusFilter],
+    queryFn: () => customersApi.searchCustomers({
+      search: debouncedSearch || undefined,
+      card_type: cardTypeFilter || undefined,
+      status: statusFilter || undefined,
+    }),
     staleTime: 60_000,
   });
 
-  const filteredCustomers = useMemo(() => {
-    if (!debouncedSearch.trim()) return customers;
-    const needle = debouncedSearch.toLowerCase();
-    return customers.filter((customer) => {
-      const name = (customer.cardName || '').toLowerCase();
-      const code = (customer.cardCode || '').toLowerCase();
-      const phone = (customer.phone || '').toLowerCase();
-      return name.includes(needle) || code.includes(needle) || phone.includes(needle);
-    });
-  }, [customers, debouncedSearch]);
+  const filteredCustomers = customers;
 
   const [selectedCardCode, setSelectedCardCode] = useState<string | null>(null);
 
@@ -103,7 +100,29 @@ export const CustomersPage = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, cardTypeFilter, statusFilter]);
+
+  const handleExportCSV = () => {
+    if (filteredCustomers.length === 0) return;
+    const headers = ["CardCode", "Name", "Type", "Phone", "Email", "Status", "Lifetime Value"];
+    const rows = filteredCustomers.map(c => [
+      `"${c.cardCode || ''}"`,
+      `"${(c.cardName || '').replace(/"/g, '""')}"`,
+      `"${c.cardType || ''}"`,
+      `"${c.phone || ''}"`,
+      `"${c.email || ''}"`,
+      `"${c.status || ''}"`,
+      c.lifetimeValue || 0
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `customers_suppliers_${new Date().toISOString().substring(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const totalCustomers = filteredCustomers.length;
   const totalPages = Math.ceil(totalCustomers / limit);
@@ -218,10 +237,11 @@ export const CustomersPage = () => {
 
             <button
               type="button"
+              onClick={handleExportCSV}
               className="atlas-btn-sm inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm cursor-pointer"
             >
               <Download className="mr-2 h-4 w-4" />
-              Export
+              Export CSV
             </button>
             <button
               type="button"
@@ -252,9 +272,42 @@ export const CustomersPage = () => {
                     type="text"
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search by name, phone, email or customer code..."
+                    placeholder="Search by name, phone, email or partner code..."
                     className="block w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <select
+                    value={cardTypeFilter}
+                    onChange={(e) => setCardTypeFilter(e.target.value)}
+                    className="px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value="">All Partner Types</option>
+                    <option value="cCustomer">Customers (cCustomer)</option>
+                    <option value="cSupplier">Suppliers (cSupplier)</option>
+                  </select>
+
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="Active">Active</option>
+                    <option value="Frozen">Frozen</option>
+                  </select>
+
+                  <button
+                    onClick={() => {
+                      setSearch('');
+                      setCardTypeFilter('');
+                      setStatusFilter('');
+                    }}
+                    className="px-3.5 py-2.5 text-xs sm:text-[13px] font-bold text-slate-700 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Reset
+                  </button>
                 </div>
               </div>
             </div>

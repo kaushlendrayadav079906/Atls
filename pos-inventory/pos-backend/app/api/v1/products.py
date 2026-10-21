@@ -342,20 +342,23 @@ async def get_products(
     request: Request,
     response: Response,
     search: Optional[str] = Query(None, max_length=100, description="Search term (name, barcode, or code)"),
+    warehouse: Optional[str] = Query(None, description="Filter by SAP Warehouse code"),
+    category: Optional[str] = Query(None, description="Filter by Category"),
+    stock_status: Optional[str] = Query(None, description="Filter by stock status: in_stock, low_stock, out_of_stock"),
     force_refresh: bool = Query(False, description="Bypass and evict the server-side cache"),
     current_user: dict = Depends(require_permission("products.view")),
 ):
     """
-    Get all products – served from in-memory cache when available (10 min TTL).
+    Get all products – served from in-memory cache when available.
     Supports ETag / 304 Not Modified.
-    Products are filtered to show stock only for the user's assigned branch warehouse.
+    Products are filtered to show stock for the authorized warehouse.
     Requires: Authorization: Bearer <token>
     """
     logger.info(f"Getting products for user: {current_user.get('sub')}")
     sap_service = SAPItemsService()
     public_base = _public_base_url(request)
 
-    # Determine the user's branch for branch-scoped stock (non-admin users only)
+    # Determine the branch/warehouse for stock scoping
     role = str(current_user.get("role") or "user").lower()
     user_branch: Optional[str] = None
     if role != "admin":
@@ -364,9 +367,13 @@ async def get_products(
             user_branch = raw_branch
         elif settings.SAP_DEFAULT_WAREHOUSE:
             user_branch = settings.SAP_DEFAULT_WAREHOUSE
+    else:
+        # Admin can explicitly query a specific warehouse
+        if warehouse:
+            user_branch = warehouse.strip()
 
     branch_suffix = f":branch:{user_branch}" if user_branch else ":branch:all"
-    cache_key = (PRODUCTS_LIST_KEY + branch_suffix) if not search else f"{PRODUCTS_LIST_KEY}{branch_suffix}:s:{search}"
+    cache_key = (PRODUCTS_LIST_KEY + branch_suffix) if not (search or category or stock_status) else f"{PRODUCTS_LIST_KEY}{branch_suffix}:s:{search}:c:{category}:st:{stock_status}"
 
     # --- Force refresh: evict both short-TTL cache and long-lived product store ---
     if force_refresh:
@@ -376,7 +383,7 @@ async def get_products(
 
     # --- Long-lived product store (60-min TTL, survives across multiple 10-min cache cycles) ---
     store_items = await product_store.get(user_branch)
-    if store_items is not None and not search:
+    if store_items is not None and not (search or category or stock_status):
         # Fast path: build response directly from the store, skip SAP entirely
         products = [_to_response(item, sap_service, branch=user_branch) for item in store_items]
         response.headers["X-Cache"] = "STORE-HIT"
@@ -392,7 +399,7 @@ async def get_products(
         response.headers["Cache-Control"] = f"private, max-age={_PRODUCTS_TTL}"
         return [ProductResponse(**{**p, "image": _absolutize_image_url(p.get("image"), public_base)}) for p in payload]
 
-    # --- Short-TTL cache hit (only for unfiltered list) ---
+    # --- Short-TTL cache hit ---
     cached_data: list | None = await cache_get(cache_key)
     if cached_data is not None:
         response.headers["X-Cache"] = "HIT"
@@ -412,7 +419,7 @@ async def get_products(
         response.headers["Cache-Control"] = f"private, max-age={_PRODUCTS_TTL}"
         return [ProductResponse(**p) for p in resolved_payload]
 
-    # --- SAP fetch (run in thread pool so the event loop is not blocked) ---
+    # --- SAP fetch ---
     try:
         loop = asyncio.get_running_loop()
         sap_items = await loop.run_in_executor(_executor, lambda: sap_service.get_items(search=search))
@@ -422,18 +429,31 @@ async def get_products(
         raise HTTPException(status_code=502, detail="Could not retrieve products from SAP")
 
     products = [_to_response(item, sap_service, branch=user_branch) for item in sap_items]
+
+    # Apply category and stock_status filters
+    if category:
+        cat_lower = category.strip().lower()
+        products = [p for p in products if p.category and str(p.category).strip().lower() == cat_lower]
+
+    if stock_status:
+        st_low = stock_status.strip().lower()
+        if st_low == "in_stock":
+            products = [p for p in products if (p.stock or 0) > 10]
+        elif st_low == "low_stock":
+            products = [p for p in products if 0 < (p.stock or 0) <= 10]
+        elif st_low == "out_of_stock":
+            products = [p for p in products if (p.stock or 0) <= 0]
+
     response.headers["X-Cache"] = "MISS"
 
     # Populate the long-lived product store (only for unfiltered list)
-    if not search:
+    if not (search or category or stock_status or warehouse):
         await product_store.set(user_branch, sap_items)
 
-    # Store in short-TTL cache (only for unfiltered list)
-    if not search:
-        # Store relative image paths + warehouse in cache.
+    # Store in short-TTL cache
+    if not (search or category or stock_status or warehouse):
         payload = [p.model_dump() for p in products]
         await cache_set(cache_key, payload, ttl=_PRODUCTS_TTL)
-        # ETag based on what we actually return (absolute image URLs).
         resolved_for_etag = [
             {**p.model_dump(), "image": _absolutize_image_url(p.image, public_base)}
             for p in products
@@ -442,7 +462,6 @@ async def get_products(
         response.headers["ETag"] = etag
         response.headers["Cache-Control"] = f"private, max-age={_PRODUCTS_TTL}"
 
-    # Return absolute URLs to the frontend.
     return [
         ProductResponse(**{**p.model_dump(), "image": _absolutize_image_url(p.image, public_base)})
         for p in products

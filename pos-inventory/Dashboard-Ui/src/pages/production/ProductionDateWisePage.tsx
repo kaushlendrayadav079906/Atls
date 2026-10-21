@@ -14,13 +14,16 @@ import {
   ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   Legend, Area
 } from 'recharts';
+import { Download } from 'lucide-react';
 import { getDateWiseProduction } from '../../api/production';
+import { commonApi } from '../../api/common';
 import { useAuth } from '../../contexts/AuthContext';
 
 type DateRange = 'today' | 'week' | 'month' | 'year' | 'total';
 
 export const ProductionDateWisePage = () => {
   const { user } = useAuth();
+  const branchId = user?.branch_id;
 
   // States
   const [dateRange, setDateRange] = useState<DateRange>('total');
@@ -34,7 +37,12 @@ export const ProductionDateWisePage = () => {
   const [sortBy, setSortBy] = useState<'date' | 'produced_qty' | 'planned_qty' | 'rejected_qty'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  const branchId = user?.branch_id || '';
+  // Fetch verified SAP filter options
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options'],
+    queryFn: () => commonApi.getFilterOptions(),
+    staleTime: 300_000,
+  });
 
   const { date_from, date_to } = useMemo(() => {
     if (dateRange === 'total') return { date_from: undefined, date_to: undefined };
@@ -73,9 +81,7 @@ export const ProductionDateWisePage = () => {
 
   const handleResetFilters = () => {
     setWarehouseFilter('');
-    setDateRange('month');
-    undefined;
-    undefined;
+    setDateRange('total');
     setGranularity('daily');
     setPage(1);
   };
@@ -83,7 +89,7 @@ export const ProductionDateWisePage = () => {
   const queryFilters = {
     date_from,
     date_to,
-    warehouse: warehouseFilter || branchId,
+    warehouse: warehouseFilter || undefined,
     granularity,
   };
 
@@ -264,14 +270,13 @@ export const ProductionDateWisePage = () => {
       )}
 
       {/* FILTER BAR */}
-      <div className="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center">
-
-        <div className="flex items-center gap-2.5">
-          <label className="text-[13.5px] sm:text-[14px] font-bold text-slate-700">Granularity:</label>
+      <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-2xs border border-slate-200/90 flex flex-wrap gap-3.5 items-center">
+        <div className="flex items-center gap-2">
+          <label className="text-[13px] font-bold text-slate-700">Granularity:</label>
           <select
             value={granularity}
             onChange={(e) => { setGranularity(e.target.value as any); setPage(1); }}
-            className="px-3.5 py-2 border border-slate-200 rounded-xl text-[13.5px] font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+            className="px-3.5 py-2 border border-slate-200 rounded-xl text-[13px] font-semibold text-slate-700 bg-white focus:outline-none focus:border-blue-500 shadow-2xs transition-colors cursor-pointer"
           >
             <option value="daily">Daily</option>
             <option value="weekly">Weekly</option>
@@ -279,19 +284,54 @@ export const ProductionDateWisePage = () => {
           </select>
         </div>
 
-        <input
-          type="text"
-          placeholder="Warehouse filter..."
-          value={warehouseFilter}
-          onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48"
-        />
+        {/* Warehouse Selector */}
+        <div className="relative min-w-[170px]">
+          <select
+            value={warehouseFilter}
+            onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1); }}
+            className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-[13px] font-semibold text-slate-700 bg-white focus:outline-none focus:border-blue-500 shadow-2xs transition-colors cursor-pointer"
+          >
+            <option value="">All Warehouses</option>
+            {filterOptions?.warehouses?.map((w) => (
+              <option key={w.code} value={w.code}>{w.name} ({w.code})</option>
+            ))}
+          </select>
+        </div>
 
         <button
           onClick={handleResetFilters}
-          className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
+          className="px-3.5 py-2 text-[13px] font-bold text-slate-700 hover:bg-slate-50 border border-slate-200 rounded-xl shadow-2xs transition-colors cursor-pointer"
         >
-          Reset Filters
+          Reset
+        </button>
+
+        <button
+          onClick={() => {
+            const data = sortedItems || [];
+            if (data.length === 0) return;
+            const headers = ["Period / Date", "Planned Qty", "Produced Qty", "Pending Qty", "Rejected Qty", "Prod %", "Rej %"];
+            const rows = data.map(d => [
+              `"${d.date}"`,
+              d.planned_qty,
+              d.produced_qty,
+              d.pending_qty,
+              d.rejected_qty,
+              d.production_percentage,
+              d.rejection_percentage
+            ]);
+            const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `date_wise_production_${new Date().toISOString().substring(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }}
+          className="flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl shadow-2xs transition-colors cursor-pointer ml-auto"
+        >
+          <Download size={14} />
+          <span>Export CSV</span>
         </button>
       </div>
 

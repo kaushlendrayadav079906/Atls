@@ -1,32 +1,84 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpFromLine, ArrowLeft, RefreshCw } from 'lucide-react';
+import { ArrowUpFromLine, ArrowLeft, RefreshCw, Calendar, ChevronDown, Download, Search, Building2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
-
+import { commonApi } from '../../api/common';
 
 export const OutgoingPaymentsPage: React.FC = () => {
-  const [payments, setPayments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  type QuickFilter = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all_time' | 'custom';
+  const [range, setRange] = useState<QuickFilter>('monthly');
+  const [branch, setBranch] = useState('');
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
 
-  const fetchPayments = async () => {
-    setLoading(true);
-    try {
-      const res = await apiClient.get('/finance/overview');
-      setPayments(res.data?.tables?.recent_payments?.outgoing || []);
-    } catch {
-      // fallback
-    } finally {
-      setLoading(false);
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options'],
+    queryFn: () => commonApi.getFilterOptions(),
+    staleTime: 300_000,
+  });
+
+  const applyQuickFilter = (f: QuickFilter) => {
+    setRange(f);
+    if (f === 'all_time') {
+      setDateFrom('');
+      setDateTo('');
+      setCustomFrom('');
+      setCustomTo('');
+      return;
     }
+    if (f === 'custom') {
+      setDateFrom(customFrom);
+      setDateTo(customTo);
+      return;
+    }
+    const now = new Date();
+    const to = new Date();
+    let from = new Date(now);
+    if (f === 'daily') {
+      from = new Date(now);
+    } else if (f === 'weekly') {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      from = new Date(now.setDate(diff));
+    } else if (f === 'monthly') {
+      from = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (f === 'yearly') {
+      from = new Date(now.getFullYear(), 0, 1);
+    }
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    setDateFrom(`${from.getFullYear()}-${pad(from.getMonth() + 1)}-${pad(from.getDate())}`);
+    setDateTo(`${to.getFullYear()}-${pad(to.getMonth() + 1)}-${pad(to.getDate())}`);
   };
 
-  useEffect(() => {
-    fetchPayments();
-  }, []);
+  const { data: overviewData, isLoading, refetch } = useQuery({
+    queryKey: ['outgoing-payments-overview', range, branch, dateFrom, dateTo],
+    queryFn: async () => {
+      const params: any = { range };
+      if (branch) params.branch = branch;
+      if (dateFrom) params.from_date = dateFrom;
+      if (dateTo) params.to_date = dateTo;
+      const res = await apiClient.get('/finance/overview', { params });
+      return res.data;
+    }
+  });
+
+  const rawPayments = overviewData?.tables?.recent_payments?.outgoing || [];
+  const filteredPayments = rawPayments.filter((p: any) => {
+    if (!search) return true;
+    const term = search.toLowerCase();
+    return (p.supplier || '').toLowerCase().includes(term) || (p.refNo || '').toLowerCase().includes(term);
+  });
+
+  const totalAmount = filteredPayments.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link to="/finance" className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 transition">
             <ArrowLeft size={16} className="text-slate-600" />
@@ -36,19 +88,139 @@ export const OutgoingPaymentsPage: React.FC = () => {
             <p className="atlas-page-subtitle text-sm sm:text-[15px] text-slate-500">Vendor settlements, accounts payable disbursements, and expense payments.</p>
           </div>
         </div>
-        <button
-          onClick={fetchPayments}
-          className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-[13px] sm:text-[13.5px] font-semibold shadow-2xs transition"
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Date Selector */}
+          <div className="relative date-dropdown-container">
+            <button 
+              onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+              className="flex items-center gap-2 px-3.5 py-2 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors font-medium text-[13px] shadow-2xs"
+            >
+              <Calendar className="w-4 h-4 text-slate-500" />
+              {range === 'all_time' ? 'All Dates (Total)' :
+               range === 'daily' ? 'Today' : 
+               range === 'custom' ? 'Custom Range' :
+               `This ${range.charAt(0).toUpperCase() + range.slice(1).replace('ly', '')}`}
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isDateDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {isDateDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 shadow-xl rounded-xl py-1 z-50">
+                <button
+                  onClick={() => { applyQuickFilter('all_time'); setIsDateDropdownOpen(false); }}
+                  className={`w-full text-left px-4 py-2 text-[13px] transition-colors ${
+                    range === 'all_time' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  All Dates (Total)
+                </button>
+                <div className="px-3 py-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50">Quick Filters</div>
+                {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(f => {
+                  const label = f === 'daily' ? 'Today' : `This ${f.charAt(0).toUpperCase() + f.slice(1).replace('ly', '')}`;
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => { applyQuickFilter(f); setIsDateDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-[13px] transition-colors ${
+                        range === f ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+                <div className="px-3 py-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50 mt-1">Custom Range</div>
+                <div className="p-3 flex flex-col gap-2">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-500 mb-1 block">From</label>
+                    <input type="date" className="w-full text-[12.5px] border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-500 mb-1 block">To</label>
+                    <input type="date" className="w-full text-[12.5px] border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={customTo} onChange={e => setCustomTo(e.target.value)} />
+                  </div>
+                  <button 
+                    disabled={!customFrom || !customTo}
+                    onClick={() => { applyQuickFilter('custom'); setIsDateDropdownOpen(false); }}
+                    className="w-full mt-2 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded font-medium text-[12.5px] transition-colors"
+                  >
+                    Apply Custom
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => refetch()}
+            className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 text-[13px] font-semibold shadow-2xs transition cursor-pointer"
+          >
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input 
+            type="text" 
+            placeholder="Search payment ref or supplier..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-[13.5px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
+          />
+        </div>
+        <div className="relative w-[200px]">
+          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+          <select 
+            value={branch}
+            onChange={(e) => setBranch(e.target.value)}
+            className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-[13.5px] text-slate-700 focus:outline-none focus:border-blue-500 transition-colors"
+          >
+            <option value="">All Branches</option>
+            {filterOptions?.branches?.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </div>
+        <button 
+          onClick={() => {
+            if (filteredPayments.length === 0) return;
+            const headers = ["Payment Ref", "Date", "Supplier", "Status", "Amount"];
+            const rows = filteredPayments.map((p: any) => [
+              `"${p.refNo}"`,
+              p.date,
+              `"${(p.supplier || '').replace(/"/g, '""')}"`,
+              p.status || 'Completed',
+              p.amount
+            ]);
+            const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map((e: any) => e.join(','))].join('\n');
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `outgoing_payments_${new Date().toISOString().substring(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }}
+          className="flex items-center gap-2 px-4 py-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl text-[13px] font-semibold transition-colors cursor-pointer"
         >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          <span>Refresh</span>
+          <Download size={15} />
+          <span>Export CSV</span>
         </button>
       </div>
 
       <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs">
-        <div className="flex items-center gap-2.5 mb-4 pb-2.5 border-b border-slate-100">
-          <ArrowUpFromLine size={20} className="text-amber-600" />
-          <h2 className="text-[16px] font-bold text-slate-900">Recent Supplier Disbursements</h2>
+        <div className="flex items-center justify-between mb-4 pb-2.5 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <ArrowUpFromLine size={20} className="text-amber-600" />
+            <h2 className="text-[16px] font-bold text-slate-900">Recent Supplier Disbursements ({filteredPayments.length})</h2>
+          </div>
+          <div className="text-[13.5px] font-semibold text-slate-700">
+            Total Disbursements: <span className="text-amber-600 font-bold">₹{totalAmount.toLocaleString('en-IN')}</span>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -63,12 +235,12 @@ export const OutgoingPaymentsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 text-slate-700">
-              {loading ? (
+              {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400 text-sm">Loading outgoing payments...</td>
+                  <td colSpan={5} className="py-8 text-center text-slate-400 text-sm">Loading outgoing payments from SAP...</td>
                 </tr>
-              ) : payments.length > 0 ? (
-                payments.map((p, idx) => (
+              ) : filteredPayments.length > 0 ? (
+                filteredPayments.map((p: any, idx: number) => (
                   <tr key={idx} className="hover:bg-slate-50 transition">
                     <td className="py-3 font-mono text-[12px] font-semibold text-amber-600">{p.refNo}</td>
                     <td className="py-3 text-slate-500 text-[12.5px]">{p.date}</td>

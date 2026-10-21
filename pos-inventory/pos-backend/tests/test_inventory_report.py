@@ -19,7 +19,7 @@ def test_inventory_overview(monkeypatch):
     monkeypatch.setattr(inventory_report, "fetch_inventory_data", lambda w: mock_items)
     
     # Bypass auth for test if possible, or mock get_current_user
-    app.dependency_overrides[inventory_report.get_current_user] = lambda: {"user_id": "test"}
+    app.dependency_overrides[inventory_report.get_current_user] = lambda: {"sub": "test", "user_id": "test", "role": "admin", "permissions": ["reports.view", "*"]}
     
     response = client.get("/api/v1/reports/inventory/overview")
     assert response.status_code == 200
@@ -36,7 +36,7 @@ def test_inventory_products(monkeypatch):
         {"ItemCode": "A001", "ItemName": "Item 1", "QuantityOnStock": 10, "AvgStdPrice": 100, "U_SUBG": "Cat1"},
     ]
     monkeypatch.setattr(inventory_report, "fetch_inventory_data", lambda w: mock_items)
-    app.dependency_overrides[inventory_report.get_current_user] = lambda: {"user_id": "test"}
+    app.dependency_overrides[inventory_report.get_current_user] = lambda: {"sub": "test", "user_id": "test", "role": "admin", "permissions": ["reports.view", "*"]}
     
     response = client.get("/api/v1/reports/inventory/products?page=1&limit=10")
     assert response.status_code == 200

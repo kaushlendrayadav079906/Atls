@@ -76,7 +76,16 @@ export const purchaseOrdersApi = {
     return res.data;
   },
 
-  getSummary: async (params: { branch_id?: number; date_from?: string; date_to?: string } = {}): Promise<PurchaseOrderSummary> => {
+  getSummary: async (params: { 
+    search?: string;
+    status?: string;
+    supplier?: string;
+    buyer?: string;
+    branch_id?: number; 
+    warehouse_code?: string;
+    date_from?: string; 
+    date_to?: string; 
+  } = {}): Promise<PurchaseOrderSummary> => {
     const res = await apiClient.get<PurchaseOrderSummary>('/purchase-orders/summary', { params });
     return res.data;
   },

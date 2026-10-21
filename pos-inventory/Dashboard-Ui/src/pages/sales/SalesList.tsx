@@ -26,6 +26,7 @@ import {
 import { useState, useEffect } from 'react';
 import { useAIAssistant } from '../../contexts/AIAssistantContext';
 import { salesApi } from '../../api/sales';
+import { commonApi } from '../../api/common';
 import { useDebounce } from '../../hooks/useDebounce';
 import type { DashboardRecentSalesPage, SaleDetail, DashboardRecentSale } from '../../types/sales';
 import { clsx, type ClassValue } from 'clsx';
@@ -290,10 +291,14 @@ export const InvoiceDetailPanel = ({ id, onClose, initialSale }: { id: number; o
 
 export const SalesList = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearch = useDebounce(searchTerm, 500);
+  const debouncedSearch = useDebounce(searchTerm, 400);
+
+  const [statusFilter, setStatusFilter] = useState('');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
+  const [branchFilter, setBranchFilter] = useState('');
 
   type QuickFilter = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom' | 'all_time';
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>('monthly');
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all_time');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [customFrom, setCustomFrom] = useState('');
@@ -308,15 +313,25 @@ export const SalesList = () => {
 
   const { setPageFilters } = useAIAssistant();
 
+  // Load SAP-backed authorized filter options
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options'],
+    queryFn: () => commonApi.getFilterOptions(),
+    staleTime: 300_000,
+  });
+
   useEffect(() => {
     setPageFilters({
       search: debouncedSearch,
+      status: statusFilter,
+      paymentMethod: paymentMethodFilter,
+      branch: branchFilter,
       quickFilter,
       dateFrom,
       dateTo,
       page
     });
-  }, [debouncedSearch, quickFilter, dateFrom, dateTo, page, setPageFilters]);
+  }, [debouncedSearch, statusFilter, paymentMethodFilter, branchFilter, quickFilter, dateFrom, dateTo, page, setPageFilters]);
 
   const applyQuickFilter = (filter: QuickFilter) => {
     setQuickFilter(filter);
@@ -370,12 +385,15 @@ export const SalesList = () => {
   }, [isDateDropdownOpen]);
 
   const { data, isLoading } = useQuery<DashboardRecentSalesPage>({
-    queryKey: ['sales', quickFilter, dateFrom, dateTo, debouncedSearch, offset, limit],
+    queryKey: ['sales', quickFilter, dateFrom, dateTo, debouncedSearch, statusFilter, paymentMethodFilter, branchFilter, offset, limit],
     queryFn: () => salesApi.getSalesFeed({
       range: quickFilter,
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
       search: debouncedSearch || undefined,
+      status: statusFilter || undefined,
+      payment_method: paymentMethodFilter || undefined,
+      branch: branchFilter || undefined,
       limit,
       offset
     })
@@ -466,7 +484,30 @@ export const SalesList = () => {
                 </div>
               )}
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all">
+            <button 
+              onClick={() => {
+                if (!data?.items || data.items.length === 0) return;
+                const headers = ["Invoice No", "Date", "Customer", "Payment Method", "Items", "Total Amount", "Status"];
+                const rows = data.items.map(s => [
+                  s.docNum || s.saleId || '',
+                  s.docDate ? s.docDate.substring(0, 10) : '',
+                  `"${(s.customerName || s.customerCode || '').replace(/"/g, '""')}"`,
+                  s.paymentMethod || 'Cash',
+                  s.items?.length || 0,
+                  s.total,
+                  s.hasReturn ? 'Refunded' : 'Paid'
+                ]);
+                const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `sales_invoices_${new Date().toISOString().substring(0, 10)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-sm transition-all cursor-pointer"
+            >
               <Download size={16} /> Export
             </button>
           </div>
@@ -528,28 +569,53 @@ export const SalesList = () => {
             />
           </div>
 
-          <div className="relative w-[140px]">
-            <select className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2 text-[13px] text-slate-700 appearance-none focus:outline-none focus:border-blue-500 transition-colors">
+          <div className="relative w-[150px]">
+            <select 
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-700 focus:outline-none focus:border-blue-500 transition-colors"
+            >
               <option value="">All Status</option>
+              <option value="open">Pending / Open</option>
+              <option value="closed">Paid / Closed</option>
+              <option value="cancelled">Cancelled</option>
             </select>
           </div>
           <div className="relative w-[180px]">
-            <select className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2 text-[13px] text-slate-700 appearance-none focus:outline-none focus:border-blue-500 transition-colors">
+            <select 
+              value={paymentMethodFilter}
+              onChange={(e) => { setPaymentMethodFilter(e.target.value); setPage(1); }}
+              className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-[13px] text-slate-700 focus:outline-none focus:border-blue-500 transition-colors"
+            >
               <option value="">All Payment Methods</option>
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="upi">UPI</option>
+              <option value="wallet">Wallet</option>
             </select>
           </div>
           <div className="relative w-[200px]">
-            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-600/60" size={16} />
-            <select className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-[13px] text-slate-700 appearance-none focus:outline-none focus:border-blue-500 transition-colors">
+            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+            <select 
+              value={branchFilter}
+              onChange={(e) => { setBranchFilter(e.target.value); setPage(1); }}
+              className="w-full bg-white border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-[13px] text-slate-700 focus:outline-none focus:border-blue-500 transition-colors"
+            >
               <option value="">All Branches</option>
+              {filterOptions?.branches?.map((br) => (
+                <option key={br.id} value={br.id}>{br.name}</option>
+              ))}
             </select>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-medium rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all">
-            <Search size={14} /> Search
-          </button>
           <button 
-            onClick={() => { setSearchTerm(''); }}
-            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-blue-600 text-[13px] font-medium rounded-lg transition-colors"
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('');
+              setPaymentMethodFilter('');
+              setBranchFilter('');
+              setPage(1);
+            }}
+            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[13px] font-medium rounded-lg transition-colors cursor-pointer"
           >
             Clear
           </button>

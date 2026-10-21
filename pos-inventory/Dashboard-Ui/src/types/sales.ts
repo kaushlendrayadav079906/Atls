@@ -67,4 +67,5 @@ export interface SalesFeedParams {
   customer?: string;
   category?: string;
   payment_method?: string;
+  status?: string;
 }

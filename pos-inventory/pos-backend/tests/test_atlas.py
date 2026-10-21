@@ -22,19 +22,19 @@ def mock_invoices():
 
 @pytest.fixture
 def manager_token():
-    app.dependency_overrides[get_current_user] = lambda: {"id": "m1", "role": "manager", "branch_id": "B1"}
+    app.dependency_overrides[get_current_user] = lambda: {"id": "m1", "role": "manager", "branch_id": "B1", "permissions": ["dashboard.view", "reports.view"]}
     yield
     app.dependency_overrides.clear()
 
 @pytest.fixture
 def admin_token():
-    app.dependency_overrides[get_current_user] = lambda: {"id": "a1", "role": "admin", "branch_id": "B1"}
+    app.dependency_overrides[get_current_user] = lambda: {"id": "a1", "role": "admin", "branch_id": "B1", "permissions": ["*"]}
     yield
     app.dependency_overrides.clear()
 
 @pytest.fixture
 def operator_token():
-    app.dependency_overrides[get_current_user] = lambda: {"id": "u1", "role": "user", "branch_id": "B1"}
+    app.dependency_overrides[get_current_user] = lambda: {"id": "u1", "role": "user", "branch_id": "B1", "permissions": ["dashboard.view", "reports.view"]}
     yield
     app.dependency_overrides.clear()
 

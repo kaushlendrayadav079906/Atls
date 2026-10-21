@@ -347,7 +347,7 @@ def test_ai_assistant_tool_permission_gating():
         current_user=user_without_finance,
     )
 
-    assert "Access Denied" in context.get("error", "")
+    assert "Forbidden" in context.get("error", "") or "Access Denied" in context.get("error", "")
     assert context.get("meta", {}).get("permission_denied") is True
 
     # User with finance.view

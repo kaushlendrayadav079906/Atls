@@ -41,7 +41,14 @@ def mock_admin_invoice():
 @pytest.fixture
 def override_get_current_user():
     def _get_current_user():
-        return {"user_id": "user123", "username": "operator", "role": "user", "branch_id": "BR1"}
+        return {
+            "sub": "operator",
+            "user_id": "user123",
+            "username": "operator",
+            "role": "user",
+            "branch_id": "BR1",
+            "permissions": ["returns.create", "returns.view", "returns.edit"],
+        }
     from app.core.security import get_current_user
     app.dependency_overrides[get_current_user] = _get_current_user
     yield _get_current_user
@@ -50,7 +57,14 @@ def override_get_current_user():
 @pytest.fixture
 def override_admin_user():
     def _require_admin():
-        return {"user_id": "admin123", "username": "admin", "role": "admin", "branch_id": "BR1"}
+        return {
+            "sub": "admin",
+            "user_id": "admin123",
+            "username": "admin",
+            "role": "admin",
+            "branch_id": "BR1",
+            "permissions": ["*"],
+        }
     from app.core.security import require_admin
     app.dependency_overrides[require_admin] = _require_admin
     yield _require_admin

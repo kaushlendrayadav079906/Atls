@@ -132,14 +132,15 @@ def test_submit_update_requires_confirmation(auth_headers):
         assert "Explicit user confirmation required" in response.json()["detail"]
 
 def test_submit_update_forbidden_for_read_only_user():
-    read_only_token = create_access_token({"sub": "user1", "role": "user", "branch_id": None})
-    with patch("app.api.v1.finance.settings.FINANCE_WRITEBACK_ENABLED", True):
-        response = client.post(
-            "/api/v1/finance/submit-update",
-            json={"entity_type": "invoice", "record_id": "101", "updates": {"Comments": "New"}, "confirm": True},
-            headers={"Authorization": f"Bearer {read_only_token}"}
-        )
-        assert response.status_code == 403
+    with patch("app.services.user_service.get_user_by_username", return_value={"id": 99, "username": "user1", "role": "user", "is_active": True, "token_version": 1, "permissions": []}):
+        read_only_token = create_access_token({"sub": "user1", "role": "user", "branch_id": None})
+        with patch("app.api.v1.finance.settings.FINANCE_WRITEBACK_ENABLED", True):
+            response = client.post(
+                "/api/v1/finance/submit-update",
+                json={"entity_type": "invoice", "record_id": "101", "updates": {"Comments": "New"}, "confirm": True},
+                headers={"Authorization": f"Bearer {read_only_token}"}
+            )
+            assert response.status_code == 403
 
 def test_submit_update_success(auth_headers):
     mock_result = {
@@ -173,7 +174,8 @@ def test_admin_settings_endpoint(auth_headers):
         assert response.json()["assistant_mode"] == "FINANCE_INTELLIGENT_WORKSPACE"
 
 def test_admin_settings_forbidden_for_non_admin():
-    manager_token = create_access_token({"sub": "mgr", "role": "manager", "branch_id": "SH"})
-    response = client.get("/api/v1/finance/admin-settings", headers={"Authorization": f"Bearer {manager_token}"})
-    assert response.status_code == 403
+    with patch("app.services.user_service.get_user_by_username", return_value={"id": 98, "username": "mgr", "role": "manager", "is_active": True, "token_version": 1, "permissions": []}):
+        manager_token = create_access_token({"sub": "mgr", "role": "manager", "branch_id": "SH"})
+        response = client.get("/api/v1/finance/admin-settings", headers={"Authorization": f"Bearer {manager_token}"})
+        assert response.status_code == 403
 

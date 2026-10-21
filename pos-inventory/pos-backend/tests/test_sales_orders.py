@@ -29,17 +29,25 @@ def test_list_sales_orders_pagination(client, auth_headers, mock_sap_service):
     assert kwargs["top"] == 25
 
 def test_list_sales_orders_branch_isolation(client, auth_headers, mock_sap_service):
-    # current_user fixture or auth_headers usually has branch_id. 
-    # The API reads branch_id from get_current_user.
+    # Branch user fixture with branch_id = 1
+    from app.core.security import get_current_user
+    from app.main import app
+    app.dependency_overrides[get_current_user] = lambda: {
+        "sub": "test", "id": 1, "role": "manager", "branch_id": 1, "permissions": ["sales_orders.view", "sales.view"]
+    }
     mock_sap_service.list_sales_orders.return_value = {"value": [], "odata.count": 0}
     response = client.get("/api/v1/sales-orders", headers=auth_headers)
     assert response.status_code == 200
     args, kwargs = mock_sap_service.list_sales_orders.call_args
     filters = kwargs.get("filters", [])
-    # Assuming auth_headers provides a user with branch_id = 1
     assert any("BPL_IDAssignedToInvoice eq 1" in f for f in filters)
 
 def test_list_sales_orders_unauthorized_branch(client, auth_headers):
+    from app.core.security import get_current_user
+    from app.main import app
+    app.dependency_overrides[get_current_user] = lambda: {
+        "sub": "test", "id": 1, "role": "manager", "branch_id": 1, "permissions": ["sales_orders:view", "sales:view"]
+    }
     response = client.get("/api/v1/sales-orders?branch_id=999", headers=auth_headers)
     assert response.status_code == 403
 

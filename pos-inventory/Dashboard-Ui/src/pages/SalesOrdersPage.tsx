@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { salesOrdersApi } from '../api/salesOrders';
-import { useDebounce } from '../hooks/useDebounce';
+import { commonApi } from '../api/common';
 import {
   FileText, Clock, CheckCircle2, XCircle, Search, Filter, RotateCcw, 
   MoreVertical, Download, Plus, Eye, Edit, ChevronLeft, ChevronRight,
@@ -13,11 +13,14 @@ export default function SalesOrdersPage() {
   const { setPageFilters } = useAIAssistant();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounce(search, 400);
   
-  const [statusFilter, setStatusFilter] = useState('');
-  const [customerFilter, setCustomerFilter] = useState('');
+  // Pending filter inputs
+  const [searchInput, setSearchInput] = useState('');
+  const [statusInput, setStatusInput] = useState('');
+  const [customerInput, setCustomerInput] = useState('');
+  const [buyerInput, setBuyerInput] = useState('');
+  const [branchInput, setBranchInput] = useState('');
+  const [warehouseInput, setWarehouseInput] = useState('');
   
   type QuickFilter = 'today' | 'week' | 'month' | 'year' | 'custom' | '';
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('');
@@ -27,16 +30,36 @@ export default function SalesOrdersPage() {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
 
+  // Active applied filters
+  const [appliedFilters, setAppliedFilters] = useState({
+    search: '',
+    status: '',
+    customer: '',
+    buyer: '',
+    branch: '',
+    warehouse: '',
+  });
+
+  // Load SAP-backed authorized filter options
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options'],
+    queryFn: () => commonApi.getFilterOptions(),
+    staleTime: 300_000,
+  });
+
   useEffect(() => {
     setPageFilters({
-      search: debouncedSearch,
-      status: statusFilter,
-      customer: customerFilter,
+      search: appliedFilters.search,
+      status: appliedFilters.status,
+      customer: appliedFilters.customer,
+      buyer: appliedFilters.buyer,
+      branch: appliedFilters.branch,
+      warehouse: appliedFilters.warehouse,
       quickFilter,
       dateFrom,
       dateTo
     });
-  }, [debouncedSearch, statusFilter, customerFilter, quickFilter, dateFrom, dateTo, setPageFilters]);
+  }, [appliedFilters, quickFilter, dateFrom, dateTo, setPageFilters]);
   
   const applyQuickFilter = (filter: QuickFilter) => {
     setQuickFilter(filter);
@@ -64,7 +87,7 @@ export default function SalesOrdersPage() {
       from = new Date(now);
     } else if (filter === 'week') {
       const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday as first day
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
       from = new Date(now.setDate(diff));
     } else if (filter === 'month') {
       from = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -112,18 +135,30 @@ export default function SalesOrdersPage() {
   }, [isDrawerOpen]);
   
   const { data: summary, isLoading: summaryLoading } = useQuery({
-    queryKey: ['sales-orders-summary', dateFrom, dateTo],
-    queryFn: () => salesOrdersApi.getSummary({ date_from: dateFrom || undefined, date_to: dateTo || undefined }),
+    queryKey: ['sales-orders-summary', appliedFilters, dateFrom, dateTo],
+    queryFn: () => salesOrdersApi.getSummary({
+      search: appliedFilters.search || undefined,
+      status: appliedFilters.status || undefined,
+      customer: appliedFilters.customer || undefined,
+      sales_employee: appliedFilters.buyer || undefined,
+      branch_id: appliedFilters.branch ? Number(appliedFilters.branch) : undefined,
+      warehouse_code: appliedFilters.warehouse || undefined,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined
+    }),
   });
 
   const { data: ordersData, isLoading: ordersLoading, isError } = useQuery({
-    queryKey: ['sales-orders', page, limit, debouncedSearch, statusFilter, customerFilter, dateFrom, dateTo],
+    queryKey: ['sales-orders', page, limit, appliedFilters, dateFrom, dateTo],
     queryFn: () => salesOrdersApi.getOrders({
       page,
       limit,
-      search: debouncedSearch,
-      status: statusFilter,
-      customer: customerFilter,
+      search: appliedFilters.search || undefined,
+      status: appliedFilters.status || undefined,
+      customer: appliedFilters.customer || undefined,
+      sales_employee: appliedFilters.buyer || undefined,
+      branch_id: appliedFilters.branch ? Number(appliedFilters.branch) : undefined,
+      warehouse_code: appliedFilters.warehouse || undefined,
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined
     })
@@ -135,10 +170,33 @@ export default function SalesOrdersPage() {
     enabled: !!selectedDocEntry && isDrawerOpen,
   });
 
+  const handleApplyFilters = () => {
+    setAppliedFilters({
+      search: searchInput,
+      status: statusInput,
+      customer: customerInput,
+      buyer: buyerInput,
+      branch: branchInput,
+      warehouse: warehouseInput,
+    });
+    setPage(1);
+  };
+
   const handleReset = () => {
-    setSearch('');
-    setStatusFilter('');
-    setCustomerFilter('');
+    setSearchInput('');
+    setStatusInput('');
+    setCustomerInput('');
+    setBuyerInput('');
+    setBranchInput('');
+    setWarehouseInput('');
+    setAppliedFilters({
+      search: '',
+      status: '',
+      customer: '',
+      buyer: '',
+      branch: '',
+      warehouse: '',
+    });
     setQuickFilter('');
     setDateFrom('');
     setDateTo('');
@@ -310,40 +368,70 @@ export default function SalesOrdersPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
           <div>
             <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Customer</label>
-            <input 
-               type="text" 
-               className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-800" 
-               placeholder="All Customers" 
-               value={customerFilter}
-               onChange={(e) => setCustomerFilter(e.target.value)}
-            />
+            <select 
+               className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-800 bg-white" 
+               value={customerInput}
+               onChange={(e) => setCustomerInput(e.target.value)}
+            >
+              <option value="">All Customers</option>
+              {filterOptions?.customers?.map((c) => (
+                <option key={c.code} value={c.code}>{c.name} ({c.code})</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Status</label>
             <select 
                className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-700 bg-white"
-               value={statusFilter}
-               onChange={(e) => setStatusFilter(e.target.value)}
+               value={statusInput}
+               onChange={(e) => setStatusInput(e.target.value)}
             >
               <option value="">All Status</option>
               <option value="pending">Pending</option>
-              <option value="received">Received</option>
+              <option value="completed">Received / Invoiced</option>
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
           <div>
-            <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Buyer</label>
-            <input type="text" className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 bg-slate-50 text-slate-500" placeholder="All Buyers" disabled />
+            <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Buyer / Agent</label>
+            <select 
+              className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-700 bg-white"
+              value={buyerInput}
+              onChange={(e) => setBuyerInput(e.target.value)}
+            >
+              <option value="">All Buyers / Agents</option>
+              {filterOptions?.buyers?.map((b) => (
+                <option key={b.code} value={b.code}>{b.name}</option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div>
             <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Branch</label>
-            <input type="text" className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none bg-slate-50 text-slate-500" placeholder="Authorized Branch Only" disabled />
+            <select 
+              className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-700 bg-white"
+              value={branchInput}
+              onChange={(e) => setBranchInput(e.target.value)}
+            >
+              <option value="">All Authorized Branches</option>
+              {filterOptions?.branches?.map((br) => (
+                <option key={br.id} value={br.id}>{br.name}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Warehouse</label>
-            <input type="text" className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none bg-slate-50 text-slate-500" placeholder="All Warehouses" disabled />
+            <select 
+              className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-700 bg-white"
+              value={warehouseInput}
+              onChange={(e) => setWarehouseInput(e.target.value)}
+            >
+              <option value="">All Warehouses</option>
+              {filterOptions?.warehouses?.map((wh) => (
+                <option key={wh.code} value={wh.code}>{wh.name} ({wh.code})</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Search</label>
@@ -352,14 +440,15 @@ export default function SalesOrdersPage() {
               <input 
                 type="text" 
                 className="w-full text-[13.5px] border border-slate-200 rounded-lg pl-9 pr-3.5 py-2.5 outline-none focus:border-blue-500 text-slate-800" 
-                placeholder="Search by PO number, customer..." 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by SO number, customer..." 
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
               />
             </div>
           </div>
           <div className="flex items-center gap-2 justify-end">
-             <button onClick={() => setPage(1)} className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[13.5px] px-4 py-2.5 rounded-lg transition-colors shadow-sm">
+             <button onClick={handleApplyFilters} className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[13.5px] px-4 py-2.5 rounded-lg transition-colors shadow-sm">
                <Filter className="w-4 h-4" />
                Apply Filters
              </button>
@@ -378,7 +467,30 @@ export default function SalesOrdersPage() {
                <FileText className="w-5 h-5 text-blue-600" />
                <h2 className="text-[16px] sm:text-[17px] font-bold text-slate-900">Sales Orders ({ordersData?.total || 0})</h2>
             </div>
-            <button className="flex items-center gap-2 px-3.5 py-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg text-[13.5px] font-semibold transition-colors">
+            <button 
+              onClick={() => {
+                if (!ordersData?.items || ordersData.items.length === 0) return;
+                const headers = ["SO No", "Order Date", "Customer Code", "Customer Name", "Total Amount", "Status", "Expected Date"];
+                const rows = ordersData.items.map(o => [
+                  o.doc_num,
+                  o.doc_date ? o.doc_date.substring(0, 10) : '',
+                  `"${o.card_code}"`,
+                  `"${(o.card_name || '').replace(/"/g, '""')}"`,
+                  o.doc_total,
+                  getStatusLabel(o.document_status, o.cancelled),
+                  o.doc_due_date ? o.doc_due_date.substring(0, 10) : ''
+                ]);
+                const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `sales_orders_${new Date().toISOString().substring(0, 10)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              className="flex items-center gap-2 px-3.5 py-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg text-[13.5px] font-semibold transition-colors cursor-pointer"
+            >
                <Download className="w-4 h-4" />
                Export
             </button>
@@ -407,18 +519,18 @@ export default function SalesOrdersPage() {
                         <td colSpan={11} className="py-12">
                            <div className="flex flex-col items-center justify-center gap-3">
                               <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                              <div className="text-slate-500 text-[14px] font-medium">Loading purchase orders...</div>
+                              <div className="text-slate-500 text-[14px] font-medium">Loading sales orders...</div>
                            </div>
                         </td>
                      </tr>
                   ) : isError ? (
                      <tr>
-                        <td colSpan={11} className="py-12 text-center text-red-500 font-semibold text-[14px]">Unable to load purchase orders.</td>
+                        <td colSpan={11} className="py-12 text-center text-red-500 font-semibold text-[14px]">Unable to load sales orders.</td>
                      </tr>
                   ) : ordersData?.items.length === 0 ? (
                      <tr>
                         <td colSpan={11} className="py-12 text-center text-slate-500 font-medium text-[14px]">
-                           No purchase orders found {quickFilter ? `for this ${quickFilter}` : ''}.
+                           No sales orders found {quickFilter ? `for this ${quickFilter}` : ''}.
                         </td>
                      </tr>
                   ) : (

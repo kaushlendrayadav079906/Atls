@@ -24,7 +24,7 @@ import {
   getWarehouseSummary,
   getItemWiseProduction,
 } from '../../api/production';
-import { useAuth } from '../../contexts/AuthContext';
+import { commonApi } from '../../api/common';
 
 const PIE_COLORS = {
   'Planned': '#3b82f6', // blue
@@ -37,11 +37,15 @@ const PIE_COLORS = {
 type DateRange = 'today' | 'week' | 'month' | 'year' | 'total';
 
 export const ProductionOverviewPage = () => {
-  const { user } = useAuth();
   const [dateRange, setDateRange] = useState<DateRange>('total');
+  const [warehouseFilter, setWarehouseFilter] = useState('');
 
-  // Use user's branch for the branch filter
-  const branchId = user?.branch_id || '';
+  // Fetch verified SAP filter options
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options'],
+    queryFn: () => commonApi.getFilterOptions(),
+    staleTime: 300_000,
+  });
 
   const { date_from, date_to } = useMemo(() => {
     if (dateRange === 'total') return { date_from: undefined, date_to: undefined };
@@ -72,49 +76,48 @@ export const ProductionOverviewPage = () => {
     return { date_from: from, date_to: to };
   }, [dateRange]);
 
-  const queryFilters = { date_from, date_to, warehouse: branchId };
+  const queryFilters = { date_from, date_to, warehouse: warehouseFilter || undefined };
 
   const [ordersPage, setOrdersPage] = useState(1);
   const [ordersPageSize, setOrdersPageSize] = useState(5);
-  
 
   useEffect(() => {
     setOrdersPage(1);
-  }, [dateRange, branchId]);
+  }, [dateRange, warehouseFilter]);
 
   // Queries
   const { data: summary, isLoading: loadingSummary, isError: errorSummary, refetch: refetchSummary } = useQuery({
-    queryKey: ['production', 'summary', branchId, date_from, date_to],
+    queryKey: ['production', 'summary', warehouseFilter, date_from, date_to],
     queryFn: () => getProductionSummary(queryFilters),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
 
   const { data: statusDist, isLoading: loadingStatus, refetch: refetchStatus } = useQuery({
-    queryKey: ['production', 'status-distribution', branchId, date_from, date_to],
+    queryKey: ['production', 'status-distribution', warehouseFilter, date_from, date_to],
     queryFn: () => getStatusDistribution(queryFilters),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
 
   const { data: trendData, isLoading: loadingTrend, refetch: refetchTrend } = useQuery({
-    queryKey: ['production', 'date-wise', branchId, date_from, date_to],
+    queryKey: ['production', 'date-wise', warehouseFilter, date_from, date_to],
     queryFn: () => getDateWiseProduction({ ...queryFilters, granularity: 'daily' }),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
 
   const { data: recentOrders, isLoading: loadingOrders, refetch: refetchOrders } = useQuery({
-    queryKey: ['production', 'orders', branchId, date_from, date_to, ordersPage, ordersPageSize],
+    queryKey: ['production', 'orders', warehouseFilter, date_from, date_to, ordersPage, ordersPageSize],
     queryFn: () => getProductionOrders({ ...queryFilters, page: ordersPage, page_size: ordersPageSize }),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
 
   const { data: warehouseData, isLoading: loadingWarehouse, refetch: refetchWarehouse } = useQuery({
-    queryKey: ['production', 'warehouses', branchId, date_from, date_to],
+    queryKey: ['production', 'warehouses', warehouseFilter, date_from, date_to],
     queryFn: () => getWarehouseSummary(queryFilters),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
 
   const { data: topItems, isLoading: loadingItems, refetch: refetchItems } = useQuery({
-    queryKey: ['production', 'item-wise', branchId, date_from, date_to],
+    queryKey: ['production', 'item-wise', warehouseFilter, date_from, date_to],
     queryFn: () => getItemWiseProduction(queryFilters),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
   });
@@ -146,10 +149,18 @@ export const ProductionOverviewPage = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Branch indicator */}
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13.5px] sm:text-[14px] font-semibold text-slate-700 shadow-sm">
-            <Factory size={16} />
-            {branchId ? `Branch: ${branchId}` : 'All Branches'}
+          {/* Warehouse Selector */}
+          <div className="relative min-w-[170px]">
+            <select
+              value={warehouseFilter}
+              onChange={(e) => setWarehouseFilter(e.target.value)}
+              className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-[13px] font-semibold text-slate-700 bg-white focus:outline-none focus:border-blue-500 shadow-2xs transition-colors cursor-pointer"
+            >
+              <option value="">All Warehouses</option>
+              {filterOptions?.warehouses?.map((w) => (
+                <option key={w.code} value={w.code}>{w.name} ({w.code})</option>
+              ))}
+            </select>
           </div>
 
           {/* Date Selector */}

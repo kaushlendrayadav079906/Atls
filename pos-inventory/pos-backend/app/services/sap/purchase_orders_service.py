@@ -8,34 +8,95 @@ class SAPPurchaseOrdersService:
     def __init__(self):
         self.client = get_sap_client()
 
-    def list_purchase_orders(self, skip: int = 0, top: int = 10, filters: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Fetch a paginated list of purchase orders."""
+    def list_purchase_orders(
+        self, 
+        skip: int = 0, 
+        top: int = 10, 
+        filters: Optional[List[str]] = None,
+        warehouse_code: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Fetch a paginated list of purchase orders with authorized filters."""
+        if warehouse_code:
+            query_parts = [
+                "$select=DocEntry,DocNum,DocDate,DocDueDate,CardCode,CardName,DocTotal,DocumentStatus,Cancelled,SalesPersonCode,BPL_IDAssignedToInvoice,Comments,DocumentLines",
+                "$top=1000",
+                "$orderby=DocEntry desc"
+            ]
+            if filters:
+                query_parts.append(f"$filter={' and '.join(filters)}")
+            
+            endpoint = f"/PurchaseOrders?{'&'.join(query_parts)}"
+            res = self.client.get(endpoint)
+            all_vals = res.get("value", [])
+            
+            matched = [
+                v for v in all_vals
+                if any(str(line.get("WarehouseCode", "")).strip().upper() == warehouse_code.strip().upper() 
+                       for line in v.get("DocumentLines", []))
+            ]
+            total = len(matched)
+            paginated = matched[skip: skip + top]
+            return {
+                "value": paginated,
+                "odata.count": total
+            }
+
         query_parts = [
-            f"$select=DocEntry,DocNum,DocDate,DocDueDate,CardCode,CardName,DocTotal,DocumentStatus,Cancelled,SalesPersonCode,BPL_IDAssignedToInvoice,Comments",
+            "$select=DocEntry,DocNum,DocDate,DocDueDate,CardCode,CardName,DocTotal,DocumentStatus,Cancelled,SalesPersonCode,BPL_IDAssignedToInvoice,Comments",
             f"$skip={skip}",
             f"$top={top}",
-            f"$orderby=DocEntry desc"
+            "$orderby=DocEntry desc"
         ]
         
         if filters:
-            filter_str = " and ".join(filters)
-            query_parts.append(f"$filter={filter_str}")
+            query_parts.append(f"$filter={' and '.join(filters)}")
 
-        query = "&".join(query_parts)
-        query += "&$inlinecount=allpages"
-        
+        query = "&".join(query_parts) + "&$inlinecount=allpages"
         endpoint = f"/PurchaseOrders?{query}"
-        response = self.client.get(endpoint)
-        return response
+        return self.client.get(endpoint)
 
     def get_purchase_order(self, doc_entry: int) -> Dict[str, Any]:
         """Fetch a single purchase order by DocEntry."""
         endpoint = f"/PurchaseOrders({doc_entry})?$select=DocEntry,DocNum,DocDate,DocDueDate,CardCode,CardName,DocTotal,DocumentStatus,Cancelled,SalesPersonCode,BPL_IDAssignedToInvoice,Comments,DocumentLines"
-        response = self.client.get(endpoint)
-        return response
+        return self.client.get(endpoint)
         
-    def get_purchase_order_summary(self, filters: Optional[List[str]] = None) -> Dict[str, Any]:
-        """Fetch summary counts for purchase orders."""
+    def get_purchase_order_summary(
+        self, 
+        filters: Optional[List[str]] = None,
+        warehouse_code: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Fetch summary counts for purchase orders with authorized filters."""
+        if warehouse_code:
+            query_parts = [
+                "$select=DocEntry,DocumentStatus,Cancelled,DocumentLines",
+                "$top=1000"
+            ]
+            if filters:
+                query_parts.append(f"$filter={' and '.join(filters)}")
+                
+            endpoint = f"/PurchaseOrders?{'&'.join(query_parts)}"
+            try:
+                res = self.client.get(endpoint)
+                all_vals = res.get("value", [])
+                matched = [
+                    v for v in all_vals
+                    if any(str(line.get("WarehouseCode", "")).strip().upper() == warehouse_code.strip().upper() 
+                           for line in v.get("DocumentLines", []))
+                ]
+                total = len(matched)
+                pending = sum(1 for v in matched if v.get("DocumentStatus") == "bost_Open" and v.get("Cancelled") != "tYES")
+                received = sum(1 for v in matched if v.get("DocumentStatus") == "bost_Close" and v.get("Cancelled") != "tYES")
+                cancelled = sum(1 for v in matched if v.get("Cancelled") == "tYES")
+                return {
+                    "total_orders": total,
+                    "pending_orders": pending,
+                    "received_orders": received,
+                    "cancelled_orders": cancelled
+                }
+            except Exception as e:
+                logger.error(f"Error computing purchase order warehouse summary: {e}")
+                return {"total_orders": 0, "pending_orders": 0, "received_orders": 0, "cancelled_orders": 0}
+
         base_filter = " and ".join(filters) if filters else ""
         
         def _get_count(extra_filter: str = "") -> int:

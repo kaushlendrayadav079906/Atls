@@ -11,11 +11,13 @@ import {
     TrendingUp,
     Warehouse,
     Eye,
-    XCircle
+    XCircle,
+    Download
 } from 'lucide-react';
 import { useMemo, useState, useEffect, type ReactNode } from 'react';
 import { useSearchParams, useParams } from 'react-router-dom';
 import { posApi } from '../api/pos';
+import { commonApi } from '../api/common';
 import { useDebounce } from '../hooks/useDebounce';
 import { useAIAssistant } from '../contexts/AIAssistantContext';
 import type { Product } from '../types/pos';
@@ -51,12 +53,20 @@ export const ProductsStockPage = () => {
   const urlOpenDetails = searchParams.get('openDetails') === 'true' || Boolean(params.id);
 
   const [search, setSearch] = useState(urlSearch);
-  const [filter, setFilter] = useState<'all' | 'low' | 'healthy'>('all');
+  const [warehouseFilter, setWarehouseFilter] = useState('');
+  const [stockStatus, setStockStatus] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
   const [selectedId, setSelectedId] = useState<string | null>(params.id || null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const debouncedSearch = useDebounce(search, 300);
+
+  // Fetch verified SAP filter options
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options'],
+    queryFn: () => commonApi.getFilterOptions(),
+    staleTime: 300_000,
+  });
 
   // Sync with URL params changes
   useEffect(() => {
@@ -69,13 +79,14 @@ export const ProductsStockPage = () => {
   useEffect(() => {
     setPageFilters({
       search,
-      filter,
+      warehouse: warehouseFilter,
+      stockStatus,
     });
-  }, [search, filter, setPageFilters]);
+  }, [search, warehouseFilter, stockStatus, setPageFilters]);
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, filter]);
+  }, [debouncedSearch, warehouseFilter, stockStatus]);
 
   useEffect(() => {
     if (isModalOpen) {
@@ -92,8 +103,12 @@ export const ProductsStockPage = () => {
   }, [isModalOpen]);
 
   const { data: products = fallbackProducts, isLoading, isError, error, refetch } = useQuery<Product[]>({
-    queryKey: ['products-stock', debouncedSearch],
-    queryFn: () => posApi.searchProducts(debouncedSearch),
+    queryKey: ['products-stock', debouncedSearch, warehouseFilter, stockStatus],
+    queryFn: () => posApi.searchProducts({
+      search: debouncedSearch,
+      warehouse: warehouseFilter || undefined,
+      stock_status: stockStatus === 'all' ? undefined : stockStatus,
+    }),
     staleTime: 60_000,
   });
 
@@ -119,22 +134,7 @@ export const ProductsStockPage = () => {
     }
   }, [urlOpenDetails, urlSearch, baseProducts]);
 
-  const filteredProducts = useMemo(() => {
-    return baseProducts.filter((product) => {
-      const matchesSearch =
-        !debouncedSearch ||
-        product.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        product.barcode?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        product.id?.toLowerCase().includes(debouncedSearch.toLowerCase());
-
-      if (!matchesSearch) return false;
-
-      const stock = Number(product.stock ?? 0);
-      if (filter === 'low') return stock <= 10;
-      if (filter === 'healthy') return stock > 10;
-      return true;
-    });
-  }, [baseProducts, debouncedSearch, filter]);
+  const filteredProducts = baseProducts;
 
   const selectedProduct = filteredProducts.find((product) => product.id === selectedId) ?? filteredProducts[0] ?? baseProducts[0] ?? null;
 
@@ -151,6 +151,35 @@ export const ProductsStockPage = () => {
     return filteredProducts.slice(start, start + limit);
   }, [filteredProducts, page, limit]);
 
+  const handleClearFilters = () => {
+    setSearch('');
+    setWarehouseFilter('');
+    setStockStatus('all');
+    setPage(1);
+  };
+
+  const handleExportCSV = () => {
+    if (filteredProducts.length === 0) return;
+    const headers = ["Item Code / SKU", "Product Name", "Barcode", "Category", "Warehouse", "Stock", "Price"];
+    const rows = filteredProducts.map(p => [
+      `"${p.id || ''}"`,
+      `"${(p.name || '').replace(/"/g, '""')}"`,
+      `"${p.barcode || ''}"`,
+      `"${p.category || ''}"`,
+      `"${p.warehouse || ''}"`,
+      p.stock ?? 0,
+      p.price ?? 0
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `products_stock_${new Date().toISOString().substring(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="mx-auto max-w-[1500px] space-y-6 pb-8 text-slate-900">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -160,26 +189,21 @@ export const ProductsStockPage = () => {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer">
-            <Boxes className="h-4 w-4 text-blue-600" />
-            <span>Import Products</span>
-          </button>
-          <button className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer">
-            <TrendingUp className="h-4 w-4 text-blue-600" />
-            <span>Export</span>
-          </button>
-          <button className="flex items-center gap-2 rounded-xl bg-blue-600 px-4.5 py-2.5 text-[14px] font-semibold text-white shadow-sm hover:bg-blue-700 transition cursor-pointer">
-            <Package2 className="h-4 w-4" />
-            <span>Add Product</span>
+          <button 
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition cursor-pointer"
+          >
+            <Download className="h-4 w-4 text-blue-600" />
+            <span>Export CSV</span>
           </button>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Total Products" value={`${totalProducts}`} change="vs. last month" trend="positive" icon={<Package2 className="h-5 w-5" />} tone="blue" metadata="1,248" />
-        <StatCard title="In Stock" value={`${inStock}`} change="vs. last month" trend="positive" icon={<Boxes className="h-5 w-5" />} tone="emerald" metadata="892" />
-        <StatCard title="Low Stock" value={`${lowStock}`} change="vs. last month" trend="warning" icon={<AlertTriangle className="h-5 w-5" />} tone="amber" metadata="47" />
-        <StatCard title="Out of Stock" value={`${outOfStock}`} change="vs. last month" trend="negative" icon={<ShieldAlert className="h-5 w-5" />} tone="red" metadata="12" />
+        <StatCard title="Total Products" value={`${totalProducts}`} change="live SAP catalog" trend="positive" icon={<Package2 className="h-5 w-5" />} tone="blue" metadata="SAP Items" />
+        <StatCard title="In Stock" value={`${inStock}`} change="stock > 10" trend="positive" icon={<Boxes className="h-5 w-5" />} tone="emerald" metadata="Available" />
+        <StatCard title="Low Stock" value={`${lowStock}`} change="stock 1-10" trend="warning" icon={<AlertTriangle className="h-5 w-5" />} tone="amber" metadata="Reorder soon" />
+        <StatCard title="Out of Stock" value={`${outOfStock}`} change="stock = 0" trend="negative" icon={<ShieldAlert className="h-5 w-5" />} tone="red" metadata="Depleted" />
       </div>
 
       <div className="flex flex-col gap-6">
@@ -192,25 +216,48 @@ export const ProductsStockPage = () => {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search products, SKU, barcode, or ask AI..."
+                placeholder="Search products by name, SKU, or barcode..."
                 className="block w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3.5 text-[14px] sm:text-[14.5px] text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="relative w-full max-w-[190px]">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Warehouse selector */}
+              <div className="relative min-w-[170px]">
                 <select
-                  value={filter}
-                  onChange={(event) => setFilter(event.target.value as 'all' | 'low' | 'healthy')}
-                  className="block w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 pr-9 text-[13.5px] font-medium text-slate-700 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  value={warehouseFilter}
+                  onChange={(e) => setWarehouseFilter(e.target.value)}
+                  className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 pr-8 text-[13px] font-semibold text-slate-700 focus:border-blue-500 focus:bg-white focus:outline-none transition-colors cursor-pointer"
                 >
-                  <option value="all">All Categories</option>
-                  <option value="low">Low Stock</option>
-                  <option value="healthy">Healthy Stock</option>
+                  <option value="">All Warehouses</option>
+                  {filterOptions?.warehouses?.map((w) => (
+                    <option key={w.code} value={w.code}>{w.name} ({w.code})</option>
+                  ))}
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-600" />
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               </div>
-              <button className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50">Clear Filters</button>
+
+              {/* Stock status selector */}
+              <div className="relative min-w-[160px]">
+                <select
+                  value={stockStatus}
+                  onChange={(event) => setStockStatus(event.target.value as any)}
+                  className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 pr-8 text-[13px] font-semibold text-slate-700 focus:border-blue-500 focus:bg-white focus:outline-none transition-colors cursor-pointer"
+                >
+                  <option value="all">All Stock Status</option>
+                  <option value="in_stock">In Stock (&gt;10)</option>
+                  <option value="low_stock">Low Stock (1-10)</option>
+                  <option value="out_of_stock">Out of Stock (0)</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              </div>
+
+              <button 
+                onClick={handleClearFilters}
+                className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Clear Filters
+              </button>
             </div>
           </div>
 

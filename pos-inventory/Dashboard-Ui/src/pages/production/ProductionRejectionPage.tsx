@@ -16,13 +16,16 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell
 } from 'recharts';
+import { Download } from 'lucide-react';
 import { getProductionRejection } from '../../api/production';
+import { commonApi } from '../../api/common';
 import { useAuth } from '../../contexts/AuthContext';
 
 type DateRange = 'today' | 'week' | 'month' | 'year' | 'total';
 
 export const ProductionRejectionPage = () => {
   const { user } = useAuth();
+  const branchId = user?.branch_id;
 
   // States
   const [dateRange, setDateRange] = useState<DateRange>('total');
@@ -37,7 +40,12 @@ export const ProductionRejectionPage = () => {
   const [sortBy, setSortBy] = useState<'produced_qty' | 'rejected_qty' | 'rejection_percentage'>('rejected_qty');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  const branchId = user?.branch_id || '';
+  // Fetch verified SAP filter options
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options'],
+    queryFn: () => commonApi.getFilterOptions(),
+    staleTime: 300_000,
+  });
 
   // Debounce search
   useEffect(() => {
@@ -87,16 +95,14 @@ export const ProductionRejectionPage = () => {
     setSearch('');
     setDebouncedSearch('');
     setWarehouseFilter('');
-    setDateRange('today');
-    undefined;
-    undefined;
+    setDateRange('total');
     setPage(1);
   };
 
   const queryFilters = {
     date_from,
     date_to,
-    warehouse: warehouseFilter || branchId,
+    warehouse: warehouseFilter || undefined,
     search: debouncedSearch || undefined,
   };
 
@@ -251,31 +257,64 @@ export const ProductionRejectionPage = () => {
       )}
 
       {/* FILTER BAR */}
-      <div className="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center">
-        <div className="flex-1 min-w-[260px] relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={19} />
+      <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-2xs border border-slate-200/90 flex flex-wrap gap-3.5 items-center">
+        <div className="flex-1 min-w-[240px] relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
           <input
             type="text"
-            placeholder="Search Item Code or Name..."
+            placeholder="Search Item Code or Description..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl text-[14px] sm:text-[14.5px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
+            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl text-[13.5px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 shadow-2xs transition-colors"
           />
         </div>
 
-        <input
-          type="text"
-          placeholder="Warehouse filter..."
-          value={warehouseFilter}
-          onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        {/* Warehouse Selector */}
+        <div className="relative min-w-[170px]">
+          <select
+            value={warehouseFilter}
+            onChange={(e) => { setWarehouseFilter(e.target.value); setPage(1); }}
+            className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-[13px] font-semibold text-slate-700 bg-white focus:outline-none focus:border-blue-500 shadow-2xs transition-colors cursor-pointer"
+          >
+            <option value="">All Warehouses</option>
+            {filterOptions?.warehouses?.map((w) => (
+              <option key={w.code} value={w.code}>{w.name} ({w.code})</option>
+            ))}
+          </select>
+        </div>
 
         <button
           onClick={handleResetFilters}
-          className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
+          className="px-3.5 py-2 text-[13px] font-bold text-slate-700 hover:bg-slate-50 border border-slate-200 rounded-xl shadow-2xs transition-colors cursor-pointer"
         >
-          Reset Filters
+          Reset
+        </button>
+
+        <button
+          onClick={() => {
+            const items = sortedItems || [];
+            if (items.length === 0) return;
+            const headers = ["Item Code", "Item Name", "Produced Qty", "Rejected Qty", "Rejection %"];
+            const rows = items.map(item => [
+              `"${item.item_code}"`,
+              `"${(item.item_name || '').replace(/"/g, '""')}"`,
+              item.produced_qty,
+              item.rejected_qty,
+              item.rejection_percentage
+            ]);
+            const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `production_rejection_${new Date().toISOString().substring(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }}
+          className="flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl shadow-2xs transition-colors cursor-pointer ml-auto"
+        >
+          <Download size={14} />
+          <span>Export CSV</span>
         </button>
       </div>
 

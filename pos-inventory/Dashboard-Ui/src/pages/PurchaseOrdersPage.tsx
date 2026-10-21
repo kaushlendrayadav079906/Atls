@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { purchaseOrdersApi } from '../api/purchaseOrders';
-import { useDebounce } from '../hooks/useDebounce';
+import { commonApi } from '../api/common';
 import {
   FileText, Clock, CheckCircle2, XCircle, Search, Filter, RotateCcw, 
   MoreVertical, Download, Plus, Eye, Edit, ChevronLeft, ChevronRight,
@@ -13,11 +13,14 @@ export default function PurchaseOrdersPage() {
   const { setPageFilters } = useAIAssistant();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounce(search, 400);
   
-  const [statusFilter, setStatusFilter] = useState('');
-  const [supplierFilter, setSupplierFilter] = useState('');
+  // Pending filter inputs
+  const [searchInput, setSearchInput] = useState('');
+  const [statusInput, setStatusInput] = useState('');
+  const [supplierInput, setSupplierInput] = useState('');
+  const [buyerInput, setBuyerInput] = useState('');
+  const [branchInput, setBranchInput] = useState('');
+  const [warehouseInput, setWarehouseInput] = useState('');
   
   type QuickFilter = 'today' | 'week' | 'month' | 'year' | 'custom' | '';
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('');
@@ -27,16 +30,36 @@ export default function PurchaseOrdersPage() {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
 
+  // Active applied filters
+  const [appliedFilters, setAppliedFilters] = useState({
+    search: '',
+    status: '',
+    supplier: '',
+    buyer: '',
+    branch: '',
+    warehouse: '',
+  });
+
+  // Load SAP-backed authorized filter options
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options'],
+    queryFn: () => commonApi.getFilterOptions(),
+    staleTime: 300_000,
+  });
+
   useEffect(() => {
     setPageFilters({
-      search: debouncedSearch,
-      status: statusFilter,
-      supplier: supplierFilter,
+      search: appliedFilters.search,
+      status: appliedFilters.status,
+      supplier: appliedFilters.supplier,
+      buyer: appliedFilters.buyer,
+      branch: appliedFilters.branch,
+      warehouse: appliedFilters.warehouse,
       quickFilter,
       dateFrom,
       dateTo
     });
-  }, [debouncedSearch, statusFilter, supplierFilter, quickFilter, dateFrom, dateTo, setPageFilters]);
+  }, [appliedFilters, quickFilter, dateFrom, dateTo, setPageFilters]);
   
   const applyQuickFilter = (filter: QuickFilter) => {
     setQuickFilter(filter);
@@ -64,7 +87,7 @@ export default function PurchaseOrdersPage() {
       from = new Date(now);
     } else if (filter === 'week') {
       const day = now.getDay();
-      const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday as first day
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
       from = new Date(now.setDate(diff));
     } else if (filter === 'month') {
       from = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -112,18 +135,30 @@ export default function PurchaseOrdersPage() {
   }, [isDrawerOpen]);
   
   const { data: summary, isLoading: summaryLoading } = useQuery({
-    queryKey: ['purchase-orders-summary', dateFrom, dateTo],
-    queryFn: () => purchaseOrdersApi.getSummary({ date_from: dateFrom || undefined, date_to: dateTo || undefined }),
+    queryKey: ['purchase-orders-summary', appliedFilters, dateFrom, dateTo],
+    queryFn: () => purchaseOrdersApi.getSummary({
+      search: appliedFilters.search || undefined,
+      status: appliedFilters.status || undefined,
+      supplier: appliedFilters.supplier || undefined,
+      buyer: appliedFilters.buyer || undefined,
+      branch_id: appliedFilters.branch ? Number(appliedFilters.branch) : undefined,
+      warehouse_code: appliedFilters.warehouse || undefined,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined
+    }),
   });
 
   const { data: ordersData, isLoading: ordersLoading, isError } = useQuery({
-    queryKey: ['purchase-orders', page, limit, debouncedSearch, statusFilter, supplierFilter, dateFrom, dateTo],
+    queryKey: ['purchase-orders', page, limit, appliedFilters, dateFrom, dateTo],
     queryFn: () => purchaseOrdersApi.getOrders({
       page,
       limit,
-      search: debouncedSearch,
-      status: statusFilter,
-      supplier: supplierFilter,
+      search: appliedFilters.search || undefined,
+      status: appliedFilters.status || undefined,
+      supplier: appliedFilters.supplier || undefined,
+      buyer: appliedFilters.buyer || undefined,
+      branch_id: appliedFilters.branch ? Number(appliedFilters.branch) : undefined,
+      warehouse_code: appliedFilters.warehouse || undefined,
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined
     })
@@ -135,10 +170,33 @@ export default function PurchaseOrdersPage() {
     enabled: !!selectedDocEntry && isDrawerOpen,
   });
 
+  const handleApplyFilters = () => {
+    setAppliedFilters({
+      search: searchInput,
+      status: statusInput,
+      supplier: supplierInput,
+      buyer: buyerInput,
+      branch: branchInput,
+      warehouse: warehouseInput,
+    });
+    setPage(1);
+  };
+
   const handleReset = () => {
-    setSearch('');
-    setStatusFilter('');
-    setSupplierFilter('');
+    setSearchInput('');
+    setStatusInput('');
+    setSupplierInput('');
+    setBuyerInput('');
+    setBranchInput('');
+    setWarehouseInput('');
+    setAppliedFilters({
+      search: '',
+      status: '',
+      supplier: '',
+      buyer: '',
+      branch: '',
+      warehouse: '',
+    });
     setQuickFilter('');
     setDateFrom('');
     setDateTo('');
@@ -310,20 +368,23 @@ export default function PurchaseOrdersPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
           <div>
             <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Supplier</label>
-            <input 
-               type="text" 
-               className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-800" 
-               placeholder="All Suppliers" 
-               value={supplierFilter}
-               onChange={(e) => setSupplierFilter(e.target.value)}
-            />
+            <select 
+               className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-800 bg-white" 
+               value={supplierInput}
+               onChange={(e) => setSupplierInput(e.target.value)}
+            >
+              <option value="">All Suppliers</option>
+              {filterOptions?.suppliers?.map((s) => (
+                <option key={s.code} value={s.code}>{s.name} ({s.code})</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Status</label>
             <select 
                className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-700 bg-white"
-               value={statusFilter}
-               onChange={(e) => setStatusFilter(e.target.value)}
+               value={statusInput}
+               onChange={(e) => setStatusInput(e.target.value)}
             >
               <option value="">All Status</option>
               <option value="pending">Pending</option>
@@ -333,17 +394,44 @@ export default function PurchaseOrdersPage() {
           </div>
           <div>
             <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Buyer</label>
-            <input type="text" className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 bg-slate-50 text-slate-500" placeholder="All Buyers" disabled />
+            <select 
+              className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-700 bg-white"
+              value={buyerInput}
+              onChange={(e) => setBuyerInput(e.target.value)}
+            >
+              <option value="">All Buyers</option>
+              {filterOptions?.buyers?.map((b) => (
+                <option key={b.code} value={b.code}>{b.name}</option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div>
             <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Branch</label>
-            <input type="text" className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none bg-slate-50 text-slate-500" placeholder="Authorized Branch Only" disabled />
+            <select 
+              className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-700 bg-white"
+              value={branchInput}
+              onChange={(e) => setBranchInput(e.target.value)}
+            >
+              <option value="">All Authorized Branches</option>
+              {filterOptions?.branches?.map((br) => (
+                <option key={br.id} value={br.id}>{br.name}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Warehouse</label>
-            <input type="text" className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none bg-slate-50 text-slate-500" placeholder="All Warehouses" disabled />
+            <select 
+              className="w-full text-[13.5px] border border-slate-200 rounded-lg px-3.5 py-2.5 outline-none focus:border-blue-500 font-medium text-slate-700 bg-white"
+              value={warehouseInput}
+              onChange={(e) => setWarehouseInput(e.target.value)}
+            >
+              <option value="">All Warehouses</option>
+              {filterOptions?.warehouses?.map((wh) => (
+                <option key={wh.code} value={wh.code}>{wh.name} ({wh.code})</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-[13px] sm:text-[13.5px] font-semibold text-slate-700 mb-1.5">Search</label>
@@ -353,13 +441,14 @@ export default function PurchaseOrdersPage() {
                 type="text" 
                 className="w-full text-[13.5px] border border-slate-200 rounded-lg pl-9 pr-3.5 py-2.5 outline-none focus:border-blue-500 text-slate-800" 
                 placeholder="Search by PO number, supplier..." 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
               />
             </div>
           </div>
           <div className="flex items-center gap-2 justify-end">
-             <button onClick={() => setPage(1)} className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[13.5px] px-4 py-2.5 rounded-lg transition-colors shadow-sm">
+             <button onClick={handleApplyFilters} className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[13.5px] px-4 py-2.5 rounded-lg transition-colors shadow-sm">
                <Filter className="w-4 h-4" />
                Apply Filters
              </button>
@@ -378,7 +467,30 @@ export default function PurchaseOrdersPage() {
                <FileText className="w-5 h-5 text-blue-600" />
                <h2 className="text-[16px] sm:text-[17px] font-bold text-slate-900">Purchase Orders ({ordersData?.total || 0})</h2>
             </div>
-            <button className="flex items-center gap-2 px-3.5 py-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg text-[13.5px] font-semibold transition-colors">
+            <button 
+              onClick={() => {
+                if (!ordersData?.items || ordersData.items.length === 0) return;
+                const headers = ["PO No", "Order Date", "Supplier Code", "Supplier Name", "Total Amount", "Status", "Expected Date"];
+                const rows = ordersData.items.map(o => [
+                  o.doc_num,
+                  o.doc_date ? o.doc_date.substring(0, 10) : '',
+                  `"${o.card_code}"`,
+                  `"${(o.card_name || '').replace(/"/g, '""')}"`,
+                  o.doc_total,
+                  getStatusLabel(o.document_status, o.cancelled),
+                  o.doc_due_date ? o.doc_due_date.substring(0, 10) : ''
+                ]);
+                const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `purchase_orders_${new Date().toISOString().substring(0, 10)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              className="flex items-center gap-2 px-3.5 py-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg text-[13.5px] font-semibold transition-colors cursor-pointer"
+            >
                <Download className="w-4 h-4" />
                Export
             </button>

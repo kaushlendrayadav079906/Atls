@@ -17,7 +17,12 @@ from app.services.sap.inventory_service import SAPInventoryService
 # ---------------------------------------------------------------------------
 
 def _user(role="operator", branch_id="BRANCH_A"):
-    return {"sub": f"{role}1", "role": role, "branch_id": branch_id}
+    return {
+        "sub": f"{role}1",
+        "role": role,
+        "branch_id": branch_id,
+        "permissions": ["products.view", "products.edit"] if role == "admin" else ["products.view"],
+    }
 
 
 @pytest.fixture
@@ -206,7 +211,9 @@ def test_refresh_cache_forbidden_for_operator(client):
 
 
 def test_refresh_cache_allowed_for_manager(client):
-    app.dependency_overrides[get_current_user] = lambda: _user("manager")
+    app.dependency_overrides[get_current_user] = lambda: {
+        "sub": "manager1", "role": "manager", "branch_id": "BRANCH_A", "permissions": ["products.view", "products.edit"]
+    }
     with patch("app.api.v1.products._refresh_cache_background", return_value=None):
         resp = client.post("/api/v1/products/refresh-cache")
     assert resp.status_code == 202

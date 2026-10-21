@@ -8,13 +8,13 @@ from app.services.sap.client import SAPValidationError
 client = TestClient(app)
 
 def mock_get_current_user_operator():
-    return {"sub": "op1", "role": "operator", "branch_id": "BRANCH_A"}
+    return {"sub": "op1", "role": "operator", "branch_id": "BRANCH_A", "permissions": ["invoices.view", "invoices.edit"]}
 
 def mock_get_current_user_manager():
-    return {"sub": "mgr1", "role": "manager", "branch_id": "BRANCH_A"}
+    return {"sub": "mgr1", "role": "manager", "branch_id": "BRANCH_A", "permissions": ["invoices.view", "invoices.edit"]}
 
 def mock_get_current_user_admin():
-    return {"sub": "admin1", "role": "admin"}
+    return {"sub": "admin1", "role": "admin", "permissions": ["*"]}
 
 @pytest.fixture
 def mock_invoice_service():

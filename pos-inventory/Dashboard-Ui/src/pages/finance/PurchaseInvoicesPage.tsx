@@ -1,31 +1,87 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FileSpreadsheet, ArrowLeft, RefreshCw, ShoppingCart } from 'lucide-react';
+import { FileSpreadsheet, ArrowLeft, RefreshCw, ShoppingCart, Calendar, ChevronDown, Download, Search, Building2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
+import { commonApi } from '../../api/common';
 
 export const PurchaseInvoicesPage: React.FC = () => {
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  type QuickFilter = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all_time' | 'custom';
+  const [range, setRange] = useState<QuickFilter>('monthly');
+  const [branch, setBranch] = useState('');
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
 
-  const fetchPurchaseInvoices = async () => {
-    setLoading(true);
-    try {
-      const res = await apiClient.get('/finance/overview');
-      setInvoices(res.data?.tables?.top_suppliers || []);
-    } catch {
-      // fallback
-    } finally {
-      setLoading(false);
+  // Load SAP-backed authorized filter options
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options'],
+    queryFn: () => commonApi.getFilterOptions(),
+    staleTime: 300_000,
+  });
+
+  const applyQuickFilter = (f: QuickFilter) => {
+    setRange(f);
+    if (f === 'all_time') {
+      setDateFrom('');
+      setDateTo('');
+      setCustomFrom('');
+      setCustomTo('');
+      return;
     }
+    if (f === 'custom') {
+      setDateFrom(customFrom);
+      setDateTo(customTo);
+      return;
+    }
+    const now = new Date();
+    const to = new Date();
+    let from = new Date(now);
+    if (f === 'daily') {
+      from = new Date(now);
+    } else if (f === 'weekly') {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      from = new Date(now.setDate(diff));
+    } else if (f === 'monthly') {
+      from = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else if (f === 'yearly') {
+      from = new Date(now.getFullYear(), 0, 1);
+    }
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    setDateFrom(`${from.getFullYear()}-${pad(from.getMonth() + 1)}-${pad(from.getDate())}`);
+    setDateTo(`${to.getFullYear()}-${pad(to.getMonth() + 1)}-${pad(to.getDate())}`);
   };
 
-  useEffect(() => {
-    fetchPurchaseInvoices();
-  }, []);
+  const { data: overviewData, isLoading, refetch } = useQuery({
+    queryKey: ['purchase-invoices-overview', range, branch, dateFrom, dateTo],
+    queryFn: async () => {
+      const params: any = { range };
+      if (branch) params.branch = branch;
+      if (dateFrom) params.from_date = dateFrom;
+      if (dateTo) params.to_date = dateTo;
+      const res = await apiClient.get('/finance/overview', { params });
+      return res.data;
+    }
+  });
+
+  const suppliers = overviewData?.tables?.top_suppliers || [];
+  const filteredSuppliers = suppliers.filter((s: any) => {
+    if (!search) return true;
+    const term = search.toLowerCase();
+    return (s.supplierName || '').toLowerCase().includes(term) || (s.supplierCode || '').toLowerCase().includes(term);
+  });
+
+  const totalInvoices = suppliers.reduce((sum: number, s: any) => sum + (Number(s.invoices) || 0), 0);
+  const totalPurchases = suppliers.reduce((sum: number, s: any) => sum + (Number(s.netPurchases) || 0), 0);
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link to="/finance" className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 transition">
             <ArrowLeft size={16} className="text-slate-600" />
@@ -35,28 +91,158 @@ export const PurchaseInvoicesPage: React.FC = () => {
             <p className="atlas-page-subtitle text-sm sm:text-[15px] text-slate-500">A/P Purchase invoices and vendor billing from SAP Business One.</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Date Selector */}
+          <div className="relative date-dropdown-container">
+            <button 
+              onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+              className="flex items-center gap-2 px-3.5 py-2 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors font-medium text-[13px] shadow-2xs"
+            >
+              <Calendar className="w-4 h-4 text-slate-500" />
+              {range === 'all_time' ? 'All Dates (Total)' :
+               range === 'daily' ? 'Today' : 
+               range === 'custom' ? 'Custom Range' :
+               `This ${range.charAt(0).toUpperCase() + range.slice(1).replace('ly', '')}`}
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isDateDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {isDateDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 shadow-xl rounded-xl py-1 z-50">
+                <button
+                  onClick={() => { applyQuickFilter('all_time'); setIsDateDropdownOpen(false); }}
+                  className={`w-full text-left px-4 py-2 text-[13px] transition-colors ${
+                    range === 'all_time' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  All Dates (Total)
+                </button>
+                <div className="px-3 py-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50">Quick Filters</div>
+                {(['daily', 'weekly', 'monthly', 'yearly'] as const).map(f => {
+                  const label = f === 'daily' ? 'Today' : `This ${f.charAt(0).toUpperCase() + f.slice(1).replace('ly', '')}`;
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => { applyQuickFilter(f); setIsDateDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2 text-[13px] transition-colors ${
+                        range === f ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+                <div className="px-3 py-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-y border-slate-100 bg-slate-50 mt-1">Custom Range</div>
+                <div className="p-3 flex flex-col gap-2">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-500 mb-1 block">From</label>
+                    <input type="date" className="w-full text-[12.5px] border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={customFrom} onChange={e => setCustomFrom(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-500 mb-1 block">To</label>
+                    <input type="date" className="w-full text-[12.5px] border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500" value={customTo} onChange={e => setCustomTo(e.target.value)} />
+                  </div>
+                  <button 
+                    disabled={!customFrom || !customTo}
+                    onClick={() => { applyQuickFilter('custom'); setIsDateDropdownOpen(false); }}
+                    className="w-full mt-2 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded font-medium text-[12.5px] transition-colors"
+                  >
+                    Apply Custom
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <Link
             to="/purchase-orders"
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 text-[13px] sm:text-[13.5px] font-semibold text-slate-700 shadow-2xs transition"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2 text-[13px] font-semibold text-slate-700 shadow-2xs transition"
           >
             <ShoppingCart size={15} />
             <span>Purchase Orders</span>
           </Link>
           <button
-            onClick={fetchPurchaseInvoices}
-            className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-[13px] sm:text-[13.5px] font-semibold shadow-2xs transition cursor-pointer"
+            onClick={() => refetch()}
+            className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 text-[13px] font-semibold shadow-2xs transition cursor-pointer"
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
             <span>Refresh</span>
           </button>
         </div>
       </div>
 
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
+          <p className="text-[13px] font-semibold text-slate-500 uppercase tracking-wider">A/P Invoices Recorded</p>
+          <h3 className="text-2xl font-black text-slate-900 mt-1">{totalInvoices}</h3>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
+          <p className="text-[13px] font-semibold text-slate-500 uppercase tracking-wider">Net Purchases (SAP)</p>
+          <h3 className="text-2xl font-black text-slate-900 mt-1">₹{totalPurchases.toLocaleString('en-IN')}</h3>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
+          <p className="text-[13px] font-semibold text-slate-500 uppercase tracking-wider">Active Suppliers</p>
+          <h3 className="text-2xl font-black text-slate-900 mt-1">{suppliers.length}</h3>
+        </div>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input 
+            type="text" 
+            placeholder="Search supplier by code or name..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-[13.5px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
+          />
+        </div>
+        <div className="relative w-[200px]">
+          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+          <select 
+            value={branch}
+            onChange={(e) => setBranch(e.target.value)}
+            className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-[13.5px] text-slate-700 focus:outline-none focus:border-blue-500 transition-colors"
+          >
+            <option value="">All Branches</option>
+            {filterOptions?.branches?.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </div>
+        <button 
+          onClick={() => {
+            if (filteredSuppliers.length === 0) return;
+            const headers = ["Supplier Code", "Supplier Name", "Invoices Count", "Net Purchases", "% of Total"];
+            const rows = filteredSuppliers.map((s: any) => [
+              `"${s.supplierCode}"`,
+              `"${(s.supplierName || '').replace(/"/g, '""')}"`,
+              s.invoices,
+              s.netPurchases,
+              s.percentage
+            ]);
+            const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map((e: any) => e.join(','))].join('\n');
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `purchase_invoices_${new Date().toISOString().substring(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }}
+          className="flex items-center gap-2 px-4 py-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl text-[13px] font-semibold transition-colors cursor-pointer"
+        >
+          <Download size={15} />
+          <span>Export CSV</span>
+        </button>
+      </div>
+
+      {/* Invoices Table */}
       <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-2xs">
         <div className="flex items-center gap-2.5 mb-4 pb-2.5 border-b border-slate-100">
           <FileSpreadsheet size={20} className="text-amber-500" />
-          <h2 className="atlas-card-title text-[16px] font-bold text-slate-900">A/P Invoices by Supplier</h2>
+          <h2 className="atlas-card-title text-[16px] font-bold text-slate-900">A/P Invoices by Supplier ({filteredSuppliers.length})</h2>
         </div>
 
         <div className="overflow-x-auto">
@@ -71,12 +257,12 @@ export const PurchaseInvoicesPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 text-slate-700">
-              {loading ? (
+              {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400 text-sm">Loading purchase invoices...</td>
+                  <td colSpan={5} className="py-8 text-center text-slate-400 text-sm">Loading purchase invoices from SAP...</td>
                 </tr>
-              ) : invoices.length > 0 ? (
-                invoices.map((s, idx) => (
+              ) : filteredSuppliers.length > 0 ? (
+                filteredSuppliers.map((s: any, idx: number) => (
                   <tr key={idx} className="hover:bg-slate-50 transition">
                     <td className="py-3 font-mono text-[12px] font-semibold text-slate-600">{s.supplierCode}</td>
                     <td className="py-3 font-semibold text-slate-900">{s.supplierName}</td>
@@ -87,7 +273,7 @@ export const PurchaseInvoicesPage: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400 text-sm">No purchase invoices found in SAP.</td>
+                  <td colSpan={5} className="py-8 text-center text-slate-400 text-sm">No purchase invoices found matching the selected filters.</td>
                 </tr>
               )}
             </tbody>

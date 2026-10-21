@@ -7,10 +7,10 @@ from app.core.security import get_current_user
 client = TestClient(app)
 
 def mock_get_current_user_operator():
-    return {"sub": "op1", "role": "operator", "branch_id": "BRANCH_A"}
+    return {"sub": "op1", "role": "operator", "branch_id": "BRANCH_A", "permissions": ["invoices.view", "sales.view"]}
 
 def mock_get_current_user_admin():
-    return {"sub": "admin1", "role": "admin"}
+    return {"sub": "admin1", "role": "admin", "permissions": ["*"]}
 
 @pytest.fixture
 def mock_invoice_service():

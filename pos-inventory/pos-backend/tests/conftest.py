@@ -16,7 +16,16 @@ def client():
         patch("app.services.sap.client.SAPServiceLayerClient.login", return_value=True),
         patch("app.services.sap.items_service.SAPItemsService.get_items", return_value=[]),
     ):
-        app.dependency_overrides[get_current_user] = lambda: {"sub": "test", "branch_id": 1}
+        app.dependency_overrides[get_current_user] = lambda: {
+            "sub": "test",
+            "id": 1,
+            "user_id": 1,
+            "username": "test",
+            "role": "admin",
+            "branch_id": 1,
+            "permissions": ["*"],
+            "is_active": True,
+        }
         with TestClient(app) as test_client:
             yield test_client
 

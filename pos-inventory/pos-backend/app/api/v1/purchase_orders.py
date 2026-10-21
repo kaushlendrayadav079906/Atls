@@ -1,6 +1,6 @@
 import math
 import logging
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, Query, HTTPException
 from app.core.security import get_current_user, require_permission
 from app.schemas.purchase_orders import (
@@ -16,6 +16,72 @@ from app.services.sap.client import SAPConnectionError
 router = APIRouter()
 logger = logging.getLogger(__name__)
 _service = SAPPurchaseOrdersService()
+
+def _build_purchase_order_filters(
+    current_user: dict,
+    branch_id: Optional[int] = None,
+    supplier: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    buyer: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    search: Optional[str] = None,
+) -> List[str]:
+    filters = []
+    
+    # 1. Enforce branch isolation based on user context
+    user_branch = current_user.get("branch_id")
+    user_role = str(current_user.get("role") or "").lower()
+    
+    if user_branch and user_role not in ("admin", "administrator"):
+        if branch_id and branch_id != user_branch:
+            raise HTTPException(status_code=403, detail="Unauthorized access to branch")
+        target_branch = user_branch
+    else:
+        target_branch = branch_id
+
+    if target_branch:
+        filters.append(f"BPL_IDAssignedToInvoice eq {target_branch}")
+        
+    # 2. Supplier
+    if supplier:
+        safe_supplier = supplier.replace("'", "''")
+        filters.append(f"CardCode eq '{safe_supplier}'")
+        
+    # 3. Status
+    if status_filter:
+        s_low = status_filter.lower()
+        if s_low in ("pending", "open", "bost_open"):
+            filters.append("DocumentStatus eq 'bost_Open' and Cancelled eq 'tNO'")
+        elif s_low in ("received", "completed", "closed", "bost_close"):
+            filters.append("DocumentStatus eq 'bost_Close' and Cancelled eq 'tNO'")
+        elif s_low in ("cancelled", "canceled"):
+            filters.append("Cancelled eq 'tYES'")
+            
+    # 4. Buyer / Sales Person
+    if buyer:
+        try:
+            buyer_code = int(buyer)
+            filters.append(f"SalesPersonCode eq {buyer_code}")
+        except ValueError:
+            pass
+            
+    # 5. Date Range
+    if date_from:
+        filters.append(f"DocDate ge '{date_from}'")
+    if date_to:
+        filters.append(f"DocDate le '{date_to}'")
+        
+    # 6. Search (DocNum or substring on CardName, CardCode, Comments)
+    if search:
+        s_clean = search.strip()
+        safe_search = s_clean.replace("'", "''")
+        if s_clean.isdigit():
+            filters.append(f"(DocNum eq {int(s_clean)} or substringof('{safe_search}', CardName) or substringof('{safe_search}', CardCode))")
+        else:
+            filters.append(f"(substringof('{safe_search}', CardName) or substringof('{safe_search}', CardCode) or substringof('{safe_search}', Comments))")
+            
+    return filters
 
 @router.get("", response_model=PurchaseOrderListResponse)
 def list_purchase_orders(
@@ -33,44 +99,23 @@ def list_purchase_orders(
 ):
     try:
         skip = (page - 1) * limit
-        filters = []
-        
-        user_branch = current_user.get("branch_id")
-        if branch_id and user_branch and branch_id != user_branch:
-            raise HTTPException(status_code=403, detail="Unauthorized access to branch")
-            
-        target_branch = branch_id or user_branch
-        if target_branch:
-            filters.append(f"BPL_IDAssignedToInvoice eq {target_branch}")
-            
-        if search:
-            safe_search = search.replace("'", "''")
-            filters.append(f"(substringof('{safe_search}', CardName) or substringof('{safe_search}', CardCode))")
-            
-        if supplier:
-            safe_supplier = supplier.replace("'", "''")
-            filters.append(f"CardCode eq '{safe_supplier}'")
-            
-        if status_filter:
-            if status_filter.lower() == "pending":
-                filters.append("DocumentStatus eq 'bost_Open' and Cancelled eq 'tNO'")
-            elif status_filter.lower() == "received":
-                filters.append("DocumentStatus eq 'bost_Close' and Cancelled eq 'tNO'")
-            elif status_filter.lower() == "cancelled":
-                filters.append("Cancelled eq 'tYES'")
-                
-        if buyer:
-            filters.append(f"SalesPersonCode eq {buyer}")
-            
-        if date_from:
-            filters.append(f"DocDate ge '{date_from}'")
-        if date_to:
-            filters.append(f"DocDate le '{date_to}'")
-            
-        if warehouse_code:
-             filters.append(f"DocumentLines/any(l: l/WarehouseCode eq '{warehouse_code}')")
+        filters = _build_purchase_order_filters(
+            current_user=current_user,
+            branch_id=branch_id,
+            supplier=supplier,
+            status_filter=status_filter,
+            buyer=buyer,
+            date_from=date_from,
+            date_to=date_to,
+            search=search,
+        )
 
-        response = _service.list_purchase_orders(skip=skip, top=limit, filters=filters)
+        response = _service.list_purchase_orders(
+            skip=skip, 
+            top=limit, 
+            filters=filters,
+            warehouse_code=warehouse_code
+        )
         
         items = []
         for v in response.get("value", []):
@@ -109,27 +154,32 @@ def list_purchase_orders(
 
 @router.get("/summary", response_model=PurchaseOrderSummary)
 def get_purchase_order_summary(
+    search: Optional[str] = None,
+    status_filter: Optional[str] = Query(None, alias="status"),
+    supplier: Optional[str] = None,
+    buyer: Optional[str] = None,
     branch_id: Optional[int] = None,
+    warehouse_code: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     current_user: dict = Depends(require_permission("purchase_orders.view"))
 ):
     try:
-        filters = []
-        user_branch = current_user.get("branch_id")
-        if branch_id and user_branch and branch_id != user_branch:
-            raise HTTPException(status_code=403, detail="Unauthorized access to branch")
+        filters = _build_purchase_order_filters(
+            current_user=current_user,
+            branch_id=branch_id,
+            supplier=supplier,
+            status_filter=status_filter,
+            buyer=buyer,
+            date_from=date_from,
+            date_to=date_to,
+            search=search,
+        )
             
-        target_branch = branch_id or user_branch
-        if target_branch:
-            filters.append(f"BPL_IDAssignedToInvoice eq {target_branch}")
-            
-        if date_from:
-            filters.append(f"DocDate ge '{date_from}'")
-        if date_to:
-            filters.append(f"DocDate le '{date_to}'")
-            
-        summary = _service.get_purchase_order_summary(filters=filters)
+        summary = _service.get_purchase_order_summary(
+            filters=filters,
+            warehouse_code=warehouse_code
+        )
         return PurchaseOrderSummary(**summary)
     except SAPConnectionError as e:
         logger.error(f"SAP API Error: {e}")
@@ -149,8 +199,9 @@ def get_purchase_order(
         response = _service.get_purchase_order(doc_entry)
         
         user_branch = current_user.get("branch_id")
+        user_role = str(current_user.get("role") or "").lower()
         order_branch = response.get("BPL_IDAssignedToInvoice")
-        if user_branch and order_branch and user_branch != order_branch:
+        if user_branch and user_role not in ("admin", "administrator") and order_branch and user_branch != order_branch:
             raise HTTPException(status_code=403, detail="Unauthorized access to branch")
 
         lines = []

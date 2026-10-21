@@ -666,14 +666,16 @@ async def _customer_search_fallback(search: Optional[str], top: int = 20) -> Lis
 @limiter.limit(settings.RATE_LIMIT_GENERAL)
 async def search_customers(
     request: Request,
-    search: str = Query(None, description="Search term for customer name or code"),
+    search: Optional[str] = Query(None, description="Search term for customer name or code"),
+    card_type: Optional[str] = Query(None, description="Filter by CardType: cCustomer or cSupplier"),
+    status: Optional[str] = Query(None, description="Filter by status: Active or Frozen"),
     current_user: dict = Depends(require_permission("dashboard.view")),
 ):
-    """Search for customers using SAP Business Partners."""
+    """Search for business partners using SAP Business Partners."""
     try:
         loop = asyncio.get_running_loop()
         bp_service = SAPBusinessPartnersService()
-        customers = bp_service.search_customers(search_term=search, top=50)
+        customers = bp_service.search_customers(search_term=search, card_type=card_type, status=status, top=100)
         
         # Calculate lifetime value
         invoice_service = SAPInvoicesService()
@@ -691,11 +693,11 @@ async def search_customers(
         result = []
         for c in customers:
             code = c.get("CardCode")
-            status = "Active"
+            st = "Active"
             if c.get("Valid") == "tYES":
-                status = "Active"
+                st = "Active"
             elif c.get("Frozen") == "tYES":
-                status = "Frozen"
+                st = "Frozen"
                 
             result.append({
                 "cardCode": code,
@@ -706,7 +708,7 @@ async def search_customers(
                 "paymentMethod": None,
                 "salesEmployee": None,
                 "lifetimeValue": round(clv_map.get(code, 0.0), 2),
-                "status": status,
+                "status": st,
                 "cardType": c.get("CardType") or "Retail",
             })
         return result
@@ -750,6 +752,9 @@ async def get_recent_sales_feed(
     customer: Optional[str] = Query(None, description="Filter by customer Name or Code"),
     category: Optional[str] = Query(None, description="Filter by category"),
     payment_method: Optional[str] = Query(None, description="Filter by payment method"),
+    status: Optional[str] = Query(None, description="Filter by document status (open/closed/cancelled)"),
+    branch: Optional[str] = Query(None, description="Filter by authorized branch"),
+    branch_id: Optional[str] = Query(None, description="Filter by branch ID alias"),
     limit: int = Query(10, ge=1, le=50),
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(require_permission("dashboard.view")),
@@ -760,7 +765,7 @@ async def get_recent_sales_feed(
     start_date, end_date = _get_date_range_with_custom(range, effective_from, effective_to)
     try:
         invoice_service = SAPInvoicesService()
-        branch = _resolve_branch_for_user(current_user)
+        target_branch = _resolve_branch_for_user(current_user, branch or branch_id)
         loop = asyncio.get_running_loop()
         invoices = await loop.run_in_executor(
             _executor,
@@ -774,7 +779,7 @@ async def get_recent_sales_feed(
         logger.error(f"Recent sales feed fetch failed: {exc}")
         raise HTTPException(status_code=502, detail="Could not retrieve recent sales feed from SAP")
 
-    filtered = _filter_invoices_by_branch(invoices, branch)
+    filtered = _filter_invoices_by_branch(invoices, target_branch)
     
     if customer:
         c_low = customer.strip().lower()
@@ -783,6 +788,15 @@ async def get_recent_sales_feed(
     if payment_method:
         pm_low = payment_method.strip().lower()
         filtered = [inv for inv in filtered if str(inv.get("U_P_Method") or "").strip().lower() == pm_low]
+        
+    if status:
+        s_low = status.strip().lower()
+        if s_low in ("open", "pending", "bost_open"):
+            filtered = [inv for inv in filtered if str(inv.get("DocumentStatus")).lower() == "bost_open"]
+        elif s_low in ("closed", "paid", "bost_close", "completed"):
+            filtered = [inv for inv in filtered if str(inv.get("DocumentStatus")).lower() != "bost_open"]
+        elif s_low in ("cancelled", "canceled"):
+            filtered = [inv for inv in filtered if str(inv.get("Cancelled")).lower() in ("tyes", "y", "true")]
         
     if category:
         cat_low = category.strip().lower()

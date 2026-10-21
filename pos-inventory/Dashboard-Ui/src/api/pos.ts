@@ -25,10 +25,34 @@ export const posApi = {
    * Branch-scoped stock is enforced by the backend via JWT branch_id.
    * Max search length: 100 chars (backend Query param constraint).
    */
-  searchProducts: async (search: string): Promise<Product[]> => {
+  searchProducts: async (queryOrOptions?: string | {
+    search?: string;
+    warehouse?: string;
+    category?: string;
+    stock_status?: string;
+    force_refresh?: boolean;
+  }): Promise<Product[]> => {
     const params: Record<string, string> = {};
-    if (search.trim()) {
-      params.search = search.trim().slice(0, 100);
+    if (typeof queryOrOptions === 'string') {
+      if (queryOrOptions.trim()) {
+        params.search = queryOrOptions.trim().slice(0, 100);
+      }
+    } else if (queryOrOptions) {
+      if (queryOrOptions.search?.trim()) {
+        params.search = queryOrOptions.search.trim().slice(0, 100);
+      }
+      if (queryOrOptions.warehouse) {
+        params.warehouse = queryOrOptions.warehouse;
+      }
+      if (queryOrOptions.category) {
+        params.category = queryOrOptions.category;
+      }
+      if (queryOrOptions.stock_status) {
+        params.stock_status = queryOrOptions.stock_status;
+      }
+      if (queryOrOptions.force_refresh) {
+        params.force_refresh = 'true';
+      }
     }
     const res = await apiClient.get<Product[]>('/products', { params });
     return res.data;
