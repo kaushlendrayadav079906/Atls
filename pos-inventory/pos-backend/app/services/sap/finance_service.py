@@ -216,7 +216,7 @@ class SAPFinanceService:
             yr = int(r)
             return date(yr, 1, 1), date(yr, 12, 31)
         elif r in ("all", "all_time", "total"):
-            return date(today.year - 5, 1, 1), today
+            return date(2000, 1, 1), today
         else:
             return first_this_month, today
 
@@ -228,7 +228,9 @@ class SAPFinanceService:
 
     def _get_period_label(self, range_str: str, d_from: date, d_to: date) -> str:
         r = (range_str or "monthly").lower().strip()
-        if r in ("daily", "today"):
+        if r in ("all", "all_time", "total"):
+            return "All Dates (Total)"
+        elif r in ("daily", "today"):
             return f"Today ({d_from})"
         elif r in ("weekly", "week", "this_week"):
             return f"This Week ({d_from} to {d_to})"
@@ -691,16 +693,17 @@ class SAPFinanceService:
 
     def get_purchase_invoices(
         self,
-        range_str: str = "monthly",
+        range_str: str = "all_time",
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
         supplier_code: Optional[str] = None,
         status: Optional[str] = None,
         branch_id: Optional[str] = None,
         search: Optional[str] = None,
-        limit: int = 20,
+        page: int = 1,
+        page_size: int = 20,
     ) -> Dict[str, Any]:
-        """Fetch detailed purchase invoices from SAP Service Layer with filtering."""
+        """Fetch detailed purchase invoices from SAP Service Layer with pagination, filtering, and KPIs."""
         d_from, d_to = self._resolve_date_range(range_str, from_date, to_date)
         try:
             filters = [
@@ -710,71 +713,133 @@ class SAPFinanceService:
             ]
             if supplier_code:
                 filters.append(f"CardCode eq '{supplier_code}'")
-            if status:
-                s_low = status.lower()
-                if s_low in ("open", "unpaid"):
-                    filters.append("DocumentStatus eq 'bost_Open'")
-                elif s_low in ("closed", "paid"):
-                    filters.append("DocumentStatus eq 'bost_Close'")
 
             filter_str = " and ".join(filters)
             params = {
                 "$filter": filter_str,
                 "$orderby": "DocDate desc, DocEntry desc",
-                "$top": 200,
-                "$select": "DocEntry,DocNum,DocDate,CardCode,CardName,DocTotal,DocumentStatus,DocCurrency",
+                "$top": 500,
+                "$select": "DocEntry,DocNum,DocDate,DocDueDate,CardCode,CardName,DocTotal,PaidToDate,DocumentStatus,DocCurrency,Cancelled,BPL_IDAssignedToInvoice,BPLName",
             }
             res = self.client.get("PurchaseInvoices", params)
-            raw = res.get("value", [])
+            raw = res.get("value", []) if isinstance(res, dict) else []
         except Exception as e:
             logger.warning("Error querying PurchaseInvoices: %s", e)
             raw = []
 
+        raw = [p for p in raw if p.get("Cancelled") != "tYES"]
+
         if search:
-            q = search.lower()
+            q = search.lower().strip()
             raw = [
                 p for p in raw
                 if q in str(p.get("CardName") or "").lower()
                 or q in str(p.get("CardCode") or "").lower()
                 or q in str(p.get("DocNum") or "").lower()
+                or q in str(p.get("DocEntry") or "").lower()
             ]
 
-        total_amount = round(sum(_to_float(p.get("DocTotal")) for p in raw), 2)
-        total_count = len(raw)
+        if branch_id and branch_id.upper() not in ("ALL", "*"):
+            b_up = branch_id.upper()
+            raw = [p for p in raw if str(p.get("BPLID") or p.get("BPL_IDAssignedToInvoice") or p.get("BPLName") or "").upper() == b_up]
 
-        items = []
-        for p in raw[:limit]:
+        total_purchases = 0.0
+        total_paid = 0.0
+        total_outstanding = 0.0
+        status_counts = {"paid": 0, "partially_paid": 0, "unpaid": 0}
+
+        enriched_invoices = []
+        for p in raw:
+            doc_total = _to_float(p.get("DocTotal"))
+            paid_to_date = _to_float(p.get("PaidToDate"))
+            balance_due = max(0.0, round(doc_total - paid_to_date, 2))
+            doc_status = p.get("DocumentStatus")
+
+            is_paid = doc_status == "bost_Close" or (paid_to_date >= doc_total and doc_total > 0)
+            is_partial = paid_to_date > 0 and paid_to_date < doc_total
+            payment_status = "Paid" if is_paid else ("Partially Paid" if is_partial else "Unpaid")
+
+            if payment_status == "Paid":
+                status_counts["paid"] += 1
+            elif payment_status == "Partially Paid":
+                status_counts["partially_paid"] += 1
+            else:
+                status_counts["unpaid"] += 1
+
+            if status and status.lower() not in ("all", ""):
+                s_low = status.lower()
+                if s_low in ("paid", "closed") and payment_status != "Paid":
+                    continue
+                elif s_low in ("unpaid", "open") and payment_status != "Unpaid":
+                    continue
+                elif s_low in ("partially_paid", "partial") and payment_status != "Partially Paid":
+                    continue
+
+            total_purchases += doc_total
+            total_paid += min(doc_total, paid_to_date)
+            total_outstanding += balance_due
+
             d_date = str(p.get("DocDate") or "")[:10]
-            items.append({
+            d_due = str(p.get("DocDueDate") or "")[:10] if p.get("DocDueDate") else d_date
+
+            enriched_invoices.append({
                 "doc_entry": p.get("DocEntry"),
                 "doc_num": p.get("DocNum") or p.get("DocEntry"),
                 "doc_date": d_date,
+                "doc_due_date": d_due,
                 "card_code": p.get("CardCode") or "UNKNOWN",
                 "card_name": p.get("CardName") or p.get("CardCode") or "Supplier",
-                "doc_total": _to_float(p.get("DocTotal")),
-                "status": "Open" if p.get("DocumentStatus") == "bost_Open" else "Closed",
+                "doc_total": doc_total,
+                "paid_to_date": paid_to_date,
+                "balance_due": balance_due,
+                "payment_status": payment_status,
+                "document_status": "Closed" if doc_status == "bost_Close" else "Open",
+                "currency": p.get("DocCurrency") or "INR",
+                "branch": str(p.get("BPLName") or p.get("BPL_IDAssignedToInvoice") or "Main Branch"),
             })
 
+        total_count = len(enriched_invoices)
+        page = max(1, page)
+        page_size = max(1, min(100, page_size))
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+        start_idx = (page - 1) * page_size
+        paginated_items = enriched_invoices[start_idx : start_idx + page_size]
+
         return {
-            "period": self._get_period_label(range_str, d_from, d_to),
-            "date_from": d_from.isoformat(),
-            "date_to": d_to.isoformat(),
+            "period": {
+                "range": range_str,
+                "label": self._get_period_label(range_str, d_from, d_to),
+                "from_date": d_from.isoformat(),
+                "to_date": d_to.isoformat(),
+            },
+            "kpis": {
+                "total_invoices": total_count,
+                "total_purchases": round(total_purchases, 2),
+                "total_paid": round(total_paid, 2),
+                "total_outstanding_balance": round(total_outstanding, 2),
+                "status_counts": status_counts,
+            },
             "total_count": total_count,
-            "total_amount": total_amount,
-            "purchase_invoices": items,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "invoices": paginated_items,
+            "purchase_invoices": paginated_items,
         }
 
     def get_incoming_payments(
         self,
-        range_str: str = "monthly",
+        range_str: str = "all_time",
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
         customer_code: Optional[str] = None,
         payment_method: Optional[str] = None,
         branch_id: Optional[str] = None,
-        limit: int = 20,
+        search: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
     ) -> Dict[str, Any]:
-        """Fetch detailed customer incoming payments from SAP."""
+        """Fetch detailed customer incoming payments from SAP Business One."""
         d_from, d_to = self._resolve_date_range(range_str, from_date, to_date)
         try:
             filters = [
@@ -788,63 +853,125 @@ class SAPFinanceService:
             params = {
                 "$filter": filter_str,
                 "$orderby": "DocDate desc, DocEntry desc",
-                "$top": 200,
-                "$select": "DocEntry,DocNum,DocDate,CardCode,CardName,CashSum,TransferSum,CheckSum,DocCurrency",
+                "$top": 500,
+                "$select": "DocEntry,DocNum,DocDate,CardCode,CardName,CashSum,TransferSum,Cancelled,DocCurrency,BPLID,BPLName,PaymentInvoices",
             }
             res = self.client.get("IncomingPayments", params)
-            raw = res.get("value", [])
+            raw = res.get("value", []) if isinstance(res, dict) else []
         except Exception as e:
             logger.warning("Error querying IncomingPayments: %s", e)
             raw = []
 
+        raw = [p for p in raw if p.get("Cancelled") != "tYES"]
+
+        if search:
+            q = search.lower().strip()
+            raw = [
+                p for p in raw
+                if q in str(p.get("CardName") or "").lower()
+                or q in str(p.get("CardCode") or "").lower()
+                or q in str(p.get("DocNum") or "").lower()
+                or q in str(p.get("DocEntry") or "").lower()
+            ]
+
+        if branch_id and branch_id.upper() not in ("ALL", "*"):
+            b_up = branch_id.upper()
+            raw = [p for p in raw if str(p.get("BPLID") or p.get("BPLName") or "").upper() == b_up]
+
         total_amount = 0.0
-        by_method = {"cash": 0.0, "transfer": 0.0, "check": 0.0}
+        by_method = {"cash": 0.0, "transfer": 0.0, "other": 0.0}
         items = []
 
         for p in raw:
             cash = _to_float(p.get("CashSum"))
             transfer = _to_float(p.get("TransferSum"))
-            check = _to_float(p.get("CheckSum"))
-            tot = cash + transfer + check
+            tot = round(cash + transfer, 2)
+
+            if transfer > 0 and cash > 0:
+                method_name = "Transfer & Cash"
+            elif transfer > 0:
+                method_name = "Bank Transfer"
+            elif cash > 0:
+                method_name = "Cash"
+            else:
+                method_name = "Bank Transfer"
+
+            if payment_method and payment_method.lower() not in ("all", ""):
+                if payment_method.lower() not in method_name.lower():
+                    continue
+
             total_amount += tot
             by_method["cash"] += cash
             by_method["transfer"] += transfer
-            by_method["check"] += check
 
-            primary_method = "Transfer" if transfer > cash and transfer > check else ("Cash" if cash > 0 else "Check")
-            if payment_method and payment_method.lower() not in primary_method.lower():
-                continue
+            pinvs = p.get("PaymentInvoices") or []
+            applied_invoices = [
+                {
+                    "docEntry": inv.get("DocEntry"),
+                    "docNum": inv.get("DocNum"),
+                    "sumApplied": _to_float(inv.get("SumApplied")),
+                }
+                for inv in pinvs
+            ]
 
             items.append({
                 "doc_entry": p.get("DocEntry"),
+                "doc_num": p.get("DocNum") or p.get("DocEntry"),
                 "ref_no": f"RCT-{p.get('DocNum') or p.get('DocEntry')}",
                 "date": str(p.get("DocDate") or "")[:10],
                 "customer_code": p.get("CardCode") or "",
                 "customer_name": p.get("CardName") or p.get("CardCode") or "Customer",
-                "amount": round(tot, 2),
-                "method": primary_method,
+                "amount": tot,
+                "method": method_name,
+                "applied_invoices_count": len(applied_invoices),
+                "applied_invoices": applied_invoices,
+                "status": "Completed",
+                "currency": p.get("DocCurrency") or "INR",
+                "branch": str(p.get("BPLName") or p.get("BPLID") or "Main Branch"),
             })
 
+        total_count = len(items)
+        page = max(1, page)
+        page_size = max(1, min(100, page_size))
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+        start_idx = (page - 1) * page_size
+        paginated_items = items[start_idx : start_idx + page_size]
+
+        avg_payment = round(total_amount / total_count, 2) if total_count > 0 else 0.0
+
         return {
-            "period": self._get_period_label(range_str, d_from, d_to),
-            "date_from": d_from.isoformat(),
-            "date_to": d_to.isoformat(),
-            "total_count": len(items),
-            "total_amount": round(total_amount, 2),
-            "by_method": {k: round(v, 2) for k, v in by_method.items()},
-            "payments": items[:limit],
+            "period": {
+                "range": range_str,
+                "label": self._get_period_label(range_str, d_from, d_to),
+                "from_date": d_from.isoformat(),
+                "to_date": d_to.isoformat(),
+            },
+            "kpis": {
+                "total_incoming_amount": round(total_amount, 2),
+                "transactions_count": total_count,
+                "average_payment": avg_payment,
+                "by_method": {k: round(v, 2) for k, v in by_method.items()},
+            },
+            "total_count": total_count,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "payments": paginated_items,
         }
 
     def get_outgoing_payments(
         self,
-        range_str: str = "monthly",
+        range_str: str = "all_time",
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
         supplier_code: Optional[str] = None,
+        payment_method: Optional[str] = None,
         branch_id: Optional[str] = None,
-        limit: int = 20,
+        search: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
     ) -> Dict[str, Any]:
-        """Fetch vendor outgoing payments from SAP."""
+        """Fetch vendor outgoing payments from SAP Business One."""
         d_from, d_to = self._resolve_date_range(range_str, from_date, to_date)
         try:
             filters = [
@@ -858,218 +985,413 @@ class SAPFinanceService:
             params = {
                 "$filter": filter_str,
                 "$orderby": "DocDate desc, DocEntry desc",
-                "$top": 200,
-                "$select": "DocEntry,DocNum,DocDate,CardCode,CardName,CashSum,TransferSum,CheckSum,DocCurrency",
+                "$top": 500,
+                "$select": "DocEntry,DocNum,DocDate,CardCode,CardName,CashSum,TransferSum,Cancelled,DocCurrency,BPLID,BPLName,PaymentInvoices",
             }
             res = self.client.get("VendorPayments", params)
-            raw = res.get("value", [])
+            raw = res.get("value", []) if isinstance(res, dict) else []
         except Exception as e:
             logger.warning("Error querying VendorPayments: %s", e)
             raw = []
 
+        raw = [p for p in raw if p.get("Cancelled") != "tYES"]
+
+        if search:
+            q = search.lower().strip()
+            raw = [
+                p for p in raw
+                if q in str(p.get("CardName") or "").lower()
+                or q in str(p.get("CardCode") or "").lower()
+                or q in str(p.get("DocNum") or "").lower()
+                or q in str(p.get("DocEntry") or "").lower()
+            ]
+
+        if branch_id and branch_id.upper() not in ("ALL", "*"):
+            b_up = branch_id.upper()
+            raw = [p for p in raw if str(p.get("BPLID") or p.get("BPLName") or "").upper() == b_up]
+
         total_amount = 0.0
+        by_method = {"cash": 0.0, "transfer": 0.0, "other": 0.0}
         items = []
 
         for p in raw:
             cash = _to_float(p.get("CashSum"))
             transfer = _to_float(p.get("TransferSum"))
-            check = _to_float(p.get("CheckSum"))
-            tot = cash + transfer + check
-            total_amount += tot
+            tot = round(cash + transfer, 2)
 
-            primary_method = "Bank Transfer" if transfer > 0 else ("Cash" if cash > 0 else "Cheque")
+            if transfer > 0 and cash > 0:
+                method_name = "Transfer & Cash"
+            elif transfer > 0:
+                method_name = "Bank Transfer"
+            elif cash > 0:
+                method_name = "Cash"
+            else:
+                method_name = "Bank Transfer"
+
+            if payment_method and payment_method.lower() not in ("all", ""):
+                if payment_method.lower() not in method_name.lower():
+                    continue
+
+            total_amount += tot
+            by_method["cash"] += cash
+            by_method["transfer"] += transfer
+
+            pinvs = p.get("PaymentInvoices") or []
+            applied_invoices = [
+                {
+                    "docEntry": inv.get("DocEntry"),
+                    "docNum": inv.get("DocNum"),
+                    "sumApplied": _to_float(inv.get("SumApplied")),
+                    "invoiceType": inv.get("InvoiceType"),
+                }
+                for inv in pinvs
+            ]
+
             items.append({
                 "doc_entry": p.get("DocEntry"),
+                "doc_num": p.get("DocNum") or p.get("DocEntry"),
                 "ref_no": f"PAY-{p.get('DocNum') or p.get('DocEntry')}",
                 "date": str(p.get("DocDate") or "")[:10],
                 "supplier_code": p.get("CardCode") or "",
                 "supplier_name": p.get("CardName") or p.get("CardCode") or "Supplier",
-                "amount": round(tot, 2),
-                "method": primary_method,
+                "amount": tot,
+                "method": method_name,
+                "applied_invoices_count": len(applied_invoices),
+                "applied_invoices": applied_invoices,
+                "status": "Completed",
+                "currency": p.get("DocCurrency") or "INR",
+                "branch": str(p.get("BPLName") or p.get("BPLID") or "Main Branch"),
             })
 
+        total_count = len(items)
+        page = max(1, page)
+        page_size = max(1, min(100, page_size))
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+        start_idx = (page - 1) * page_size
+        paginated_items = items[start_idx : start_idx + page_size]
+
+        avg_disbursement = round(total_amount / total_count, 2) if total_count > 0 else 0.0
+
         return {
-            "period": self._get_period_label(range_str, d_from, d_to),
-            "date_from": d_from.isoformat(),
-            "date_to": d_to.isoformat(),
-            "total_count": len(items),
-            "total_amount": round(total_amount, 2),
-            "payments": items[:limit],
+            "period": {
+                "range": range_str,
+                "label": self._get_period_label(range_str, d_from, d_to),
+                "from_date": d_from.isoformat(),
+                "to_date": d_to.isoformat(),
+            },
+            "kpis": {
+                "total_outgoing_amount": round(total_amount, 2),
+                "transactions_count": total_count,
+                "average_disbursement": avg_disbursement,
+                "by_method": {k: round(v, 2) for k, v in by_method.items()},
+            },
+            "total_count": total_count,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "payments": paginated_items,
         }
 
-    def get_customer_sales_ranking(
+    def get_customer_analysis(
         self,
-        range_str: str = "monthly",
+        range_str: str = "all_time",
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
-        order: str = "top",
         branch_id: Optional[str] = None,
-        limit: int = 10,
+        search: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
+        sort_by: str = "sales",
+        sort_order: str = "desc",
     ) -> Dict[str, Any]:
-        """Rank customers by net sales volume, supporting top or lowest purchasing."""
+        """Aggregate sales, receivables, and transactions per customer from SAP."""
         d_from, d_to = self._resolve_date_range(range_str, from_date, to_date)
-        invoices = self.invoices_service.get_invoices_by_date(d_from, d_to)
-        if len(invoices) < 3:
-            expanded_start = d_to - timedelta(days=365)
-            invoices = self.invoices_service.get_invoices_by_date(expanded_start, d_to)
+        try:
+            invoices = self.invoices_service.get_invoices_by_date(d_from, d_to)
+        except Exception as e:
+            logger.warning("Error getting invoices for customer analysis: %s", e)
+            invoices = []
 
         if branch_id and branch_id.upper() not in ("ALL", "*"):
             b_up = branch_id.upper()
             invoices = [inv for inv in invoices if str(inv.get("U_Branch") or "").upper() == b_up]
 
-        stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"customerName": "", "invoices": 0, "netSales": 0.0})
-        total_sales = 0.0
+        try:
+            res_bp = self.client.get("BusinessPartners", {"$select": "CardCode,CardName,CardType,CurrentAccountBalance,Phone1,EmailAddress", "$top": 500})
+            bps = {b.get("CardCode"): b for b in res_bp.get("value", []) if b.get("CardCode")}
+        except Exception as e:
+            logger.warning("Error getting BusinessPartners for customer analysis: %s", e)
+            bps = {}
+
+        customer_map: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
+            "customer_code": "",
+            "customer_name": "",
+            "sales_revenue": 0.0,
+            "invoices_count": 0,
+            "last_transaction_date": "",
+            "phone": "-",
+            "email": "-",
+            "outstanding_receivables": 0.0,
+        })
+
         for inv in invoices:
-            code = inv.get("CardCode") or "UNKNOWN"
+            code = inv.get("CardCode")
+            if not code:
+                continue
             name = inv.get("CardName") or inv.get("U_C_Name") or code
             tot = _to_float(inv.get("DocTotal"))
-            stats[code]["customerName"] = name
-            stats[code]["customerCode"] = code
-            stats[code]["invoices"] += 1
-            stats[code]["netSales"] += tot
-            total_sales += tot
+            d_date = str(inv.get("DocDate") or "")[:10]
 
-        customer_list = [c for c in stats.values() if c["netSales"] > 0]
-        is_lowest = order.lower() in ("lowest", "bottom", "least", "min")
-        sorted_customers = sorted(customer_list, key=lambda x: x["netSales"], reverse=not is_lowest)[:limit]
+            c = customer_map[code]
+            c["customer_code"] = code
+            c["customer_name"] = name
+            c["sales_revenue"] += tot
+            c["invoices_count"] += 1
+            if not c["last_transaction_date"] or d_date > c["last_transaction_date"]:
+                c["last_transaction_date"] = d_date
 
-        for idx, c in enumerate(sorted_customers, 1):
-            c["rank"] = idx
-            c["percentage"] = round((c["netSales"] / total_sales * 100), 1) if total_sales > 0 else 0.0
-            c["netSales"] = round(c["netSales"], 2)
+        total_sales = 0.0
+        total_receivables = 0.0
+
+        for code, c in customer_map.items():
+            bp = bps.get(code)
+            if bp:
+                if not c["customer_name"] or c["customer_name"] == code:
+                    c["customer_name"] = bp.get("CardName") or code
+                bal = _to_float(bp.get("CurrentAccountBalance"))
+                c["outstanding_receivables"] = max(0.0, round(bal, 2))
+                c["phone"] = bp.get("Phone1") or "-"
+                c["email"] = bp.get("EmailAddress") or "-"
+
+            total_sales += c["sales_revenue"]
+            total_receivables += c["outstanding_receivables"]
+
+        customer_list = list(customer_map.values())
+
+        for code, bp in bps.items():
+            if bp.get("CardType") == "cCustomer" and code not in customer_map:
+                bal = _to_float(bp.get("CurrentAccountBalance"))
+                if bal > 0:
+                    total_receivables += bal
+                    customer_list.append({
+                        "customer_code": code,
+                        "customer_name": bp.get("CardName") or code,
+                        "sales_revenue": 0.0,
+                        "invoices_count": 0,
+                        "last_transaction_date": "-",
+                        "phone": bp.get("Phone1") or "-",
+                        "email": bp.get("EmailAddress") or "-",
+                        "outstanding_receivables": round(bal, 2),
+                    })
+
+        for c in customer_list:
+            c["sales_revenue"] = round(c["sales_revenue"], 2)
+            c["sales_share_percentage"] = round((c["sales_revenue"] / total_sales * 100), 1) if total_sales > 0 else 0.0
+
+        if search:
+            q = search.lower().strip()
+            customer_list = [
+                c for c in customer_list
+                if q in c["customer_name"].lower() or q in c["customer_code"].lower()
+            ]
+
+        reverse = sort_order.lower() != "asc"
+        if sort_by == "sales":
+            customer_list.sort(key=lambda x: x["sales_revenue"], reverse=reverse)
+        elif sort_by == "receivables":
+            customer_list.sort(key=lambda x: x["outstanding_receivables"], reverse=reverse)
+        elif sort_by == "invoices":
+            customer_list.sort(key=lambda x: x["invoices_count"], reverse=reverse)
+        elif sort_by == "name":
+            customer_list.sort(key=lambda x: x["customer_name"].lower(), reverse=reverse)
+
+        total_count = len(customer_list)
+        page = max(1, page)
+        page_size = max(1, min(100, page_size))
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+        start_idx = (page - 1) * page_size
+        paginated = customer_list[start_idx : start_idx + page_size]
+
+        avg_spend = round(total_sales / total_count, 2) if total_count > 0 else 0.0
 
         return {
-            "period": self._get_period_label(range_str, d_from, d_to),
-            "order": "lowest" if is_lowest else "highest",
-            "total_sales": round(total_sales, 2),
-            "customer_count": len(customer_list),
-            "customers": sorted_customers,
+            "period": {
+                "range": range_str,
+                "label": self._get_period_label(range_str, d_from, d_to),
+                "from_date": d_from.isoformat(),
+                "to_date": d_to.isoformat(),
+            },
+            "kpis": {
+                "total_customers": total_count,
+                "total_sales_revenue": round(total_sales, 2),
+                "total_outstanding_receivables": round(total_receivables, 2),
+                "average_revenue_per_customer": avg_spend,
+            },
+            "total_count": total_count,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "customers": paginated,
         }
 
-    def get_supplier_purchase_ranking(
+    def get_supplier_analysis(
         self,
-        range_str: str = "monthly",
+        range_str: str = "all_time",
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
-        order: str = "top",
         branch_id: Optional[str] = None,
-        limit: int = 10,
+        search: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
+        sort_by: str = "spend",
+        sort_order: str = "desc",
     ) -> Dict[str, Any]:
-        """Rank suppliers by total purchase value from SAP purchase invoices."""
+        """Aggregate purchases, payables, and transactions per supplier from SAP."""
         d_from, d_to = self._resolve_date_range(range_str, from_date, to_date)
         try:
-            res = self.client.get("PurchaseInvoices", {"$orderby": "DocDate desc, DocEntry desc", "$top": 300, "$select": "DocEntry,CardCode,CardName,DocTotal,Cancelled"})
-            pinvs = [p for p in res.get("value", []) if p.get("Cancelled") != "tYES"]
+            filters = [
+                f"DocDate ge '{d_from.isoformat()}'",
+                f"DocDate le '{d_to.isoformat()}'",
+                "Cancelled ne 'tYES'",
+            ]
+            filter_str = " and ".join(filters)
+            params = {
+                "$filter": filter_str,
+                "$orderby": "DocDate desc, DocEntry desc",
+                "$top": 500,
+                "$select": "DocEntry,DocNum,DocDate,CardCode,CardName,DocTotal,Cancelled,BPLID,BPLName",
+            }
+            res = self.client.get("PurchaseInvoices", params)
+            raw_pinvs = [p for p in res.get("value", []) if p.get("Cancelled") != "tYES"]
         except Exception as e:
-            logger.warning("Error querying PurchaseInvoices for ranking: %s", e)
-            pinvs = []
+            logger.warning("Error querying PurchaseInvoices for supplier analysis: %s", e)
+            raw_pinvs = []
 
-        stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"supplierName": "", "invoices": 0, "netPurchases": 0.0})
-        total_purchases = 0.0
-        for p in pinvs:
-            code = p.get("CardCode") or "UNKNOWN"
+        if branch_id and branch_id.upper() not in ("ALL", "*"):
+            b_up = branch_id.upper()
+            raw_pinvs = [p for p in raw_pinvs if str(p.get("BPLID") or p.get("BPLName") or "").upper() == b_up]
+
+        try:
+            res_bp = self.client.get("BusinessPartners", {"$select": "CardCode,CardName,CardType,CurrentAccountBalance,Phone1,EmailAddress", "$top": 500})
+            bps = {b.get("CardCode"): b for b in res_bp.get("value", []) if b.get("CardCode")}
+        except Exception as e:
+            logger.warning("Error querying BusinessPartners for supplier analysis: %s", e)
+            bps = {}
+
+        supplier_map: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
+            "supplier_code": "",
+            "supplier_name": "",
+            "purchase_spend": 0.0,
+            "invoices_count": 0,
+            "last_purchase_date": "",
+            "phone": "-",
+            "email": "-",
+            "outstanding_payables": 0.0,
+        })
+
+        for p in raw_pinvs:
+            code = p.get("CardCode")
+            if not code:
+                continue
             name = p.get("CardName") or code
             tot = _to_float(p.get("DocTotal"))
-            stats[code]["supplierName"] = name
-            stats[code]["supplierCode"] = code
-            stats[code]["invoices"] += 1
-            stats[code]["netPurchases"] += tot
-            total_purchases += tot
+            d_date = str(p.get("DocDate") or "")[:10]
 
-        supplier_list = [s for s in stats.values() if s["netPurchases"] > 0]
-        is_lowest = order.lower() in ("lowest", "bottom", "least", "min")
-        sorted_suppliers = sorted(supplier_list, key=lambda x: x["netPurchases"], reverse=not is_lowest)[:limit]
+            s = supplier_map[code]
+            s["supplier_code"] = code
+            s["supplier_name"] = name
+            s["purchase_spend"] += tot
+            s["invoices_count"] += 1
+            if not s["last_purchase_date"] or d_date > s["last_purchase_date"]:
+                s["last_purchase_date"] = d_date
 
-        for idx, s in enumerate(sorted_suppliers, 1):
-            s["rank"] = idx
-            s["percentage"] = round((s["netPurchases"] / total_purchases * 100), 1) if total_purchases > 0 else 0.0
-            s["netPurchases"] = round(s["netPurchases"], 2)
+        total_purchases = 0.0
+        total_payables = 0.0
 
-        return {
-            "period": self._get_period_label(range_str, d_from, d_to),
-            "order": "lowest" if is_lowest else "highest",
-            "total_purchases": round(total_purchases, 2),
-            "supplier_count": len(supplier_list),
-            "suppliers": sorted_suppliers,
-        }
+        for code, s in supplier_map.items():
+            bp = bps.get(code)
+            if bp:
+                if not s["supplier_name"] or s["supplier_name"] == code:
+                    s["supplier_name"] = bp.get("CardName") or code
+                bal = abs(_to_float(bp.get("CurrentAccountBalance")))
+                s["outstanding_payables"] = round(bal, 2)
+                s["phone"] = bp.get("Phone1") or "-"
+                s["email"] = bp.get("EmailAddress") or "-"
 
-    def get_accounts_receivable(
-        self,
-        customer_code: Optional[str] = None,
-        min_balance: float = 0.0,
-        limit: int = 20,
-    ) -> Dict[str, Any]:
-        """Fetch outstanding accounts receivable owed by customers from SAP Business Partners."""
-        try:
-            res = self.client.get("BusinessPartners", {"$select": "CardCode,CardName,CardType,CurrentAccountBalance,Phone1", "$top": 500})
-            bps = res.get("value", [])
-        except Exception as e:
-            logger.warning("Error querying BusinessPartners for AR: %s", e)
-            bps = []
+            total_purchases += s["purchase_spend"]
+            total_payables += s["outstanding_payables"]
 
-        customers = []
-        total_ar = 0.0
-        for b in bps:
-            if b.get("CardType") != "cCustomer":
-                continue
-            bal = _to_float(b.get("CurrentAccountBalance"))
-            if bal > min_balance:
-                total_ar += bal
-                if not customer_code or str(b.get("CardCode") or "").upper() == customer_code.upper():
-                    customers.append({
-                        "card_code": b.get("CardCode"),
-                        "card_name": b.get("CardName") or b.get("CardCode"),
-                        "outstanding_balance": round(bal, 2),
-                        "phone": b.get("Phone1") or "-",
+        supplier_list = list(supplier_map.values())
+
+        for code, bp in bps.items():
+            if bp.get("CardType") == "cSupplier" and code not in supplier_map:
+                bal = abs(_to_float(bp.get("CurrentAccountBalance")))
+                if bal > 0:
+                    total_payables += bal
+                    supplier_list.append({
+                        "supplier_code": code,
+                        "supplier_name": bp.get("CardName") or code,
+                        "purchase_spend": 0.0,
+                        "invoices_count": 0,
+                        "last_purchase_date": "-",
+                        "phone": bp.get("Phone1") or "-",
+                        "email": bp.get("EmailAddress") or "-",
+                        "outstanding_payables": round(bal, 2),
                     })
 
-        sorted_customers = sorted(customers, key=lambda x: x["outstanding_balance"], reverse=True)[:limit]
+        for s in supplier_list:
+            s["purchase_spend"] = round(s["purchase_spend"], 2)
+            s["spend_share_percentage"] = round((s["purchase_spend"] / total_purchases * 100), 1) if total_purchases > 0 else 0.0
+
+        if search:
+            q = search.lower().strip()
+            supplier_list = [
+                s for s in supplier_list
+                if q in s["supplier_name"].lower() or q in s["supplier_code"].lower()
+            ]
+
+        reverse = sort_order.lower() != "asc"
+        if sort_by == "spend":
+            supplier_list.sort(key=lambda x: x["purchase_spend"], reverse=reverse)
+        elif sort_by == "payables":
+            supplier_list.sort(key=lambda x: x["outstanding_payables"], reverse=reverse)
+        elif sort_by == "invoices":
+            supplier_list.sort(key=lambda x: x["invoices_count"], reverse=reverse)
+        elif sort_by == "name":
+            supplier_list.sort(key=lambda x: x["supplier_name"].lower(), reverse=reverse)
+
+        total_count = len(supplier_list)
+        page = max(1, page)
+        page_size = max(1, min(100, page_size))
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+        start_idx = (page - 1) * page_size
+        paginated = supplier_list[start_idx : start_idx + page_size]
+
+        avg_spend = round(total_purchases / total_count, 2) if total_count > 0 else 0.0
+
         return {
-            "total_accounts_receivable": round(total_ar, 2),
-            "total_debtors_count": len(customers),
-            "customers": sorted_customers,
-        }
-
-    def get_accounts_payable(
-        self,
-        supplier_code: Optional[str] = None,
-        min_balance: float = 0.0,
-        limit: int = 20,
-    ) -> Dict[str, Any]:
-        """Fetch outstanding accounts payable owed to suppliers from SAP Business Partners."""
-        try:
-            res = self.client.get("BusinessPartners", {"$select": "CardCode,CardName,CardType,CurrentAccountBalance,Phone1", "$top": 500})
-            bps = res.get("value", [])
-        except Exception as e:
-            logger.warning("Error querying BusinessPartners for AP: %s", e)
-            bps = []
-
-        suppliers = []
-        total_ap = 0.0
-        for b in bps:
-            if b.get("CardType") != "cSupplier":
-                continue
-            bal = abs(_to_float(b.get("CurrentAccountBalance")))
-            if bal > min_balance:
-                total_ap += bal
-                if not supplier_code or str(b.get("CardCode") or "").upper() == supplier_code.upper():
-                    suppliers.append({
-                        "card_code": b.get("CardCode"),
-                        "card_name": b.get("CardName") or b.get("CardCode"),
-                        "outstanding_balance": round(bal, 2),
-                        "phone": b.get("Phone1") or "-",
-                    })
-
-        sorted_suppliers = sorted(suppliers, key=lambda x: x["outstanding_balance"], reverse=True)[:limit]
-        return {
-            "total_accounts_payable": round(total_ap, 2),
-            "total_creditors_count": len(suppliers),
-            "suppliers": sorted_suppliers,
+            "period": {
+                "range": range_str,
+                "label": self._get_period_label(range_str, d_from, d_to),
+                "from_date": d_from.isoformat(),
+                "to_date": d_to.isoformat(),
+            },
+            "kpis": {
+                "total_suppliers": total_count,
+                "total_purchase_spend": round(total_purchases, 2),
+                "total_outstanding_payables": round(total_payables, 2),
+                "average_spend_per_supplier": avg_spend,
+            },
+            "total_count": total_count,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "suppliers": paginated,
         }
 
     def get_profitability_report(
         self,
-        range_str: str = "monthly",
+        range_str: str = "all_time",
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
         branch_id: Optional[str] = None,
@@ -1100,18 +1422,191 @@ class SAPFinanceService:
             m["gross_margin"] = round((gp / s * 100), 1) if s > 0 else 0.0
 
         return {
-            "period": self._get_period_label(range_str, d_from, d_to),
-            "date_from": d_from.isoformat(),
-            "date_to": d_to.isoformat(),
-            "net_sales": net_sales,
-            "cost_of_purchases": cost_of_purchases,
-            "gross_profit": gross_profit,
-            "gross_margin_percentage": gross_margin,
-            "growth_profit_vs_previous": self._calculate_growth(gross_profit, prev_gp),
-            "growth_margin_vs_previous": round(gross_margin - prev_gm, 1),
-            "accounting_note": "Gross Profit calculated as Net Sales Invoices minus Net Purchase Invoices from verified SAP Business One records.",
+            "period": {
+                "range": range_str,
+                "label": self._get_period_label(range_str, d_from, d_to),
+                "from_date": d_from.isoformat(),
+                "to_date": d_to.isoformat(),
+            },
+            "kpis": {
+                "total_revenue": net_sales,
+                "sales_invoices_count": sales_data["invoice_count"],
+                "cost_of_purchases": cost_of_purchases,
+                "purchase_invoices_count": purchases_data["invoice_count"],
+                "gross_profit": gross_profit,
+                "gross_margin": gross_margin,
+                "growth_profit_vs_previous": self._calculate_growth(gross_profit, prev_gp),
+                "growth_margin_vs_previous": round(gross_margin - prev_gm, 1),
+            },
+            "accounting_note": "Revenue is derived from verified SAP A/R Invoices (OINV). Cost basis is derived from SAP A/P Purchase Invoices (OPCH) and standard inventory valuation. Gross Profit and Margin % are computed in accordance with GAAP accrual reporting standards based on live SAP records.",
             "monthly_breakdown": monthly_breakdown,
         }
+
+    def export_finance_csv(
+        self,
+        module: str,
+        range_str: str = "all_time",
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        branch_id: Optional[str] = None,
+        search: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> str:
+        """Generate formatted CSV string for any of the 7 financial modules."""
+        import csv
+        import io
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        mod = (module or "").lower().strip()
+        if mod in ("purchase_invoices", "purchase-invoices", "purchases"):
+            data = self.get_purchase_invoices(
+                range_str=range_str,
+                from_date=from_date,
+                to_date=to_date,
+                branch_id=branch_id,
+                search=search,
+                status=status,
+                page=1,
+                page_size=5000,
+            )
+            writer.writerow(["DocEntry", "Invoice No", "Date", "Due Date", "Supplier Code", "Supplier Name", "Total Amount", "Paid to Date", "Balance Due", "Payment Status", "Doc Status", "Branch"])
+            for inv in data.get("invoices", []):
+                writer.writerow([
+                    inv.get("doc_entry"),
+                    inv.get("doc_num"),
+                    inv.get("doc_date"),
+                    inv.get("doc_due_date"),
+                    inv.get("card_code"),
+                    inv.get("card_name"),
+                    inv.get("doc_total"),
+                    inv.get("paid_to_date"),
+                    inv.get("balance_due"),
+                    inv.get("payment_status"),
+                    inv.get("document_status"),
+                    inv.get("branch"),
+                ])
+
+        elif mod in ("incoming_payments", "incoming-payments", "receipts"):
+            data = self.get_incoming_payments(
+                range_str=range_str,
+                from_date=from_date,
+                to_date=to_date,
+                branch_id=branch_id,
+                search=search,
+                page=1,
+                page_size=5000,
+            )
+            writer.writerow(["DocEntry", "Receipt No", "Date", "Customer Code", "Customer Name", "Amount", "Method", "Applied Invoices Count", "Status", "Branch"])
+            for p in data.get("payments", []):
+                writer.writerow([
+                    p.get("doc_entry"),
+                    p.get("ref_no"),
+                    p.get("date"),
+                    p.get("customer_code"),
+                    p.get("customer_name"),
+                    p.get("amount"),
+                    p.get("method"),
+                    p.get("applied_invoices_count"),
+                    p.get("status"),
+                    p.get("branch"),
+                ])
+
+        elif mod in ("outgoing_payments", "outgoing-payments", "disbursements"):
+            data = self.get_outgoing_payments(
+                range_str=range_str,
+                from_date=from_date,
+                to_date=to_date,
+                branch_id=branch_id,
+                search=search,
+                page=1,
+                page_size=5000,
+            )
+            writer.writerow(["DocEntry", "Voucher No", "Date", "Supplier Code", "Supplier Name", "Amount", "Method", "Applied Invoices Count", "Status", "Branch"])
+            for p in data.get("payments", []):
+                writer.writerow([
+                    p.get("doc_entry"),
+                    p.get("ref_no"),
+                    p.get("date"),
+                    p.get("supplier_code"),
+                    p.get("supplier_name"),
+                    p.get("amount"),
+                    p.get("method"),
+                    p.get("applied_invoices_count"),
+                    p.get("status"),
+                    p.get("branch"),
+                ])
+
+        elif mod in ("customer_analysis", "customer-analysis", "customers"):
+            data = self.get_customer_analysis(
+                range_str=range_str,
+                from_date=from_date,
+                to_date=to_date,
+                branch_id=branch_id,
+                search=search,
+                page=1,
+                page_size=5000,
+            )
+            writer.writerow(["Customer Code", "Customer Name", "Sales Revenue", "Invoices Count", "Outstanding Receivables", "Last Transaction Date", "Sales Share %", "Phone", "Email"])
+            for c in data.get("customers", []):
+                writer.writerow([
+                    c.get("customer_code"),
+                    c.get("customer_name"),
+                    c.get("sales_revenue"),
+                    c.get("invoices_count"),
+                    c.get("outstanding_receivables"),
+                    c.get("last_transaction_date"),
+                    c.get("sales_share_percentage"),
+                    c.get("phone"),
+                    c.get("email"),
+                ])
+
+        elif mod in ("supplier_analysis", "supplier-analysis", "suppliers"):
+            data = self.get_supplier_analysis(
+                range_str=range_str,
+                from_date=from_date,
+                to_date=to_date,
+                branch_id=branch_id,
+                search=search,
+                page=1,
+                page_size=5000,
+            )
+            writer.writerow(["Supplier Code", "Supplier Name", "Purchase Spend", "Invoices Count", "Outstanding Payables", "Last Purchase Date", "Spend Share %", "Phone", "Email"])
+            for s in data.get("suppliers", []):
+                writer.writerow([
+                    s.get("supplier_code"),
+                    s.get("supplier_name"),
+                    s.get("purchase_spend"),
+                    s.get("invoices_count"),
+                    s.get("outstanding_payables"),
+                    s.get("last_purchase_date"),
+                    s.get("spend_share_percentage"),
+                    s.get("phone"),
+                    s.get("email"),
+                ])
+
+        elif mod in ("profitability", "profitability-reports", "profitability_reports"):
+            data = self.get_profitability_report(
+                range_str=range_str,
+                from_date=from_date,
+                to_date=to_date,
+                branch_id=branch_id,
+            )
+            writer.writerow(["Month", "Period", "Net Sales", "Purchases / Cost", "Gross Profit", "Gross Margin %"])
+            for m in data.get("monthly_breakdown", []):
+                writer.writerow([
+                    m.get("month"),
+                    m.get("period"),
+                    m.get("sales"),
+                    m.get("purchases"),
+                    m.get("gross_profit"),
+                    m.get("gross_margin"),
+                ])
+        else:
+            writer.writerow(["Error", "Unknown module specified"])
+
+        return output.getvalue()
 
     # =========================================================================
     # Phase 2 Upgrade: Admin-Controlled Record Inspection & SAP Write-Back

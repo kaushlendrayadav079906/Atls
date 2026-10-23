@@ -29,6 +29,8 @@ from app.api.v1.admin import (
     _get_date_range_with_custom,
     _filter_invoices_by_branch,
     _compute_payment_split,
+    _resolve_invoice_payments_map,
+    _derive_invoice_payment_method,
     _compute_trend,
     _compute_branch_breakdown,
     _fetch_credit_notes_for_range,
@@ -81,30 +83,52 @@ def _filter_invoices_advanced(
     branch: Optional[str],
     customer: Optional[str] = None,
     category: Optional[str] = None,
-    payment_method: Optional[str] = None
+    payment_method: Optional[str] = None,
+    invoice_payments_map: Optional[Dict[int, Any]] = None
 ) -> List[Dict[str, Any]]:
-    # branch filter
-    filtered = _filter_invoices_by_branch(invoices, branch)
+    # 1. Exclude cancelled invoices
+    filtered = [inv for inv in invoices if inv.get("Cancelled") != "tYES"]
+
+    # 2. Branch filter
+    filtered = _filter_invoices_by_branch(filtered, branch)
     
-    # customer filter
+    # 3. Customer filter
     if customer:
         c_low = customer.strip().lower()
-        filtered = [inv for inv in filtered if c_low in str(inv.get("CardCode") or "").lower() or c_low in str(inv.get("CardName") or "").lower()]
+        filtered = [
+            inv for inv in filtered
+            if c_low in str(inv.get("CardCode") or "").lower()
+            or c_low in str(inv.get("CardName") or "").lower()
+        ]
         
-    # payment method filter
+    # 4. Payment method filter (using real SAP payment attribution)
     if payment_method:
         pm_low = payment_method.strip().lower()
-        filtered = [inv for inv in filtered if str(inv.get("U_P_Method") or "").strip().lower() == pm_low]
+        if invoice_payments_map is None:
+            invoice_payments_map = _resolve_invoice_payments_map()
+
+        def match_pm(inv: Dict[str, Any]) -> bool:
+            m = _derive_invoice_payment_method(inv, invoice_payments_map).lower()
+            if pm_low in ("credit", "on account", "unpaid"):
+                return "credit" in m or "account" in m or "unpaid" in m
+            if pm_low in ("transfer", "bank", "bank transfer"):
+                return "transfer" in m or "bank" in m
+            return pm_low in m
+
+        filtered = [inv for inv in filtered if match_pm(inv)]
         
-    # category filter
+    # 5. Category filter
     if category:
         cat_low = category.strip().lower()
         cat_filtered = []
         for inv in filtered:
             has_cat = False
             for line in inv.get("DocumentLines") or []:
-                # Usually ItemGroup or UDF_CATEGORY. We check ItemDescription or ItemCode for simple fallback if not present
-                if cat_low in str(line.get("ItemCode") or "").lower() or cat_low in str(line.get("ItemDescription") or "").lower():
+                if (
+                    cat_low in str(line.get("ItemCode") or "").lower()
+                    or cat_low in str(line.get("ItemDescription") or "").lower()
+                    or cat_low in str(line.get("CostingCode") or "").lower()
+                ):
                     has_cat = True
                     break
             if has_cat:
@@ -148,12 +172,14 @@ async def get_overview(
 
     total_sales = sum(float(inv.get("DocTotal") or 0) for inv in invoices)
     invoice_count = len(invoices)
+    total_customers = len(set(str(inv.get("CardCode") or "") for inv in invoices if inv.get("CardCode")))
     aov = round(total_sales / invoice_count, 2) if invoice_count else 0.0
     payment_split = _compute_payment_split(invoices)
 
     result = AtlasOverview(
         totalSales=round(total_sales, 2),
         invoiceCount=invoice_count,
+        totalCustomers=total_customers,
         averageOrderValue=aov,
         paymentBreakdown=payment_split,
     )
@@ -172,6 +198,7 @@ async def get_sales_trends(
     customer: Optional[str] = Query(None, description="Filter by customer Code or Name"),
     category: Optional[str] = Query(None, description="Filter by product category"),
     payment_method: Optional[str] = Query(None, description="Filter by payment method"),
+    group_by: Optional[str] = Query(None, description="Grouping granularity (hourly, daily, monthly, yearly)"),
     current_user: dict = Depends(require_permission("dashboard.view")),
 ):
     target_branch = _get_permitted_branch(current_user, branch)
@@ -179,7 +206,7 @@ async def get_sales_trends(
     end = to_date or date_to
     start_date, end_date = _get_date_range_with_custom(range, start, end)
     
-    cache_key = f"pos:atlas:trends:{range}:{start_date}:{end_date}:{target_branch or 'all'}:{customer or 'all'}:{category or 'all'}:{payment_method or 'all'}"
+    cache_key = f"pos:atlas:trends:{range}:{group_by or 'default'}:{start_date}:{end_date}:{target_branch or 'all'}:{customer or 'all'}:{category or 'all'}:{payment_method or 'all'}"
     cached = await cache_get(cache_key)
     if cached:
         return DynamicSalesTrendResponse(**cached)
@@ -194,7 +221,7 @@ async def get_sales_trends(
         logger.error(f"Atlas trend fetch failed: {e}")
         raise HTTPException(status_code=502, detail=f"SAP Error: {str(e)}")
 
-    trend_result = _compute_dynamic_trend(invoices, range, start_date, end_date)
+    trend_result = _compute_dynamic_trend(invoices, range, start_date, end_date, requested_group_by=group_by)
     await cache_set(cache_key, trend_result, ttl=_ATLAS_CACHE_TTL)
     return DynamicSalesTrendResponse(**trend_result)
 

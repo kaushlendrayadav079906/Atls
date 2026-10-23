@@ -8,7 +8,7 @@ import os as _os
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
@@ -191,19 +191,23 @@ def _compute_branch_breakdown(
     invoices: List[Dict[str, Any]],
     warehouse_names: Dict[str, str],
 ) -> List[BranchSummary]:
-    """Aggregate branch revenue and bill counts from invoice lines by WarehouseCode."""
+    """Aggregate branch revenue and bill counts from invoice lines or header branch."""
     grouped: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"total": 0.0, "billCount": 0})
 
     for inv in invoices:
+        if inv.get("Cancelled") == "tYES":
+            continue
         invoice_branch_codes = set()
         lines = inv.get("DocumentLines") or []
-        if not lines:
-            raise ValueError("Cannot compare branches without invoice lines.")
-        for line in lines:
-            branch_id = str(line.get("WarehouseCode") or "").strip()
-            if not branch_id:
-                raise ValueError("Cannot compare branches without warehouse-attributed invoice lines.")
-            grouped[branch_id]["total"] += float(line.get("LineTotal") or 0)
+        if lines:
+            for line in lines:
+                branch_id = str(line.get("WarehouseCode") or "").strip()
+                if branch_id:
+                    grouped[branch_id]["total"] += float(line.get("LineTotal") or 0)
+                    invoice_branch_codes.add(branch_id)
+        else:
+            branch_id = str(inv.get("BPLName") or inv.get("BPL_IDAssignedToInvoice") or "Main Branch").strip()
+            grouped[branch_id]["total"] += float(inv.get("DocTotal") or 0)
             invoice_branch_codes.add(branch_id)
 
         for branch_id in invoice_branch_codes:
@@ -215,20 +219,84 @@ def _compute_branch_breakdown(
             branchName=warehouse_names.get(branch_id, branch_id),
             total=round(values["total"], 2),
             billCount=values["billCount"],
+            totalSales=round(values["total"], 2),
+            invoiceCount=values["billCount"],
         )
         for branch_id, values in grouped.items()
     ]
     return sorted(summaries, key=lambda s: s.total, reverse=True)
 
 
+def _resolve_invoice_payments_map() -> Dict[int, List[Tuple[str, float]]]:
+    """Retrieve mapping of DocEntry -> list of (method, sumApplied) from SAP IncomingPayments."""
+    inv_pay: Dict[int, List[Tuple[str, float]]] = {}
+    try:
+        from app.services.sap.payments_report_service import SAPPaymentsReportService
+        pay_service = SAPPaymentsReportService()
+        payments = pay_service.get_payments()
+        for p in payments:
+            pm = p.get("_PaymentMethod") or "cash"
+            if pm.lower() == "transfer":
+                pm = "bank transfer"
+            for li in p.get("_LinkedInvoices", []):
+                de = li.get("docEntry")
+                if de is not None:
+                    try:
+                        inv_pay.setdefault(int(de), []).append((pm, float(li.get("sumApplied") or 0)))
+                    except (ValueError, TypeError):
+                        pass
+    except Exception as e:
+        logger.debug(f"Could not load payments mapping from SAP: {e}")
+    return inv_pay
+
+
+def _derive_invoice_payment_method(
+    inv: Dict[str, Any],
+    inv_pay_map: Optional[Dict[int, List[Tuple[str, float]]]] = None
+) -> str:
+    """Accurately derive payment method from SAP incoming payments, invoice status, or payment method."""
+    doc_entry = inv.get("DocEntry")
+    doc_entry_int = int(doc_entry) if doc_entry is not None else 0
+
+    if inv_pay_map and doc_entry_int in inv_pay_map:
+        p_list = inv_pay_map[doc_entry_int]
+        pos_pays = [(m, s) for m, s in p_list if s > 0]
+        if pos_pays:
+            return max(pos_pays, key=lambda x: x[1])[0].title()
+        elif p_list:
+            return p_list[0][0].title()
+
+    raw_pm = str(inv.get("PaymentMethod") or "").strip().lower()
+    if "cash" in raw_pm:
+        return "Cash"
+    elif "card" in raw_pm or "credit" in raw_pm:
+        return "Card"
+    elif "upi" in raw_pm or "gpay" in raw_pm:
+        return "UPI"
+    elif "bank" in raw_pm or "transfer" in raw_pm:
+        return "Bank Transfer"
+    elif "check" in raw_pm or "cheque" in raw_pm:
+        return "Check"
+    elif raw_pm:
+        return raw_pm.title()
+
+    status = str(inv.get("DocumentStatus") or "").lower()
+    paid = float(inv.get("PaidToDate") or 0)
+    if status == "bost_open" or paid < 0.01:
+        return "Credit / On Account"
+
+    return "Cash"
+
+
 def _compute_payment_split(invoices: List[Dict[str, Any]]) -> List[PaymentMethodSummary]:
-    """Aggregate invoice totals by payment method for donut/summary cards."""
+    """Aggregate invoice totals by verified payment method for donut/summary cards."""
     grouped: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"total": 0.0, "billCount": 0})
+    inv_pay_map = _resolve_invoice_payments_map()
 
     for inv in invoices:
-        method = str(inv.get("U_P_Method") or "unknown").strip().lower()
-        if not method or method == "none":
-            method = "unknown"
+        if inv.get("Cancelled") == "tYES":
+            continue
+        method = _derive_invoice_payment_method(inv, inv_pay_map)
         grouped[method]["total"] += float(inv.get("DocTotal") or 0)
         grouped[method]["billCount"] += 1
 

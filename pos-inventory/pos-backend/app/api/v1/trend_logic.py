@@ -10,12 +10,20 @@ def format_hour(hr: int) -> str:
         h = 12
     return f"{h:02d} {am_pm}"
 
-def _compute_dynamic_trend(invoices: List[Dict[str, Any]], range_str: str, start_date: Optional[date] = None, end_date: Optional[date] = None) -> Dict[str, Any]:
+def _compute_dynamic_trend(
+    invoices: List[Dict[str, Any]],
+    range_str: str,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    requested_group_by: Optional[str] = None
+) -> Dict[str, Any]:
+    active_invoices = [inv for inv in invoices if inv.get("Cancelled") != "tYES"]
+
     # Determine bounds
     actual_min_date = None
     actual_max_date = None
-    if invoices:
-        dates = [inv.get("DocDate") for inv in invoices if inv.get("DocDate")]
+    if active_invoices:
+        dates = [inv.get("DocDate") for inv in active_invoices if inv.get("DocDate")]
         if dates:
             actual_min_date = min(dates)[:10]
             actual_max_date = max(dates)[:10]
@@ -29,7 +37,16 @@ def _compute_dynamic_trend(invoices: List[Dict[str, Any]], range_str: str, start
 
     span_days = max(1, (d_max - d_min).days + 1)
 
-    if range_str == "daily":
+    req_norm = (requested_group_by or "").lower().strip()
+    if "hour" in req_norm:
+        group_by = "hour"
+    elif "day" in req_norm or "daily" in req_norm:
+        group_by = "day"
+    elif "month" in req_norm:
+        group_by = "month"
+    elif "year" in req_norm:
+        group_by = "year"
+    elif range_str == "daily":
         group_by = "hour"
     elif range_str == "weekly":
         group_by = "day"
@@ -42,10 +59,8 @@ def _compute_dynamic_trend(invoices: List[Dict[str, Any]], range_str: str, start
             group_by = "hour"
         elif span_days <= 31:
             group_by = "day"
-        elif span_days <= 365:
-            group_by = "month"
         else:
-            group_by = "year"
+            group_by = "month"
     else:
         group_by = "day"
 
@@ -174,25 +189,15 @@ def _compute_dynamic_trend(invoices: List[Dict[str, Any]], range_str: str, start
             "invoice_count": buckets[k]["invoice_count"]
         })
         
-    total_sales = sum(float(inv.get("DocTotal") or 0) for inv in invoices)
-    total_invoices = len(invoices)
-    unique_customers = len(set(str(inv.get("CardCode") or "") for inv in invoices if inv.get("CardCode")))
+    total_sales = sum(float(inv.get("DocTotal") or 0) for inv in active_invoices)
+    total_invoices = len(active_invoices)
+    unique_customers = len(set(str(inv.get("CardCode") or "") for inv in active_invoices if inv.get("CardCode")))
     aov = round(total_sales / total_invoices, 2) if total_invoices else 0.0
 
-    # compute payment breakdown
-    payment_map = defaultdict(lambda: {"total": 0.0, "count": 0})
-    for inv in invoices:
-        pm = str(inv.get("PaymentMethod") or "unknown").strip().lower()
-        if not pm or pm == "none":
-            pm = "unknown"
-        payment_map[pm]["total"] += float(inv.get("DocTotal") or 0)
-        payment_map[pm]["count"] += 1
-    
-    payment_breakdown = [
-        {"method": k, "total": round(v["total"], 2), "billCount": v["count"]}
-        for k, v in payment_map.items()
-    ]
-    payment_breakdown.sort(key=lambda x: x["total"], reverse=True)
+    # compute payment breakdown from real SAP incoming payments
+    from app.api.v1.admin import _compute_payment_split
+    payment_split_summaries = _compute_payment_split(active_invoices)
+    payment_breakdown = [p.model_dump() for p in payment_split_summaries]
 
     return {
         "range": range_str,

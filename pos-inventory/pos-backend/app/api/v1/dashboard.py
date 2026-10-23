@@ -42,6 +42,7 @@ from app.services.sap.business_partners_service import SAPBusinessPartnersServic
 from app.services.sap.returns_service import SAPReturnsService
 from app.api.v1.customers import _compute_customer_insights
 from app.api.v1.atlas import _get_permitted_branch
+from app.api.v1.admin import _resolve_invoice_payments_map, _derive_invoice_payment_method
 from app.services import approval_service
 from app.models.schemas import DashboardAlert
 
@@ -265,8 +266,16 @@ def _extract_base_doc_entries_from_credit_notes(notes: List[Dict[str, Any]]) -> 
     return doc_entries
 
 
-def _build_recent_sales_payload(invoices: List[Dict[str, Any]], limit: int = 8, returned_doc_entries: Optional[set] = None) -> List[DashboardRecentSale]:
+def _build_recent_sales_payload(
+    invoices: List[Dict[str, Any]],
+    limit: int = 8,
+    returned_doc_entries: Optional[set] = None,
+    inv_pay_map: Optional[dict] = None
+) -> List[DashboardRecentSale]:
     rows: List[DashboardRecentSale] = []
+    if inv_pay_map is None:
+        inv_pay_map = _resolve_invoice_payments_map()
+
     for inv in invoices[:limit]:
         items, computed_subtotal = _extract_sale_items(inv)
         total = _to_float(inv.get("DocTotal"))
@@ -286,6 +295,8 @@ def _build_recent_sales_payload(invoices: List[Dict[str, Any]], limit: int = 8, 
             and doc_entry_val in returned_doc_entries
         )
 
+        pm = _derive_invoice_payment_method(inv, inv_pay_map)
+
         rows.append(
             DashboardRecentSale(
                 docEntry=doc_entry_val,
@@ -295,7 +306,7 @@ def _build_recent_sales_payload(invoices: List[Dict[str, Any]], limit: int = 8, 
                 customerCode=inv.get("CardCode"),
                 customerName=inv.get("U_C_Name") or inv.get("CardName"),
                 customerPhone=inv.get("U_W_Number"),
-                paymentMethod=inv.get("U_P_Method"),
+                paymentMethod=pm,
                 subtotal=subtotal,
                 discount=discount,
                 gst=gst,
@@ -785,9 +796,19 @@ async def get_recent_sales_feed(
         c_low = customer.strip().lower()
         filtered = [inv for inv in filtered if c_low in str(inv.get("CardCode") or "").lower() or c_low in str(inv.get("CardName") or "").lower()]
         
+    inv_pay_map = _resolve_invoice_payments_map()
+
     if payment_method:
         pm_low = payment_method.strip().lower()
-        filtered = [inv for inv in filtered if str(inv.get("U_P_Method") or "").strip().lower() == pm_low]
+        def match_pm(inv: Dict[str, Any]) -> bool:
+            m = _derive_invoice_payment_method(inv, inv_pay_map).lower()
+            if pm_low in ("credit", "on account", "unpaid"):
+                return "credit" in m or "account" in m or "unpaid" in m
+            if pm_low in ("transfer", "bank", "bank transfer"):
+                return "transfer" in m or "bank" in m
+            return pm_low in m
+
+        filtered = [inv for inv in filtered if match_pm(inv)]
         
     if status:
         s_low = status.strip().lower()
@@ -804,7 +825,11 @@ async def get_recent_sales_feed(
         for inv in filtered:
             has_cat = False
             for line in inv.get("DocumentLines") or []:
-                if cat_low in str(line.get("ItemCode") or "").lower() or cat_low in str(line.get("ItemDescription") or "").lower():
+                if (
+                    cat_low in str(line.get("ItemCode") or "").lower()
+                    or cat_low in str(line.get("ItemDescription") or "").lower()
+                    or cat_low in str(line.get("CostingCode") or "").lower()
+                ):
                     has_cat = True
                     break
             if has_cat:
@@ -833,7 +858,7 @@ async def get_recent_sales_feed(
     pending_invoices = sum(1 for inv in filtered if str(inv.get('DocumentStatus')).lower() == 'bost_open')
 
     page = filtered[offset: offset + limit]
-    items = _build_recent_sales_payload(page, limit=limit, returned_doc_entries=returned_doc_entries)
+    items = _build_recent_sales_payload(page, limit=limit, returned_doc_entries=returned_doc_entries, inv_pay_map=inv_pay_map)
     next_offset = offset + limit if offset + limit < total else None
 
     return DashboardRecentSalesPage(items=items, nextOffset=next_offset, total=total, grossSales=gross_sales, paidInvoices=paid_invoices, pendingInvoices=pending_invoices)

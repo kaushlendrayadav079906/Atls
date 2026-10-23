@@ -635,6 +635,7 @@ OperatorDashboardData.model_rebuild()
 class AtlasOverview(BaseModel):
     totalSales: float
     invoiceCount: int
+    totalCustomers: int = 0
     averageOrderValue: float
     paymentBreakdown: List[PaymentMethodSummary] = Field(default_factory=list)
 

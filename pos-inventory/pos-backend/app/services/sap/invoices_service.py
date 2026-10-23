@@ -775,7 +775,7 @@ class SAPInvoicesService:
             skip = 0
 
             header_select = (
-                "DocEntry,DocNum,DocDate,DocTime,DocTotal,VatSum,TotalDiscount,CardCode,CardName,PaymentMethod"
+                "DocEntry,DocNum,DocDate,DocTime,DocTotal,VatSum,TotalDiscount,CardCode,CardName,PaymentMethod,DocumentStatus,PaidToDate,Cancelled,BPL_IDAssignedToInvoice,BPLName"
             )
 
             while len(all_invoices) < _MAX_INVOICES_PER_DATE_RANGE:

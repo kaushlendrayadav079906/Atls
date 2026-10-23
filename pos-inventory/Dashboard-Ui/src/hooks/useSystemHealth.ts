@@ -44,13 +44,21 @@ export const useSystemHealth = (pollIntervalMs = 20000): SystemHealthState => {
 
       // Check if SAP just reconnected after an outage
       if (prevSapConnectedRef.current === false && sapOk) {
-        console.info('[useSystemHealth] SAP reconnected! Invalidating dashboard queries...');
         queryClient.invalidateQueries({ queryKey: ['atlasOverview'] });
         queryClient.invalidateQueries({ queryKey: ['recentSales'] });
         queryClient.invalidateQueries({ queryKey: ['topProducts'] });
         queryClient.invalidateQueries({ queryKey: ['salesTrend'] });
         queryClient.invalidateQueries({ queryKey: ['inventoryRisk'] });
         queryClient.invalidateQueries({ queryKey: ['dashboardAlerts'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-overview'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-distribution'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-category-value'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-movements-list'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-valuation'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-low-stock'] });
+        queryClient.invalidateQueries({ queryKey: ['inventory-expiry'] });
       }
       prevSapConnectedRef.current = sapOk;
     } catch {

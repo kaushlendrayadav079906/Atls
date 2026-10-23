@@ -179,3 +179,136 @@ def test_admin_settings_forbidden_for_non_admin():
         response = client.get("/api/v1/finance/admin-settings", headers={"Authorization": f"Bearer {manager_token}"})
         assert response.status_code == 403
 
+
+def test_purchase_invoices_endpoint(auth_headers):
+    mock_data = {
+        "period": {"range": "all_time", "label": "All Dates (Total)"},
+        "kpis": {"total_invoices": 2, "total_purchases": 2100.0, "total_paid": 2050.0, "total_outstanding_balance": 50.0},
+        "total_count": 2,
+        "page": 1,
+        "page_size": 20,
+        "total_pages": 1,
+        "invoices": [
+            {"doc_entry": 1, "doc_num": 1, "doc_date": "2023-10-13", "card_code": "VEN001", "card_name": "Amazon Ven", "doc_total": 1050.0, "paid_to_date": 1050.0, "balance_due": 0.0, "payment_status": "Paid"}
+        ]
+    }
+    with patch("app.api.v1.finance._finance_service.get_purchase_invoices", return_value=mock_data):
+        response = client.get("/api/v1/finance/purchase-invoices?range=all_time", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_count"] == 2
+        assert data["kpis"]["total_purchases"] == 2100.0
+        assert len(data["invoices"]) == 1
+
+
+def test_incoming_payments_endpoint(auth_headers):
+    mock_data = {
+        "period": {"range": "all_time", "label": "All Dates (Total)"},
+        "kpis": {"total_incoming_amount": 2100.0, "transactions_count": 1, "average_payment": 2100.0},
+        "total_count": 1,
+        "page": 1,
+        "page_size": 20,
+        "total_pages": 1,
+        "payments": [
+            {"doc_entry": 1, "doc_num": 1, "amount": 2100.0, "method": "Bank Transfer", "customer_name": "Amazon"}
+        ]
+    }
+    with patch("app.api.v1.finance._finance_service.get_incoming_payments", return_value=mock_data):
+        response = client.get("/api/v1/finance/incoming-payments?range=all_time", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["kpis"]["total_incoming_amount"] == 2100.0
+        assert len(data["payments"]) == 1
+
+
+def test_outgoing_payments_endpoint(auth_headers):
+    mock_data = {
+        "period": {"range": "all_time", "label": "All Dates (Total)"},
+        "kpis": {"total_outgoing_amount": 1000.0, "transactions_count": 1, "average_disbursement": 1000.0},
+        "total_count": 1,
+        "page": 1,
+        "page_size": 20,
+        "total_pages": 1,
+        "payments": [
+            {"doc_entry": 1, "doc_num": 1, "amount": 1000.0, "method": "Bank Transfer", "supplier_name": "HASAGREEN Ven"}
+        ]
+    }
+    with patch("app.api.v1.finance._finance_service.get_outgoing_payments", return_value=mock_data):
+        response = client.get("/api/v1/finance/outgoing-payments?range=all_time", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["kpis"]["total_outgoing_amount"] == 1000.0
+        assert len(data["payments"]) == 1
+
+
+def test_customer_analysis_endpoint(auth_headers):
+    mock_data = {
+        "period": {"range": "all_time", "label": "All Dates (Total)"},
+        "kpis": {"total_customers": 5, "total_sales_revenue": 50000.0, "total_outstanding_receivables": 10000.0},
+        "total_count": 5,
+        "page": 1,
+        "page_size": 20,
+        "total_pages": 1,
+        "customers": [
+            {"customer_code": "CUS001", "customer_name": "Amazon", "sales_revenue": 25000.0, "invoices_count": 3}
+        ]
+    }
+    with patch("app.api.v1.finance._finance_service.get_customer_analysis", return_value=mock_data):
+        response = client.get("/api/v1/finance/customer-analysis?range=all_time", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["kpis"]["total_sales_revenue"] == 50000.0
+        assert len(data["customers"]) == 1
+
+
+def test_supplier_analysis_endpoint(auth_headers):
+    mock_data = {
+        "period": {"range": "all_time", "label": "All Dates (Total)"},
+        "kpis": {"total_suppliers": 3, "total_purchase_spend": 30000.0, "total_outstanding_payables": 5000.0},
+        "total_count": 3,
+        "page": 1,
+        "page_size": 20,
+        "total_pages": 1,
+        "suppliers": [
+            {"supplier_code": "VEN001", "supplier_name": "Amazon Ven", "purchase_spend": 15000.0, "invoices_count": 2}
+        ]
+    }
+    with patch("app.api.v1.finance._finance_service.get_supplier_analysis", return_value=mock_data):
+        response = client.get("/api/v1/finance/supplier-analysis?range=all_time", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["kpis"]["total_purchase_spend"] == 30000.0
+        assert len(data["suppliers"]) == 1
+
+
+def test_profitability_reports_endpoint(auth_headers):
+    mock_data = {
+        "period": {"range": "all_time", "label": "All Dates (Total)"},
+        "kpis": {
+            "total_revenue": 50000.0,
+            "cost_of_purchases": 30000.0,
+            "gross_profit": 20000.0,
+            "gross_margin": 40.0,
+        },
+        "monthly_breakdown": [
+            {"month": "2023-10", "period": "Oct 2023", "sales": 20000.0, "purchases": 12000.0, "gross_profit": 8000.0, "gross_margin": 40.0}
+        ],
+        "accounting_note": "Accrual basis SAP calculation."
+    }
+    with patch("app.api.v1.finance._finance_service.get_profitability_report", return_value=mock_data):
+        response = client.get("/api/v1/finance/profitability-reports?range=all_time", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["kpis"]["gross_profit"] == 20000.0
+        assert data["kpis"]["gross_margin"] == 40.0
+
+
+def test_export_finance_endpoint(auth_headers):
+    mock_csv = "DocEntry,Invoice No,Total\n1,1,1050.0"
+    with patch("app.api.v1.finance._finance_service.export_finance_csv", return_value=mock_csv):
+        response = client.get("/api/v1/finance/export?module=purchase_invoices&range=all_time", headers=auth_headers)
+        assert response.status_code == 200
+        assert "text/csv" in response.headers.get("content-type", "")
+        assert "Invoice No" in response.text
+
+

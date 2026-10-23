@@ -124,8 +124,8 @@ export const dashboardApi = {
 };
 
 export const atlasApi = {
-  getSalesTrend: async (branch_id?: string, range: string = 'monthly', customer?: string, category?: string, payment_method?: string, from_date?: string, to_date?: string): Promise<any> => {
-    const res = await apiClient.get('/atlas/sales-trends', { params: { branch: branch_id, range, customer, category, payment_method, from_date, to_date } });
+  getSalesTrend: async (branch_id?: string, range: string = 'monthly', customer?: string, category?: string, payment_method?: string, from_date?: string, to_date?: string, group_by?: string): Promise<any> => {
+    const res = await apiClient.get('/atlas/sales-trends', { params: { branch: branch_id, range, customer, category, payment_method, from_date, to_date, group_by } });
     return res.data;
   },
   getRecentSalesFeed: async (params?: { range?: string, search?: string, limit?: number, offset?: number, branch?: string, customer?: string, category?: string, payment_method?: string, from_date?: string, to_date?: string }) => {
@@ -154,59 +154,329 @@ export const atlasApi = {
 export interface PaymentOverview {
   totalPayments: number;
   paymentCount: number;
-  averagePaymentValue: number;
+  paidInvoices: number;
+  pendingPayments: number;
+  pendingPaymentsCount?: number;
   refundsIssued: number;
   refundsAmount: number;
+  refundsCount?: number;
+  averagePaymentValue: number;
+  currency?: string;
+  period?: {
+    range?: string;
+    startDate?: string | null;
+    endDate?: string | null;
+  };
+  rules?: Record<string, string>;
 }
 
 export interface PaymentDistributionItem {
   method: string;
   total: number;
   count: number;
+  percentage?: number;
 }
 
 export interface PaymentTrendItem {
   label: string;
   amount: number;
   count: number;
+  cashAmount?: number;
+  transferAmount?: number;
+  cardAmount?: number;
+}
+
+export interface PaymentLinkedInvoice {
+  docEntry: number;
+  docNum?: number;
+  sumApplied: number;
+  invoiceTotal?: number | null;
+  paidToDate?: number | null;
+  invoiceDate?: string | null;
+  invoiceStatus?: string | null;
 }
 
 export interface PaymentTransactionItem {
   docEntry: number;
   docNum: number;
-  invoiceDocNum?: number;
+  invoiceDocNum?: string;
+  invoiceDocEntry?: number;
+  invoiceAmount?: number | null;
   docDate: string;
   customerCode: string;
   customerName: string;
   paymentMethod: string;
   totalAmount: number;
+  sumApplied?: number;
   status: string;
   transactionId?: string;
+  currency?: string;
+  branchName?: string;
+  branchId?: number;
+  linkedInvoices?: PaymentLinkedInvoice[];
 }
 
 export interface PaymentTransactionsResponse {
   total: number;
   items: PaymentTransactionItem[];
+  offset?: number;
+  limit?: number;
+}
+
+export interface CustomerPaymentItem {
+  customerCode: string;
+  customerName: string;
+  totalAmount: number;
+  paymentCount: number;
+  lastPaymentDate: string;
+  preferredMethod: string;
+  linkedInvoicesCount: number;
+}
+
+export interface MethodAnalysisItem {
+  method: string;
+  displayName: string;
+  totalAmount: number;
+  transactionCount: number;
+  percentage: number;
+  averageValue: number;
+  minAmount: number;
+  maxAmount: number;
+}
+
+export interface PaymentDetailResponse {
+  docEntry: number;
+  docNum: number;
+  docDate: string;
+  cardCode: string;
+  cardName: string;
+  totalAmount: number;
+  docCurrency: string;
+  branchId?: number;
+  branchName?: string;
+  cancelled: boolean;
+  cashSum: number;
+  transferSum: number;
+  transferReference?: string | null;
+  transferDate?: string | null;
+  cardSum: number;
+  creditCards?: any[];
+  checkSum: number;
+  checks?: any[];
+  remarks?: string | null;
+  journalRemarks?: string | null;
+  linkedInvoices: PaymentLinkedInvoice[];
+}
+
+export interface PaymentFilterParams {
+  range?: string;
+  from_date?: string;
+  to_date?: string;
+  branch?: string;
+  customer?: string;
+  payment_method?: string;
+  payment_status?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
 }
 
 export const paymentsReportApi = {
-  getOverview: async (params?: { range?: string, from_date?: string, to_date?: string, branch?: string, customer?: string, payment_method?: string }): Promise<PaymentOverview> => {
+  getOverview: async (params?: PaymentFilterParams): Promise<PaymentOverview> => {
     const res = await apiClient.get('/reports/payments/overview', { params });
     return res.data;
   },
-  getDistribution: async (params?: { range?: string, from_date?: string, to_date?: string, branch?: string, customer?: string }): Promise<PaymentDistributionItem[]> => {
+  getDistribution: async (params?: PaymentFilterParams): Promise<PaymentDistributionItem[]> => {
     const res = await apiClient.get('/reports/payments/distribution', { params });
     return res.data;
   },
-  getTrend: async (params?: { range?: string, from_date?: string, to_date?: string, branch?: string, customer?: string, payment_method?: string, granularity?: string }): Promise<PaymentTrendItem[]> => {
+  getTrend: async (params?: PaymentFilterParams & { granularity?: string }): Promise<PaymentTrendItem[]> => {
     const res = await apiClient.get('/reports/payments/trend', { params });
     return res.data;
   },
-  getTransactions: async (params?: { range?: string, from_date?: string, to_date?: string, branch?: string, customer?: string, payment_method?: string, search?: string, limit?: number, offset?: number }): Promise<PaymentTransactionsResponse> => {
+  getTransactions: async (params?: PaymentFilterParams): Promise<PaymentTransactionsResponse> => {
     const res = await apiClient.get('/reports/payments/transactions', { params });
+    return res.data;
+  },
+  getCustomerPayments: async (params?: PaymentFilterParams): Promise<CustomerPaymentItem[]> => {
+    const res = await apiClient.get('/reports/payments/customers', { params });
+    return res.data;
+  },
+  getMethodAnalysis: async (params?: PaymentFilterParams): Promise<MethodAnalysisItem[]> => {
+    const res = await apiClient.get('/reports/payments/methods', { params });
+    return res.data;
+  },
+  getPaymentDetail: async (docEntry: number): Promise<PaymentDetailResponse> => {
+    const res = await apiClient.get(`/reports/payments/detail/${docEntry}`);
+    return res.data;
+  },
+  exportTransactions: async (params?: PaymentFilterParams & { format?: string }): Promise<Blob> => {
+    const res = await apiClient.get('/reports/payments/export', { params, responseType: 'blob' });
     return res.data;
   }
 };
+
+export interface InvoiceOverview {
+  totalInvoices: number;
+  totalSales: number;
+  totalPaid: number;
+  totalDue: number;
+  avgInvoiceValue: number;
+  paidPercentage: number;
+  duePercentage: number;
+  counts: {
+    paid: number;
+    partiallyPaid: number;
+    unpaid: number;
+    cancelled: number;
+  };
+  growth?: {
+    invoicesPct?: number;
+    salesPct?: number;
+    avgPct?: number;
+  };
+  currency?: string;
+  period?: {
+    range?: string;
+    startDate?: string | null;
+    endDate?: string | null;
+  };
+  rules?: Record<string, string>;
+}
+
+export interface InvoiceListItem {
+  docEntry: number;
+  docNum: number;
+  invoiceNo: string;
+  docDate: string;
+  docTime: string;
+  dateTime: string;
+  cardCode: string;
+  cardName: string;
+  docTotal: number;
+  paidToDate: number;
+  balanceDue: number;
+  currency: string;
+  invoiceStatus: 'Open' | 'Closed' | 'Cancelled';
+  paymentStatus: 'Paid' | 'Partially Paid' | 'Unpaid' | 'Cancelled';
+  paymentMethod: string;
+  branchId?: number;
+  branchName?: string;
+  cancelled: boolean;
+  vatSum?: number;
+  totalDiscount?: number;
+}
+
+export interface InvoiceListResponse {
+  total: number;
+  items: InvoiceListItem[];
+  offset: number;
+  limit: number;
+}
+
+export interface InvoiceTrendItem {
+  label: string;
+  invoicesCount: number;
+  totalSales: number;
+  totalPaid: number;
+  totalDue: number;
+}
+
+export interface InvoiceStatusBreakdownItem {
+  status: string;
+  count: number;
+  total: number;
+  percentage: number;
+}
+
+export interface InvoiceAnalyticsResponse {
+  trend: InvoiceTrendItem[];
+  paymentStatusBreakdown: InvoiceStatusBreakdownItem[];
+  invoiceStatusBreakdown: InvoiceStatusBreakdownItem[];
+  topCustomers: Array<{
+    cardCode: string;
+    cardName: string;
+    totalSales: number;
+    invoicesCount: number;
+  }>;
+}
+
+export interface InvoiceLineItem {
+  lineNum: number;
+  itemCode: string;
+  itemDescription: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  warehouseCode?: string;
+  taxCode?: string;
+}
+
+export interface InvoiceDetailResponse {
+  docEntry: number;
+  docNum: number;
+  invoiceNo: string;
+  docDate: string;
+  docDueDate?: string;
+  docTime: string;
+  cardCode: string;
+  cardName: string;
+  docTotal: number;
+  paidToDate: number;
+  balanceDue: number;
+  currency: string;
+  invoiceStatus: string;
+  paymentStatus: string;
+  paymentMethod: string;
+  branchId?: number;
+  branchName?: string;
+  cancelled: boolean;
+  comments?: string;
+  vatSum?: number;
+  totalDiscount?: number;
+  lines: InvoiceLineItem[];
+}
+
+export interface InvoiceFilterParams {
+  range?: string;
+  from_date?: string;
+  to_date?: string;
+  branch?: string;
+  customer?: string;
+  invoice_status?: string;
+  payment_status?: string;
+  payment_method?: string;
+  search?: string;
+  sort_by?: string;
+  sort_order?: string;
+  limit?: number;
+  offset?: number;
+  force_refresh?: boolean;
+}
+
+export const invoicesReportApi = {
+  getOverview: async (params?: InvoiceFilterParams): Promise<InvoiceOverview> => {
+    const res = await apiClient.get('/reports/invoices/overview', { params });
+    return res.data;
+  },
+  getList: async (params?: InvoiceFilterParams): Promise<InvoiceListResponse> => {
+    const res = await apiClient.get('/reports/invoices/list', { params });
+    return res.data;
+  },
+  getAnalytics: async (params?: InvoiceFilterParams & { granularity?: string }): Promise<InvoiceAnalyticsResponse> => {
+    const res = await apiClient.get('/reports/invoices/analytics', { params });
+    return res.data;
+  },
+  getDetail: async (docEntry: number): Promise<InvoiceDetailResponse> => {
+    const res = await apiClient.get(`/reports/invoices/detail/${docEntry}`);
+    return res.data;
+  },
+  exportInvoices: async (params?: InvoiceFilterParams & { format?: string }): Promise<Blob> => {
+    const res = await apiClient.get('/reports/invoices/export', { params, responseType: 'blob' });
+    return res.data;
+  },
+};
+
 
 export interface AIAssistantChatPayload {
   message: string;
@@ -417,6 +687,41 @@ export const financeApi = {
     return res.data;
   },
 
+  getPurchaseInvoices: async (params?: any) => {
+    const res = await apiClient.get('/finance/purchase-invoices', { params });
+    return res.data;
+  },
+
+  getIncomingPayments: async (params?: any) => {
+    const res = await apiClient.get('/finance/incoming-payments', { params });
+    return res.data;
+  },
+
+  getOutgoingPayments: async (params?: any) => {
+    const res = await apiClient.get('/finance/outgoing-payments', { params });
+    return res.data;
+  },
+
+  getCustomerAnalysis: async (params?: any) => {
+    const res = await apiClient.get('/finance/customer-analysis', { params });
+    return res.data;
+  },
+
+  getSupplierAnalysis: async (params?: any) => {
+    const res = await apiClient.get('/finance/supplier-analysis', { params });
+    return res.data;
+  },
+
+  getProfitabilityReport: async (params?: any) => {
+    const res = await apiClient.get('/finance/profitability-reports', { params });
+    return res.data;
+  },
+
+  exportFinanceData: async (params: any) => {
+    const res = await apiClient.get('/finance/export', { params, responseType: 'blob' });
+    return res.data;
+  },
+
   getRecordDetails: async (params: {
     entity_type: string;
     record_id: string;
@@ -458,6 +763,7 @@ export const financeApi = {
     return res.data;
   },
 };
+
 
 export interface PermissionItem {
   id: string;
@@ -622,7 +928,24 @@ export const emailApi = {
   },
 };
 
-
-
-
+export type {
+  PurchaseInvoiceItem,
+  PurchaseInvoiceSummary,
+  PurchaseInvoicesResponse,
+  IncomingPaymentItem,
+  IncomingPaymentSummary,
+  IncomingPaymentsResponse,
+  OutgoingPaymentItem,
+  OutgoingPaymentSummary,
+  OutgoingPaymentsResponse,
+  CustomerAnalysisItem,
+  CustomerAnalysisSummary,
+  CustomerAnalysisResponse,
+  SupplierAnalysisItem,
+  SupplierAnalysisSummary,
+  SupplierAnalysisResponse,
+  ProfitabilitySummary,
+  ProfitabilityTrendItem,
+  ProfitabilityResponse,
+} from './finance';
 

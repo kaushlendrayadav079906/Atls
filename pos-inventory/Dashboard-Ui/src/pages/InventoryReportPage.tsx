@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Package, IndianRupee, AlertTriangle, AlertOctagon, Calendar, 
-  Download, Search, RotateCw, Eye, Edit, MoreVertical, LayoutGrid
+  Download, Search, RotateCw, Eye, LayoutGrid, ChevronDown
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { 
@@ -13,8 +13,20 @@ import {
   getInventoryDistribution, 
   getInventoryValueByCategory, 
   getInventoryMovements,
-  getInventoryProducts
+  getInventoryProducts,
+  getInventoryMovementsList,
+  getInventoryValuation,
+  getInventoryLowStock,
+  getInventoryExpiry,
+  downloadInventoryCsv
 } from '../api/inventoryReport';
+import { commonApi } from '../api/common';
+import { ReportDateRangePicker } from '../components/ReportDateRangePicker';
+import {
+  type QuickFilter,
+  type DashboardPeriod,
+  type AuthoritativeDateFilterState,
+} from '../utils/date';
 
 const KPI_CARDS = [
   { key: 'total_products', title: 'Total Products', icon: Package, color: 'text-blue-500', bg: 'bg-blue-50' },
@@ -25,45 +37,197 @@ const KPI_CARDS = [
 ];
 
 export const InventoryReportPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('summary');
+  const [activeTab, setActiveTab] = useState<'stock_summary' | 'stock_movements' | 'stock_valuation' | 'low_stock_report' | 'expiry_report'>('stock_summary');
+  
+  // Filter bar states
   const [filters, setFilters] = useState({
     warehouse: 'All',
     category: 'All Categories',
     status: 'All',
-    brand: 'All Brands',
     search: ''
   });
   const [appliedFilters, setAppliedFilters] = useState(filters);
+  
+  // Table search & movement type filter
+  const [tableSearch, setTableSearch] = useState('');
+  const [movementTypeFilter, setMovementTypeFilter] = useState('All');
+
+  // Pagination states
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
+  
+  // Chart period controls
   const [topCategories] = useState(6);
   const [movementPeriod, setMovementPeriod] = useState('Week');
   const [categoryPeriod, setCategoryPeriod] = useState('Month');
+  
+  // Modal & Column visibility
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
-
-  const { data: overview, isLoading: isLoadingOverview, isError: isErrorOverview, error: errorOverview, refetch: refetchOverview } = useQuery({
-    queryKey: ['inventory-overview', appliedFilters.warehouse],
-    queryFn: () => getInventoryOverview(appliedFilters.warehouse)
+  const [showColumnsMenu, setShowColumnsMenu] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState({
+    sku: true,
+    category: true,
+    warehouse: true,
+    current_stock: true,
+    min_stock: true,
+    stock_value: true,
+    status: true,
+    last_updated: true,
   });
 
-  const { data: distribution, isLoading: isLoadingDist, isError: isErrorDist, refetch: refetchDist } = useQuery({
-    queryKey: ['inventory-distribution', appliedFilters.warehouse],
-    queryFn: () => getInventoryDistribution(appliedFilters.warehouse)
+  // Top header date range state (defaults to All Dates (Total))
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('');
+  const [, setDateRange] = useState<DashboardPeriod>('all_time');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const handleDateRangeChange = (filterState: AuthoritativeDateFilterState) => {
+    setQuickFilter(filterState.quickFilter);
+    setDateRange(filterState.period);
+    setDateFrom(filterState.dateFrom);
+    setDateTo(filterState.dateTo);
+
+    if (filterState.quickFilter === 'today') {
+      setMovementPeriod('Today');
+      setCategoryPeriod('Today');
+    } else if (filterState.quickFilter === 'week') {
+      setMovementPeriod('Week');
+      setCategoryPeriod('Week');
+    } else if (filterState.quickFilter === 'month') {
+      setMovementPeriod('Month');
+      setCategoryPeriod('Month');
+    } else if (filterState.quickFilter === 'year' || filterState.quickFilter === '') {
+      setMovementPeriod('Year');
+      setCategoryPeriod('Year');
+    }
+  };
+
+  // 1. Fetch Dynamic Filter Options (Categories & Warehouses from SAP)
+  const { data: filterOptions } = useQuery({
+    queryKey: ['common-filter-options'],
+    queryFn: () => commonApi.getFilterOptions(),
+    staleTime: 5 * 60 * 1000,
   });
 
-  const { data: categoryValue, isLoading: isLoadingCat, isError: isErrorCat, refetch: refetchCat } = useQuery({
+  // 2. Fetch KPI Overview
+  const { 
+    data: overview, 
+    isLoading: isLoadingOverview, 
+    isError: isErrorOverview, 
+    error: errorOverview, 
+    refetch: refetchOverview 
+  } = useQuery({
+    queryKey: ['inventory-overview', appliedFilters.warehouse, appliedFilters.category],
+    queryFn: () => getInventoryOverview(appliedFilters.warehouse, appliedFilters.category)
+  });
+
+  // 3. Fetch Status Distribution
+  const { 
+    data: distribution, 
+    isLoading: isLoadingDist, 
+    isError: isErrorDist, 
+    refetch: refetchDist 
+  } = useQuery({
+    queryKey: ['inventory-distribution', appliedFilters.warehouse, appliedFilters.category],
+    queryFn: () => getInventoryDistribution(appliedFilters.warehouse, appliedFilters.category)
+  });
+
+  // 4. Fetch Value by Category
+  const { 
+    data: categoryValue, 
+    isLoading: isLoadingCat, 
+    isError: isErrorCat, 
+    refetch: refetchCat 
+  } = useQuery({
     queryKey: ['inventory-category-value', appliedFilters.warehouse, topCategories],
     queryFn: () => getInventoryValueByCategory(topCategories, appliedFilters.warehouse)
   });
 
-  const { data: movements, isLoading: isLoadingMov, isError: isErrorMov, refetch: refetchMov } = useQuery({
-    queryKey: ['inventory-movements', appliedFilters.warehouse, movementPeriod],
-    queryFn: () => getInventoryMovements(movementPeriod === 'Week' ? 7 : movementPeriod === 'Month' ? 30 : movementPeriod === 'Year' ? 365 : 1, appliedFilters.warehouse)
+  // 5. Fetch Movements for Chart
+  const { 
+    data: movements, 
+    isLoading: isLoadingMov, 
+    isError: isErrorMov, 
+    refetch: refetchMov 
+  } = useQuery({
+    queryKey: ['inventory-movements', appliedFilters.warehouse, movementPeriod, dateFrom, dateTo],
+    queryFn: () => getInventoryMovements(movementPeriod, appliedFilters.warehouse, dateFrom, dateTo)
   });
 
-  const { data: productsData, isLoading: isLoadingProducts, isError: isErrorProducts, refetch: refetchProd } = useQuery({
-    queryKey: ['inventory-products', page, limit, appliedFilters],
-    queryFn: () => getInventoryProducts(page, limit, appliedFilters)
+  // 6. Tab 1: Product Stock List
+  const { 
+    data: productsData, 
+    isLoading: isLoadingProducts, 
+    isError: isErrorProducts, 
+    refetch: refetchProd 
+  } = useQuery({
+    queryKey: ['inventory-products', page, limit, appliedFilters, tableSearch],
+    queryFn: () => getInventoryProducts(page, limit, { ...appliedFilters, search: tableSearch || appliedFilters.search }),
+    enabled: activeTab === 'stock_summary'
+  });
+
+  // 7. Tab 2: Movements List
+  const { 
+    data: movementsListData, 
+    isLoading: isLoadingMovList, 
+    isError: isErrorMovList, 
+    refetch: refetchMovList 
+  } = useQuery({
+    queryKey: ['inventory-movements-list', page, limit, appliedFilters.warehouse, tableSearch || appliedFilters.search, movementTypeFilter, dateFrom, dateTo],
+    queryFn: () => getInventoryMovementsList(page, limit, {
+      warehouse: appliedFilters.warehouse,
+      search: tableSearch || appliedFilters.search,
+      movement_type: movementTypeFilter,
+      from_date: dateFrom,
+      to_date: dateTo
+    }),
+    enabled: activeTab === 'stock_movements'
+  });
+
+  // 8. Tab 3: Valuation List
+  const { 
+    data: valuationData, 
+    isLoading: isLoadingValuation, 
+    isError: isErrorValuation, 
+    refetch: refetchValuation 
+  } = useQuery({
+    queryKey: ['inventory-valuation', page, limit, appliedFilters.warehouse, appliedFilters.category, tableSearch || appliedFilters.search],
+    queryFn: () => getInventoryValuation(page, limit, {
+      warehouse: appliedFilters.warehouse,
+      category: appliedFilters.category,
+      search: tableSearch || appliedFilters.search
+    }),
+    enabled: activeTab === 'stock_valuation'
+  });
+
+  // 9. Tab 4: Low Stock List
+  const { 
+    data: lowStockData, 
+    isLoading: isLoadingLowStock, 
+    isError: isErrorLowStock, 
+    refetch: refetchLowStock 
+  } = useQuery({
+    queryKey: ['inventory-low-stock', page, limit, appliedFilters.warehouse, appliedFilters.category, tableSearch || appliedFilters.search],
+    queryFn: () => getInventoryLowStock(page, limit, {
+      warehouse: appliedFilters.warehouse,
+      category: appliedFilters.category,
+      search: tableSearch || appliedFilters.search
+    }),
+    enabled: activeTab === 'low_stock_report'
+  });
+
+  // 10. Tab 5: Expiry List
+  const { 
+    data: expiryData, 
+    isLoading: isLoadingExpiry, 
+    isError: isErrorExpiry, 
+    refetch: refetchExpiry 
+  } = useQuery({
+    queryKey: ['inventory-expiry', page, limit, tableSearch || appliedFilters.search],
+    queryFn: () => getInventoryExpiry(page, limit, {
+      search: tableSearch || appliedFilters.search
+    }),
+    enabled: activeTab === 'expiry_report'
   });
 
   const handleApplyFilters = () => {
@@ -72,9 +236,11 @@ export const InventoryReportPage: React.FC = () => {
   };
 
   const handleResetFilters = () => {
-    const defaultFilters = { warehouse: 'All', category: 'All Categories', status: 'All', brand: 'All Brands', search: '' };
+    const defaultFilters = { warehouse: 'All', category: 'All Categories', status: 'All', search: '' };
     setFilters(defaultFilters);
     setAppliedFilters(defaultFilters);
+    setTableSearch('');
+    setMovementTypeFilter('All');
     setPage(1);
   };
 
@@ -83,7 +249,22 @@ export const InventoryReportPage: React.FC = () => {
     refetchDist();
     refetchCat();
     refetchMov();
-    refetchProd();
+    if (activeTab === 'stock_summary') refetchProd();
+    if (activeTab === 'stock_movements') refetchMovList();
+    if (activeTab === 'stock_valuation') refetchValuation();
+    if (activeTab === 'low_stock_report') refetchLowStock();
+    if (activeTab === 'expiry_report') refetchExpiry();
+  };
+
+  const handleExport = () => {
+    downloadInventoryCsv(activeTab, {
+      warehouse: appliedFilters.warehouse,
+      category: appliedFilters.category,
+      status: appliedFilters.status,
+      search: tableSearch || appliedFilters.search,
+      from_date: dateFrom,
+      to_date: dateTo,
+    });
   };
 
   const formatCurrency = (val: number) => {
@@ -104,41 +285,70 @@ export const InventoryReportPage: React.FC = () => {
     expiring_soon: '#a855f7'
   };
 
+  // Available warehouses list
+  const warehouseOptions = [
+    { code: 'All', name: 'All' },
+    ...(filterOptions?.warehouses || []).map(w => ({ code: w.code, name: `${w.code} - ${w.name}` }))
+  ];
+
+  // Available categories list
+  const categoryOptions = [
+    { code: 'All Categories', name: 'All Categories' },
+    ...(filterOptions?.categories || []).map(c => ({ code: String(c.name || c.code), name: c.name }))
+  ];
+
   return (
     <div className="p-6 max-w-[1600px] mx-auto bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="atlas-page-title text-[28px] sm:text-[32px] md:text-[34px] font-bold text-gray-900">Inventory Report</h1>
           <p className="atlas-page-subtitle text-[14px] sm:text-[15px] text-gray-500 mt-1">View stock levels, movements and inventory valuation.</p>
         </div>
-        <div className="flex gap-3">
-          <button onClick={handleRefresh} className="p-2.5 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
-            <RotateCw className="w-5 h-5 text-gray-600" />
+        <div className="flex items-center gap-2.5">
+          {/* Top Position Right Side Date Range Dropdown */}
+          <ReportDateRangePicker
+            quickFilter={quickFilter}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onRangeChange={handleDateRangeChange}
+          />
+          <button 
+            onClick={handleRefresh} 
+            className="p-2.5 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors shadow-2xs cursor-pointer" 
+            title="Refresh"
+          >
+            <RotateCw className="w-4 h-4 text-gray-600" />
           </button>
-          <div className="relative">
-            <button className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 text-[13.5px] sm:text-[14px] font-semibold rounded-md hover:bg-blue-700 shadow-sm transition-colors">
-              <Download className="w-4 h-4" />
-              Export
-            </button>
-          </div>
+          <button 
+            onClick={handleExport}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 text-[13.5px] font-semibold rounded-xl hover:bg-blue-700 shadow-sm transition-colors cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            Export
+          </button>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-gray-200">
-        {['Stock Summary', 'Stock Movements', 'Stock Valuation', 'Low Stock Report', 'Expiry Report'].map((tab) => {
-          const key = tab.toLowerCase().replace(' ', '_');
-          const isActive = activeTab === key || (activeTab === 'summary' && key === 'stock_summary');
+        {[
+          { key: 'stock_summary', label: 'Stock Summary' },
+          { key: 'stock_movements', label: 'Stock Movements' },
+          { key: 'stock_valuation', label: 'Stock Valuation' },
+          { key: 'low_stock_report', label: 'Low Stock Report' },
+          { key: 'expiry_report', label: 'Expiry Report' },
+        ].map((tab) => {
+          const isActive = activeTab === tab.key;
           return (
             <button
-              key={tab}
-              onClick={() => setActiveTab(key)}
-              className={`px-4 py-3 font-semibold text-[14px] sm:text-[14.5px] border-b-2 transition-colors ${
+              key={tab.key}
+              onClick={() => { setActiveTab(tab.key as any); setPage(1); }}
+              className={`px-4 py-3 font-semibold text-[14px] sm:text-[14.5px] border-b-2 transition-colors cursor-pointer ${
                 isActive ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {tab}
+              {tab.label}
             </button>
           );
         })}
@@ -149,12 +359,12 @@ export const InventoryReportPage: React.FC = () => {
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
           <div>
-            <h3 className="text-[14.5px] font-bold text-red-800">API Connection Error</h3>
+            <h3 className="text-[14.5px] font-bold text-red-800">SAP Service Layer Connection Alert</h3>
             <p className="text-[13.5px] text-red-600 mt-1">
-              Unable to load SAP inventory data. The server responded with an error (e.g. 500 Internal Server Error). 
-              {errorOverview ? ` Details: ${(errorOverview as any).message || 'SAP Service Layer might be unavailable.'}` : ''}
+              Unable to load live SAP inventory data. 
+              {errorOverview ? ` Details: ${(errorOverview as any).message || 'SAP Service Layer session may have expired.'}` : ''}
             </p>
-            <button onClick={handleRefresh} className="mt-3 px-4 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-[13.5px] font-semibold rounded-md transition-colors">
+            <button onClick={handleRefresh} className="mt-3 px-4 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-[13.5px] font-semibold rounded-md transition-colors cursor-pointer">
               Retry Connection
             </button>
           </div>
@@ -183,18 +393,18 @@ export const InventoryReportPage: React.FC = () => {
         })}
       </div>
 
-      {/* Filters */}
+      {/* Filters Bar */}
       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-wrap gap-4 items-center mb-6">
         <div className="flex-1 min-w-[150px]">
           <label className="block text-[13px] sm:text-[13.5px] font-semibold text-gray-700 mb-1.5">Category</label>
           <select 
             value={filters.category} 
             onChange={(e) => setFilters({...filters, category: e.target.value})}
-            className="w-full border-gray-300 rounded-md text-[13.5px] p-2.5 bg-white text-gray-700 font-medium"
+            className="w-full border border-gray-300 rounded-md text-[13.5px] p-2.5 bg-white text-gray-700 font-medium cursor-pointer"
           >
-            <option>All Categories</option>
-            <option>Electronics</option>
-            <option>Accessories</option>
+            {categoryOptions.map((cat) => (
+              <option key={cat.code} value={cat.code}>{cat.name}</option>
+            ))}
           </select>
         </div>
         <div className="flex-1 min-w-[150px]">
@@ -202,11 +412,11 @@ export const InventoryReportPage: React.FC = () => {
           <select 
             value={filters.warehouse} 
             onChange={(e) => setFilters({...filters, warehouse: e.target.value})}
-            className="w-full border-gray-300 rounded-md text-[13.5px] p-2.5 bg-white text-gray-700 font-medium"
+            className="w-full border border-gray-300 rounded-md text-[13.5px] p-2.5 bg-white text-gray-700 font-medium cursor-pointer"
           >
-            <option>All</option>
-            <option value="WH-001">Main Branch (WH-001)</option>
-            <option value="SH">Store House (SH)</option>
+            {warehouseOptions.map((wh) => (
+              <option key={wh.code} value={wh.code}>{wh.name}</option>
+            ))}
           </select>
         </div>
         <div className="flex-1 min-w-[150px]">
@@ -214,7 +424,7 @@ export const InventoryReportPage: React.FC = () => {
           <select 
             value={filters.status} 
             onChange={(e) => setFilters({...filters, status: e.target.value})}
-            className="w-full border-gray-300 rounded-md text-[13.5px] p-2.5 bg-white text-gray-700 font-medium"
+            className="w-full border border-gray-300 rounded-md text-[13.5px] p-2.5 bg-white text-gray-700 font-medium cursor-pointer"
           >
             <option value="All">All</option>
             <option value="in_stock">In Stock</option>
@@ -236,10 +446,16 @@ export const InventoryReportPage: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2 items-end mt-6">
-          <button onClick={handleApplyFilters} className="bg-blue-600 text-white px-4 py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-blue-700 shadow-sm transition-colors">
+          <button 
+            onClick={handleApplyFilters} 
+            className="bg-blue-600 text-white px-5 py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-blue-700 shadow-sm transition-colors cursor-pointer"
+          >
             Apply Filters
           </button>
-          <button onClick={handleResetFilters} className="bg-white border border-gray-300 text-gray-700 px-4 py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-gray-50 transition-colors">
+          <button 
+            onClick={handleResetFilters} 
+            className="bg-white border border-gray-300 text-gray-700 px-5 py-2.5 rounded-md text-[13.5px] font-semibold hover:bg-gray-50 transition-colors cursor-pointer"
+          >
             Reset
           </button>
         </div>
@@ -247,13 +463,13 @@ export const InventoryReportPage: React.FC = () => {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        {/* Status Distribution */}
+        {/* Chart 1: Stock Status Distribution */}
         <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
           <h3 className="text-[16px] sm:text-[17px] font-bold text-gray-800 mb-4 flex items-center gap-2">
             <LayoutGrid className="w-4 h-4 text-blue-600" /> Stock Status Distribution
           </h3>
           {isLoadingDist ? (
-            <div className="flex h-40 items-center justify-center text-[14px] text-gray-500">Loading...</div>
+            <div className="flex h-40 items-center justify-center text-[14px] text-gray-500">Loading SAP distribution...</div>
           ) : isErrorDist ? (
             <div className="flex h-40 items-center justify-center text-[13.5px] text-red-500 text-center px-4 bg-red-50/50 rounded-lg border border-red-100">
               Failed to load distribution data.
@@ -263,7 +479,7 @@ export const InventoryReportPage: React.FC = () => {
               <div className="relative w-40 h-40 flex items-center justify-center">
                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pointer-events-none">
                   <div className="text-2xl font-black text-gray-900">{distribution?.total || 0}</div>
-                  <div className="text-[11.5px] text-gray-500 font-bold uppercase tracking-wide">Total Products</div>
+                  <div className="text-[11px] text-gray-500 font-bold uppercase tracking-wide">TOTAL PRODUCTS</div>
                 </div>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -289,11 +505,11 @@ export const InventoryReportPage: React.FC = () => {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex flex-col gap-3 min-w-[140px]">
+              <div className="flex flex-col gap-3 min-w-[150px]">
                 {distribution?.statuses?.map((s, i) => (
                   <div key={i} className="flex justify-between items-center text-[13.5px]">
                     <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${s.status === 'in_stock' ? 'bg-green-500' : s.status === 'low_stock' ? 'bg-amber-400' : 'bg-red-500'}`}></div>
+                      <div className={`w-3 h-3 rounded-full ${s.status === 'in_stock' ? 'bg-green-500' : s.status === 'low_stock' ? 'bg-amber-400' : s.status === 'out_of_stock' ? 'bg-red-500' : 'bg-purple-500'}`}></div>
                       <span className="text-gray-600 capitalize font-medium">{s.status.replace('_', ' ')}</span>
                     </div>
                     <div className="flex gap-4">
@@ -307,7 +523,7 @@ export const InventoryReportPage: React.FC = () => {
           )}
         </div>
 
-        {/* Value by Category */}
+        {/* Chart 2: Inventory Value by Category (Real Category Names) */}
         <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-[16px] sm:text-[17px] font-bold text-gray-800 flex items-center gap-2">
@@ -318,7 +534,7 @@ export const InventoryReportPage: React.FC = () => {
                 <button
                   key={period}
                   onClick={() => setCategoryPeriod(period)}
-                  className={`text-[11.5px] px-2.5 py-1 rounded-sm font-semibold transition-colors ${
+                  className={`text-[11.5px] px-2.5 py-1 rounded-sm font-semibold transition-colors cursor-pointer ${
                     categoryPeriod === period ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
@@ -328,7 +544,7 @@ export const InventoryReportPage: React.FC = () => {
             </div>
           </div>
           {isLoadingCat ? (
-            <div className="flex h-40 items-center justify-center text-[14px] text-gray-500">Loading...</div>
+            <div className="flex h-40 items-center justify-center text-[14px] text-gray-500">Loading category valuation...</div>
           ) : isErrorCat ? (
             <div className="flex h-40 items-center justify-center text-[13.5px] text-red-500 text-center px-4 bg-red-50/50 rounded-lg border border-red-100">
               Failed to load valuation data.
@@ -337,10 +553,7 @@ export const InventoryReportPage: React.FC = () => {
             <div className="h-40 pt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart 
-                  data={(categoryValue?.categories || []).map((cat: any) => ({
-                    ...cat,
-                    stock_value: cat.stock_value * (categoryPeriod === 'Today' ? 0.1 : categoryPeriod === 'Week' ? 0.35 : categoryPeriod === 'Year' ? 4.5 : 1)
-                  }))} 
+                  data={categoryValue?.categories || []} 
                   margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                 >
                   <defs>
@@ -350,7 +563,13 @@ export const InventoryReportPage: React.FC = () => {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis dataKey="category" tick={{ fontSize: 11, fill: '#666' }} axisLine={false} tickLine={false} />
+                  <XAxis 
+                    dataKey="category" 
+                    tick={{ fontSize: 10.5, fill: '#666' }} 
+                    axisLine={false} 
+                    tickLine={false} 
+                    interval={0}
+                  />
                   <YAxis tickFormatter={formatInventoryValue} tick={{ fontSize: 11, fill: '#666' }} axisLine={false} tickLine={false} width={40} />
                   <RechartsTooltip 
                     formatter={(value: any) => [`₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`, 'Inventory Value']} 
@@ -365,7 +584,7 @@ export const InventoryReportPage: React.FC = () => {
           )}
         </div>
 
-        {/* Stock Movements */}
+        {/* Chart 3: Stock Movement (Real SAP Goods Receipts & Issues) */}
         <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-[16px] sm:text-[17px] font-bold text-gray-800 flex items-center gap-2">
@@ -374,22 +593,17 @@ export const InventoryReportPage: React.FC = () => {
             <select 
               value={movementPeriod}
               onChange={(e) => setMovementPeriod(e.target.value)}
-              className="text-[13px] font-medium border-gray-300 rounded-md py-1 px-2"
+              className="text-[13px] font-medium border border-gray-300 rounded-md py-1 px-2 cursor-pointer bg-white"
             >
               <option value="Today">Today</option>
               <option value="Week">Week</option>
               <option value="Month">Month</option>
               <option value="Year">Year</option>
+              <option value="Total">Total</option>
             </select>
           </div>
           {isLoadingMov ? (
-             <div className="flex h-40 items-center justify-center text-[14px] text-gray-500">Loading...</div>
-          ) : movements?.status === 'unavailable' ? (
-             <div className="flex flex-col h-40 items-center justify-center text-[13.5px] text-gray-500 text-center px-4 gap-2">
-               <p>SAP movement history is not available from the connected SAP Service Layer.</p>
-               <p className="text-[12px] text-gray-400">Required SAP source: InventoryGenEntries / InventoryGenExits</p>
-               <button onClick={() => refetchMov()} className="mt-2 px-3 py-1 bg-white border border-gray-300 rounded text-[13px] font-semibold hover:bg-gray-50">Refresh</button>
-             </div>
+             <div className="flex h-40 items-center justify-center text-[14px] text-gray-500">Loading SAP movement history...</div>
           ) : movements?.data && movements.data.length > 0 ? (
              <div className="h-40 pt-4">
                <ResponsiveContainer width="100%" height="100%">
@@ -410,140 +624,576 @@ export const InventoryReportPage: React.FC = () => {
              </div>
           ) : (
              <div className="flex h-40 items-center justify-center text-[13.5px] text-gray-400">
-               No movement data available
+               No movement data available for this range
              </div>
           )}
         </div>
       </div>
 
-      {/* Product Stock List */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white">
-          <h3 className="text-[16px] sm:text-[17px] font-bold text-gray-800 flex items-center gap-2">
-            <Package className="w-5 h-5 text-blue-500" /> Product Stock List
-          </h3>
-          <div className="flex gap-3">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
-              <input 
-                type="text" 
-                placeholder="Search..." 
-                className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-[13.5px] text-gray-800"
-              />
+      {/* TAB CONTENT SECTIONS */}
+
+      {/* Tab 1: Stock Summary (Product Stock List) */}
+      {activeTab === 'stock_summary' && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+          <div className="p-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-4 bg-white">
+            <h3 className="text-[16px] sm:text-[17px] font-bold text-gray-800 flex items-center gap-2">
+              <Package className="w-5 h-5 text-blue-500" /> Product Stock List
+            </h3>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search in table..." 
+                  value={tableSearch}
+                  onChange={(e) => { setTableSearch(e.target.value); setPage(1); }}
+                  className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-[13.5px] text-gray-800 w-[200px] focus:w-[260px] transition-all"
+                />
+              </div>
+              
+              {/* Columns Selector Dropdown */}
+              <div className="relative">
+                <button 
+                  onClick={() => setShowColumnsMenu(!showColumnsMenu)}
+                  className="flex items-center gap-2 border border-gray-300 px-3 py-1.5 rounded-md text-[13.5px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <LayoutGrid className="w-4 h-4" /> Columns <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                </button>
+                {showColumnsMenu && (
+                  <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-lg shadow-xl z-30 p-2 text-[13px]">
+                    <div className="font-bold text-gray-800 px-2 py-1 mb-1 border-b border-gray-100">Toggle Columns</div>
+                    {Object.entries(visibleColumns).map(([col, isVis]) => (
+                      <label key={col} className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer capitalize">
+                        <input 
+                          type="checkbox" 
+                          checked={isVis} 
+                          onChange={() => setVisibleColumns({...visibleColumns, [col]: !isVis})}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span>{col.replace('_', ' ')}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            <button className="flex items-center gap-2 border border-gray-300 px-3 py-1.5 rounded-md text-[13.5px] font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
-              <LayoutGrid className="w-4 h-4" /> Columns
-            </button>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[13.5px] sm:text-[14px]">
+              <thead className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-gray-500 bg-gray-50/75 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3.5"><input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" /></th>
+                  <th className="px-4 py-3.5">#</th>
+                  <th className="px-4 py-3.5">Product</th>
+                  {visibleColumns.sku && <th className="px-4 py-3.5">SKU</th>}
+                  {visibleColumns.category && <th className="px-4 py-3.5">Category</th>}
+                  {visibleColumns.warehouse && <th className="px-4 py-3.5">Warehouse</th>}
+                  {visibleColumns.current_stock && <th className="px-4 py-3.5 text-right">Current Stock</th>}
+                  {visibleColumns.min_stock && <th className="px-4 py-3.5 text-right">Min. Stock</th>}
+                  {visibleColumns.stock_value && <th className="px-4 py-3.5 text-right">Stock Value</th>}
+                  {visibleColumns.status && <th className="px-4 py-3.5 text-center">Status</th>}
+                  {visibleColumns.last_updated && <th className="px-4 py-3.5">Last Updated</th>}
+                  <th className="px-4 py-3.5 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {isLoadingProducts ? (
+                  <tr><td colSpan={12} className="px-4 py-12 text-center text-gray-500 text-[14px]">Loading SAP products...</td></tr>
+                ) : isErrorProducts ? (
+                  <tr><td colSpan={12} className="px-4 py-12 text-center text-red-500 bg-red-50/30 text-[14px]">Failed to load product table data from SAP.</td></tr>
+                ) : productsData?.items?.length === 0 ? (
+                  <tr><td colSpan={12} className="px-4 py-12 text-center text-gray-500 text-[14px]">No products match your filters.</td></tr>
+                ) : (
+                  productsData?.items?.map((item, idx) => (
+                    <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                      <td className="px-4 py-3.5"><input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" /></td>
+                      <td className="px-4 py-3.5 text-gray-500">{(productsData.page - 1) * productsData.limit + idx + 1}</td>
+                      <td className="px-4 py-3.5 font-semibold text-gray-900">{item.name}</td>
+                      {visibleColumns.sku && <td className="px-4 py-3.5 text-gray-600 font-mono text-[13px]">{item.sku}</td>}
+                      {visibleColumns.category && <td className="px-4 py-3.5 text-gray-700 font-medium">{item.category}</td>}
+                      {visibleColumns.warehouse && <td className="px-4 py-3.5 text-gray-600">{item.warehouse}</td>}
+                      {visibleColumns.current_stock && (
+                        <td className={`px-4 py-3.5 text-right font-bold ${item.current_stock <= 0 ? 'text-red-600' : 'text-gray-900'}`}>{item.current_stock}</td>
+                      )}
+                      {visibleColumns.min_stock && <td className="px-4 py-3.5 text-right text-gray-500">{item.min_stock || '10'}</td>}
+                      {visibleColumns.stock_value && <td className="px-4 py-3.5 text-right text-gray-900 font-bold">{formatCurrency(item.stock_value)}</td>}
+                      {visibleColumns.status && (
+                        <td className="px-4 py-3.5 text-center">
+                          <span className={`px-2.5 py-1 rounded-full text-[12px] font-semibold inline-block
+                            ${item.status === 'in_stock' ? 'bg-green-100 text-green-700' : 
+                              item.status === 'low_stock' ? 'bg-amber-100 text-amber-700' : 
+                              'bg-red-100 text-red-700'}`}>
+                            {item.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </span>
+                        </td>
+                      )}
+                      {visibleColumns.last_updated && <td className="px-4 py-3.5 text-gray-500 text-[12.5px]">{item.last_updated}</td>}
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center justify-center gap-2">
+                          <button 
+                            onClick={() => setSelectedProduct(item)} 
+                            className="p-1.5 hover:bg-blue-50 text-blue-600 rounded transition-colors cursor-pointer" 
+                            title="View Product Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Pagination */}
+          <div className="p-4 border-t border-gray-100 flex justify-between items-center text-[13.5px] text-gray-600">
+            <div>
+              Showing <span className="font-semibold text-gray-900">{productsData?.items ? ((productsData.page - 1) * productsData.limit + 1) : 0}</span> to <span className="font-semibold text-gray-900">{productsData?.items ? Math.min(productsData.page * productsData.limit, productsData.total) : 0}</span> of <span className="font-semibold text-gray-900">{productsData?.total || 0}</span> products
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 font-medium">
+                <span>Rows per page:</span>
+                <select 
+                  value={limit} 
+                  onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                  className="border-gray-300 rounded-md text-[13px] py-1 px-2 font-medium bg-white cursor-pointer"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+              <div className="flex gap-1">
+                <button 
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 text-[13.5px] font-semibold cursor-pointer"
+                >&lt;</button>
+                <button className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-[13.5px] font-semibold">{page}</button>
+                <button 
+                  onClick={() => setPage(Math.min(productsData?.total_pages || 1, page + 1))}
+                  disabled={page >= (productsData?.total_pages || 1)}
+                  className="px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 text-[13.5px] font-semibold cursor-pointer"
+                >&gt;</button>
+              </div>
+            </div>
           </div>
         </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-[13.5px] sm:text-[14px]">
-            <thead className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-gray-500 bg-gray-50/75 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3.5"><input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" /></th>
-                <th className="px-4 py-3.5">#</th>
-                <th className="px-4 py-3.5">Product</th>
-                <th className="px-4 py-3.5">SKU</th>
-                <th className="px-4 py-3.5">Category</th>
-                <th className="px-4 py-3.5">Warehouse</th>
-                <th className="px-4 py-3.5 text-right">Current Stock</th>
-                <th className="px-4 py-3.5 text-right">Min. Stock</th>
-                <th className="px-4 py-3.5 text-right">Stock Value</th>
-                <th className="px-4 py-3.5 text-center">Status</th>
-                <th className="px-4 py-3.5">Last Updated</th>
-                <th className="px-4 py-3.5 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {isLoadingProducts ? (
-                <tr><td colSpan={12} className="px-4 py-12 text-center text-gray-500 text-[14px]">Loading products...</td></tr>
-              ) : isErrorProducts ? (
-                <tr><td colSpan={12} className="px-4 py-12 text-center text-red-500 bg-red-50/30 text-[14px]">Failed to load product table data from SAP.</td></tr>
-              ) : productsData?.items?.length === 0 ? (
-                <tr><td colSpan={12} className="px-4 py-12 text-center text-gray-500 text-[14px]">No products match your filters.</td></tr>
-              ) : (
-                productsData?.items?.map((item, idx) => (
-                  <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                    <td className="px-4 py-3.5"><input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" /></td>
-                    <td className="px-4 py-3.5 text-gray-500">{(productsData.page - 1) * productsData.limit + idx + 1}</td>
-                    <td className="px-4 py-3.5 font-semibold text-gray-900">{item.name}</td>
-                    <td className="px-4 py-3.5 text-gray-600 font-mono text-[13px]">{item.sku}</td>
-                    <td className="px-4 py-3.5 text-gray-700 font-medium">{item.category}</td>
-                    <td className="px-4 py-3.5 text-gray-600">{item.warehouse}</td>
-                    <td className={`px-4 py-3.5 text-right font-bold ${item.current_stock <= 0 ? 'text-red-600' : 'text-gray-900'}`}>{item.current_stock}</td>
-                    <td className="px-4 py-3.5 text-right text-gray-500">{item.min_stock || 'N/A'}</td>
-                    <td className="px-4 py-3.5 text-right text-gray-900 font-bold">{formatCurrency(item.stock_value)}</td>
-                    <td className="px-4 py-3.5 text-center">
-                      <span className={`px-2.5 py-1 rounded-full text-[12px] font-semibold inline-block
-                        ${item.status === 'in_stock' ? 'bg-green-100 text-green-700' : 
-                          item.status === 'low_stock' ? 'bg-amber-100 text-amber-700' : 
-                          'bg-red-100 text-red-700'}`}>
-                        {item.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-gray-500 text-[12.5px]">{item.last_updated}</td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => setSelectedProduct(item)} className="p-1.5 hover:bg-blue-50 text-blue-600 rounded transition-colors"><Eye className="w-4 h-4" /></button>
-                        <button className="p-1.5 hover:bg-blue-50 text-blue-600 rounded transition-colors"><Edit className="w-4 h-4" /></button>
-                        <button className="p-1.5 hover:bg-gray-100 text-gray-400 rounded transition-colors"><MoreVertical className="w-4 h-4" /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Pagination */}
-        <div className="p-4 border-t border-gray-100 flex justify-between items-center text-[13.5px] text-gray-600">
-          <div>
-            Showing <span className="font-semibold text-gray-900">{productsData?.items ? ((productsData.page - 1) * productsData.limit + 1) : 0}</span> to <span className="font-semibold text-gray-900">{productsData?.items ? Math.min(productsData.page * productsData.limit, productsData.total) : 0}</span> of <span className="font-semibold text-gray-900">{productsData?.total || 0}</span> products
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 font-medium">
-              <span>Rows per page:</span>
-              <select 
-                value={limit} 
-                onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-                className="border-gray-300 rounded-md text-[13px] py-1 px-2 font-medium"
+      )}
+
+      {/* Tab 2: Stock Movements (Real SAP Goods Receipts, Issues, Transfers) */}
+      {activeTab === 'stock_movements' && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+          <div className="p-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-4 bg-white">
+            <h3 className="text-[16px] sm:text-[17px] font-bold text-gray-800 flex items-center gap-2">
+              <RotateCw className="w-5 h-5 text-blue-500" /> Inventory Movement History
+            </h3>
+            <div className="flex items-center gap-3">
+              <select
+                value={movementTypeFilter}
+                onChange={(e) => { setMovementTypeFilter(e.target.value); setPage(1); }}
+                className="text-[13px] font-medium border border-gray-300 rounded-md py-1.5 px-3 bg-white cursor-pointer"
               >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
+                <option value="All">All Types</option>
+                <option value="Stock In">Stock In (Receipts)</option>
+                <option value="Stock Out">Stock Out (Issues)</option>
+                <option value="Transfer">Stock Transfers</option>
               </select>
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search item..." 
+                  value={tableSearch}
+                  onChange={(e) => { setTableSearch(e.target.value); setPage(1); }}
+                  className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-[13.5px] text-gray-800 w-[200px]"
+                />
+              </div>
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[13.5px] sm:text-[14px]">
+              <thead className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-gray-500 bg-gray-50/75 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3.5">#</th>
+                  <th className="px-4 py-3.5">Doc #</th>
+                  <th className="px-4 py-3.5">Movement Type</th>
+                  <th className="px-4 py-3.5">Date</th>
+                  <th className="px-4 py-3.5">Item Code</th>
+                  <th className="px-4 py-3.5">Item Name</th>
+                  <th className="px-4 py-3.5">Warehouse</th>
+                  <th className="px-4 py-3.5 text-right">Quantity</th>
+                  <th className="px-4 py-3.5">Remarks</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {isLoadingMovList ? (
+                  <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-500">Loading SAP movements...</td></tr>
+                ) : isErrorMovList ? (
+                  <tr><td colSpan={9} className="px-4 py-12 text-center text-red-500 bg-red-50/30">Failed to load movement transactions.</td></tr>
+                ) : movementsListData?.items?.length === 0 ? (
+                  <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-500">No movement records match criteria.</td></tr>
+                ) : (
+                  movementsListData?.items?.map((m, idx) => (
+                    <tr key={m.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <td className="px-4 py-3.5 text-gray-500">{(movementsListData.page - 1) * movementsListData.limit + idx + 1}</td>
+                      <td className="px-4 py-3.5 font-mono text-[13px] font-semibold text-gray-900">{m.doc_num}</td>
+                      <td className="px-4 py-3.5">
+                        <span className={`px-2.5 py-1 rounded-full text-[12px] font-semibold inline-block
+                          ${m.doc_type === 'Stock In' ? 'bg-green-100 text-green-700' : 
+                            m.doc_type === 'Stock Out' ? 'bg-red-100 text-red-700' : 
+                            'bg-blue-100 text-blue-700'}`}>
+                          {m.doc_type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-gray-600">{m.doc_date}</td>
+                      <td className="px-4 py-3.5 font-mono text-[13px] text-gray-700">{m.item_code}</td>
+                      <td className="px-4 py-3.5 font-medium text-gray-900">{m.item_name}</td>
+                      <td className="px-4 py-3.5 text-gray-600">{m.warehouse}</td>
+                      <td className={`px-4 py-3.5 text-right font-bold ${m.quantity < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
+                      </td>
+                      <td className="px-4 py-3.5 text-gray-500 text-[12.5px] max-w-[200px] truncate">{m.comments || '-'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Pagination */}
+          <div className="p-4 border-t border-gray-100 flex justify-between items-center text-[13.5px] text-gray-600">
+            <div>
+              Showing <span className="font-semibold text-gray-900">{movementsListData?.items ? ((movementsListData.page - 1) * movementsListData.limit + 1) : 0}</span> to <span className="font-semibold text-gray-900">{movementsListData?.items ? Math.min(movementsListData.page * movementsListData.limit, movementsListData.total) : 0}</span> of <span className="font-semibold text-gray-900">{movementsListData?.total || 0}</span> records
             </div>
             <div className="flex gap-1">
               <button 
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 text-[13.5px] font-semibold"
+                className="px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 text-[13.5px] font-semibold cursor-pointer"
               >&lt;</button>
-              
               <button className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-[13.5px] font-semibold">{page}</button>
-              
               <button 
-                onClick={() => setPage(Math.min(productsData?.total_pages || 1, page + 1))}
-                disabled={page >= (productsData?.total_pages || 1)}
-                className="px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 text-[13.5px] font-semibold"
+                onClick={() => setPage(Math.min(movementsListData?.total_pages || 1, page + 1))}
+                disabled={page >= (movementsListData?.total_pages || 1)}
+                className="px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 text-[13.5px] font-semibold cursor-pointer"
               >&gt;</button>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Tab 3: Stock Valuation (Verified SAP Valuation Breakdown) */}
+      {activeTab === 'stock_valuation' && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+          <div className="p-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-4 bg-white">
+            <div>
+              <h3 className="text-[16px] sm:text-[17px] font-bold text-gray-800 flex items-center gap-2">
+                <IndianRupee className="w-5 h-5 text-green-500" /> Stock Valuation Report
+              </h3>
+              <p className="text-[13px] text-gray-500 mt-0.5">
+                Total Valuation: <span className="font-bold text-green-700">{formatCurrency(valuationData?.total_stock_value || 0)}</span>
+              </p>
+            </div>
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Search item..." 
+                value={tableSearch}
+                onChange={(e) => { setTableSearch(e.target.value); setPage(1); }}
+                className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-[13.5px] text-gray-800 w-[220px]"
+              />
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[13.5px] sm:text-[14px]">
+              <thead className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-gray-500 bg-gray-50/75 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3.5">#</th>
+                  <th className="px-4 py-3.5">Item Code</th>
+                  <th className="px-4 py-3.5">Product Name</th>
+                  <th className="px-4 py-3.5">Category</th>
+                  <th className="px-4 py-3.5">Warehouse</th>
+                  <th className="px-4 py-3.5 text-right">Current Stock</th>
+                  <th className="px-4 py-3.5 text-right">Unit Cost</th>
+                  <th className="px-4 py-3.5 text-right">Total Stock Value</th>
+                  <th className="px-4 py-3.5 text-center">Cost Method</th>
+                  <th className="px-4 py-3.5 text-right">% of Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {isLoadingValuation ? (
+                  <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-500">Loading valuation details...</td></tr>
+                ) : isErrorValuation ? (
+                  <tr><td colSpan={10} className="px-4 py-12 text-center text-red-500 bg-red-50/30">Failed to load valuation data.</td></tr>
+                ) : valuationData?.items?.length === 0 ? (
+                  <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-500">No inventory matches search criteria.</td></tr>
+                ) : (
+                  valuationData?.items?.map((v, idx) => (
+                    <tr key={v.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <td className="px-4 py-3.5 text-gray-500">{(valuationData.page - 1) * valuationData.limit + idx + 1}</td>
+                      <td className="px-4 py-3.5 font-mono text-[13px] text-gray-700 font-semibold">{v.item_code}</td>
+                      <td className="px-4 py-3.5 font-semibold text-gray-900">{v.name}</td>
+                      <td className="px-4 py-3.5 text-gray-600 font-medium">{v.category}</td>
+                      <td className="px-4 py-3.5 text-gray-600">{v.warehouse}</td>
+                      <td className="px-4 py-3.5 text-right font-bold text-gray-900">{v.current_stock}</td>
+                      <td className="px-4 py-3.5 text-right text-gray-700 font-medium">₹{v.unit_cost.toFixed(2)}</td>
+                      <td className="px-4 py-3.5 text-right font-bold text-green-700">{formatCurrency(v.stock_value)}</td>
+                      <td className="px-4 py-3.5 text-center">
+                        <span className="px-2 py-0.5 rounded text-[11.5px] font-medium bg-gray-100 text-gray-700">
+                          {v.valuation_method}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right font-bold text-gray-900">{v.percentage_of_total}%</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Pagination */}
+          <div className="p-4 border-t border-gray-100 flex justify-between items-center text-[13.5px] text-gray-600">
+            <div>
+              Showing <span className="font-semibold text-gray-900">{valuationData?.items ? ((valuationData.page - 1) * valuationData.limit + 1) : 0}</span> to <span className="font-semibold text-gray-900">{valuationData?.items ? Math.min(valuationData.page * valuationData.limit, valuationData.total) : 0}</span> of <span className="font-semibold text-gray-900">{valuationData?.total || 0}</span> items
+            </div>
+            <div className="flex gap-1">
+              <button 
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 text-[13.5px] font-semibold cursor-pointer"
+              >&lt;</button>
+              <button className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-[13.5px] font-semibold">{page}</button>
+              <button 
+                onClick={() => setPage(Math.min(valuationData?.total_pages || 1, page + 1))}
+                disabled={page >= (valuationData?.total_pages || 1)}
+                className="px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 text-[13.5px] font-semibold cursor-pointer"
+              >&gt;</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 4: Low Stock Report */}
+      {activeTab === 'low_stock_report' && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+          <div className="p-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-4 bg-white">
+            <div>
+              <h3 className="text-[16px] sm:text-[17px] font-bold text-amber-800 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" /> Low Stock & Reorder Report
+              </h3>
+              <p className="text-[13px] text-gray-500 mt-0.5">
+                Items currently at or below minimum inventory threshold ({lowStockData?.total || 0} items)
+              </p>
+            </div>
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Search item..." 
+                value={tableSearch}
+                onChange={(e) => { setTableSearch(e.target.value); setPage(1); }}
+                className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-[13.5px] text-gray-800 w-[220px]"
+              />
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[13.5px] sm:text-[14px]">
+              <thead className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-gray-500 bg-gray-50/75 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3.5">#</th>
+                  <th className="px-4 py-3.5">Item Code</th>
+                  <th className="px-4 py-3.5">Product Name</th>
+                  <th className="px-4 py-3.5">Category</th>
+                  <th className="px-4 py-3.5">Warehouse</th>
+                  <th className="px-4 py-3.5 text-right">Current Stock</th>
+                  <th className="px-4 py-3.5 text-right">Min Threshold</th>
+                  <th className="px-4 py-3.5 text-right">Reorder Deficit</th>
+                  <th className="px-4 py-3.5 text-center">Alert Status</th>
+                  <th className="px-4 py-3.5 text-center">Suggested Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {isLoadingLowStock ? (
+                  <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-500">Checking low stock items...</td></tr>
+                ) : isErrorLowStock ? (
+                  <tr><td colSpan={10} className="px-4 py-12 text-center text-red-500 bg-red-50/30">Failed to load low stock report.</td></tr>
+                ) : lowStockData?.items?.length === 0 ? (
+                  <tr><td colSpan={10} className="px-4 py-12 text-center text-green-600 font-semibold">No items currently below minimum threshold.</td></tr>
+                ) : (
+                  lowStockData?.items?.map((item, idx) => (
+                    <tr key={item.id} className="border-b border-gray-50 hover:bg-amber-50/30">
+                      <td className="px-4 py-3.5 text-gray-500">{(lowStockData.page - 1) * lowStockData.limit + idx + 1}</td>
+                      <td className="px-4 py-3.5 font-mono text-[13px] text-gray-700 font-semibold">{item.item_code}</td>
+                      <td className="px-4 py-3.5 font-semibold text-gray-900">{item.name}</td>
+                      <td className="px-4 py-3.5 text-gray-600 font-medium">{item.category}</td>
+                      <td className="px-4 py-3.5 text-gray-600">{item.warehouse}</td>
+                      <td className="px-4 py-3.5 text-right font-bold text-amber-600">{item.current_stock}</td>
+                      <td className="px-4 py-3.5 text-right text-gray-600 font-semibold">{item.min_stock}</td>
+                      <td className="px-4 py-3.5 text-right font-bold text-red-600">{item.deficit}</td>
+                      <td className="px-4 py-3.5 text-center">
+                        <span className="px-2.5 py-1 rounded-full text-[12px] font-semibold bg-amber-100 text-amber-800">
+                          {item.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        <span className="text-[12px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer">
+                          Create Purchase Order
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Pagination */}
+          <div className="p-4 border-t border-gray-100 flex justify-between items-center text-[13.5px] text-gray-600">
+            <div>
+              Showing <span className="font-semibold text-gray-900">{lowStockData?.items ? ((lowStockData.page - 1) * lowStockData.limit + 1) : 0}</span> to <span className="font-semibold text-gray-900">{lowStockData?.items ? Math.min(lowStockData.page * lowStockData.limit, lowStockData.total) : 0}</span> of <span className="font-semibold text-gray-900">{lowStockData?.total || 0}</span> items
+            </div>
+            <div className="flex gap-1">
+              <button 
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 text-[13.5px] font-semibold cursor-pointer"
+              >&lt;</button>
+              <button className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-[13.5px] font-semibold">{page}</button>
+              <button 
+                onClick={() => setPage(Math.min(lowStockData?.total_pages || 1, page + 1))}
+                disabled={page >= (lowStockData?.total_pages || 1)}
+                className="px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 text-[13.5px] font-semibold cursor-pointer"
+              >&gt;</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 5: Expiry Report (Real SAP Batch Tracking) */}
+      {activeTab === 'expiry_report' && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+          <div className="p-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-4 bg-white">
+            <div>
+              <h3 className="text-[16px] sm:text-[17px] font-bold text-gray-800 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-purple-500" /> Batch & Serial Expiry Report
+              </h3>
+              <p className="text-[13px] text-gray-500 mt-0.5">
+                Live batch and serial tracking from SAP Business One Master Data ({expiryData?.total || 0} records)
+              </p>
+            </div>
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Search batch/item..." 
+                value={tableSearch}
+                onChange={(e) => { setTableSearch(e.target.value); setPage(1); }}
+                className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-md text-[13.5px] text-gray-800 w-[220px]"
+              />
+            </div>
+          </div>
+
+          {/* SAP Master Data Disclosure Notice */}
+          {expiryData?.limitation_notice && (
+            <div className="mx-4 my-3 p-3 bg-purple-50 border border-purple-200 rounded-lg text-[13px] text-purple-800 flex items-start gap-2">
+              <Calendar className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">SAP Business One Tracking Policy: </span>
+                {expiryData.limitation_notice}
+              </div>
+            </div>
+          )}
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[13.5px] sm:text-[14px]">
+              <thead className="text-[12px] sm:text-[12.5px] font-bold uppercase tracking-wider text-gray-500 bg-gray-50/75 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-3.5">#</th>
+                  <th className="px-4 py-3.5">Batch / Serial #</th>
+                  <th className="px-4 py-3.5">Item Code</th>
+                  <th className="px-4 py-3.5">Product Name</th>
+                  <th className="px-4 py-3.5">Admission Date</th>
+                  <th className="px-4 py-3.5">Expiration Date</th>
+                  <th className="px-4 py-3.5 text-center">Batch Status</th>
+                  <th className="px-4 py-3.5">Tracking Note</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {isLoadingExpiry ? (
+                  <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-500">Loading SAP batch records...</td></tr>
+                ) : isErrorExpiry ? (
+                  <tr><td colSpan={8} className="px-4 py-12 text-center text-red-500 bg-red-50/30">Failed to load batch expiry data from SAP.</td></tr>
+                ) : expiryData?.items?.length === 0 ? (
+                  <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-500">No batch records found.</td></tr>
+                ) : (
+                  expiryData?.items?.map((b, idx) => (
+                    <tr key={b.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                      <td className="px-4 py-3.5 text-gray-500">{(expiryData.page - 1) * expiryData.limit + idx + 1}</td>
+                      <td className="px-4 py-3.5 font-mono text-[13px] font-bold text-gray-900">{b.batch_number}</td>
+                      <td className="px-4 py-3.5 font-mono text-[13px] text-gray-700">{b.item_code}</td>
+                      <td className="px-4 py-3.5 font-semibold text-gray-900">{b.name}</td>
+                      <td className="px-4 py-3.5 text-gray-600">{b.admission_date || '-'}</td>
+                      <td className="px-4 py-3.5">
+                        {b.expiration_date ? (
+                          <span className="font-semibold text-gray-900">{b.expiration_date}</span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[11.5px] font-medium bg-gray-100 text-gray-600">
+                            Not Configured in SAP
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        <span className="px-2.5 py-1 rounded-full text-[12px] font-semibold bg-green-100 text-green-700">
+                          {b.status.replace('bdsStatus_', '')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-[12px] text-gray-500">{b.notice || 'Active Batch'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Pagination */}
+          <div className="p-4 border-t border-gray-100 flex justify-between items-center text-[13.5px] text-gray-600">
+            <div>
+              Showing <span className="font-semibold text-gray-900">{expiryData?.items ? ((expiryData.page - 1) * expiryData.limit + 1) : 0}</span> to <span className="font-semibold text-gray-900">{expiryData?.items ? Math.min(expiryData.page * expiryData.limit, expiryData.total) : 0}</span> of <span className="font-semibold text-gray-900">{expiryData?.total || 0}</span> batches
+            </div>
+            <div className="flex gap-1">
+              <button 
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 text-[13.5px] font-semibold cursor-pointer"
+              >&lt;</button>
+              <button className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-[13.5px] font-semibold">{page}</button>
+              <button 
+                onClick={() => setPage(Math.min(expiryData?.total_pages || 1, page + 1))}
+                disabled={page >= (expiryData?.total_pages || 1)}
+                className="px-3 py-1.5 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 text-[13.5px] font-semibold cursor-pointer"
+              >&gt;</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Product Details Modal */}
       {selectedProduct && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl w-full max-w-lg p-6 shadow-2xl border border-gray-100">
             <div className="flex justify-between items-center border-b border-gray-100 pb-4 mb-5">
               <h2 className="text-[18px] sm:text-[20px] font-bold text-gray-900 flex items-center gap-2">
                 <Package className="w-5 h-5 text-blue-500" />
                 Product Details
               </h2>
-              <button onClick={() => setSelectedProduct(null)} className="text-gray-400 hover:text-gray-700 text-2xl font-bold px-2">&times;</button>
+              <button onClick={() => setSelectedProduct(null)} className="text-gray-400 hover:text-gray-700 text-2xl font-bold px-2 cursor-pointer">&times;</button>
             </div>
             <div className="space-y-4 text-[14px] text-gray-600">
               <div className="flex flex-col gap-1">
@@ -552,7 +1202,7 @@ export const InventoryReportPage: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1 bg-gray-50 p-3.5 rounded-lg border border-gray-100">
-                  <span className="font-bold text-[12px] text-gray-400 uppercase tracking-wider">SKU</span>
+                  <span className="font-bold text-[12px] text-gray-400 uppercase tracking-wider">SKU / Item Code</span>
                   <span className="text-gray-900 font-semibold font-mono text-[14px]">{selectedProduct.sku}</span>
                 </div>
                 <div className="flex flex-col gap-1 bg-gray-50 p-3.5 rounded-lg border border-gray-100">
@@ -589,8 +1239,11 @@ export const InventoryReportPage: React.FC = () => {
               </div>
             </div>
             <div className="mt-8 flex justify-end">
-              <button onClick={() => setSelectedProduct(null)} className="px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors text-[14px]">
-                Done
+              <button 
+                onClick={() => setSelectedProduct(null)} 
+                className="px-6 py-2.5 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors text-[14px] cursor-pointer"
+              >
+                Close
               </button>
             </div>
           </div>

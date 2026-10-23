@@ -76,6 +76,18 @@ def _fetch_from_sap(client) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error fetching branches for filter options: {e}")
 
+    # 6. Product Categories (ItemGroups)
+    categories = []
+    try:
+        res = client.get("ItemGroups")
+        for g in res.get("value", []):
+            gid = g.get("Number")
+            gname = g.get("GroupName")
+            if gid is not None and gname:
+                categories.append({"id": str(gid), "code": str(gid), "name": gname})
+    except Exception as e:
+        logger.error(f"Error fetching item groups for filter options: {e}")
+
     statuses = {
         "orders": [
             {"value": "pending", "label": "Pending"},
@@ -106,6 +118,7 @@ def _fetch_from_sap(client) -> Dict[str, Any]:
         "buyers": buyers,
         "warehouses": warehouses,
         "branches": branches,
+        "categories": categories,
         "statuses": statuses
     }
 

@@ -37,6 +37,7 @@ export interface FilterOptionsResponse {
   buyers: BuyerOption[];
   warehouses: WarehouseOption[];
   branches: BranchOption[];
+  categories?: { code: string | number; name: string }[];
   statuses: {
     orders: StatusOption[];
     purchase_orders: StatusOption[];
