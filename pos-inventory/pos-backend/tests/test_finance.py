@@ -312,3 +312,569 @@ def test_export_finance_endpoint(auth_headers):
         assert "Invoice No" in response.text
 
 
+# ============================================================================
+# REGRESSION TESTS — Dual-Contract Shapes & SAP Error Propagation
+# ============================================================================
+
+def test_purchase_invoices_dual_contract_and_kpis(auth_headers):
+    """Verify backend returns both summary & kpis, and items & invoices with correct totals."""
+    mock_dual_data = {
+        "summary": {
+            "total_invoices": 10,
+            "total_purchases": 54200.0,
+            "total_paid": 40000.0,
+            "total_outstanding_balance": 14200.0,
+            "currency": "INR",
+            "status_counts": {"open": 4, "closed": 6, "paid": 6, "partially_paid": 2, "unpaid": 2, "cancelled": 0}
+        },
+        "kpis": {
+            "total_invoices": 10,
+            "total_purchases": 54200.0,
+            "total_paid": 40000.0,
+            "total_outstanding_balance": 14200.0,
+            "currency": "INR",
+            "status_counts": {"open": 4, "closed": 6, "paid": 6, "partially_paid": 2, "unpaid": 2, "cancelled": 0}
+        },
+        "items": [
+            {
+                "doc_entry": 101,
+                "doc_num": 101,
+                "doc_date": "2026-03-01",
+                "doc_due_date": "2026-03-31",
+                "card_code": "V100",
+                "card_name": "Acme Supplier",
+                "doc_total": 5420.0,
+                "paid_to_date": 5420.0,
+                "balance_due": 0.0,
+                "doc_status": "bost_Close",
+                "cancelled": "tNO",
+                "payment_status": "Paid",
+                "currency": "INR",
+                "branch_id": 1,
+                "comments": "Stock purchase"
+            }
+        ],
+        "invoices": [
+            {
+                "doc_entry": 101,
+                "doc_num": 101,
+                "doc_date": "2026-03-01",
+                "doc_due_date": "2026-03-31",
+                "card_code": "V100",
+                "card_name": "Acme Supplier",
+                "doc_total": 5420.0,
+                "paid_to_date": 5420.0,
+                "balance_due": 0.0,
+                "doc_status": "bost_Close",
+                "cancelled": "tNO",
+                "payment_status": "Paid",
+                "currency": "INR",
+                "branch_id": 1,
+                "comments": "Stock purchase"
+            }
+        ],
+        "purchase_invoices": [
+            {
+                "doc_entry": 101,
+                "doc_num": 101,
+                "doc_date": "2026-03-01",
+                "doc_due_date": "2026-03-31",
+                "card_code": "V100",
+                "card_name": "Acme Supplier",
+                "doc_total": 5420.0,
+                "paid_to_date": 5420.0,
+                "balance_due": 0.0,
+                "doc_status": "bost_Close",
+                "cancelled": "tNO",
+                "payment_status": "Paid",
+                "currency": "INR",
+                "branch_id": 1,
+                "comments": "Stock purchase"
+            }
+        ],
+        "total_count": 10,
+        "page": 1,
+        "page_size": 20,
+        "has_more": False,
+        "filters_applied": {"range": "all_time"}
+    }
+    with patch("app.api.v1.finance._finance_service.get_purchase_invoices", return_value=mock_dual_data):
+        res = client.get("/api/v1/finance/purchase-invoices?range=all_time", headers=auth_headers)
+        assert res.status_code == 200
+        body = res.json()
+        # Verify root cause fix: BOTH summary and kpis exist with non-zero values
+        assert body["summary"]["total_invoices"] == 10
+        assert body["summary"]["total_purchases"] == 54200.0
+        assert body["summary"]["total_paid"] == 40000.0
+        assert body["summary"]["total_outstanding_balance"] == 14200.0
+        assert body["kpis"]["total_invoices"] == 10
+        # Verify root cause fix: BOTH items and invoices exist with valid rows
+        assert len(body["items"]) == 1
+        assert len(body["invoices"]) == 1
+        assert body["items"][0]["doc_num"] == 101
+        assert body["items"][0]["doc_total"] == 5420.0
+        assert body["total_count"] == 10
+
+
+def test_incoming_payments_dual_contract(auth_headers):
+    mock_data = {
+        "summary": {
+            "total_receipts_count": 11,
+            "total_received_amount": 85000.0,
+            "currency": "INR",
+            "method_breakdown": {"bank_transfer": 60000.0, "cash": 25000.0, "other": 0.0}
+        },
+        "kpis": {
+            "total_receipts_count": 11,
+            "total_received_amount": 85000.0,
+            "total_incoming_amount": 85000.0,
+            "transactions_count": 11,
+            "currency": "INR",
+            "method_breakdown": {"bank_transfer": 60000.0, "cash": 25000.0, "other": 0.0}
+        },
+        "items": [
+            {
+                "doc_entry": 201,
+                "doc_num": 201,
+                "doc_date": "2026-03-05",
+                "card_code": "C200",
+                "card_name": "Retail Customer",
+                "doc_currency": "INR",
+                "cash_sum": 0.0,
+                "transfer_sum": 15000.0,
+                "total_amount": 15000.0,
+                "amount": 15000.0,
+                "payment_method": "Bank Transfer",
+                "method": "Bank Transfer",
+                "branch_id": 1,
+                "applied_invoices_count": 1,
+                "applied_invoices": []
+            }
+        ],
+        "payments": [
+            {
+                "doc_entry": 201,
+                "doc_num": 201,
+                "doc_date": "2026-03-05",
+                "card_code": "C200",
+                "card_name": "Retail Customer",
+                "doc_currency": "INR",
+                "cash_sum": 0.0,
+                "transfer_sum": 15000.0,
+                "total_amount": 15000.0,
+                "amount": 15000.0,
+                "payment_method": "Bank Transfer",
+                "method": "Bank Transfer",
+                "branch_id": 1,
+                "applied_invoices_count": 1,
+                "applied_invoices": []
+            }
+        ],
+        "total_count": 11,
+        "page": 1,
+        "page_size": 20,
+        "has_more": False,
+        "filters_applied": {"range": "all_time"}
+    }
+    with patch("app.api.v1.finance._finance_service.get_incoming_payments", return_value=mock_data):
+        res = client.get("/api/v1/finance/incoming-payments?range=all_time", headers=auth_headers)
+        assert res.status_code == 200
+        body = res.json()
+        assert body["summary"]["total_receipts_count"] == 11
+        assert body["summary"]["total_received_amount"] == 85000.0
+        assert body["summary"]["method_breakdown"]["bank_transfer"] == 60000.0
+        assert len(body["items"]) == 1
+        assert body["items"][0]["total_amount"] == 15000.0
+        assert body["total_count"] == 11
+
+
+def test_outgoing_payments_dual_contract(auth_headers):
+    mock_data = {
+        "summary": {
+            "total_vouchers_count": 7,
+            "total_disbursed_amount": 42000.0,
+            "currency": "INR",
+            "method_breakdown": {"bank_transfer": 32000.0, "cash": 10000.0, "other": 0.0}
+        },
+        "kpis": {
+            "total_vouchers_count": 7,
+            "total_disbursed_amount": 42000.0,
+            "total_outgoing_amount": 42000.0,
+            "transactions_count": 7,
+            "currency": "INR",
+            "method_breakdown": {"bank_transfer": 32000.0, "cash": 10000.0, "other": 0.0}
+        },
+        "items": [
+            {
+                "doc_entry": 301,
+                "doc_num": 301,
+                "doc_date": "2026-03-08",
+                "card_code": "V300",
+                "card_name": "Green Mills",
+                "doc_currency": "INR",
+                "cash_sum": 0.0,
+                "transfer_sum": 12000.0,
+                "total_amount": 12000.0,
+                "payment_method": "Bank Transfer",
+                "branch_id": 1,
+                "applied_purchase_invoices_count": 1,
+                "applied_invoices": []
+            }
+        ],
+        "payments": [
+            {
+                "doc_entry": 301,
+                "doc_num": 301,
+                "doc_date": "2026-03-08",
+                "card_code": "V300",
+                "card_name": "Green Mills",
+                "doc_currency": "INR",
+                "cash_sum": 0.0,
+                "transfer_sum": 12000.0,
+                "total_amount": 12000.0,
+                "payment_method": "Bank Transfer",
+                "branch_id": 1,
+                "applied_purchase_invoices_count": 1,
+                "applied_invoices": []
+            }
+        ],
+        "total_count": 7,
+        "page": 1,
+        "page_size": 20,
+        "has_more": False,
+        "filters_applied": {"range": "all_time"}
+    }
+    with patch("app.api.v1.finance._finance_service.get_outgoing_payments", return_value=mock_data):
+        res = client.get("/api/v1/finance/outgoing-payments?range=all_time", headers=auth_headers)
+        assert res.status_code == 200
+        body = res.json()
+        assert body["summary"]["total_vouchers_count"] == 7
+        assert body["summary"]["total_disbursed_amount"] == 42000.0
+        assert len(body["items"]) == 1
+        assert body["total_count"] == 7
+
+
+def test_customer_analysis_dual_contract(auth_headers):
+    mock_data = {
+        "summary": {
+            "total_customers_analyzed": 5,
+            "total_sales_revenue": 150000.0,
+            "total_outstanding_receivables": 25000.0,
+            "currency": "INR"
+        },
+        "kpis": {
+            "total_customers_analyzed": 5,
+            "total_sales_revenue": 150000.0,
+            "total_outstanding_receivables": 25000.0,
+            "currency": "INR"
+        },
+        "items": [
+            {
+                "card_code": "C1",
+                "card_name": "Customer 1",
+                "sales_revenue": 60000.0,
+                "invoice_count": 3,
+                "payments_received": 50000.0,
+                "outstanding_receivables": 10000.0,
+                "last_transaction_date": "2026-03-10",
+                "sales_share_pct": 40.0,
+                "currency": "INR"
+            }
+        ],
+        "customers": [
+            {
+                "card_code": "C1",
+                "card_name": "Customer 1",
+                "sales_revenue": 60000.0,
+                "invoice_count": 3,
+                "payments_received": 50000.0,
+                "outstanding_receivables": 10000.0,
+                "last_transaction_date": "2026-03-10",
+                "sales_share_pct": 40.0,
+                "currency": "INR"
+            }
+        ],
+        "total_count": 5,
+        "page": 1,
+        "page_size": 20,
+        "has_more": False,
+        "filters_applied": {"range": "all_time"}
+    }
+    with patch("app.api.v1.finance._finance_service.get_customer_analysis", return_value=mock_data):
+        res = client.get("/api/v1/finance/customer-analysis?range=all_time", headers=auth_headers)
+        assert res.status_code == 200
+        body = res.json()
+        assert body["summary"]["total_customers_analyzed"] == 5
+        assert body["summary"]["total_sales_revenue"] == 150000.0
+        assert len(body["items"]) == 1
+        assert body["items"][0]["card_code"] == "C1"
+
+
+def test_supplier_analysis_dual_contract(auth_headers):
+    mock_data = {
+        "summary": {
+            "total_suppliers_analyzed": 4,
+            "total_purchase_spend": 80000.0,
+            "total_outstanding_payables": 15000.0,
+            "currency": "INR"
+        },
+        "kpis": {
+            "total_suppliers_analyzed": 4,
+            "total_purchase_spend": 80000.0,
+            "total_outstanding_payables": 15000.0,
+            "currency": "INR"
+        },
+        "items": [
+            {
+                "card_code": "S1",
+                "card_name": "Supplier 1",
+                "purchase_spend": 40000.0,
+                "invoice_count": 2,
+                "disbursements": 30000.0,
+                "outstanding_payables": 10000.0,
+                "last_purchase_date": "2026-03-12",
+                "spend_share_pct": 50.0,
+                "currency": "INR"
+            }
+        ],
+        "suppliers": [
+            {
+                "card_code": "S1",
+                "card_name": "Supplier 1",
+                "purchase_spend": 40000.0,
+                "invoice_count": 2,
+                "disbursements": 30000.0,
+                "outstanding_payables": 10000.0,
+                "last_purchase_date": "2026-03-12",
+                "spend_share_pct": 50.0,
+                "currency": "INR"
+            }
+        ],
+        "total_count": 4,
+        "page": 1,
+        "page_size": 20,
+        "has_more": False,
+        "filters_applied": {"range": "all_time"}
+    }
+    with patch("app.api.v1.finance._finance_service.get_supplier_analysis", return_value=mock_data):
+        res = client.get("/api/v1/finance/supplier-analysis?range=all_time", headers=auth_headers)
+        assert res.status_code == 200
+        body = res.json()
+        assert body["summary"]["total_suppliers_analyzed"] == 4
+        assert body["summary"]["total_purchase_spend"] == 80000.0
+        assert len(body["items"]) == 1
+        assert body["items"][0]["card_code"] == "S1"
+
+
+def test_profitability_reports_dual_contract(auth_headers):
+    mock_data = {
+        "summary": {
+            "net_sales_revenue": 150000.0,
+            "procurement_cogs_basis": 80000.0,
+            "gross_profit": 70000.0,
+            "gross_margin_pct": 46.67,
+            "sales_invoice_count": 10,
+            "purchase_invoice_count": 6,
+            "currency": "INR",
+            "accounting_note": "Accrual basis SAP calculation."
+        },
+        "kpis": {
+            "net_sales_revenue": 150000.0,
+            "procurement_cogs_basis": 80000.0,
+            "gross_profit": 70000.0,
+            "gross_margin_pct": 46.67,
+            "total_revenue": 150000.0,
+            "cost_of_purchases": 80000.0,
+            "gross_margin": 46.67,
+            "sales_invoice_count": 10,
+            "purchase_invoice_count": 6,
+            "currency": "INR",
+            "accounting_note": "Accrual basis SAP calculation."
+        },
+        "monthly_breakdown": [
+            {
+                "period": "2026-03",
+                "month": "2026-03",
+                "revenue": 150000.0,
+                "sales": 150000.0,
+                "cost": 80000.0,
+                "purchases": 80000.0,
+                "gross_profit": 70000.0,
+                "margin_pct": 46.67,
+                "gross_margin": 46.67
+            }
+        ],
+        "breakdown": [
+            {
+                "period": "2026-03",
+                "month": "2026-03",
+                "revenue": 150000.0,
+                "sales": 150000.0,
+                "cost": 80000.0,
+                "purchases": 80000.0,
+                "gross_profit": 70000.0,
+                "margin_pct": 46.67,
+                "gross_margin": 46.67
+            }
+        ],
+        "date_scope": {"range": "all_time", "from_date": "", "to_date": ""},
+        "filters_applied": {"range": "all_time"}
+    }
+    with patch("app.api.v1.finance._finance_service.get_profitability_report", return_value=mock_data):
+        res = client.get("/api/v1/finance/profitability-reports?range=all_time", headers=auth_headers)
+        assert res.status_code == 200
+        body = res.json()
+        assert body["summary"]["net_sales_revenue"] == 150000.0
+        assert body["summary"]["gross_profit"] == 70000.0
+        assert len(body["monthly_breakdown"]) == 1
+        assert body["monthly_breakdown"][0]["revenue"] == 150000.0
+
+
+def test_sap_connection_error_returns_502(auth_headers):
+    """Ensure SAP connection failure returns HTTP 502 with diagnostic detail, NOT silently masking to 0."""
+    from app.services.sap.client import SAPConnectionError
+    with patch("app.api.v1.finance._finance_service.get_purchase_invoices", side_effect=SAPConnectionError("Connection timed out")):
+        res = client.get("/api/v1/finance/purchase-invoices?range=all_time", headers=auth_headers)
+        assert res.status_code == 502
+        assert "Service Layer connection failed" in res.json()["detail"]
+
+
+def test_sap_validation_error_returns_400(auth_headers):
+    """Ensure SAP validation failure returns HTTP 400 with diagnostic detail."""
+    from app.services.sap.client import SAPValidationError
+    with patch("app.api.v1.finance._finance_service.get_purchase_invoices", side_effect=SAPValidationError("Invalid OData query")):
+        res = client.get("/api/v1/finance/purchase-invoices?range=all_time", headers=auth_headers)
+        assert res.status_code == 400
+        assert "Service Layer query validation failed" in res.json()["detail"]
+
+
+# ============================================================================
+# REGRESSION TESTS — SAPFinanceService Calculation & Filter Logic
+# ============================================================================
+
+def test_finance_service_purchase_invoices_aggregation():
+    from app.services.sap.finance_service import SAPFinanceService
+    service = SAPFinanceService()
+
+    raw_sap_invoices = [
+        {
+            "DocEntry": 1,
+            "DocNum": 1001,
+            "DocDate": "2026-03-01",
+            "DocDueDate": "2026-03-31",
+            "CardCode": "V001",
+            "CardName": "Acme Tools",
+            "DocTotal": 10000.0,
+            "PaidToDate": 10000.0,
+            "DocStatus": "bost_Close",
+            "Cancelled": "tNO",
+            "DocCurrency": "INR",
+            "BPL_IDAssignedToInvoice": 1,
+            "Comments": "Tools delivery"
+        },
+        {
+            "DocEntry": 2,
+            "DocNum": 1002,
+            "DocDate": "2026-03-02",
+            "DocDueDate": "2026-04-01",
+            "CardCode": "V002",
+            "CardName": "Beta Hardware",
+            "DocTotal": 5000.0,
+            "PaidToDate": 2000.0,
+            "DocStatus": "bost_Open",
+            "Cancelled": "tNO",
+            "DocCurrency": "INR",
+            "BPL_IDAssignedToInvoice": 2,
+            "Comments": "Paints delivery"
+        },
+        {
+            "DocEntry": 3,
+            "DocNum": 1003,
+            "DocDate": "2026-03-03",
+            "DocDueDate": "2026-04-02",
+            "CardCode": "V003",
+            "CardName": "Gamma Supplies",
+            "DocTotal": 3000.0,
+            "PaidToDate": 0.0,
+            "DocStatus": "bost_Open",
+            "Cancelled": "tYES",
+            "DocCurrency": "INR",
+            "BPL_IDAssignedToInvoice": 1,
+            "Comments": "Cancelled invoice"
+        }
+    ]
+
+    with patch.object(service, "_fetch_all_sap_records", return_value=raw_sap_invoices):
+        result = service.get_purchase_invoices(range_str="all_time", page=1, page_size=10)
+
+        # Total non-cancelled invoices = 2 (1001 and 1002). 1003 is Cancelled and filtered out.
+        assert result["total_count"] == 2
+        assert result["summary"]["total_purchases"] == 15000.0  # 10000 + 5000 (excludes cancelled)
+        assert result["summary"]["total_paid"] == 12000.0  # 10000 + 2000
+        assert result["summary"]["total_outstanding_balance"] == 3000.0  # 5000 - 2000
+        assert result["summary"]["status_counts"]["paid"] == 1
+        assert result["summary"]["status_counts"]["partially_paid"] == 1
+
+        # Check dual-contract output
+        assert "items" in result
+        assert "invoices" in result
+        assert "summary" in result
+        assert "kpis" in result
+        assert len(result["items"]) == 2
+
+        # Test branch filter
+        branch_1_result = service.get_purchase_invoices(range_str="all_time", branch_id="1")
+        assert branch_1_result["total_count"] == 1  # entry 1 has BPL=1 (entry 3 cancelled)
+        assert branch_1_result["summary"]["total_purchases"] == 10000.0
+
+        # Test status filter
+        paid_result = service.get_purchase_invoices(range_str="all_time", status="Paid")
+        assert paid_result["total_count"] == 1
+        assert paid_result["items"][0]["doc_num"] == 1001
+
+
+def test_finance_service_incoming_payments_aggregation():
+    from app.services.sap.finance_service import SAPFinanceService
+    service = SAPFinanceService()
+
+    raw_payments = [
+        {
+            "DocEntry": 10,
+            "DocNum": 5001,
+            "DocDate": "2026-03-01",
+            "CardCode": "C001",
+            "CardName": "Customer A",
+            "DocCurrency": "INR",
+            "CashSum": 5000.0,
+            "TransferSum": 0.0,
+            "BPLID": 1,
+            "Cancelled": "tNO",
+            "PaymentInvoices": [{"DocEntry": 100, "SumApplied": 5000.0, "InvoiceType": "it_Invoice"}]
+        },
+        {
+            "DocEntry": 11,
+            "DocNum": 5002,
+            "DocDate": "2026-03-02",
+            "CardCode": "C002",
+            "CardName": "Customer B",
+            "DocCurrency": "INR",
+            "CashSum": 0.0,
+            "TransferSum": 15000.0,
+            "BPLID": 1,
+            "Cancelled": "tNO",
+            "PaymentInvoices": []
+        }
+    ]
+
+    with patch.object(service, "_fetch_all_sap_records", return_value=raw_payments):
+        result = service.get_incoming_payments(range_str="all_time")
+        assert result["total_count"] == 2
+        assert result["summary"]["total_receipts_count"] == 2
+        assert result["summary"]["total_received_amount"] == 20000.0
+        assert result["summary"]["method_breakdown"]["cash"] == 5000.0
+        assert result["summary"]["method_breakdown"]["bank_transfer"] == 15000.0
+        assert result["items"][0]["applied_invoices_count"] == 1
+
+
+
+

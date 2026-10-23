@@ -78,9 +78,9 @@ export const PurchaseInvoicesPage: React.FC = () => {
     staleTime: 30_000,
   });
 
-  const summary = data?.summary;
-  const items = data?.items || [];
-  const totalCount = data?.total_count || 0;
+  const summary = data?.summary || data?.kpis;
+  const items = data?.items || data?.invoices || data?.purchase_invoices || [];
+  const totalCount = data?.total_count ?? (items.length || 0);
   const totalPages = Math.ceil(totalCount / pageSize) || 1;
 
   const handleResetFilters = () => {

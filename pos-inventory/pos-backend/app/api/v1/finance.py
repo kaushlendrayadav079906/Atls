@@ -1,12 +1,16 @@
 """Finance API endpoints for ATLAS Operations Dashboard."""
 
 import asyncio
+import logging
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from pydantic import BaseModel
 from app.core.security import get_current_user, require_admin, require_permission
 from app.core.config import settings
+from app.services.sap.client import SAPConnectionError, SAPValidationError
 from app.services.sap.finance_service import SAPFinanceService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 _finance_service = SAPFinanceService()
@@ -25,6 +29,23 @@ def _get_permitted_branch(user: dict, requested_branch: Optional[str] = None) ->
     return user_branch if user_branch else (requested_branch or None)
 
 
+async def _execute_finance_call(func, *args, **kwargs):
+    """Execute finance service call in thread pool with strict SAP error mapping."""
+    try:
+        return await asyncio.to_thread(func, *args, **kwargs)
+    except SAPValidationError as e:
+        logger.error("SAP Service Layer validation error: %s", e)
+        raise HTTPException(status_code=400, detail=f"Service Layer query validation failed: {str(e)}")
+    except SAPConnectionError as e:
+        logger.error("SAP Service Layer connection error: %s", e)
+        raise HTTPException(status_code=502, detail=f"Service Layer connection failed: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Finance API error: %s", e)
+        raise HTTPException(status_code=500, detail=f"Financial service error: {str(e)}")
+
+
 @router.get("/overview")
 async def get_finance_overview(
     range: str = Query("all_time", pattern="^(daily|weekly|monthly|yearly|all_time|custom)$"),
@@ -35,7 +56,7 @@ async def get_finance_overview(
 ) -> Dict[str, Any]:
     """Retrieve financial overview KPIs, trends, top customers/suppliers, and recent payments."""
     target_branch = _get_permitted_branch(current_user, branch)
-    data = await asyncio.to_thread(
+    data = await _execute_finance_call(
         _finance_service.get_finance_overview,
         range_str=range,
         branch_id=target_branch,
@@ -60,7 +81,7 @@ async def get_purchase_invoices(
 ) -> Dict[str, Any]:
     """Retrieve verified SAP purchase invoices with pagination, search, status, and summary KPIs."""
     target_branch = _get_permitted_branch(current_user, branch)
-    data = await asyncio.to_thread(
+    data = await _execute_finance_call(
         _finance_service.get_purchase_invoices,
         range_str=range,
         from_date=from_date,
@@ -90,7 +111,7 @@ async def get_incoming_payments(
 ) -> Dict[str, Any]:
     """Retrieve verified SAP incoming customer payments with method breakdowns and applied invoices."""
     target_branch = _get_permitted_branch(current_user, branch)
-    data = await asyncio.to_thread(
+    data = await _execute_finance_call(
         _finance_service.get_incoming_payments,
         range_str=range,
         from_date=from_date,
@@ -120,7 +141,7 @@ async def get_outgoing_payments(
 ) -> Dict[str, Any]:
     """Retrieve verified SAP vendor outgoing payments with method breakdowns and applied purchase invoices."""
     target_branch = _get_permitted_branch(current_user, branch)
-    data = await asyncio.to_thread(
+    data = await _execute_finance_call(
         _finance_service.get_outgoing_payments,
         range_str=range,
         from_date=from_date,
@@ -150,7 +171,7 @@ async def get_customer_analysis(
 ) -> Dict[str, Any]:
     """Retrieve customer sales rankings, AR balances, transaction frequencies, and concentration analysis."""
     target_branch = _get_permitted_branch(current_user, branch)
-    data = await asyncio.to_thread(
+    data = await _execute_finance_call(
         _finance_service.get_customer_analysis,
         range_str=range,
         from_date=from_date,
@@ -180,7 +201,7 @@ async def get_supplier_analysis(
 ) -> Dict[str, Any]:
     """Retrieve supplier procurement rankings, AP balances, purchase frequencies, and vendor concentration."""
     target_branch = _get_permitted_branch(current_user, branch)
-    data = await asyncio.to_thread(
+    data = await _execute_finance_call(
         _finance_service.get_supplier_analysis,
         range_str=range,
         from_date=from_date,
@@ -205,7 +226,7 @@ async def get_profitability_report(
 ) -> Dict[str, Any]:
     """Retrieve verified Net Sales, Purchase/Cost values, Gross Profit, and Operating Margin %."""
     target_branch = _get_permitted_branch(current_user, branch)
-    data = await asyncio.to_thread(
+    data = await _execute_finance_call(
         _finance_service.get_profitability_report,
         range_str=range,
         from_date=from_date,
@@ -229,7 +250,7 @@ async def export_finance_data(
     """Stream live formatted CSV export for any of the 7 financial modules."""
     from fastapi.responses import Response
     target_branch = _get_permitted_branch(current_user, branch)
-    csv_text = await asyncio.to_thread(
+    csv_text = await _execute_finance_call(
         _finance_service.export_finance_csv,
         module=module,
         range_str=range,
@@ -238,6 +259,11 @@ async def export_finance_data(
         branch_id=target_branch,
         search=search,
         status=status,
+    )
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=SAP_{module}_{range}.csv"},
     )
     filename = f"atlas_{module}_{range}.csv"
     return Response(

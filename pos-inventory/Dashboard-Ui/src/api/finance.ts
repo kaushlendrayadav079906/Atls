@@ -57,6 +57,7 @@ export interface FinanceOverviewResponse {
       subtext: string;
     };
   };
+  summary?: FinanceOverviewResponse['kpis'];
   charts: {
     sales_vs_purchases: Array<{
       month: string;
@@ -136,7 +137,10 @@ export interface PurchaseInvoiceSummary {
 
 export interface PurchaseInvoicesResponse {
   summary: PurchaseInvoiceSummary;
+  kpis?: PurchaseInvoiceSummary;
   items: PurchaseInvoiceItem[];
+  invoices?: PurchaseInvoiceItem[];
+  purchase_invoices?: PurchaseInvoiceItem[];
   total_count: number;
   page: number;
   page_size: number;
@@ -178,7 +182,10 @@ export interface IncomingPaymentSummary {
 
 export interface IncomingPaymentsResponse {
   summary: IncomingPaymentSummary;
+  kpis?: IncomingPaymentSummary;
   items: IncomingPaymentItem[];
+  payments?: IncomingPaymentItem[];
+  incoming_payments?: IncomingPaymentItem[];
   total_count: number;
   page: number;
   page_size: number;
@@ -220,7 +227,10 @@ export interface OutgoingPaymentSummary {
 
 export interface OutgoingPaymentsResponse {
   summary: OutgoingPaymentSummary;
+  kpis?: OutgoingPaymentSummary;
   items: OutgoingPaymentItem[];
+  payments?: OutgoingPaymentItem[];
+  outgoing_payments?: OutgoingPaymentItem[];
   total_count: number;
   page: number;
   page_size: number;
@@ -249,7 +259,9 @@ export interface CustomerAnalysisSummary {
 
 export interface CustomerAnalysisResponse {
   summary: CustomerAnalysisSummary;
+  kpis?: CustomerAnalysisSummary;
   items: CustomerAnalysisItem[];
+  customers?: CustomerAnalysisItem[];
   total_count: number;
   page: number;
   page_size: number;
@@ -278,7 +290,9 @@ export interface SupplierAnalysisSummary {
 
 export interface SupplierAnalysisResponse {
   summary: SupplierAnalysisSummary;
+  kpis?: SupplierAnalysisSummary;
   items: SupplierAnalysisItem[];
+  suppliers?: SupplierAnalysisItem[];
   total_count: number;
   page: number;
   page_size: number;
@@ -307,7 +321,9 @@ export interface ProfitabilitySummary {
 
 export interface ProfitabilityResponse {
   summary: ProfitabilitySummary;
+  kpis?: ProfitabilitySummary;
   monthly_breakdown: ProfitabilityTrendItem[];
+  breakdown?: ProfitabilityTrendItem[];
   date_scope: {
     range: string;
     from_date: string;

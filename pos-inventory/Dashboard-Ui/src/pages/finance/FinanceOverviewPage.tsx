@@ -118,7 +118,7 @@ export const FinanceOverviewPage: React.FC = () => {
     return `₹${val}`;
   };
 
-  const kpis = data?.kpis;
+  const kpis = data?.kpis || data?.summary;
   const currentBranchLabel = branch
     ? filterOptions?.branches?.find((b: any) => String(b.id) === branch)?.name || `Branch ${branch}`
     : 'All Branches';

@@ -78,8 +78,8 @@ export const ProfitabilityReportsPage: React.FC = () => {
     staleTime: 60_000,
   });
 
-  const summary = data?.summary;
-  const breakdown = data?.monthly_breakdown || [];
+  const summary = data?.summary || data?.kpis;
+  const breakdown = data?.monthly_breakdown || data?.breakdown || [];
   const rangeLabel = getDateScopeLabel(quickFilter, dateFrom, dateTo);
 
   const formatINR = (val?: number) => {
