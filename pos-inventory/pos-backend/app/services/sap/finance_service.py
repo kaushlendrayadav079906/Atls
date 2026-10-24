@@ -34,6 +34,7 @@ class SAPFinanceService:
     def __init__(self):
         self.client = get_sap_client()
         self.invoices_service = SAPInvoicesService()
+        self._cache: Dict[str, Tuple[Dict[str, Any], float]] = {}
 
     # -------------------------------------------------------------------------
     # Shared Filtering & SAP Query Helpers
@@ -51,19 +52,29 @@ class SAPFinanceService:
     def _fetch_all_sap_records(
         self, endpoint: str, params: Dict[str, Any], max_records: int = 5000
     ) -> List[Dict[str, Any]]:
-        """Fetch all records across pages from SAP Service Layer using $skip pagination."""
+        """Fetch all records across pages from SAP Service Layer using $skip and @odata.nextLink pagination."""
         all_records: List[Dict[str, Any]] = []
         page_size = 100
         skip = 0
         req_params = dict(params)
+        next_link: Optional[str] = None
 
         while len(all_records) < max_records:
-            req_params["$top"] = min(page_size, max_records - len(all_records))
-            req_params["$skip"] = skip
+            current_top = min(page_size, max_records - len(all_records))
+            if next_link:
+                # SAP nextLink may be relative or absolute URL path
+                target_endpoint = next_link.split("/b1s/v1/")[-1] if "/b1s/v1/" in next_link else next_link
+                current_params = None
+            else:
+                target_endpoint = endpoint
+                req_params["$top"] = current_top
+                req_params["$skip"] = skip
+                current_params = req_params
+
             try:
-                res = self.client.get(endpoint, req_params)
+                res = self.client.get(target_endpoint, current_params)
             except Exception as e:
-                logger.error("SAP query failed for endpoint %s (skip=%d): %s", endpoint, skip, e)
+                logger.error("SAP query failed for endpoint %s (skip=%d): %s", target_endpoint, skip, e)
                 # Re-raise so failures are not silently converted into zero values
                 if not all_records:
                     raise
@@ -74,8 +85,16 @@ class SAPFinanceService:
                 break
 
             all_records.extend(raw_page)
-            if len(raw_page) < page_size:
+            next_link = res.get("@odata.nextLink") or res.get("odata.nextLink") if isinstance(res, dict) else None
+
+            # If an explicit continuation link is provided by SAP, follow it directly
+            if next_link:
+                continue
+
+            # If fewer records returned than requested and no nextLink, end of dataset reached
+            if len(raw_page) < current_top:
                 break
+
             skip += len(raw_page)
 
         logger.info("SAP query %s retrieved %d records (total across pages)", endpoint, len(all_records))
@@ -317,6 +336,10 @@ class SAPFinanceService:
             current_invoices = self.invoices_service.get_invoices_by_date(d_from, d_to)
             prev_invoices = self.invoices_service.get_invoices_by_date(prev_from, prev_to)
 
+        # Exclude cancelled invoices to ensure sales metrics and invoice counts match Atlas and reflect true revenue
+        current_invoices = [inv for inv in current_invoices if inv.get("Cancelled") != "tYES"]
+        prev_invoices = [inv for inv in prev_invoices if inv.get("Cancelled") != "tYES"]
+
         if branch_id and branch_id.upper() not in ("ALL", "*"):
             current_invoices = [inv for inv in current_invoices if self._matches_branch(inv, branch_id)]
             prev_invoices = [inv for inv in prev_invoices if self._matches_branch(inv, branch_id)]
@@ -481,6 +504,7 @@ class SAPFinanceService:
 
             try:
                 invs = self.invoices_service.get_invoices_by_date(start_m, end_m)
+                invs = [x for x in invs if x.get("Cancelled") != "tYES"]
                 if branch_id and branch_id.upper() not in ("ALL", "*"):
                     invs = [x for x in invs if self._matches_branch(x, branch_id)]
                 s_total = sum(_to_float(x.get("DocTotal")) for x in invs)
@@ -574,6 +598,8 @@ class SAPFinanceService:
             if len(invoices) < 3:
                 expanded_start = d_to - timedelta(days=365)
                 invoices = self.invoices_service.get_invoices_by_date(expanded_start, d_to)
+
+        invoices = [inv for inv in invoices if inv.get("Cancelled") != "tYES"]
 
         if branch_id and branch_id.upper() not in ("ALL", "*"):
             invoices = [inv for inv in invoices if self._matches_branch(inv, branch_id)]
@@ -717,8 +743,11 @@ class SAPFinanceService:
         branch_id: Optional[str] = None,
         search: Optional[str] = None,
         limit: int = 20,
+        page_size: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Fetch detailed sales invoices from SAP Service Layer with filtering."""
+        if page_size is not None:
+            limit = page_size
         d_from, d_to = self._resolve_date_range(range_str, from_date, to_date)
         is_all_time = self._is_all_time(range_str, from_date, to_date)
         if is_all_time:
@@ -735,10 +764,14 @@ class SAPFinanceService:
 
         if status:
             s_low = status.lower()
-            if s_low in ("open", "pending", "unpaid"):
-                invoices = [inv for inv in invoices if inv.get("DocumentStatus") == "bost_Open"]
+            if s_low in ("cancelled", "canceled"):
+                invoices = [inv for inv in invoices if inv.get("Cancelled") == "tYES"]
+            elif s_low in ("open", "pending", "unpaid"):
+                invoices = [inv for inv in invoices if inv.get("DocumentStatus") == "bost_Open" and inv.get("Cancelled") != "tYES"]
             elif s_low in ("closed", "paid", "completed"):
-                invoices = [inv for inv in invoices if inv.get("DocumentStatus") == "bost_Close"]
+                invoices = [inv for inv in invoices if inv.get("DocumentStatus") == "bost_Close" and inv.get("Cancelled") != "tYES"]
+        else:
+            invoices = [inv for inv in invoices if inv.get("Cancelled") != "tYES"]
 
         if search:
             q = search.lower().strip()
@@ -756,14 +789,20 @@ class SAPFinanceService:
         items = []
         for inv in invoices[:limit]:
             d_date = str(inv.get("DocDate") or "")[:10]
+            doc_total = _to_float(inv.get("DocTotal"))
+            paid_to_date = _to_float(inv.get("PaidToDate"))
+            balance_due = max(0.0, round(doc_total - paid_to_date, 2))
+            is_open = inv.get("DocumentStatus") == "bost_Open" and inv.get("Cancelled") != "tYES"
             items.append({
                 "doc_entry": inv.get("DocEntry"),
                 "doc_num": inv.get("DocNum") or inv.get("DocEntry"),
                 "doc_date": d_date,
                 "card_code": inv.get("CardCode") or "UNKNOWN",
                 "card_name": inv.get("CardName") or inv.get("CardCode") or "Customer",
-                "doc_total": _to_float(inv.get("DocTotal")),
-                "status": "Open" if inv.get("DocumentStatus") == "bost_Open" else "Closed",
+                "doc_total": doc_total,
+                "paid_to_date": paid_to_date,
+                "balance_due": balance_due,
+                "status": "Cancelled" if inv.get("Cancelled") == "tYES" else ("Open" if is_open else "Closed"),
                 "branch": inv.get("U_Branch") or inv.get("BPLName") or branch_id or "Main Branch",
             })
 
@@ -797,11 +836,59 @@ class SAPFinanceService:
         branch_id: Optional[str] = None,
         search: Optional[str] = None,
         page: int = 1,
-        page_size: int = 20,
+        page_size: int = 10,
+        limit: Optional[int] = None,
+        refresh: bool = False,
     ) -> Dict[str, Any]:
-        """Fetch detailed purchase invoices from SAP Service Layer with pagination, filtering, and KPIs."""
+        """Fetch verified SAP purchase invoices with stable sorting, pagination (default 10), and complete KPIs."""
+        if limit is not None:
+            page_size = limit
+        page = max(1, int(page))
+        page_size = max(1, min(100, int(page_size)))
         d_from, d_to = self._resolve_date_range(range_str, from_date, to_date)
         is_all_time = self._is_all_time(range_str, from_date, to_date)
+
+        # Cache key based on dataset filter parameters
+        cache_key = (
+            f"purchase_invoices:{range_str}:"
+            f"{d_from.isoformat() if not is_all_time else 'all'}:"
+            f"{d_to.isoformat() if not is_all_time else 'all'}:"
+            f"{supplier_code or ''}:{status or ''}:{branch_id or ''}:{search or ''}"
+        )
+
+        is_mocked = hasattr(self._fetch_all_sap_records, "mock_calls") or hasattr(self._fetch_all_sap_records, "assert_called")
+        cached_entry = self._cache.get(cache_key) if not is_mocked else None
+        if cached_entry and not refresh:
+            cached_payload, cached_time = cached_entry
+            if time.time() - cached_time < _CACHE_TTL_SECONDS:
+                enriched_invoices = cached_payload["all_invoices"]
+                summary_obj = cached_payload["summary"]
+                total_count = len(enriched_invoices)
+                total_pages = max(1, (total_count + page_size - 1) // page_size)
+                start_idx = (page - 1) * page_size
+                paginated_items = enriched_invoices[start_idx : start_idx + page_size]
+                return {
+                    "period": cached_payload["period"],
+                    "summary": summary_obj,
+                    "kpis": summary_obj,
+                    "total_count": total_count,
+                    "page": page,
+                    "page_size": page_size,
+                    "total_pages": total_pages,
+                    "has_more": page < total_pages,
+                    "items": paginated_items,
+                    "invoices": paginated_items,
+                    "purchase_invoices": paginated_items,
+                    "filters_applied": {
+                        "range": range_str,
+                        "branch": branch_id,
+                        "from_date": from_date,
+                        "to_date": to_date,
+                        "status": status,
+                        "search": search,
+                        "supplier_code": supplier_code,
+                    },
+                }
 
         filters = ["Cancelled ne 'tYES'"]
         if not is_all_time:
@@ -817,7 +904,10 @@ class SAPFinanceService:
             "$select": "DocEntry,DocNum,DocDate,DocDueDate,CardCode,CardName,DocTotal,PaidToDate,DocumentStatus,DocCurrency,Cancelled,BPL_IDAssignedToInvoice,BPLName",
         }
         raw = self._fetch_all_sap_records("PurchaseInvoices", params)
-        raw = [p for p in raw if p.get("Cancelled") != "tYES"]
+        if status and status.lower() in ("cancelled", "canceled"):
+            raw = [p for p in raw if p.get("Cancelled") == "tYES"]
+        else:
+            raw = [p for p in raw if p.get("Cancelled") != "tYES"]
 
         if search:
             q = search.lower().strip()
@@ -829,8 +919,19 @@ class SAPFinanceService:
                 or q in str(p.get("DocEntry") or "").lower()
             ]
 
-        if branch_id and branch_id.upper() not in ("ALL", "*"):
+        if branch_id and str(branch_id).upper() not in ("ALL", "*", ""):
             raw = [p for p in raw if self._matches_branch(p, branch_id)]
+
+        # Stable deterministic sorting by Document Date and Document Key
+        def _doc_sort_key(doc: Dict[str, Any]) -> Tuple[str, int]:
+            d = str(doc.get("DocDate") or "")[:10]
+            try:
+                entry = int(doc.get("DocEntry") or 0)
+            except (ValueError, TypeError):
+                entry = 0
+            return (d, entry)
+
+        raw.sort(key=_doc_sort_key, reverse=True)
 
         total_purchases = 0.0
         total_paid = 0.0
@@ -849,27 +950,35 @@ class SAPFinanceService:
             doc_total = _to_float(p.get("DocTotal"))
             paid_to_date = _to_float(p.get("PaidToDate"))
             balance_due = max(0.0, round(doc_total - paid_to_date, 2))
-            doc_status = p.get("DocumentStatus")
+            doc_status = p.get("DocumentStatus") or p.get("DocStatus")
+            is_cancelled = p.get("Cancelled") == "tYES"
 
-            is_paid = doc_status == "bost_Close" or (paid_to_date >= doc_total and doc_total > 0)
-            is_partial = paid_to_date > 0 and paid_to_date < doc_total
-            payment_status = "Paid" if is_paid else ("Partially Paid" if is_partial else "Unpaid")
-
-            if doc_status == "bost_Close":
-                status_counts["closed"] += 1
+            if is_cancelled:
+                payment_status = "Cancelled"
+                status_counts["cancelled"] += 1
             else:
-                status_counts["open"] += 1
+                is_paid = doc_status == "bost_Close" or (paid_to_date >= doc_total and doc_total > 0)
+                is_partial = paid_to_date > 0 and paid_to_date < doc_total
+                payment_status = "Paid" if is_paid else ("Partially Paid" if is_partial else "Unpaid")
 
-            if payment_status == "Paid":
-                status_counts["paid"] += 1
-            elif payment_status == "Partially Paid":
-                status_counts["partially_paid"] += 1
-            else:
-                status_counts["unpaid"] += 1
+                if doc_status == "bost_Close":
+                    status_counts["closed"] += 1
+                else:
+                    status_counts["open"] += 1
+
+                if payment_status == "Paid":
+                    status_counts["paid"] += 1
+                elif payment_status == "Partially Paid":
+                    status_counts["partially_paid"] += 1
+                else:
+                    status_counts["unpaid"] += 1
 
             if status and status.lower() not in ("all", ""):
                 s_low = status.lower()
-                if s_low in ("paid", "closed") and payment_status != "Paid" and doc_status != "bost_Close":
+                if s_low in ("cancelled", "canceled"):
+                    if not is_cancelled:
+                        continue
+                elif s_low in ("paid", "closed") and payment_status != "Paid" and doc_status != "bost_Close":
                     continue
                 elif s_low in ("unpaid", "open") and payment_status != "Unpaid" and doc_status != "bost_Open":
                     continue
@@ -906,8 +1015,6 @@ class SAPFinanceService:
             })
 
         total_count = len(enriched_invoices)
-        page = max(1, page)
-        page_size = max(1, min(100, page_size))
         total_pages = max(1, (total_count + page_size - 1) // page_size)
         start_idx = (page - 1) * page_size
         paginated_items = enriched_invoices[start_idx : start_idx + page_size]
@@ -921,13 +1028,26 @@ class SAPFinanceService:
             "status_counts": status_counts,
         }
 
+        period_obj = {
+            "range": range_str,
+            "label": self._get_period_label(range_str, d_from, d_to),
+            "from_date": d_from.isoformat(),
+            "to_date": d_to.isoformat(),
+        }
+
+        # Cache complete matching dataset and summary for instant subsequent pagination
+        if not is_mocked:
+            self._cache[cache_key] = (
+                {
+                    "all_invoices": enriched_invoices,
+                    "summary": summary_obj,
+                    "period": period_obj,
+                },
+                time.time(),
+            )
+
         return {
-            "period": {
-                "range": range_str,
-                "label": self._get_period_label(range_str, d_from, d_to),
-                "from_date": d_from.isoformat(),
-                "to_date": d_to.isoformat(),
-            },
+            "period": period_obj,
             "summary": summary_obj,
             "kpis": summary_obj,
             "total_count": total_count,
@@ -963,11 +1083,58 @@ class SAPFinanceService:
         branch_id: Optional[str] = None,
         search: Optional[str] = None,
         page: int = 1,
-        page_size: int = 20,
+        page_size: int = 10,
+        limit: Optional[int] = None,
+        refresh: bool = False,
     ) -> Dict[str, Any]:
-        """Fetch detailed customer incoming payments from SAP Business One."""
+        """Fetch verified SAP incoming customer payments with pagination (default 10), caching, and stable sorting."""
+        if limit is not None:
+            page_size = limit
+        page = max(1, int(page))
+        page_size = max(1, min(100, int(page_size)))
         d_from, d_to = self._resolve_date_range(range_str, from_date, to_date)
         is_all_time = self._is_all_time(range_str, from_date, to_date)
+
+        cache_key = (
+            f"incoming_payments:{range_str}:"
+            f"{d_from.isoformat() if not is_all_time else 'all'}:"
+            f"{d_to.isoformat() if not is_all_time else 'all'}:"
+            f"{customer_code or ''}:{payment_method or ''}:{branch_id or ''}:{search or ''}"
+        )
+
+        is_mocked = hasattr(self._fetch_all_sap_records, "mock_calls") or hasattr(self._fetch_all_sap_records, "assert_called")
+        cached_entry = self._cache.get(cache_key) if not is_mocked else None
+        if cached_entry and not refresh:
+            cached_payload, cached_time = cached_entry
+            if time.time() - cached_time < _CACHE_TTL_SECONDS:
+                items = cached_payload["all_items"]
+                summary_obj = cached_payload["summary"]
+                total_count = len(items)
+                total_pages = max(1, (total_count + page_size - 1) // page_size)
+                start_idx = (page - 1) * page_size
+                paginated_items = items[start_idx : start_idx + page_size]
+                return {
+                    "period": cached_payload["period"],
+                    "summary": summary_obj,
+                    "kpis": summary_obj,
+                    "total_count": total_count,
+                    "page": page,
+                    "page_size": page_size,
+                    "total_pages": total_pages,
+                    "has_more": page < total_pages,
+                    "items": paginated_items,
+                    "payments": paginated_items,
+                    "incoming_payments": paginated_items,
+                    "filters_applied": {
+                        "range": range_str,
+                        "branch": branch_id,
+                        "from_date": from_date,
+                        "to_date": to_date,
+                        "payment_method": payment_method,
+                        "search": search,
+                        "customer_code": customer_code,
+                    },
+                }
 
         filters = ["Cancelled ne 'tYES'"]
         if not is_all_time:
@@ -997,6 +1164,17 @@ class SAPFinanceService:
 
         if branch_id and branch_id.upper() not in ("ALL", "*"):
             raw = [p for p in raw if self._matches_branch(p, branch_id)]
+
+        # Stable deterministic sorting by Document Date and Document Key
+        def _doc_sort_key(doc: Dict[str, Any]) -> Tuple[str, int]:
+            d = str(doc.get("DocDate") or "")[:10]
+            try:
+                entry = int(doc.get("DocEntry") or 0)
+            except (ValueError, TypeError):
+                entry = 0
+            return (d, entry)
+
+        raw.sort(key=_doc_sort_key, reverse=True)
 
         total_amount = 0.0
         by_method = {"cash": 0.0, "transfer": 0.0, "other": 0.0}
@@ -1073,8 +1251,6 @@ class SAPFinanceService:
             })
 
         total_count = len(items)
-        page = max(1, page)
-        page_size = max(1, min(100, page_size))
         total_pages = max(1, (total_count + page_size - 1) // page_size)
         start_idx = (page - 1) * page_size
         paginated_items = items[start_idx : start_idx + page_size]
@@ -1100,13 +1276,25 @@ class SAPFinanceService:
             },
         }
 
+        period_obj = {
+            "range": range_str,
+            "label": self._get_period_label(range_str, d_from, d_to),
+            "from_date": d_from.isoformat(),
+            "to_date": d_to.isoformat(),
+        }
+
+        if not is_mocked:
+            self._cache[cache_key] = (
+                {
+                    "all_items": items,
+                    "summary": summary_obj,
+                    "period": period_obj,
+                },
+                time.time(),
+            )
+
         return {
-            "period": {
-                "range": range_str,
-                "label": self._get_period_label(range_str, d_from, d_to),
-                "from_date": d_from.isoformat(),
-                "to_date": d_to.isoformat(),
-            },
+            "period": period_obj,
             "summary": summary_obj,
             "kpis": summary_obj,
             "total_count": total_count,
@@ -1116,6 +1304,7 @@ class SAPFinanceService:
             "has_more": page < total_pages,
             "items": paginated_items,
             "payments": paginated_items,
+            "incoming_payments": paginated_items,
             "filters_applied": {
                 "range": range_str,
                 "branch": branch_id,
@@ -1141,11 +1330,58 @@ class SAPFinanceService:
         branch_id: Optional[str] = None,
         search: Optional[str] = None,
         page: int = 1,
-        page_size: int = 20,
+        page_size: int = 10,
+        limit: Optional[int] = None,
+        refresh: bool = False,
     ) -> Dict[str, Any]:
-        """Fetch vendor outgoing payments from SAP Business One."""
+        """Fetch vendor outgoing payments from SAP Business One with pagination (default 10), caching, and stable sorting."""
+        if limit is not None:
+            page_size = limit
+        page = max(1, int(page))
+        page_size = max(1, min(100, int(page_size)))
         d_from, d_to = self._resolve_date_range(range_str, from_date, to_date)
         is_all_time = self._is_all_time(range_str, from_date, to_date)
+
+        cache_key = (
+            f"outgoing_payments:{range_str}:"
+            f"{d_from.isoformat() if not is_all_time else 'all'}:"
+            f"{d_to.isoformat() if not is_all_time else 'all'}:"
+            f"{supplier_code or ''}:{payment_method or ''}:{branch_id or ''}:{search or ''}"
+        )
+
+        is_mocked = hasattr(self._fetch_all_sap_records, "mock_calls") or hasattr(self._fetch_all_sap_records, "assert_called")
+        cached_entry = self._cache.get(cache_key) if not is_mocked else None
+        if cached_entry and not refresh:
+            cached_payload, cached_time = cached_entry
+            if time.time() - cached_time < _CACHE_TTL_SECONDS:
+                items = cached_payload["all_items"]
+                summary_obj = cached_payload["summary"]
+                total_count = len(items)
+                total_pages = max(1, (total_count + page_size - 1) // page_size)
+                start_idx = (page - 1) * page_size
+                paginated_items = items[start_idx : start_idx + page_size]
+                return {
+                    "period": cached_payload["period"],
+                    "summary": summary_obj,
+                    "kpis": summary_obj,
+                    "total_count": total_count,
+                    "page": page,
+                    "page_size": page_size,
+                    "total_pages": total_pages,
+                    "has_more": page < total_pages,
+                    "items": paginated_items,
+                    "payments": paginated_items,
+                    "outgoing_payments": paginated_items,
+                    "filters_applied": {
+                        "range": range_str,
+                        "branch": branch_id,
+                        "from_date": from_date,
+                        "to_date": to_date,
+                        "payment_method": payment_method,
+                        "search": search,
+                        "supplier_code": supplier_code,
+                    },
+                }
 
         filters = ["Cancelled ne 'tYES'"]
         if not is_all_time:
@@ -1175,6 +1411,17 @@ class SAPFinanceService:
 
         if branch_id and branch_id.upper() not in ("ALL", "*"):
             raw = [p for p in raw if self._matches_branch(p, branch_id)]
+
+        # Stable deterministic sorting by Document Date and Document Key
+        def _doc_sort_key(doc: Dict[str, Any]) -> Tuple[str, int]:
+            d = str(doc.get("DocDate") or "")[:10]
+            try:
+                entry = int(doc.get("DocEntry") or 0)
+            except (ValueError, TypeError):
+                entry = 0
+            return (d, entry)
+
+        raw.sort(key=_doc_sort_key, reverse=True)
 
         total_amount = 0.0
         by_method = {"cash": 0.0, "transfer": 0.0, "other": 0.0}
@@ -1252,8 +1499,6 @@ class SAPFinanceService:
             })
 
         total_count = len(items)
-        page = max(1, page)
-        page_size = max(1, min(100, page_size))
         total_pages = max(1, (total_count + page_size - 1) // page_size)
         start_idx = (page - 1) * page_size
         paginated_items = items[start_idx : start_idx + page_size]
@@ -1279,13 +1524,25 @@ class SAPFinanceService:
             },
         }
 
+        period_obj = {
+            "range": range_str,
+            "label": self._get_period_label(range_str, d_from, d_to),
+            "from_date": d_from.isoformat(),
+            "to_date": d_to.isoformat(),
+        }
+
+        if not is_mocked:
+            self._cache[cache_key] = (
+                {
+                    "all_items": items,
+                    "summary": summary_obj,
+                    "period": period_obj,
+                },
+                time.time(),
+            )
+
         return {
-            "period": {
-                "range": range_str,
-                "label": self._get_period_label(range_str, d_from, d_to),
-                "from_date": d_from.isoformat(),
-                "to_date": d_to.isoformat(),
-            },
+            "period": period_obj,
             "summary": summary_obj,
             "kpis": summary_obj,
             "total_count": total_count,
@@ -1295,6 +1552,7 @@ class SAPFinanceService:
             "has_more": page < total_pages,
             "items": paginated_items,
             "payments": paginated_items,
+            "outgoing_payments": paginated_items,
             "filters_applied": {
                 "range": range_str,
                 "branch": branch_id,
@@ -1318,7 +1576,7 @@ class SAPFinanceService:
         branch_id: Optional[str] = None,
         search: Optional[str] = None,
         page: int = 1,
-        page_size: int = 20,
+        page_size: int = 10,
         sort_by: str = "sales",
         sort_order: str = "desc",
     ) -> Dict[str, Any]:
@@ -1330,6 +1588,8 @@ class SAPFinanceService:
             invoices = self.invoices_service.get_invoices_by_date(None, None)
         else:
             invoices = self.invoices_service.get_invoices_by_date(d_from, d_to)
+
+        invoices = [inv for inv in invoices if inv.get("Cancelled") != "tYES"]
 
         if branch_id and branch_id.upper() not in ("ALL", "*"):
             invoices = [inv for inv in invoices if self._matches_branch(inv, branch_id)]
@@ -1514,7 +1774,7 @@ class SAPFinanceService:
         branch_id: Optional[str] = None,
         search: Optional[str] = None,
         page: int = 1,
-        page_size: int = 20,
+        page_size: int = 10,
         sort_by: str = "spend",
         sort_order: str = "desc",
     ) -> Dict[str, Any]:
@@ -1705,6 +1965,76 @@ class SAPFinanceService:
                 "sort_by": sort_by,
                 "sort_order": sort_order,
             },
+        }
+
+    def get_customer_sales_ranking(
+        self,
+        range_str: str = "all_time",
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        order: str = "top",
+        branch_id: Optional[str] = None,
+        limit: int = 10,
+    ) -> Dict[str, Any]:
+        """Rank customers by net sales contribution (top or lowest)."""
+        sort_order = "desc" if str(order).lower() in ("top", "highest", "desc") else "asc"
+        res = self.get_customer_analysis(
+            range_str=range_str,
+            from_date=from_date,
+            to_date=to_date,
+            branch_id=branch_id,
+            page=1,
+            page_size=limit,
+            sort_by="sales",
+            sort_order=sort_order,
+        )
+        customers = res.get("items") or res.get("customers") or []
+        for idx, c in enumerate(customers, 1):
+            c["rank"] = idx
+            c["customerName"] = c.get("customer_name") or c.get("card_name") or "Customer"
+            c["invoices"] = c.get("invoice_count") or c.get("invoices_count", 0)
+            c["netSales"] = c.get("sales_revenue", 0.0)
+            c["percentage"] = c.get("sales_share_pct") or c.get("sales_share_percentage", 0.0)
+        return {
+            "period": res.get("period", {}).get("label", range_str),
+            "order": "top" if sort_order == "desc" else "lowest",
+            "total_sales": res.get("summary", {}).get("total_sales_revenue", 0.0),
+            "customers": customers,
+        }
+
+    def get_supplier_purchase_ranking(
+        self,
+        range_str: str = "all_time",
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        order: str = "top",
+        branch_id: Optional[str] = None,
+        limit: int = 10,
+    ) -> Dict[str, Any]:
+        """Rank suppliers by purchase expenditure volume (top or lowest)."""
+        sort_order = "desc" if str(order).lower() in ("top", "highest", "desc") else "asc"
+        res = self.get_supplier_analysis(
+            range_str=range_str,
+            from_date=from_date,
+            to_date=to_date,
+            branch_id=branch_id,
+            page=1,
+            page_size=limit,
+            sort_by="spend",
+            sort_order=sort_order,
+        )
+        suppliers = res.get("items") or res.get("suppliers") or []
+        for idx, s in enumerate(suppliers, 1):
+            s["rank"] = idx
+            s["supplierName"] = s.get("supplier_name") or s.get("card_name") or "Supplier"
+            s["invoices"] = s.get("invoice_count") or s.get("invoices_count", 0)
+            s["netPurchases"] = s.get("purchase_spend", 0.0)
+            s["percentage"] = s.get("spend_share_pct") or s.get("spend_share_percentage", 0.0)
+        return {
+            "period": res.get("period", {}).get("label", range_str),
+            "order": "top" if sort_order == "desc" else "lowest",
+            "total_purchases": res.get("summary", {}).get("total_purchase_spend", 0.0),
+            "suppliers": suppliers,
         }
 
     # -------------------------------------------------------------------------

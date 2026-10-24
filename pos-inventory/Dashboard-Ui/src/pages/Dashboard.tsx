@@ -461,6 +461,10 @@ export const Dashboard = () => {
                 <span className="rounded-md border border-amber-300 bg-amber-50/80 px-2 py-0.5 text-[10px] font-bold text-amber-700" title={`Cached at ${formatTime(summaryUpdatedAt)}`}>
                   CACHED
                 </span>
+              ) : isSapConnected === null || loadingSummary ? (
+                <span className="rounded-md border border-slate-300 bg-slate-50/80 px-2 py-0.5 text-[10px] font-bold text-slate-500 animate-pulse">
+                  CHECKING
+                </span>
               ) : (
                 <span className="rounded-md border border-rose-300 bg-rose-50/80 px-2 py-0.5 text-[10px] font-bold text-rose-700">
                   OFFLINE
@@ -512,6 +516,10 @@ export const Dashboard = () => {
               ) : isSummaryCached ? (
                 <span className="rounded-md border border-amber-300 bg-amber-50/80 px-2 py-0.5 text-[10px] font-bold text-amber-700" title={`Cached at ${formatTime(summaryUpdatedAt)}`}>
                   CACHED
+                </span>
+              ) : isSapConnected === null || loadingSummary ? (
+                <span className="rounded-md border border-slate-300 bg-slate-50/80 px-2 py-0.5 text-[10px] font-bold text-slate-500 animate-pulse">
+                  CHECKING
                 </span>
               ) : (
                 <span className="rounded-md border border-rose-300 bg-rose-50/80 px-2 py-0.5 text-[10px] font-bold text-rose-700">
@@ -590,6 +598,10 @@ export const Dashboard = () => {
               ) : isRiskCached ? (
                 <span className="rounded-md border border-amber-300 bg-amber-50/80 px-2 py-0.5 text-[10px] font-bold text-amber-700" title={`Cached at ${formatTime(riskUpdatedAt)}`}>
                   CACHED
+                </span>
+              ) : isSapConnected === null || loadingRisk ? (
+                <span className="rounded-md border border-slate-300 bg-slate-50/80 px-2 py-0.5 text-[10px] font-bold text-slate-500 animate-pulse">
+                  CHECKING
                 </span>
               ) : (
                 <span className="rounded-md border border-rose-300 bg-rose-50/80 px-2 py-0.5 text-[10px] font-bold text-rose-700">
@@ -904,6 +916,10 @@ export const Dashboard = () => {
                       CACHED
                     </span>
                   )
+                ) : isSapConnected === null || loadingSales ? (
+                  <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.2 text-[9px] font-bold text-slate-500 animate-pulse">CHECKING</span>
+                ) : isSapConnected ? (
+                  <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.2 text-[9px] font-bold text-slate-500">NO DATA</span>
                 ) : (
                   <span className="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">OFFLINE</span>
                 )}
@@ -991,6 +1007,10 @@ export const Dashboard = () => {
                       CACHED
                     </span>
                   )
+                ) : isSapConnected === null || loadingProducts ? (
+                  <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.2 text-[9px] font-bold text-slate-500 animate-pulse">CHECKING</span>
+                ) : isSapConnected ? (
+                  <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.2 text-[9px] font-bold text-slate-500">NO DATA</span>
                 ) : (
                   <span className="rounded border border-rose-200 bg-rose-50 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">OFFLINE</span>
                 )}

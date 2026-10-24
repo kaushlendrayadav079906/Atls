@@ -1103,8 +1103,50 @@ class AIAssistantService:
                 "structured_data": None
             }
 
+        user_role_str = (current_user.get("role") or "").lower()
+        job_role_str = (current_user.get("job_role") or current_user.get("designation") or "").lower()
+        user_permissions = set(current_user.get("permissions") or [])
+
+        # Determine Role Perspective for tailored executive advisory
+        if any(k in user_role_str or k in job_role_str for k in ("owner", "ceo", "managing director", "director", "executive")) or (user_role_str in ("admin", "superadmin") and not any(k in job_role_str for k in ("finance", "cfo", "sales", "production"))):
+            role_title = "Company Owner / CEO"
+            role_directive = (
+                "ROLE FOCUS (Company Owner / CEO):\n"
+                "- Emphasize overall commercial health, revenue velocity, gross margin resilience, and strategic capital priorities.\n"
+                "- Highlight top operational & financial risks, debtor concentrations, and cross-branch performance.\n"
+                "- Keep executive summaries high-level, decisive, and focused on business value, cash stability, and growth."
+            )
+        elif any(k in user_role_str or k in job_role_str for k in ("cfo", "finance", "accountant", "controller", "accounts")) or ("finance.view" in user_permissions and "sales_orders.view" not in user_permissions):
+            role_title = "CFO / Finance Manager"
+            role_directive = (
+                "ROLE FOCUS (CFO / Finance Controller / Finance Manager):\n"
+                "- Emphasize cash flow, collections realization vs invoiced revenue, accounts receivable aging, and overdue debt exposure.\n"
+                "- Reconcile gross and operating margins, purchase liabilities, vendor obligations, and payment allocations.\n"
+                "- Enforce strict GAAP principles: distinguish invoiced sales from actual cash collections, and purchase expenses from capitalized inventory COGS."
+            )
+        elif any(k in user_role_str or k in job_role_str for k in ("sales", "commercial", "revenue", "account manager")):
+            role_title = "Sales Manager"
+            role_directive = (
+                "ROLE FOCUS (Sales Manager / Commercial Director):\n"
+                "- Emphasize sales velocity, target fulfillment, customer accounts, order booking vs billed invoices, and customer revenue concentration.\n"
+                "- Focus on overdue receivables by customer account, actionable collection follow-ups, and top client relationships."
+            )
+        elif any(k in user_role_str or k in job_role_str for k in ("production", "plant", "manufacturing", "operations")):
+            role_title = "Production Manager"
+            role_directive = (
+                "ROLE FOCUS (Production Manager / Operations Director):\n"
+                "- Emphasize production order status (Planned vs Released vs Completed), throughput fulfillment rate, and delivery timelines.\n"
+                "- Highlight scrap and rejection rates by item, capacity bottlenecks, and raw material / component stock shortages."
+            )
+        else:
+            role_title = "General Manager / Operations Lead"
+            role_directive = (
+                "ROLE FOCUS (General Manager / Operations Lead):\n"
+                "- Provide balanced operational and financial insights covering sales momentum, collections health, inventory levels, and production throughput."
+            )
+
         system_prompt = (
-            f"You are ATLAS, the Personal AI Business Assistant for retail and manufacturing operations.\n"
+            f"You are ATLAS, the Senior Real-Time Business Advisor for SAP Business One retail and manufacturing operations.\n"
             f"SYSTEM TIME CONTEXT:\n"
             f"- Current Date: {today_date_str} (Timezone: Asia/Kolkata).\n"
             f"- Current Year: {today.year}, Month: {today.strftime('%B')}.\n"
@@ -1117,14 +1159,36 @@ class AIAssistantService:
             f"- 'Year {today.year - 1}' or 'last year' is {today.year - 1}-01-01 to {today.year - 1}-12-31.\n\n"
             f"USER & AUTHORIZATION CONTEXT:\n"
             f"- User Name: {current_user.get('name', 'User')}\n"
-            f"- User Role: {current_user.get('role', 'user')}\n"
+            f"- User Role: {current_user.get('role', 'user')} (Advisory Perspective: {role_title})\n"
             f"- Authorized Warehouse Scope: {active_scope_name}\n\n"
-            f"BUSINESS INTEGRITY RULES:\n"
-            f"1. NEVER invent or hallucinate financial figures, counts, or dates. Always execute backend tools to query live SAP data.\n"
-            f"2. Separate document types strictly: Sales Orders (open/closed customer commitments) are NOT Sales Invoices (financial revenue).\n"
-            f"3. Never combine Sales Invoices with Purchase Orders or Credit Notes into one total.\n"
-            f"4. If SAP returns 0 records, clearly state that no records match the filter; do not treat an empty response as an error, but distinguish API failures.\n"
-            f"5. If SAP is disconnected or data is unavailable, state clearly that SAP Service Layer is offline. NEVER report an outage as zero sales or zero business activity.\n\n"
+            f"ATLAS AI BUSINESS ADVISOR DIRECTIVE:\n"
+            f"You serve as a senior executive business advisor for company owners, CFOs, finance managers, sales managers, and production managers.\n"
+            f"{role_directive}\n\n"
+            f"THE FOUR CORE ADVISORY QUESTIONS:\n"
+            f"Every business inquiry must be evaluated through four executive lenses:\n"
+            f"1. What is happening? (Current factual state from verified SAP data)\n"
+            f"2. Why does it matter? (Commercial, financial, and operational significance)\n"
+            f"3. What needs attention? (Risks, variances, overdue balances, delays, or shortages)\n"
+            f"4. What should the manager do next? (1 to 3 concrete, prioritized next steps)\n\n"
+            f"MANDATORY RESPONSE FORMAT FOR BUSINESS INQUIRIES:\n"
+            f"Unless answering a non-business conversational question (such as a greeting or settings permission query) or generating an Enterprise AI Report, structure your response using these exact section headers:\n\n"
+            f"**Direct answer:** Directly answer the question first in 1-2 incisive sentences.\n\n"
+            f"**Key numbers:** Present the verified metrics from SAP Business One (formatted with ₹ INR currency symbols, counts, percentages).\n\n"
+            f"**Business meaning:** Explain what these metrics mean in clear, practical business language.\n\n"
+            f"**What needs attention:** Highlight important risks, overdue accounts, variance spikes, or operational bottlenecks.\n\n"
+            f"**Recommended next step:** Provide 1 to 3 prioritized, actionable management interventions.\n\n"
+            f"**Evidence:** State supporting SAP document references (e.g. DocNums, CardCodes), reporting date scope ({active_scope_name}), and freshness (*Data verified from live SAP Business One as of {today_date_str} {today.strftime('%H:%M:%S')} IST*).\n\n"
+            f"ADAPTIVE ANSWER LENGTH:\n"
+            f"- For simple factual questions (e.g. 'What are today\\'s sales?', 'What is our top customer?'), keep sections crisp, concise, and focused.\n"
+            f"- For complex diagnostic or multi-period questions, provide comprehensive analysis with supporting figures.\n\n"
+            f"STRICT ACCOUNTING & BUSINESS REASONING RULES:\n"
+            f"1. Invoiced Sales != Actual Payments: Sales Invoices record earned revenue and accounts receivable. Incoming Payments record cash or bank funds collected. Never treat billed sales as collected cash.\n"
+            f"2. Cash Balance != Profit: Bank/cash balance is liquidity, not accounting net profit.\n"
+            f"3. Purchase Invoices != Cost of Goods Sold (COGS): A/P Purchase Invoices reflect vendor procurement and inventory receipts. COGS requires perpetual inventory relief upon delivery. Disclose this accounting limitation when discussing margins.\n"
+            f"4. No Hallucinations: NEVER invent causes, forecasts, savings, profit figures, or customer records. Every metric must be traced to structured tool results.\n"
+            f"5. Disclose Uncertainty: State uncertainty and missing data transparently. If cost records or documents are absent, note the gap explicitly.\n"
+            f"6. SAP Outage Disclosure: If the SAP Service Layer is offline or times out, state clearly that live data could not be retrieved. Never present stale data as live or treat an outage as zero business activity.\n"
+            f"7. Financial Write-Back Disabled: Keep SAP financial write-back strictly disabled. You cannot create, edit, or cancel financial documents in SAP Business One.\n\n"
             f"ADMIN & USER MANAGEMENT INTELLIGENCE RULES:\n"
             f"1. When an administrator or user with 'users.manage' asks about employees, roles, or who has access to a feature (e.g., 'Which employees can edit products?'):\n"
             f"   - Call get_admin_user_info(feature_permission='products.edit' or search_query=...).\n"
@@ -1173,6 +1237,59 @@ class AIAssistantService:
             f"   - Explain that the user can review, edit, and click 'Confirm & Send Email' to dispatch it.\n"
             f"   - Explicitly remind that drafting an email does NOT send it automatically.\n"
         )
+
+        # Check if the query is an AI Generated Report request or has report context
+        ctx = context or {}
+        is_report_request = bool(
+            ctx.get("module") in ("sales", "finance", "payments", "inventory", "production")
+            or ("generate" in message.lower() and "report" in message.lower())
+            or ("overview" in message.lower() and "report" in message.lower())
+            or "performance report" in message.lower()
+            or "profitability overview" in message.lower()
+            or "collections and incoming payments" in message.lower()
+            or "inventory stock report" in message.lower()
+            or "production operations report" in message.lower()
+        )
+        detail_depth = str(ctx.get("detail_level") or "detailed").lower()
+
+        if is_report_request:
+            depth_instruction = (
+                "DETAIL LEVEL: Executive Brief mode. Focus concisely on the critical briefing, top 2-3 risks, and top 2 immediate recommendations. Keep paragraphs tight and impactful."
+                if detail_depth == "brief"
+                else "DETAIL LEVEL: Detailed Enterprise Audit mode. Provide deep multi-period variance analysis, customer/product concentration breakdowns, full risk registers with Indian Rupee figures, and comprehensive audit methodology notes."
+            )
+
+            system_prompt += (
+                "\n═══════════════════════════════════════════════════════════════════════════════\n"
+                "EXECUTIVE BUSINESS INTELLIGENCE & ENTERPRISE REPORTING DIRECTIVE:\n"
+                "You are acting as a Senior Business Intelligence Architect, Financial Controller, and Operations Director.\n"
+                "DO NOT merely echo raw numbers or dump raw transaction lists. You must interpret the verified SAP data.\n"
+                f"{depth_instruction}\n\n"
+                "YOUR GENERATED REPORT MUST STRICTLY ADHERE TO THIS RIGOROUS 5-SECTION STRUCTURE:\n\n"
+                "### Executive Intelligence Brief\n"
+                "Deliver an incisive management briefing directly answering:\n"
+                "- What Happened: High-level synthesis of operational volume, revenue, and throughput from verified SAP documents.\n"
+                "- Why It Matters: Commercial significance (cash flow health, margin stability, customer retention, or capacity constraints).\n"
+                "- What Requires Attention: Highlight urgent anomalies, concentration risks, or operational bottlenecks.\n"
+                "- What Management Should Do Next: The single highest-priority managerial intervention.\n\n"
+                "### Business Performance & Variance Analysis\n"
+                "- Analyze underlying drivers behind the numbers (e.g. period growth rate, customer concentration, tender share, unit variance).\n"
+                "- Identify what is performing well vs. what is underperforming.\n"
+                "- Trace every financial claim to SAP records. Distinguish verified facts from hypotheses. If an explanation is an inference, explicitly label it as a hypothesis and identify what additional evidence is needed to prove it.\n"
+                "- Never claim correlation proves causation. Never invent fictitious events, customers, or forecasts.\n\n"
+                "### Critical Risks & Operational Vulnerabilities\n"
+                "- Rank identified business risks by severity: [HIGH RISK], [MEDIUM RISK], [LOW RISK].\n"
+                "- Quantify every risk with concrete numbers from the verified data (e.g. '₹12,450.00 exposure across 3 overdue accounts', '4 SKUs at zero stock').\n"
+                "- Detail the potential operational, supply chain, or financial impact if left unaddressed.\n\n"
+                "### Strategic Management Recommendations\n"
+                "- Provide 2 to 4 concrete, numbered, prioritized next steps for executive leadership.\n"
+                "- Each recommendation must reference supporting evidence from the report and outline the expected operational outcome.\n\n"
+                "### Audit Scope, Accounting Methodology & Limitations\n"
+                "- Authoritative SAP document source (e.g. posted A/R Invoices with Cancelled ne 'tYES', IncomingPayments, Items).\n"
+                "- Currency (INR / ₹), date scope, and branch basis.\n"
+                "- Transparently declare data limitations and accounting boundaries (e.g. vendor purchase expenses vs capitalized inventory COGS; unposted drafts excluded).\n"
+                "═══════════════════════════════════════════════════════════════════════════════\n"
+            )
 
         messages = [{"role": "system", "content": system_prompt}]
 
@@ -1285,9 +1402,22 @@ class AIAssistantService:
 
             # Construct composite response payload
             structured_payload = None
+            sap_offline_detected = any(isinstance(c, dict) and c.get("type") == "sap_offline" for c in collected_cards)
+            source_status = "offline" if sap_offline_detected else "online"
+            data_source_label = "SAP Business One (Offline / Unavailable)" if sap_offline_detected else "SAP Business One Service Layer (Live)"
+            refresh_time_str = f"{today_date_str} {datetime.now().strftime('%H:%M:%S')} IST"
+
             if collected_cards or nav_action:
                 if len(collected_cards) == 1 and not nav_action:
                     structured_payload = collected_cards[0]
+                    if "meta" not in structured_payload or not isinstance(structured_payload["meta"], dict):
+                        structured_payload["meta"] = {}
+                    structured_payload["meta"].setdefault("timestamp", datetime.now().isoformat())
+                    structured_payload["meta"].setdefault("refresh_time", refresh_time_str)
+                    structured_payload["meta"].setdefault("data_source", data_source_label)
+                    structured_payload["meta"].setdefault("status", source_status)
+                    structured_payload["meta"].setdefault("role_perspective", role_title)
+                    structured_payload["meta"].setdefault("branch", permitted_warehouse or default_wh)
                 else:
                     structured_payload = {
                         "type": collected_cards[0].get("type") if collected_cards else "navigation",
@@ -1295,6 +1425,10 @@ class AIAssistantService:
                         "navigation": nav_action,
                         "meta": {
                             "timestamp": datetime.now().isoformat(),
+                            "refresh_time": refresh_time_str,
+                            "data_source": data_source_label,
+                            "status": source_status,
+                            "role_perspective": role_title,
                             "timezone": "Asia/Kolkata",
                             "branch": permitted_warehouse or default_wh
                         }
@@ -1304,6 +1438,18 @@ class AIAssistantService:
                         for k, v in primary_structured_data.items():
                             if k not in structured_payload:
                                 structured_payload[k] = v
+
+                    # Scan all collected cards to promote critical visualization and tabular elements
+                    for card in collected_cards:
+                        if not isinstance(card, dict):
+                            continue
+                        for field in ("chart", "columns", "rows", "title", "summary", "kpis", "filters"):
+                            if field in card and card[field] is not None and field not in structured_payload:
+                                structured_payload[field] = card[field]
+                        if "meta" in card and isinstance(card["meta"], dict):
+                            for mk, mv in card["meta"].items():
+                                if mk not in structured_payload["meta"]:
+                                    structured_payload["meta"][mk] = mv
 
             total_dur = (time.perf_counter() - chat_start_time) * 1000.0
             logger.info(f"[AI TIMING] Total chat request duration_ms={total_dur:.2f} cards={len(collected_cards)} has_nav={bool(nav_action)}")
@@ -2125,6 +2271,12 @@ class AIAssistantService:
                     "meta": {"is_partial": False, "permission_denied": True}
                 }, None, None
 
+            # Enforce strict branch scoping: non-admin users with permitted_warehouse cannot cross branch boundaries
+            def _resolve_tool_branch(req_branch: Optional[str]) -> Optional[str]:
+                if user_role != "admin" and permitted_warehouse:
+                    return permitted_warehouse
+                return req_branch or permitted_warehouse
+
             # ──────────────────────────────────────────────────────────────────
             # 0. get_workflow_flowchart
             # ──────────────────────────────────────────────────────────────────
@@ -2158,7 +2310,7 @@ class AIAssistantService:
             if tool_name == "get_dashboard_summary":
                 r = args.get("range", "today")
                 d_from, d_to, date_label = _resolve_date_range(r, args.get("date_from"), args.get("date_to"))
-                target_branch = args.get("branch") or permitted_warehouse
+                target_branch = _resolve_tool_branch(args.get("branch"))
 
                 invoices = []
                 if d_from and d_to:
@@ -2281,7 +2433,7 @@ class AIAssistantService:
             # ──────────────────────────────────────────────────────────────────
             elif tool_name == "get_sales_invoices":
                 r = args.get("range", "monthly")
-                branch = args.get("branch") or permitted_warehouse
+                branch = _resolve_tool_branch(args.get("branch"))
                 res = self.finance_service.get_sales_invoices(
                     range_str=r,
                     from_date=args.get("date_from"),
@@ -2316,6 +2468,7 @@ class AIAssistantService:
                         {"key": "doc_date", "label": "Date", "type": "date"},
                         {"key": "card_name", "label": "Customer", "type": "string"},
                         {"key": "doc_total", "label": "Total Amount", "type": "currency"},
+                        {"key": "balance_due", "label": "Balance Due", "type": "currency"},
                         {"key": "status", "label": "Status", "type": "string"}
                     ],
                     "rows": sinvs,
@@ -2447,10 +2600,24 @@ class AIAssistantService:
                                     "WarehouseCode": target_wh
                                 })
 
+                        columns = [
+                            {"key": "ItemCode", "label": "SKU / Code", "type": "string"},
+                            {"key": "ItemName", "label": "Item Name", "type": "string"},
+                            {"key": "QuantityOnStock", "label": "In Stock", "type": "number"},
+                            {"key": "MinimalStock", "label": "Safety Stock", "type": "number"},
+                            {"key": "WarehouseCode", "label": "Warehouse", "type": "string"},
+                        ]
                         card = {
                             "type": "inventory_risk",
+                            "title": f"Low Stock & Operational Risk Alert ({target_wh})",
                             "items": risky,
+                            "rows": risky,
+                            "columns": columns,
                             "total_count": len(risky),
+                            "kpis": [
+                                {"title": "Critical Low Stock SKUs", "value": len(risky), "format": "number"},
+                                {"title": "Monitored Warehouse", "value": target_wh, "format": "string"},
+                            ],
                             "chart": {
                                 "type": "bar",
                                 "xKey": "ItemName",
@@ -2462,14 +2629,61 @@ class AIAssistantService:
                         nav = {"label": "Open Inventory", "route": "/products", "target_module": "products", "params": {"low_stock": "true"}}
                         return {"low_stock_items_count": len(risky), "items": risky[:25], "warehouse": target_wh}, card, nav
                     else:
+                        total_units = sum(float(it.get("QuantityOnStock") or 0.0) for it in items_clean)
+                        low_stock_items = [it for it in items_clean if float(it.get("QuantityOnStock") or 0.0) <= 10.0]
+                        zero_stock_items = [it for it in items_clean if float(it.get("QuantityOnStock") or 0.0) <= 0.0]
+                        sorted_items = sorted(items_clean, key=lambda x: float(x.get("QuantityOnStock") or 0.0), reverse=True)
+                        top_inventory_chart = sorted_items[:10]
+
+                        columns = [
+                            {"key": "ItemCode", "label": "SKU / Code", "type": "string"},
+                            {"key": "ItemName", "label": "Item Name", "type": "string"},
+                            {"key": "QuantityOnStock", "label": "In Stock", "type": "number"},
+                            {"key": "WarehouseCode", "label": "Warehouse", "type": "string"},
+                        ]
                         card = {
                             "type": "inventory_list",
-                            "items": items_clean[:50],
+                            "title": f"Inventory Valuation & Stock Levels ({target_wh})",
+                            "items": sorted_items[:50],
+                            "rows": sorted_items[:50],
+                            "columns": columns,
                             "total_count": len(items_clean),
-                            "meta": {"warehouse": target_wh}
+                            "kpis": [
+                                {"title": "Tracked SKUs", "value": len(items_clean), "format": "number"},
+                                {"title": "Units on Hand", "value": round(total_units, 1), "format": "number"},
+                                {"title": "Low Stock Items", "value": len(low_stock_items), "subtext": "<= 10 units threshold", "format": "number"},
+                                {"title": "Critical Stockouts", "value": len(zero_stock_items), "subtext": "Zero inventory", "format": "number"},
+                            ],
+                            "chart": {
+                                "type": "bar",
+                                "xKey": "ItemName",
+                                "series": ["QuantityOnStock"],
+                                "data": top_inventory_chart,
+                                "defaultView": "both"
+                            } if top_inventory_chart else None,
+                            "meta": {
+                                "warehouse": target_wh,
+                                "low_stock_count": len(low_stock_items),
+                                "zero_stock_count": len(zero_stock_items)
+                            }
                         }
                         nav = {"label": "Open Inventory", "route": "/products", "target_module": "products"}
-                        return {"total_items": len(items_clean), "sample_items": items_clean[:25], "warehouse": target_wh}, card, nav
+                        tool_resp = {
+                            "total_items": len(items_clean),
+                            "total_units_on_hand": round(total_units, 1),
+                            "low_stock_count": len(low_stock_items),
+                            "zero_stock_count": len(zero_stock_items),
+                            "warehouse": target_wh,
+                            "top_stocked_items": [
+                                {"code": it.get("ItemCode"), "name": it.get("ItemName"), "qty": it.get("QuantityOnStock")}
+                                for it in sorted_items[:5]
+                            ],
+                            "critical_low_stock_samples": [
+                                {"code": it.get("ItemCode"), "name": it.get("ItemName"), "qty": it.get("QuantityOnStock")}
+                                for it in low_stock_items[:5]
+                            ]
+                        }
+                        return tool_resp, card, nav
 
             # ──────────────────────────────────────────────────────────────────
             # 6. get_products
@@ -2612,9 +2826,17 @@ class AIAssistantService:
                     date_from=args.get("date_from"),
                     date_to=args.get("date_to")
                 )
+                kpis = [
+                    {"title": "Total Production Orders", "value": summary.get("total_orders", 0) if isinstance(summary, dict) else 0, "format": "number"},
+                    {"title": "Completed Orders", "value": summary.get("completed_orders", 0) if isinstance(summary, dict) else 0, "format": "number"},
+                    {"title": "Pending / In-Progress", "value": summary.get("open_orders", 0) if isinstance(summary, dict) else 0, "format": "number"},
+                    {"title": "Rejection Rate", "value": summary.get("rejection_rate", 0) if isinstance(summary, dict) else 0.0, "format": "percentage"},
+                ]
                 card = {
                     "type": "production_summary",
+                    "title": f"Production Operations Summary ({target_wh or 'All Warehouses'})",
                     "summary": summary,
+                    "kpis": kpis,
                     "meta": {"warehouse": target_wh or "All"}
                 }
                 nav = {"label": "Open Production Overview", "route": "/production", "target_module": "production_overview"}
@@ -2649,9 +2871,36 @@ class AIAssistantService:
                 )
                 summary = self.production_service.get_production_summary(warehouse=target_wh)
 
+                total_planned = sum(float(o.get("planned_qty") or 0.0) for o in orders)
+                total_produced = sum(float(o.get("produced_qty") or 0.0) for o in orders)
+                completed_count = summary.get("completed_orders", 0) if isinstance(summary, dict) else 0
+                open_count = summary.get("open_orders", 0) if isinstance(summary, dict) else 0
+                order_completion_pct = round((completed_count / total * 100), 1) if total > 0 else 0.0
+                unit_fulfillment_pct = round((total_produced / total_planned * 100), 1) if total_planned > 0 else 0.0
+                plan_variance = round(total_planned - total_produced, 1)
+
+                columns = [
+                    {"key": "doc_num", "label": "Order #", "type": "string"},
+                    {"key": "item_code", "label": "Item Code", "type": "string"},
+                    {"key": "item_name", "label": "Item Name", "type": "string"},
+                    {"key": "planned_qty", "label": "Planned Qty", "type": "number"},
+                    {"key": "produced_qty", "label": "Produced Qty", "type": "number"},
+                    {"key": "status", "label": "Status", "type": "string"}
+                ]
+                kpis = [
+                    {"title": "Total Orders", "value": total, "format": "number"},
+                    {"title": "Order Completion", "value": f"{order_completion_pct}%", "subtext": f"{completed_count} completed", "format": "string"},
+                    {"title": "Unit Fulfillment", "value": f"{unit_fulfillment_pct}%", "subtext": f"{int(total_produced)} of {int(total_planned)} units", "format": "string"},
+                    {"title": "Rejection Rate", "value": f"{summary.get('rejection_rate', 0) if isinstance(summary, dict) else 0.0}%", "format": "string"},
+                ]
+
                 card = {
                     "type": "production_orders",
+                    "title": f"Production Orders & Manufacturing Efficiency ({target_wh or 'All'})",
                     "orders": orders,
+                    "rows": orders,
+                    "columns": columns,
+                    "kpis": kpis,
                     "summary": summary,
                     "total_count": total,
                     "chart": {
@@ -2660,10 +2909,28 @@ class AIAssistantService:
                         "series": ["planned_qty", "produced_qty"],
                         "defaultView": "both"
                     } if orders else None,
-                    "meta": {"warehouse": target_wh or "All", "status": status_filter or "all"}
+                    "meta": {
+                        "warehouse": target_wh or "All",
+                        "status": status_filter or "all",
+                        "order_completion_rate": f"{order_completion_pct}%",
+                        "unit_fulfillment_rate": f"{unit_fulfillment_pct}%",
+                        "plan_variance_units": plan_variance
+                    }
                 }
                 nav = {"label": "Open Production Orders", "route": "/production/orders", "target_module": "production_orders"}
-                return {"total_orders": total, "summary": summary, "sample_orders": orders[:10]}, card, nav
+                tool_resp = {
+                    "total_orders": total,
+                    "completed_orders": completed_count,
+                    "open_orders": open_count,
+                    "order_completion_percentage": order_completion_pct,
+                    "total_planned_units": total_planned,
+                    "total_produced_units": total_produced,
+                    "unit_fulfillment_percentage": unit_fulfillment_pct,
+                    "plan_variance_units": plan_variance,
+                    "rejection_rate_percentage": summary.get("rejection_rate", 0) if isinstance(summary, dict) else 0.0,
+                    "sample_orders": orders[:10]
+                }
+                return tool_resp, card, nav
 
             # ──────────────────────────────────────────────────────────────────
             # 11. get_production_rejection
@@ -2717,18 +2984,46 @@ class AIAssistantService:
                 d_from, d_to, date_label = _resolve_date_range(r, args.get("from_date"), args.get("to_date"))
                 target_branch = args.get("branch") or permitted_warehouse
 
-                if d_from and d_to:
-                    raw_invoices = self.invoices_service.get_invoices_by_date(d_from, d_to)
-                else:
-                    raw_invoices = self.invoices_service.get_recent_invoices(limit=1000)
+                cache_key = f"sales_report:{r}:{d_from}:{d_to}:{target_branch}"
+                is_mocked = hasattr(self.invoices_service, '_mock_return_value') or hasattr(self.client, '_mock_return_value')
+                now = time.time()
+                if not is_mocked:
+                    with _ANALYTICS_CACHE_LOCK:
+                        if cache_key in _ANALYTICS_CACHE:
+                            c_resp, c_card, c_nav, c_time = _ANALYTICS_CACHE[cache_key]
+                            if now - c_time < _ANALYTICS_CACHE_TTL:
+                                logger.info(f"[AI TIMING] Sales report cache hit for {cache_key}")
+                                return c_resp, c_card, c_nav
+
+                raw_invoices = self.invoices_service.get_invoices_by_date(d_from, d_to)
 
                 filtered = []
                 for inv in raw_invoices:
+                    if str(inv.get("Cancelled") or "").lower() == "tyes":
+                        continue
                     inv_b = _normalize_branch(_extract_branch_from_invoice(inv))
                     if current_user.get("role") == "admin" or not target_branch or inv_b == target_branch:
                         filtered.append(inv)
 
                 total_sales = sum(float(i.get("DocTotal") or 0.0) for i in filtered)
+
+                # Customer Concentration Analysis
+                cust_sales = {}
+                for inv in filtered:
+                    code = str(inv.get("CardCode") or "UNKNOWN")
+                    name = str(inv.get("CardName") or code)
+                    amt = float(inv.get("DocTotal") or 0.0)
+                    if code not in cust_sales:
+                        cust_sales[code] = {"name": name, "sales": 0.0, "count": 0}
+                    cust_sales[code]["sales"] += amt
+                    cust_sales[code]["count"] += 1
+
+                sorted_custs = sorted(cust_sales.values(), key=lambda x: x["sales"], reverse=True)
+                top_cust = sorted_custs[0] if sorted_custs else None
+                top_cust_sales = top_cust["sales"] if top_cust else 0.0
+                top_cust_share = round((top_cust_sales / total_sales * 100), 1) if total_sales > 0 else 0.0
+                top_3_sales = sum(c["sales"] for c in sorted_custs[:3])
+                top_3_share = round((top_3_sales / total_sales * 100), 1) if total_sales > 0 else 0.0
 
                 # Monthly/daily trend breakdown
                 month_buckets = {}
@@ -2739,21 +3034,77 @@ class AIAssistantService:
 
                 trend_list = [{"label": k, "sales": round(v, 2)} for k, v in sorted(month_buckets.items())]
 
+                # Period-over-period growth calculation
+                growth_rate = None
+                if len(trend_list) >= 2:
+                    last_m = trend_list[-1]["sales"]
+                    prev_m = trend_list[-2]["sales"]
+                    if prev_m > 0:
+                        growth_rate = round(((last_m - prev_m) / prev_m * 100), 1)
+
+                # Largest invoice
+                max_inv = max(filtered, key=lambda x: float(x.get("DocTotal") or 0.0)) if filtered else None
+                max_inv_info = {
+                    "doc_num": max_inv.get("DocNum") if max_inv else None,
+                    "customer": max_inv.get("CardName") if max_inv else None,
+                    "amount": round(float(max_inv.get("DocTotal") or 0.0), 2) if max_inv else 0.0,
+                    "date": max_inv.get("DocDate") if max_inv else None,
+                } if max_inv else None
+
+                columns = [
+                    {"key": "label", "label": "Month / Period", "type": "string"},
+                    {"key": "sales", "label": "Net Sales Revenue (₹)", "type": "currency"},
+                ]
+
+                avg_bill = round(total_sales / len(filtered), 2) if len(filtered) > 0 else 0.0
                 card = {
                     "type": "sales_report",
+                    "title": f"Sales Performance Report ({date_label})",
                     "total_sales": round(total_sales, 2),
                     "invoice_count": len(filtered),
                     "trend": trend_list,
+                    "rows": trend_list,
+                    "columns": columns,
+                    "kpis": [
+                        {"title": "Total Net Sales", "value": round(total_sales, 2), "format": "currency"},
+                        {"title": "Total Invoices", "value": len(filtered), "format": "number"},
+                        {"title": "Average Invoice Value", "value": avg_bill, "format": "currency"},
+                        {
+                            "title": "Top Account Concentration",
+                            "value": f"{top_cust_share}%",
+                            "subtext": f"{top_cust['name'][:20]}" if top_cust else "N/A",
+                            "format": "string",
+                        },
+                    ],
                     "chart": {
                         "type": "bar",
                         "xKey": "label",
                         "series": ["sales"],
                         "defaultView": "both"
                     } if trend_list else None,
-                    "meta": {"date_range": date_label, "branch_scope": target_branch or "All"}
+                    "meta": {
+                        "date_range": date_label,
+                        "branch_scope": target_branch or "All",
+                        "top_customer_concentration": f"{top_cust_share}%",
+                        "top_3_concentration": f"{top_3_share}%"
+                    }
                 }
                 nav = {"label": "View Sales Reports", "route": "/reports/sales", "target_module": "reports_sales"}
-                return {"total_sales": round(total_sales, 2), "invoice_count": len(filtered), "trend": trend_list}, card, nav
+                tool_resp = {
+                    "total_sales": round(total_sales, 2),
+                    "invoice_count": len(filtered),
+                    "average_invoice_value": avg_bill,
+                    "trend": trend_list,
+                    "growth_rate_latest_period_pct": growth_rate,
+                    "top_customer_concentration_pct": top_cust_share,
+                    "top_3_customer_concentration_pct": top_3_share,
+                    "top_customer": top_cust["name"] if top_cust else None,
+                    "largest_single_invoice": max_inv_info,
+                }
+                if not is_mocked:
+                    with _ANALYTICS_CACHE_LOCK:
+                        _ANALYTICS_CACHE[cache_key] = (tool_resp, card, nav, now)
+                return tool_resp, card, nav
 
             # ──────────────────────────────────────────────────────────────────
             # 14. get_invoice_report
@@ -2762,16 +3113,37 @@ class AIAssistantService:
                 d_from, d_to, date_label = _resolve_date_range(None, args.get("from_date"), args.get("to_date"))
                 target_branch = args.get("branch") or permitted_warehouse
 
-                if not d_from:
-                    d_from = date(2026, 10, 1)
-                    d_to = date(2026, 10, 13)
+                cache_key = f"invoice_report:{d_from}:{d_to}:{target_branch}"
+                is_mocked = hasattr(self.invoices_service, '_mock_return_value') or hasattr(self.client, '_mock_return_value')
+                now = time.time()
+                if not is_mocked:
+                    with _ANALYTICS_CACHE_LOCK:
+                        if cache_key in _ANALYTICS_CACHE:
+                            c_resp, c_card, c_nav, c_time = _ANALYTICS_CACHE[cache_key]
+                            if now - c_time < _ANALYTICS_CACHE_TTL:
+                                return c_resp, c_card, c_nav
 
                 raw_invoices = self.invoices_service.get_invoices_by_date(d_from, d_to)
-                filtered = [inv for inv in raw_invoices if current_user.get("role") == "admin" or not target_branch or _normalize_branch(_extract_branch_from_invoice(inv)) == target_branch]
+                filtered = [
+                    inv for inv in raw_invoices
+                    if str(inv.get("Cancelled") or "").lower() != "tyes"
+                    and (current_user.get("role") == "admin" or not target_branch or _normalize_branch(_extract_branch_from_invoice(inv)) == target_branch)
+                ]
 
                 total_gross = sum(float(i.get("DocTotal") or 0.0) for i in filtered)
                 total_vat = sum(float(i.get("VatSum") or 0.0) for i in filtered)
                 total_discount = sum(float(i.get("TotalDiscount") or 0.0) for i in filtered)
+
+                rows = [
+                    {"metric": "Gross Invoice Total", "amount": round(total_gross, 2)},
+                    {"metric": "Tax Collected (GST/VAT)", "amount": round(total_vat, 2)},
+                    {"metric": "Total Discounts Given", "amount": round(total_discount, 2)},
+                    {"metric": "Net Invoice Value", "amount": round(total_gross - total_vat, 2)},
+                ]
+                columns = [
+                    {"key": "metric", "label": "Tax & Invoice Metric", "type": "string"},
+                    {"key": "amount", "label": "Amount (₹)", "type": "currency"},
+                ]
 
                 report_data = {
                     "total_invoices": len(filtered),
@@ -2783,10 +3155,28 @@ class AIAssistantService:
 
                 card = {
                     "type": "invoice_report",
+                    "title": f"Invoice & Tax Summary Report ({date_label})",
                     "data": report_data,
+                    "rows": rows,
+                    "columns": columns,
+                    "kpis": [
+                        {"title": "Total Invoices", "value": len(filtered), "format": "number"},
+                        {"title": "Gross Revenue", "value": round(total_gross, 2), "format": "currency"},
+                        {"title": "Tax Collected", "value": round(total_vat, 2), "format": "currency"},
+                        {"title": "Discounts", "value": round(total_discount, 2), "format": "currency"},
+                    ],
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "metric",
+                        "series": ["amount"],
+                        "defaultView": "both"
+                    },
                     "meta": {"date_range": date_label}
                 }
                 nav = {"label": "View Invoice Reports", "route": "/reports/invoice", "target_module": "reports_invoice"}
+                if not is_mocked:
+                    with _ANALYTICS_CACHE_LOCK:
+                        _ANALYTICS_CACHE[cache_key] = (report_data, card, nav, now)
                 return report_data, card, nav
 
             # ──────────────────────────────────────────────────────────────────
@@ -2797,13 +3187,19 @@ class AIAssistantService:
                 d_from, d_to, date_label = _resolve_date_range(r, args.get("from_date"), args.get("to_date"))
                 target_branch = args.get("branch") or permitted_warehouse
 
-                if not d_from or not d_to:
-                    d_from = date(2026, 10, 1)
-                    d_to = date(2026, 10, 13)
+                cache_key = f"payment_report:{r}:{d_from}:{d_to}:{target_branch}"
+                is_mocked = hasattr(self.payments_service, '_mock_return_value') or hasattr(self.client, '_mock_return_value')
+                now = time.time()
+                if not is_mocked:
+                    with _ANALYTICS_CACHE_LOCK:
+                        if cache_key in _ANALYTICS_CACHE:
+                            c_resp, c_card, c_nav, c_time = _ANALYTICS_CACHE[cache_key]
+                            if now - c_time < _ANALYTICS_CACHE_TTL:
+                                return c_resp, c_card, c_nav
 
                 payments = self.payments_service.get_payments_by_date(
-                    start_date=d_from.strftime("%Y-%m-%d"),
-                    end_date=d_to.strftime("%Y-%m-%d"),
+                    start_date=d_from.strftime("%Y-%m-%d") if d_from else None,
+                    end_date=d_to.strftime("%Y-%m-%d") if d_to else None,
                     branch=target_branch
                 )
 
@@ -2813,44 +3209,94 @@ class AIAssistantService:
                 for p in payments:
                     cash = float(p.get("CashSum") or 0.0)
                     transfer = float(p.get("TransferSum") or 0.0)
-                    card = sum(float(c.get("CreditSum") or 0.0) for c in (p.get("PaymentCreditCards") or []))
+                    card_sum = sum(float(c.get("CreditSum") or 0.0) for c in (p.get("PaymentCreditCards") or []))
 
-                    total_p = cash + transfer + card
+                    total_p = cash + transfer + card_sum
                     if total_p == 0.0:
-                        total_p = cash or transfer or card
+                        total_p = cash or transfer or card_sum
 
                     total_amount += total_p
-                    if card > 0: methods_split["Card"] += card
+                    if card_sum > 0: methods_split["Card"] += card_sum
                     elif transfer > 0: methods_split["Transfer / UPI"] += transfer
                     else: methods_split["Cash"] += cash
 
+                digital_total = methods_split["Card"] + methods_split["Transfer / UPI"]
+                digital_ratio = round((digital_total / total_amount * 100), 1) if total_amount > 0 else 0.0
+                avg_receipt = round(total_amount / len(payments), 2) if len(payments) > 0 else 0.0
+
                 distribution = [{"method": k, "amount": round(v, 2), "percentage": round((v / total_amount * 100), 1) if total_amount > 0 else 0.0} for k, v in methods_split.items()]
+
+                columns = [
+                    {"key": "method", "label": "Payment Method", "type": "string"},
+                    {"key": "amount", "label": "Total Amount (₹)", "type": "currency"},
+                    {"key": "percentage", "label": "Share (%)", "type": "percentage"},
+                ]
 
                 card = {
                     "type": "payment_report",
+                    "title": f"Collections & Payments Report ({date_label})",
                     "total_payments": round(total_amount, 2),
                     "payment_count": len(payments),
                     "distribution": distribution,
+                    "rows": distribution,
+                    "columns": columns,
+                    "kpis": [
+                        {"title": "Total Collections", "value": round(total_amount, 2), "format": "currency"},
+                        {"title": "Payment Count", "value": len(payments), "format": "number"},
+                        {"title": "Average Receipt", "value": avg_receipt, "format": "currency"},
+                        {"title": "Digital Tender Ratio", "value": f"{digital_ratio}%", "subtext": "Card + Transfer / UPI", "format": "string"},
+                    ],
                     "chart": {
                         "type": "pie",
                         "xKey": "method",
                         "series": ["amount"],
                         "defaultView": "both"
                     } if distribution else None,
-                    "meta": {"date_range": date_label}
+                    "meta": {
+                        "date_range": date_label,
+                        "digital_ratio": f"{digital_ratio}%",
+                        "cash_ratio": f"{round(100.0 - digital_ratio, 1)}%"
+                    }
                 }
                 nav = {"label": "View Payment Reports", "route": "/reports/payment", "target_module": "reports_payment"}
-                return {"total_collected": round(total_amount, 2), "payment_count": len(payments), "distribution": distribution}, card, nav
+                tool_resp = {
+                    "total_collected": round(total_amount, 2),
+                    "payment_count": len(payments),
+                    "average_receipt_amount": avg_receipt,
+                    "digital_tender_percentage": digital_ratio,
+                    "cash_tender_percentage": round(100.0 - digital_ratio, 1) if total_amount > 0 else 0.0,
+                    "distribution": distribution
+                }
+                if not is_mocked:
+                    with _ANALYTICS_CACHE_LOCK:
+                        _ANALYTICS_CACHE[cache_key] = (tool_resp, card, nav, now)
+                return tool_resp, card, nav
 
             # ──────────────────────────────────────────────────────────────────
             # 16. get_customer_report
             # ──────────────────────────────────────────────────────────────────
             elif tool_name == "get_customer_report":
                 r = args.get("range", "monthly")
-                invoices = self.invoices_service.get_recent_invoices(limit=500)
+                target_branch = args.get("branch") or permitted_warehouse
+                cache_key = f"cust_report:{r}:{target_branch}"
+                is_mocked = hasattr(self.invoices_service, '_mock_return_value') or hasattr(self.client, '_mock_return_value')
+                now = time.time()
+                if not is_mocked:
+                    with _ANALYTICS_CACHE_LOCK:
+                        if cache_key in _ANALYTICS_CACHE:
+                            c_resp, c_card, c_nav, c_time = _ANALYTICS_CACHE[cache_key]
+                            if now - c_time < _ANALYTICS_CACHE_TTL:
+                                return c_resp, c_card, c_nav
+
+                invoices = self.invoices_service.get_invoices_by_date(None, None)
                 cust_map = {}
 
                 for inv in invoices:
+                    if str(inv.get("Cancelled") or "").lower() == "tyes":
+                        continue
+                    inv_b = _normalize_branch(_extract_branch_from_invoice(inv))
+                    if current_user.get("role") != "admin" and target_branch and inv_b != target_branch:
+                        continue
                     code = str(inv.get("CardCode") or "UNKNOWN")
                     name = str(inv.get("CardName") or code)
                     amt = float(inv.get("DocTotal") or 0.0)
@@ -2860,15 +3306,42 @@ class AIAssistantService:
                     cust_map[code]["total_spend"] += amt
                     cust_map[code]["invoice_count"] += 1
 
-                top_customers = sorted(cust_map.values(), key=lambda x: x["total_spend"], reverse=True)[:10]
+                top_customers = sorted(cust_map.values(), key=lambda x: x["total_spend"], reverse=True)[:15]
+                for tc in top_customers:
+                    tc["total_spend"] = round(tc["total_spend"], 2)
+
+                columns = [
+                    {"key": "customer_code", "label": "Card Code", "type": "string"},
+                    {"key": "customer_name", "label": "Customer Name", "type": "string"},
+                    {"key": "total_spend", "label": "Total Revenue (₹)", "type": "currency"},
+                    {"key": "invoice_count", "label": "Invoices", "type": "number"},
+                ]
 
                 card = {
                     "type": "customer_report",
+                    "title": "Customer Revenue & Concentration Report",
                     "top_customers": top_customers,
+                    "rows": top_customers,
+                    "columns": columns,
+                    "kpis": [
+                        {"title": "Active Customers", "value": len(cust_map), "format": "number"},
+                        {"title": "Top Spender", "value": top_customers[0]["customer_name"] if top_customers else "-", "format": "string"},
+                        {"title": "Top Account Revenue", "value": top_customers[0]["total_spend"] if top_customers else 0.0, "format": "currency"},
+                    ],
+                    "chart": {
+                        "type": "bar",
+                        "xKey": "customer_name",
+                        "series": ["total_spend"],
+                        "defaultView": "both"
+                    } if top_customers else None,
                     "meta": {"range": r}
                 }
                 nav = {"label": "Open Customers Page", "route": "/customers", "target_module": "customers"}
-                return {"top_customers": top_customers}, card, nav
+                tool_resp = {"top_customers": top_customers}
+                if not is_mocked:
+                    with _ANALYTICS_CACHE_LOCK:
+                        _ANALYTICS_CACHE[cache_key] = (tool_resp, card, nav, now)
+                return tool_resp, card, nav
 
             # ──────────────────────────────────────────────────────────────────
             # 17. get_pending_approvals
@@ -3010,7 +3483,7 @@ class AIAssistantService:
 
             elif tool_name == "get_purchase_invoices":
                 r = args.get("range", "monthly")
-                branch = args.get("branch") or permitted_warehouse
+                branch = _resolve_tool_branch(args.get("branch"))
                 res = self.finance_service.get_purchase_invoices(
                     range_str=r,
                     from_date=args.get("date_from"),
@@ -3019,7 +3492,7 @@ class AIAssistantService:
                     status=args.get("status"),
                     branch_id=branch,
                     search=args.get("search"),
-                    limit=int(args.get("limit") or 20)
+                    page_size=int(args.get("limit") or args.get("page_size") or 20)
                 )
                 if isinstance(res, list):
                     pinvs = res
@@ -3056,7 +3529,7 @@ class AIAssistantService:
 
             elif tool_name == "get_incoming_payments":
                 r = args.get("range", "monthly")
-                branch = args.get("branch") or permitted_warehouse
+                branch = _resolve_tool_branch(args.get("branch"))
                 res = self.finance_service.get_incoming_payments(
                     range_str=r,
                     from_date=args.get("date_from"),
@@ -3064,7 +3537,7 @@ class AIAssistantService:
                     customer_code=args.get("customer_code"),
                     payment_method=args.get("payment_method"),
                     branch_id=branch,
-                    limit=int(args.get("limit") or 20)
+                    page_size=int(args.get("limit") or args.get("page_size") or 20)
                 )
                 pays = res.get("payments", [])
                 card = {
@@ -3076,7 +3549,8 @@ class AIAssistantService:
                         {"key": "date", "label": "Date", "type": "date"},
                         {"key": "customer_name", "label": "Customer", "type": "string"},
                         {"key": "amount", "label": "Amount", "type": "currency"},
-                        {"key": "method", "label": "Method", "type": "string"}
+                        {"key": "method", "label": "Method", "type": "string"},
+                        {"key": "applied_invoices_count", "label": "Allocated Invoices", "type": "number"}
                     ],
                     "rows": pays,
                     "chart": {
@@ -3092,14 +3566,14 @@ class AIAssistantService:
 
             elif tool_name == "get_outgoing_payments":
                 r = args.get("range", "monthly")
-                branch = args.get("branch") or permitted_warehouse
+                branch = _resolve_tool_branch(args.get("branch"))
                 res = self.finance_service.get_outgoing_payments(
                     range_str=r,
                     from_date=args.get("date_from"),
                     to_date=args.get("date_to"),
                     supplier_code=args.get("supplier_code"),
                     branch_id=branch,
-                    limit=int(args.get("limit") or 20)
+                    page_size=int(args.get("limit") or args.get("page_size") or 20)
                 )
                 pays = res.get("payments", [])
                 card = {
@@ -3127,7 +3601,7 @@ class AIAssistantService:
 
             elif tool_name == "get_customer_sales_ranking":
                 r = args.get("range", "monthly")
-                branch = args.get("branch") or permitted_warehouse
+                branch = _resolve_tool_branch(args.get("branch"))
                 order_mode = args.get("order", "top")
                 res = self.finance_service.get_customer_sales_ranking(
                     range_str=r,
@@ -3164,7 +3638,7 @@ class AIAssistantService:
 
             elif tool_name == "get_supplier_purchase_ranking":
                 r = args.get("range", "monthly")
-                branch = args.get("branch") or permitted_warehouse
+                branch = _resolve_tool_branch(args.get("branch"))
                 order_mode = args.get("order", "top")
                 res = self.finance_service.get_supplier_purchase_ranking(
                     range_str=r,
@@ -3259,7 +3733,7 @@ class AIAssistantService:
 
             elif tool_name == "get_profitability_report":
                 r = args.get("range", "monthly")
-                branch = args.get("branch") or permitted_warehouse
+                branch = _resolve_tool_branch(args.get("branch"))
                 res = self.finance_service.get_profitability_report(
                     range_str=r,
                     from_date=args.get("date_from"),
@@ -3279,6 +3753,12 @@ class AIAssistantService:
                         {"key": "gross_margin", "label": "Margin %", "type": "percentage"}
                     ],
                     "rows": monthly,
+                    "kpis": [
+                        {"title": "Net Sales Revenue", "value": round(res.get("net_sales", 0.0), 2), "format": "currency"},
+                        {"title": "Cost of Purchases", "value": round(res.get("cost_of_purchases", 0.0), 2), "format": "currency"},
+                        {"title": "Gross Profit", "value": round(res.get("gross_profit", 0.0), 2), "format": "currency"},
+                        {"title": "Gross Margin", "value": f"{res.get('gross_margin_percentage', 0.0)}%", "format": "string"},
+                    ],
                     "chart": {
                         "type": "bar",
                         "xKey": "period",

@@ -37,9 +37,9 @@ export const IncomingPaymentsPage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [search, setSearch] = useState<string>('');
   const [page, setPage] = useState<number>(1);
-  const [pageSize] = useState<number>(20);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [isExporting, setIsExporting] = useState<boolean>(false);
-
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   // Load SAP-backed authorized filter options (branches)
   const { data: filterOptions } = useQuery({
@@ -83,7 +83,34 @@ export const IncomingPaymentsPage: React.FC = () => {
   const summary = data?.summary || data?.kpis;
   const items = data?.items || data?.payments || data?.incoming_payments || [];
   const totalCount = data?.total_count ?? (items.length || 0);
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
+  const totalPages = data?.total_pages ?? (Math.ceil(totalCount / pageSize) || 1);
+  const startRecord = totalCount > 0 ? (page - 1) * pageSize + 1 : 0;
+  const endRecord = Math.min(page * pageSize, totalCount);
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setPage(1);
+  };
+
+  const handleManualRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      await financeApi.getIncomingPayments({
+        range: dateRange,
+        branch: branch || undefined,
+        from_date: dateFrom || undefined,
+        to_date: dateTo || undefined,
+        payment_method: paymentMethod || undefined,
+        search: search.trim() || undefined,
+        page,
+        page_size: pageSize,
+        refresh: true,
+      });
+      await refetch();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleResetFilters = () => {
     setQuickFilter('');
@@ -166,11 +193,11 @@ export const IncomingPaymentsPage: React.FC = () => {
           </Link>
 
           <button
-            onClick={() => refetch()}
-            disabled={isLoading}
+            onClick={handleManualRefresh}
+            disabled={isLoading || isRefreshing}
             className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 text-[13px] font-semibold shadow-2xs transition cursor-pointer disabled:opacity-50"
           >
-            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={isLoading || isRefreshing ? 'animate-spin' : ''} />
             <span>Refresh</span>
           </button>
         </div>
@@ -333,12 +360,11 @@ export const IncomingPaymentsPage: React.FC = () => {
           <div className="flex items-center gap-2.5">
             <ArrowDownToLine size={20} className="text-purple-600" />
             <h2 className="atlas-card-title text-[16px] font-bold text-slate-900">
-              SAP Incoming Payments ({totalCount})
+              SAP Incoming Payments {isError ? '(Unavailable)' : `(${totalCount})`}
             </h2>
           </div>
           <div className="text-[12px] text-slate-400">
-            Showing {items.length > 0 ? (page - 1) * pageSize + 1 : 0} -{' '}
-            {Math.min(page * pageSize, totalCount)} of {totalCount}
+            Showing {startRecord}–{endRecord} of {totalCount}
           </div>
         </div>
 
@@ -415,45 +441,108 @@ export const IncomingPaymentsPage: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-4 text-[13px]">
-            <div className="text-slate-500">
-              Page {page} of {totalPages}
+        {/* Pagination Footer Controls */}
+        {!isError && totalCount > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between border-t border-slate-100 pt-4 mt-4 gap-3 text-[13px]">
+            <div className="flex flex-wrap items-center gap-3 text-slate-500">
+              <span>
+                Showing <strong className="text-slate-700 font-semibold">{startRecord}–{endRecord}</strong> of{' '}
+                <strong className="text-slate-700 font-semibold">{totalCount}</strong> payments
+              </span>
+              <span className="text-slate-300 hidden sm:inline">|</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[12px] text-slate-400">Per page:</span>
+                <select
+                  id="page-size-select"
+                  data-testid="page-size-select"
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                  className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[12px] text-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition cursor-pointer"
-              >
-                <ChevronLeft size={16} className="text-slate-600" />
-              </button>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum = page <= 3 ? i + 1 : page + i - 2;
-                if (pageNum > totalPages) pageNum = totalPages - (4 - i);
-                if (pageNum <= 0) pageNum = i + 1;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setPage(pageNum)}
-                    className={`w-8 h-8 rounded-lg font-semibold transition cursor-pointer ${
-                      page === pageNum
-                        ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 transition cursor-pointer"
-              >
-                <ChevronRight size={16} className="text-slate-600" />
-              </button>
+
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500 text-[12.5px] mr-1">
+                Page <strong className="text-slate-700 font-semibold">{page}</strong> of <strong className="text-slate-700 font-semibold">{totalPages}</strong>
+              </span>
+
+              <div className="flex items-center gap-1">
+                {/* Previous Button */}
+                <button
+                  id="prev-page-btn"
+                  data-testid="prev-page-btn"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1 || isLoading}
+                  title="Previous Page"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium cursor-pointer"
+                >
+                  <ChevronLeft size={16} />
+                  <span className="hidden sm:inline text-[12px]">Previous</span>
+                </button>
+
+                {/* Page Number Buttons */}
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((pageNum) => {
+                    if (totalPages <= 7) return true;
+                    if (pageNum === 1 || pageNum === totalPages) return true;
+                    if (Math.abs(pageNum - page) <= 1) return true;
+                    return false;
+                  })
+                  .reduce<(number | string)[]>((acc, pageNum, idx, arr) => {
+                    if (idx > 0 && (pageNum as number) - (arr[idx - 1] as number) > 1) {
+                      acc.push(`ellipsis-${idx}`);
+                    }
+                    acc.push(pageNum);
+                    return acc;
+                  }, [])
+                  .map((item) => {
+                    if (typeof item === 'string') {
+                      return (
+                        <span key={item} className="px-1 text-slate-400 select-none">
+                          …
+                        </span>
+                      );
+                    }
+                    const pageNum = item as number;
+                    const isActive = page === pageNum;
+                    return (
+                      <button
+                        key={pageNum}
+                        id={`page-btn-${pageNum}`}
+                        data-testid={`page-btn-${pageNum}`}
+                        onClick={() => setPage(pageNum)}
+                        disabled={isLoading}
+                        className={`w-8 h-8 rounded-lg font-semibold text-[13px] transition cursor-pointer ${
+                          isActive
+                            ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                            : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+
+                {/* Next Button */}
+                <button
+                  id="next-page-btn"
+                  data-testid="next-page-btn"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages || isLoading}
+                  title="Next Page"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition font-medium cursor-pointer"
+                >
+                  <span className="hidden sm:inline text-[12px]">Next</span>
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
           </div>
         )}

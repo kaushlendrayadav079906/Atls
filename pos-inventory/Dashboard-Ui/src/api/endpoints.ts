@@ -488,12 +488,15 @@ export interface AIAssistantChatPayload {
 
 export interface AIAssistantChatResponse {
   answer: string;
-  conversation_id: string;
-  branch_context: string;
+  conversation_id?: string;
+  branch_context?: string;
   structured_data?: any;
   suggested_follow_ups?: string[];
   intent_id?: string;
   context?: Record<string, any>;
+  tool_calls?: any[];
+  trace_id?: string;
+  sap_connected?: boolean;
 }
 
 export const aiAssistantApi = {
@@ -503,7 +506,7 @@ export const aiAssistantApi = {
   ): Promise<AIAssistantChatResponse> => {
     const res = await apiClient.post<AIAssistantChatResponse>('/ai-assistant/chat', payload, {
       signal: options?.signal,
-      timeout: options?.timeout ?? 45000,
+      timeout: options?.timeout ?? 65000,
     });
     return res.data;
   },

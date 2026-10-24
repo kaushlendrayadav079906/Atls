@@ -34,8 +34,8 @@ export const useSystemHealth = (pollIntervalMs = 20000): SystemHealthState => {
     const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3001/api/v1';
 
     try {
-      // 1. Try dedicated SAP health endpoint first
-      const sapRes = await axios.get<SapHealthDetails>(`${baseURL}/health/sap`, { timeout: 6000 });
+      // 1. Try dedicated SAP health endpoint first (30s timeout for cold-start SAP login over VPN)
+      const sapRes = await axios.get<SapHealthDetails>(`${baseURL}/health/sap`, { timeout: 30000 });
       const sapOk = sapRes.data?.status === 'connected';
 
       setSapDetails(sapRes.data);
@@ -65,7 +65,7 @@ export const useSystemHealth = (pollIntervalMs = 20000): SystemHealthState => {
       // Fallback to top-level /health
       try {
         const rootHealthUrl = baseURL.replace(/\/api\/v1\/?$/, '/health');
-        const rootRes = await axios.get(rootHealthUrl, { timeout: 6000 });
+        const rootRes = await axios.get(rootHealthUrl, { timeout: 30000 });
         const sapStatus = rootRes.data?.dependencies?.sap === 'connected';
         const dbStatus = rootRes.data?.dependencies?.database === 'connected';
 

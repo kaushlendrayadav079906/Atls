@@ -76,10 +76,11 @@ async def get_purchase_invoices(
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
+    refresh: bool = Query(False),
     current_user: dict = Depends(require_permission("finance.invoices.view")),
 ) -> Dict[str, Any]:
-    """Retrieve verified SAP purchase invoices with pagination, search, status, and summary KPIs."""
+    """Retrieve verified SAP purchase invoices with pagination (default 10), search, status, and summary KPIs."""
     target_branch = _get_permitted_branch(current_user, branch)
     data = await _execute_finance_call(
         _finance_service.get_purchase_invoices,
@@ -92,6 +93,7 @@ async def get_purchase_invoices(
         search=search,
         page=page,
         page_size=page_size,
+        refresh=refresh,
     )
     return data
 
@@ -106,7 +108,8 @@ async def get_incoming_payments(
     payment_method: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
+    refresh: bool = Query(False),
     current_user: dict = Depends(require_permission("finance.payments.view")),
 ) -> Dict[str, Any]:
     """Retrieve verified SAP incoming customer payments with method breakdowns and applied invoices."""
@@ -122,6 +125,7 @@ async def get_incoming_payments(
         search=search,
         page=page,
         page_size=page_size,
+        refresh=refresh,
     )
     return data
 
@@ -136,7 +140,8 @@ async def get_outgoing_payments(
     payment_method: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
+    refresh: bool = Query(False),
     current_user: dict = Depends(require_permission("finance.payments.view")),
 ) -> Dict[str, Any]:
     """Retrieve verified SAP vendor outgoing payments with method breakdowns and applied purchase invoices."""
@@ -152,6 +157,7 @@ async def get_outgoing_payments(
         search=search,
         page=page,
         page_size=page_size,
+        refresh=refresh,
     )
     return data
 
@@ -166,7 +172,7 @@ async def get_customer_analysis(
     sort_by: str = Query("sales"),
     sort_order: str = Query("desc"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
     current_user: dict = Depends(require_permission("finance.view")),
 ) -> Dict[str, Any]:
     """Retrieve customer sales rankings, AR balances, transaction frequencies, and concentration analysis."""
@@ -196,7 +202,7 @@ async def get_supplier_analysis(
     sort_by: str = Query("spend"),
     sort_order: str = Query("desc"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=100),
     current_user: dict = Depends(require_permission("finance.view")),
 ) -> Dict[str, Any]:
     """Retrieve supplier procurement rankings, AP balances, purchase frequencies, and vendor concentration."""

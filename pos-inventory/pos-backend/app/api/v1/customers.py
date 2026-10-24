@@ -108,6 +108,8 @@ def _compute_customer_insights(
     )
 
     for inv in invoices:
+        if inv.get("Cancelled") == "tYES":
+            continue
         card_code = str(inv.get("CardCode") or "").strip()
         name = str(inv.get("CardName") or "").strip()
         if not card_code:

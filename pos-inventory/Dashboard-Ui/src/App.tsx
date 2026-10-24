@@ -38,7 +38,8 @@ import { ProfitabilityReportsPage } from './pages/finance/ProfitabilityReportsPa
 import { ProductLandingPage } from './pages/ProductLandingPage';
 import { SolutionsLandingPage } from './pages/SolutionsLandingPage';
 import { ContactPage } from './pages/ContactPage';
-import { ReportPlaceholderPage } from './components/ReportPlaceholderPage';
+import { CustomerReportPage } from './pages/reports/CustomerReportPage';
+import { AIGeneratedReportsPage } from './pages/reports/AIGeneratedReportsPage';
 import { AIAssistantProvider } from './contexts/AIAssistantContext';
 
 const queryClient = new QueryClient({
@@ -131,10 +132,7 @@ function App() {
                     path="customer"
                     element={
                       <RequirePermission permission="reports.view">
-                        <ReportPlaceholderPage
-                          title="Customer Reports"
-                          description="In-depth customer retention, repeat purchase patterns, account aging, and lifetime value analytics are currently being mapped to your SAP Business One schema."
-                        />
+                        <CustomerReportPage />
                       </RequirePermission>
                     }
                   />
@@ -142,11 +140,7 @@ function App() {
                     path="ai"
                     element={
                       <RequirePermission permission="reports.view">
-                        <ReportPlaceholderPage
-                          title="AI Generated Reports"
-                          description="Automated business intelligence narratives generated from your live SAP database. You can also ask queries directly using the ATLAS AI Assistant launcher."
-                          isAI={true}
-                        />
+                        <AIGeneratedReportsPage />
                       </RequirePermission>
                     }
                   />

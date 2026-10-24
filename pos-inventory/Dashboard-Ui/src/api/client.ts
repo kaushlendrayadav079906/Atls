@@ -30,9 +30,14 @@ apiClient.interceptors.response.use(
     if (startTime) {
       (error as any).durationMs = Math.round(performance.now() - startTime);
     }
+    const isAuthLogin = error.config?.url?.includes('/auth/login');
+    const isOnLoginPage = typeof window !== 'undefined' && window.location.pathname === '/login';
+
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      if (!isAuthLogin && !isOnLoginPage) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

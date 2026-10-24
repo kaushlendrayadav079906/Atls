@@ -691,10 +691,10 @@ class NLPIntentPipeline:
         )
 
     def _generate_follow_ups(self, intent_id: str, entities: ExtractedEntities) -> List[str]:
-        """Provides dynamic, contextually relevant follow-up questions."""
+        """Provides dynamic, contextually relevant follow-up questions for business decision-makers."""
         if intent_id == "workflow.flowchart":
             return [
-                "Show today's sales",
+                "Show today's sales and payments",
                 "Which products are running low on stock?",
                 "Show pending production orders",
                 "Open Dashboard"
@@ -712,14 +712,28 @@ class NLPIntentPipeline:
                 "Which products are running low on stock?",
                 "Open Products Catalog"
             ]
-        elif intent_id in ("dashboard.kpis", "dashboard.sales_trend"):
+        elif intent_id in ("dashboard.kpis", "dashboard.sales_trend", "invoices.list"):
             return [
-                "Compare this month with last month",
-                "Show sales by product",
-                "Show sales trends for the last six months",
-                "Open Sales Reports"
+                "What changed compared with last month?",
+                "Which customer purchases the most?",
+                "Which invoices are overdue?",
+                "Compare sales and purchases this month"
             ]
-        elif intent_id in ("production.overview", "production.orders", "production.rejection"):
+        elif intent_id in ("finance.profitability",):
+            return [
+                "Show the details behind this margin change",
+                "Compare sales and purchases this month",
+                "What changed compared with last month?",
+                "Open Profitability Reports"
+            ]
+        elif intent_id in ("finance.payments", "finance.incoming_payments", "finance.outgoing_payments"):
+            return [
+                "Why did collections decline?",
+                "Which invoices are overdue?",
+                "Which customers should we contact first?",
+                "Show payment breakdown by cash vs transfer"
+            ]
+        elif intent_id in ("production.overview", "production.orders", "production.rejection", "production.item_wise"):
             return [
                 "Compare planned and produced quantities",
                 "Show rejection by item",
@@ -733,19 +747,19 @@ class NLPIntentPipeline:
                 "Open Users & Roles",
                 "Show me all available reports"
             ]
-        elif intent_id in ("customers.receivables", "customers.ranking"):
+        elif intent_id in ("customers.receivables", "customers.ranking", "customers.search"):
             return [
-                "Which customers have outstanding balances?",
-                "Find the customer with highest sales",
-                "Show incoming payments this month",
-                "Open Customer Analysis"
+                "Which invoices are overdue?",
+                "Which customers should we contact first?",
+                "Draft a payment reminder for overdue accounts",
+                "Show incoming payments this month"
             ]
         elif intent_id in ("inventory.stock_levels", "inventory.low_stock"):
             return [
-                "Show pending purchase orders",
-                "Show top 5 products by sales",
+                "Which products are running low on stock?",
                 "Check stock in SH warehouse",
-                "Open Products & Stock"
+                "Show top 5 products by sales",
+                "Show pending purchase orders"
             ]
         elif intent_id == "reports.catalog":
             return [
@@ -756,10 +770,10 @@ class NLPIntentPipeline:
             ]
         else:
             return [
-                "Show me today's sales",
+                "Show me today's sales and payments",
+                "Which customers have overdue balances?",
                 "Which products are running low on stock?",
-                "Show pending production orders",
-                "What can I access with my current permissions?"
+                "Show pending production orders"
             ]
 
 

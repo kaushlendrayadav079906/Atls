@@ -873,7 +873,226 @@ def test_finance_service_incoming_payments_aggregation():
         assert result["summary"]["total_received_amount"] == 20000.0
         assert result["summary"]["method_breakdown"]["cash"] == 5000.0
         assert result["summary"]["method_breakdown"]["bank_transfer"] == 15000.0
-        assert result["items"][0]["applied_invoices_count"] == 1
+        item_a = next(i for i in result["items"] if i["doc_entry"] == 10)
+        assert item_a["applied_invoices_count"] == 1
+
+
+def test_finance_service_sales_metrics_excludes_cancelled():
+    from app.services.sap.finance_service import SAPFinanceService
+    from datetime import date
+    service = SAPFinanceService()
+
+    raw_invoices = [
+        {"DocEntry": 1, "DocNum": 101, "DocTotal": 81798.88, "Cancelled": "tNO"},
+        {"DocEntry": 21, "DocNum": 8, "DocTotal": 10.50, "Cancelled": "tYES"},
+    ]
+
+    with patch.object(service.invoices_service, "get_invoices_by_date", return_value=raw_invoices):
+        metrics = service._get_sales_metrics(
+            d_from=date(2026, 1, 1),
+            d_to=date(2026, 12, 31),
+            prev_from=date(2025, 1, 1),
+            prev_to=date(2025, 12, 31),
+            branch_id=None,
+            is_all_time=True,
+        )
+        # Cancelled invoice (10.50) MUST be excluded from revenue and count
+        assert metrics["total_sales"] == 81798.88
+        assert metrics["invoice_count"] == 1
+
+
+def test_finance_service_purchase_invoices_cancelled_filter():
+    from app.services.sap.finance_service import SAPFinanceService
+    service = SAPFinanceService()
+
+    raw_pinvs = [
+        {
+            "DocEntry": 101,
+            "DocNum": 101,
+            "DocDate": "2026-03-01",
+            "DocDueDate": "2026-03-15",
+            "CardCode": "S001",
+            "CardName": "Active Supplier",
+            "DocTotal": 5000.0,
+            "PaidToDate": 0.0,
+            "DocumentStatus": "bost_Open",
+            "DocCurrency": "INR",
+            "Cancelled": "tNO",
+            "BPL_IDAssignedToInvoice": 1,
+            "BPLName": "Main Branch",
+        },
+        {
+            "DocEntry": 102,
+            "DocNum": 102,
+            "DocDate": "2026-03-02",
+            "DocDueDate": "2026-03-16",
+            "CardCode": "S002",
+            "CardName": "Void Supplier",
+            "DocTotal": 2000.0,
+            "PaidToDate": 0.0,
+            "DocumentStatus": "bost_Close",
+            "DocCurrency": "INR",
+            "Cancelled": "tYES",
+            "BPL_IDAssignedToInvoice": 1,
+            "BPLName": "Main Branch",
+        },
+    ]
+
+    with patch.object(service, "_fetch_all_sap_records", return_value=raw_pinvs):
+        # Default view excludes cancelled
+        res_default = service.get_purchase_invoices(range_str="all_time")
+        assert res_default["total_count"] == 1
+        assert res_default["items"][0]["doc_entry"] == 101
+        assert res_default["summary"]["total_purchases"] == 5000.0
+
+        # Status filter for cancelled returns the cancelled invoices
+        res_cancelled = service.get_purchase_invoices(range_str="all_time", status="Cancelled")
+        assert res_cancelled["total_count"] == 1
+        assert res_cancelled["items"][0]["doc_entry"] == 102
+        assert res_cancelled["items"][0]["payment_status"] == "Cancelled"
+
+
+def test_purchase_invoices_pagination_ten_per_page():
+    from app.services.sap.finance_service import SAPFinanceService
+    service = SAPFinanceService()
+
+    # Generate 47 mock invoices to test the exact scenario described in requirements
+    raw_invoices = [
+        {
+            "DocEntry": i,
+            "DocNum": 1000 + i,
+            "DocDate": f"2026-03-{(i % 28) + 1:02d}",
+            "DocDueDate": "2026-04-15",
+            "CardCode": f"V{i:03d}",
+            "CardName": f"Supplier {i}",
+            "DocTotal": 100.0 * i,
+            "PaidToDate": 50.0 * i,
+            "DocumentStatus": "bost_Open",
+            "DocCurrency": "INR",
+            "Cancelled": "tNO",
+            "BPL_IDAssignedToInvoice": 1,
+            "BPLName": "Main Branch",
+        }
+        for i in range(1, 48)
+    ]
+
+    with patch.object(service, "_fetch_all_sap_records", return_value=raw_invoices):
+        # Page 1: Default page_size should be 10
+        p1 = service.get_purchase_invoices(range_str="all_time", page=1)
+        assert p1["page_size"] == 10
+        assert p1["page"] == 1
+        assert p1["total_count"] == 47
+        assert p1["total_pages"] == 5
+        assert p1["has_more"] is True
+        assert len(p1["items"]) == 10
+
+        # Page 2: Next 10 items
+        p2 = service.get_purchase_invoices(range_str="all_time", page=2)
+        assert p2["page"] == 2
+        assert p2["page_size"] == 10
+        assert len(p2["items"]) == 10
+        assert p2["has_more"] is True
+
+        # Page 5: Last page should contain remaining 7 items
+        p5 = service.get_purchase_invoices(range_str="all_time", page=5)
+        assert p5["page"] == 5
+        assert len(p5["items"]) == 7
+        assert p5["has_more"] is False
+
+        # Summary KPIs reflect entire 47 invoices, not just single page
+        expected_total_purchases = sum(inv["DocTotal"] for inv in raw_invoices)
+        assert p1["summary"]["total_purchases"] == round(expected_total_purchases, 2)
+        assert p2["summary"]["total_purchases"] == round(expected_total_purchases, 2)
+
+
+def test_fetch_all_sap_records_follows_next_link():
+    from app.services.sap.finance_service import SAPFinanceService
+    service = SAPFinanceService()
+
+    page1_response = {
+        "value": [{"DocEntry": 1}, {"DocEntry": 2}],
+        "@odata.nextLink": "PurchaseInvoices?$skip=2&$top=2",
+    }
+    page2_response = {
+        "value": [{"DocEntry": 3}],
+        "@odata.nextLink": None,
+    }
+
+    with patch.object(service.client, "get", side_effect=[page1_response, page2_response]):
+        records = service._fetch_all_sap_records("PurchaseInvoices", {})
+        assert len(records) == 3
+        assert [r["DocEntry"] for r in records] == [1, 2, 3]
+
+
+def test_incoming_payments_pagination_ten_per_page():
+    from app.services.sap.finance_service import SAPFinanceService
+    service = SAPFinanceService()
+
+    raw_payments = [
+        {
+            "DocEntry": i,
+            "DocNum": 1000 + i,
+            "DocDate": f"2026-03-{(i % 28) + 1:02d}",
+            "CardCode": f"C{i:03d}",
+            "CardName": f"Customer {i}",
+            "CashSum": 100.0,
+            "TransferSum": 400.0,
+            "Cancelled": "tNO",
+            "PaymentInvoices": [],
+        }
+        for i in range(1, 26)
+    ]
+
+    with patch.object(service, "_fetch_all_sap_records", return_value=raw_payments):
+        p1 = service.get_incoming_payments(range_str="all_time", page=1, page_size=10)
+        assert p1["total_count"] == 25
+        assert p1["total_pages"] == 3
+        assert p1["page"] == 1
+        assert p1["page_size"] == 10
+        assert len(p1["items"]) == 10
+        assert p1["has_more"] is True
+
+        p3 = service.get_incoming_payments(range_str="all_time", page=3, page_size=10)
+        assert len(p3["items"]) == 5
+        assert p3["has_more"] is False
+        assert p3["summary"]["total_receipts_count"] == 25
+
+
+def test_outgoing_payments_pagination_ten_per_page():
+    from app.services.sap.finance_service import SAPFinanceService
+    service = SAPFinanceService()
+
+    raw_payments = [
+        {
+            "DocEntry": i,
+            "DocNum": 2000 + i,
+            "DocDate": f"2026-03-{(i % 28) + 1:02d}",
+            "CardCode": f"V{i:03d}",
+            "CardName": f"Vendor {i}",
+            "CashSum": 200.0,
+            "TransferSum": 800.0,
+            "Cancelled": "tNO",
+            "PaymentInvoices": [],
+        }
+        for i in range(1, 22)
+    ]
+
+    with patch.object(service, "_fetch_all_sap_records", return_value=raw_payments):
+        p1 = service.get_outgoing_payments(range_str="all_time", page=1, page_size=10)
+        assert p1["total_count"] == 21
+        assert p1["total_pages"] == 3
+        assert p1["page"] == 1
+        assert p1["page_size"] == 10
+        assert len(p1["items"]) == 10
+        assert p1["has_more"] is True
+
+        p3 = service.get_outgoing_payments(range_str="all_time", page=3, page_size=10)
+        assert len(p3["items"]) == 1
+        assert p3["has_more"] is False
+        assert p3["summary"]["total_vouchers_count"] == 21
+
+
+
 
 
 

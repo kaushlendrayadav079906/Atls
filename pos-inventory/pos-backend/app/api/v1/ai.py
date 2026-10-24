@@ -46,14 +46,14 @@ async def chat_with_assistant(
                     context=request.context
                 )
             ),
-            timeout=40.0
+            timeout=60.0
         )
         return response
     except asyncio.TimeoutError:
-        logger.error("AI chat processing exceeded backend deadline (40.0s)")
+        logger.error("AI chat processing exceeded backend deadline (60.0s)")
         raise HTTPException(
             status_code=504,
-            detail="AI request timed out on backend (40s limit exceeded). The request was terminated to keep chat responsive."
+            detail="AI request timed out on backend (60s limit exceeded). The request was terminated to keep chat responsive."
         )
     except TimeoutError as e:
         logger.error(f"Timeout in AI chat provider/SAP: {e}")

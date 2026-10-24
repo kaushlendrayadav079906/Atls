@@ -136,6 +136,12 @@ export interface PurchaseInvoiceSummary {
 }
 
 export interface PurchaseInvoicesResponse {
+  period?: {
+    range: string;
+    label: string;
+    from_date: string;
+    to_date: string;
+  };
   summary: PurchaseInvoiceSummary;
   kpis?: PurchaseInvoiceSummary;
   items: PurchaseInvoiceItem[];
@@ -144,6 +150,7 @@ export interface PurchaseInvoicesResponse {
   total_count: number;
   page: number;
   page_size: number;
+  total_pages?: number;
   has_more: boolean;
   filters_applied: Record<string, any>;
 }
@@ -189,6 +196,7 @@ export interface IncomingPaymentsResponse {
   total_count: number;
   page: number;
   page_size: number;
+  total_pages?: number;
   has_more: boolean;
   filters_applied: Record<string, any>;
 }
@@ -234,6 +242,7 @@ export interface OutgoingPaymentsResponse {
   total_count: number;
   page: number;
   page_size: number;
+  total_pages?: number;
   has_more: boolean;
   filters_applied: Record<string, any>;
 }
@@ -265,6 +274,7 @@ export interface CustomerAnalysisResponse {
   total_count: number;
   page: number;
   page_size: number;
+  total_pages?: number;
   has_more: boolean;
   filters_applied: Record<string, any>;
 }
@@ -296,6 +306,7 @@ export interface SupplierAnalysisResponse {
   total_count: number;
   page: number;
   page_size: number;
+  total_pages?: number;
   has_more: boolean;
   filters_applied: Record<string, any>;
 }
@@ -353,6 +364,7 @@ export const financeApi = {
     search?: string;
     page?: number;
     page_size?: number;
+    refresh?: boolean;
   }): Promise<PurchaseInvoicesResponse> => {
     const res = await apiClient.get<PurchaseInvoicesResponse>('/finance/purchase-invoices', { params });
     return res.data;
@@ -368,6 +380,7 @@ export const financeApi = {
     search?: string;
     page?: number;
     page_size?: number;
+    refresh?: boolean;
   }): Promise<IncomingPaymentsResponse> => {
     const res = await apiClient.get<IncomingPaymentsResponse>('/finance/incoming-payments', { params });
     return res.data;
@@ -383,6 +396,7 @@ export const financeApi = {
     search?: string;
     page?: number;
     page_size?: number;
+    refresh?: boolean;
   }): Promise<OutgoingPaymentsResponse> => {
     const res = await apiClient.get<OutgoingPaymentsResponse>('/finance/outgoing-payments', { params });
     return res.data;
