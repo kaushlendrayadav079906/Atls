@@ -2697,6 +2697,81 @@ class SAPFinanceService:
             "timestamp": audit_entry["timestamp"],
         }
 
+    def get_accounts_receivable(
+        self,
+        customer_code: Optional[str] = None,
+        min_balance: float = 0.0,
+        limit: int = 20,
+        branch_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Retrieve verified accounts receivable total and aged customer receivables from SAP Business Partners."""
+        balances = self._get_ar_ap_balances()
+        total_ar = balances.get("accounts_receivable", 0.0)
+        cust_analysis = self.get_customer_analysis(range_str="all_time", branch_id=branch_id, page_size=100)
+        raw_customers = cust_analysis.get("customers", [])
+        
+        debtors = []
+        for c in raw_customers:
+            bal = _to_float(c.get("outstanding_receivables"))
+            if bal >= min_balance and bal > 0:
+                code = c.get("customer_code") or c.get("card_code") or ""
+                if customer_code and customer_code.lower() not in code.lower() and customer_code.lower() not in str(c.get("customer_name") or "").lower():
+                    continue
+                debtors.append({
+                    "card_code": code,
+                    "card_name": c.get("customer_name") or c.get("card_name") or code,
+                    "outstanding_balance": bal,
+                    "phone": c.get("phone") or "-",
+                    "email": c.get("email") or "-",
+                    "last_transaction_date": c.get("last_transaction_date") or "-",
+                })
+        debtors.sort(key=lambda x: x["outstanding_balance"], reverse=True)
+        
+        return {
+            "total_accounts_receivable": total_ar,
+            "total_receivables": total_ar,
+            "total_debtors_count": len(debtors),
+            "customers": debtors[:limit],
+            "as_of": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def get_accounts_payable(
+        self,
+        supplier_code: Optional[str] = None,
+        min_balance: float = 0.0,
+        limit: int = 20,
+        branch_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Retrieve verified accounts payable total and supplier liabilities from SAP Business Partners."""
+        balances = self._get_ar_ap_balances()
+        total_ap = balances.get("accounts_payable", 0.0)
+        sup_analysis = self.get_supplier_analysis(range_str="all_time", branch_id=branch_id, page_size=100)
+        raw_suppliers = sup_analysis.get("suppliers", [])
+        
+        creditors = []
+        for s in raw_suppliers:
+            bal = _to_float(s.get("outstanding_payables"))
+            if bal >= min_balance and bal > 0:
+                code = s.get("supplier_code") or s.get("card_code") or ""
+                if supplier_code and supplier_code.lower() not in code.lower() and supplier_code.lower() not in str(s.get("supplier_name") or "").lower():
+                    continue
+                creditors.append({
+                    "card_code": code,
+                    "card_name": s.get("supplier_name") or s.get("card_name") or code,
+                    "outstanding_balance": bal,
+                    "phone": s.get("phone") or "-",
+                    "email": s.get("email") or "-",
+                })
+        creditors.sort(key=lambda x: x["outstanding_balance"], reverse=True)
+        
+        return {
+            "total_accounts_payable": total_ap,
+            "total_payables": total_ap,
+            "total_creditors_count": len(creditors),
+            "suppliers": creditors[:limit],
+            "as_of": datetime.now(timezone.utc).isoformat(),
+        }
+
     def get_admin_settings(self) -> Dict[str, Any]:
         """Retrieve system health, enabled capabilities, role permissions, and sync status."""
         from app.core.config import settings

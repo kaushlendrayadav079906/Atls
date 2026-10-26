@@ -24,11 +24,13 @@ import atlasLogo from '../assets/LOGO.png';
 import chatbotLogo from '../assets/Chatbot.png';
 import { useAuth } from '../contexts/AuthContext';
 import { useSystemHealth } from '../hooks/useSystemHealth';
+import { useTheme } from '../contexts/ThemeContext';
 
 export const ContactPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isSapConnected } = useSystemHealth();
+  const { isDark } = useTheme();
 
   // Contact Form State
   const [formData, setFormData] = useState({
@@ -185,34 +187,46 @@ export const ContactPage: React.FC = () => {
   ];
 
   return (
-    <div className="w-full min-h-screen bg-[#f0f6ff] text-slate-900 flex flex-col transition-all duration-300">
-      {/* ── Section A: Hero (Full-width edge-to-edge, Light Blue Enterprise Gradient) ── */}
-      <section className="relative w-full overflow-hidden border-b border-blue-200/90 bg-gradient-to-br from-blue-100 via-sky-50 to-indigo-100/70 px-6 sm:px-12 lg:px-16 xl:px-20 2xl:px-24 py-14 sm:py-20 shadow-xs">
-        {/* Ambient subtle light-blue glowing shapes */}
-        <div className="pointer-events-none absolute -right-20 -top-20 h-96 w-96 rounded-full bg-blue-300/30 blur-3xl" />
-        <div className="pointer-events-none absolute -left-20 -bottom-20 h-96 w-96 rounded-full bg-sky-300/30 blur-3xl" />
+    <div className={`w-full min-h-screen flex flex-col transition-all duration-300 ${
+      isDark ? 'bg-[#0f172a] text-white' : 'bg-[#f0f6ff] text-slate-900'
+    }`}>
+      {/* ── Section A: Hero (Full-width edge-to-edge, Adaptive Gradient) ── */}
+      <section className={`relative w-full overflow-hidden border-b px-6 sm:px-12 lg:px-16 xl:px-20 2xl:px-24 py-14 sm:py-20 shadow-xs ${
+        isDark
+          ? 'border-slate-700 bg-gradient-to-br from-[#1e293b] via-[#141f32] to-[#1e3456]'
+          : 'border-blue-200/90 bg-gradient-to-br from-blue-100 via-sky-50 to-indigo-100/70'
+      }`}>
+        {/* Ambient subtle glowing shapes */}
+        <div className={`pointer-events-none absolute -right-20 -top-20 h-96 w-96 rounded-full blur-3xl ${
+          isDark ? 'bg-blue-600/15' : 'bg-blue-300/30'
+        }`} />
+        <div className={`pointer-events-none absolute -left-20 -bottom-20 h-96 w-96 rounded-full blur-3xl ${
+          isDark ? 'bg-sky-600/15' : 'bg-sky-300/30'
+        }`} />
 
         <div className="relative z-10 max-w-5xl space-y-6">
           {/* Logo & Company Badge */}
-          <div className="inline-flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/95 backdrop-blur-md border border-blue-200 shadow-xs">
+          <div className={`inline-flex items-center gap-3 px-4 py-2 rounded-2xl backdrop-blur-md border shadow-xs ${
+            isDark ? 'bg-[#1e293b]/90 border-slate-700' : 'bg-white/95 border-blue-200'
+          }`}>
             <img
               src={atlasLogo}
               alt="ATLAS Logo"
               className="h-9 w-9 object-contain drop-shadow-xs"
             />
             <div className="flex items-center gap-2">
-              <span className="text-base font-black tracking-wider text-blue-700">ATLAS</span>
-              <span className="text-slate-400 text-xs">• Enterprise Operations System</span>
+              <span className={`text-base font-black tracking-wider ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>ATLAS</span>
+              <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>• Enterprise Operations System</span>
             </div>
           </div>
 
           {/* Headline */}
-          <h1 className="atlas-page-title text-3xl sm:text-4xl lg:text-[42px] font-extrabold">
-            Let's Connect with <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700">ATLAS</span>
+          <h1 className={`atlas-page-title text-3xl sm:text-4xl lg:text-[42px] font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            Let's Connect with <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-500 to-indigo-400">ATLAS</span>
           </h1>
 
           {/* Description */}
-          <p className="atlas-body text-base sm:text-lg text-slate-600 max-w-3xl leading-relaxed">
+          <p className={`atlas-body text-base sm:text-lg max-w-3xl leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
             Unified enterprise management integrating retail Point of Sale, live inventory synchronization, sales order workflows, manufacturing production, and SAP Business One financial intelligence.
           </p>
 
@@ -228,7 +242,11 @@ export const ContactPage: React.FC = () => {
 
             <button
               onClick={scrollToContactForm}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 text-xs sm:text-[13px] font-semibold border border-blue-300 shadow-xs transition-all duration-150 cursor-pointer"
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold border shadow-xs transition-all duration-150 cursor-pointer ${
+                isDark
+                  ? 'bg-[#1e293b] hover:bg-slate-800 text-blue-300 border-slate-700'
+                  : 'bg-white hover:bg-blue-50 text-blue-700 border-blue-300'
+              }`}
             >
               <Mail size={15} />
               <span>Contact Support</span>
@@ -236,21 +254,30 @@ export const ContactPage: React.FC = () => {
 
             <button
               onClick={openAIAssistant}
-              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/90 hover:bg-indigo-50 text-indigo-700 text-xs sm:text-[13px] font-semibold border border-indigo-200 shadow-xs transition-all duration-150 cursor-pointer"
+              className={`inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold border shadow-xs transition-all duration-150 cursor-pointer ${
+                isDark
+                  ? 'bg-indigo-950/70 hover:bg-indigo-900/80 text-indigo-300 border-indigo-800'
+                  : 'bg-white/90 hover:bg-indigo-50 text-indigo-700 border-indigo-200'
+              }`}
             >
-              <Sparkles size={15} className="text-indigo-600" />
+              <Sparkles size={15} className={isDark ? 'text-indigo-400' : 'text-indigo-600'} />
               <span>Ask ATLAS AI</span>
             </button>
           </div>
 
           {/* Verified System Status Pills */}
-          <div className="pt-4 flex flex-wrap items-center gap-3 text-xs text-slate-700">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/90 border border-blue-200/90 shadow-2xs">
+          <div className={`pt-4 flex flex-wrap items-center gap-3 text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border shadow-2xs ${
+              isDark ? 'bg-[#1e293b]/90 border-slate-700' : 'bg-white/90 border-blue-200/90'
+            }`}>
               <span className={`h-2 w-2 rounded-full ${isSapConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
               <span className="font-medium text-[11.5px]">{isSapConnected ? 'SAP Business One Live Connected' : 'SAP Service Layer Offline'}</span>
             </div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/90 border border-blue-200/90 shadow-2xs">
-              <Building2 size={13} className="text-blue-600" />
+            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border shadow-2xs ${
+              isDark ? 'bg-[#1e293b]/90 border-slate-700' : 'bg-white/90 border-blue-200/90'
+            }`}>
+              <Building2 size={13} className={isDark ? 'text-blue-400' : 'text-blue-600'} />
+
               <span className="font-medium text-[11.5px]">Active Branch: {user?.store_name || 'Main Branch'} ({user?.branch_id || 'SH'})</span>
             </div>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/90 border border-blue-200/90 shadow-2xs">
@@ -321,8 +348,10 @@ export const ContactPage: React.FC = () => {
         </div>
       </section>
 
-      {/* ── Section C: Explore Our Platform (Full-width, Light Blue Tinted Grid) ── */}
-      <section className="w-full py-12 sm:py-16 px-6 sm:px-12 lg:px-16 xl:px-20 2xl:px-24 bg-[#eaf2fd]/50 border-b border-blue-100/80">
+      {/* ── Section C: Explore Our Platform (Full-width, Adaptive Grid) ── */}
+      <section className={`w-full py-12 sm:py-16 px-6 sm:px-12 lg:px-16 xl:px-20 2xl:px-24 border-b ${
+        isDark ? 'bg-[#141f32] border-slate-700' : 'bg-[#eaf2fd]/50 border-blue-100/80'
+      }`}>
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div className="space-y-1.5">
@@ -347,29 +376,37 @@ export const ContactPage: React.FC = () => {
                   if (mod.path) navigate(mod.path);
                   else if (mod.action) mod.action();
                 }}
-                className="group bg-white rounded-2xl border border-blue-100/90 p-5 sm:p-6 shadow-xs hover:shadow-md hover:border-blue-400 transition-all duration-200 cursor-pointer flex flex-col justify-between"
+                className={`group rounded-2xl border p-5 sm:p-6 shadow-xs hover:border-blue-400 transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                  isDark ? 'bg-[#1e293b] border-slate-700 hover:shadow-lg' : 'bg-white border-blue-100/90 hover:shadow-md'
+                }`}
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className={`h-10 w-10 rounded-xl ${mod.iconBg} ${mod.iconColor} flex items-center justify-center transition-transform group-hover:scale-105`}>
+                    <div className={`h-10 w-10 rounded-xl ${isDark ? 'bg-[#141f32] text-blue-400 border border-slate-700' : `${mod.iconBg} ${mod.iconColor}`} flex items-center justify-center transition-transform group-hover:scale-105`}>
                       <mod.icon size={20} />
                     </div>
-                    <span className="text-[10.5px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                    <span className={`text-[10.5px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                      isDark ? 'bg-[#141f32] text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}>
                       {mod.tag}
                     </span>
                   </div>
 
                   <div>
-                    <h3 className="atlas-card-title text-sm group-hover:text-blue-600 transition-colors">
+                    <h3 className={`atlas-card-title text-sm transition-colors ${
+                      isDark ? 'text-white group-hover:text-blue-400' : 'group-hover:text-blue-600'
+                    }`}>
                       {mod.title}
                     </h3>
-                    <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                    <p className={`text-xs mt-1.5 leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                       {mod.description}
                     </p>
                   </div>
                 </div>
 
-                <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-blue-600 group-hover:text-blue-700">
+                <div className={`pt-4 mt-3 border-t flex items-center justify-between text-xs font-semibold text-blue-500 group-hover:text-blue-400 ${
+                  isDark ? 'border-slate-700' : 'border-slate-100'
+                }`}>
                   <span>Open Module</span>
                   <ArrowRight size={14} className="transition-transform group-hover:translate-x-1" />
                 </div>
@@ -379,8 +416,10 @@ export const ContactPage: React.FC = () => {
         </div>
       </section>
 
-      {/* ── Section D: Business Information (Full-width, Light Blue Theme) ── */}
-      <section className="w-full py-12 sm:py-16 px-6 sm:px-12 lg:px-16 xl:px-20 2xl:px-24 bg-[#f0f6ff] border-b border-blue-100/80">
+      {/* ── Section D: Business Information (Full-width, Adaptive Theme) ── */}
+      <section className={`w-full py-12 sm:py-16 px-6 sm:px-12 lg:px-16 xl:px-20 2xl:px-24 border-b ${
+        isDark ? 'bg-[#0f172a] border-slate-700' : 'bg-[#f0f6ff] border-blue-100/80'
+      }`}>
         <div className="space-y-6">
           <div className="space-y-1.5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100/90 border border-blue-200 text-blue-700 text-xs font-bold uppercase tracking-wider">

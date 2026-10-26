@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   html {
@@ -156,4 +157,129 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   ATLAS GLOBAL LIGHT-DARK THEME DESIGN SYSTEM (Soft Slate Palette)
+──────────────────────────────────────────────────────────────────────────── */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #0f172a !important; /* Soft Slate-900 base */
+  color: #f1f5f9 !important;
+}
+
+html.dark main {
+  background-color: #0f172a !important;
+}
+
+/* Page containers */
+html.dark .min-h-screen:not(aside):not(header) {
+  background-color: #0f172a !important;
+}
+
+html.dark .bg-\[\#f0f6ff\] {
+  background-color: #0f172a !important;
+}
+
+/* Headings in Light-Dark Mode */
+html.dark h1,
+html.dark h2,
+html.dark h3,
+html.dark h4,
+html.dark h5,
+html.dark h6,
+html.dark .atlas-page-title,
+html.dark .page-title,
+html.dark .atlas-section-title,
+html.dark .atlas-card-title {
+  color: #f8fafc !important;
+}
+
+/* Text Colors */
+html.dark .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+html.dark .text-slate-800 {
+  color: #e2e8f0 !important;
+}
+
+html.dark .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+html.dark .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Cards & Surface Containers (Soft Slate-800 Cards) */
+html.dark .card,
+html.dark .bg-white:not([class*="text-white"]):not(button[class*="bg-blue"]):not(button[class*="bg-emerald"]):not(button[class*="bg-indigo"]):not(button[class*="bg-rose"]) {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+html.dark .bg-slate-50,
+html.dark .bg-slate-100 {
+  background-color: #141f32 !important;
+}
+
+html.dark .border-slate-200,
+html.dark .border-slate-100,
+html.dark .border-slate-300,
+html.dark .border-blue-100,
+html.dark .border-blue-200,
+html.dark .border-indigo-100,
+html.dark .border-indigo-200 {
+  border-color: #334155 !important;
+}
+
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-50 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #334155 !important;
+}
+
+/* Inputs, Textareas, Selects */
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+html.dark select,
+html.dark textarea,
+html.dark .atlas-input,
+html.dark .auth-input {
+  background-color: #141f32 !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Tables */
+html.dark table thead,
+html.dark table thead tr,
+html.dark .atlas-table-th {
+  background-color: #141f32 !important;
+  color: #94a3b8 !important;
+  border-color: #334155 !important;
+}
+
+html.dark table tbody,
+html.dark table tbody tr,
+html.dark table td,
+html.dark .atlas-table-td {
+  border-color: #334155 !important;
+}
+
+html.dark table tbody tr:hover {
+  background-color: rgba(51, 65, 85, 0.45) !important;
 }

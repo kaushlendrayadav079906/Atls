@@ -15,9 +15,12 @@ import {
   Sparkles,
   Mail,
   LogOut,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { useSystemHealth } from '../hooks/useSystemHealth';
 import { GlobalSearchModal } from './GlobalSearchModal';
 import { AIAssistantPanel, type AIAssistantContext } from './AIAssistantPanel';
@@ -203,6 +206,7 @@ export const Layout = () => {
   const { isSapConnected } = useSystemHealth();
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const { isOpen: aiOpen, setIsOpen: setAiOpen } = useAIAssistant();
+  const { isDark, toggleTheme } = useTheme();
 
   const getPageContext = (pathname: string): AIAssistantContext => {
     if (pathname === '/product' || pathname === '/products' || pathname.startsWith('/products/')) return 'products';
@@ -265,9 +269,11 @@ export const Layout = () => {
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
+    <div className={`flex flex-col h-screen font-sans overflow-hidden transition-colors duration-200 ${isDark ? 'bg-[#0f172a] text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       {/* ── Full-Width Fixed Top Navbar (Spanning all the way across left & right) ── */}
-      <header className="sticky top-0 z-30 flex h-[60px] w-full items-center justify-between border-b border-slate-200/90 bg-white px-4 sm:px-6 shrink-0 shadow-xs">
+      <header className={`sticky top-0 z-30 flex h-[60px] w-full items-center justify-between border-b px-4 sm:px-6 shrink-0 shadow-xs transition-colors duration-200 ${
+        isDark ? 'bg-[#152033] border-slate-700/80 text-white' : 'bg-white border-slate-200/90 text-slate-900'
+      }`}>
         {/* Left: Brand Logo & ATLAS Name + Collapse / Mobile toggle */}
         <div className="flex items-center gap-3">
           {/* Mobile hamburger menu */}
@@ -418,6 +424,20 @@ export const Layout = () => {
             <span className="hidden md:inline">AI Assistant</span>
           </button>
 
+          {/* Dark / Light Mode Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            className={`flex items-center justify-center h-8.5 w-8.5 rounded-full border transition-all cursor-pointer shadow-2xs ${
+              isDark
+                ? 'bg-slate-800 border-slate-700 text-amber-300 hover:bg-slate-700 hover:text-amber-200 ring-2 ring-amber-400/20'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            }`}
+            title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label="Toggle Dark/Light Mode"
+          >
+            {isDark ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} />}
+          </button>
+
           {/* Notifications */}
           <button className="relative rounded-full p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer">
             <Bell size={17} />
@@ -526,7 +546,10 @@ export const Layout = () => {
 
         {/* ── Sidebar (Below full-width navbar) ── */}
         <aside
-          style={{ backgroundColor: SIDEBAR_BG, borderRightColor: SIDEBAR_BORDER }}
+          style={{
+            backgroundColor: isDark ? '#111a2c' : SIDEBAR_BG,
+            borderRightColor: isDark ? '#26354a' : SIDEBAR_BORDER
+          }}
           className={`fixed inset-y-0 left-0 top-[60px] z-20 flex flex-col border-r transition-all duration-300 md:static md:top-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
             } md:translate-x-0 ${sidebarCollapsed ? 'w-[72px]' : 'w-[220px]'}`}
         >
@@ -542,9 +565,15 @@ export const Layout = () => {
                   type="text"
                   readOnly
                   placeholder="Search menu, reports..."
-                  className="w-full cursor-pointer rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-10 text-[11px] text-slate-700 placeholder:text-slate-400 group-hover:border-blue-400 focus:outline-none transition shadow-2xs"
+                  className={`w-full cursor-pointer rounded-lg border py-1.5 pl-8 pr-10 text-[11px] group-hover:border-blue-400 focus:outline-none transition shadow-2xs ${
+                    isDark
+                      ? 'border-slate-700 bg-[#141f32] text-slate-200 placeholder:text-slate-400'
+                      : 'border-slate-200 bg-white text-slate-700 placeholder:text-slate-400'
+                  }`}
                 />
-                <span className="pointer-events-none absolute right-1.5 rounded border border-slate-200 bg-slate-50 px-1 py-0.5 text-[8.5px] font-semibold text-slate-500 shadow-3xs group-hover:border-blue-300">
+                <span className={`pointer-events-none absolute right-1.5 rounded border px-1 py-0.5 text-[8.5px] font-semibold shadow-3xs group-hover:border-blue-300 ${
+                  isDark ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-500'
+                }`}>
                   ⌘ K
                 </span>
               </div>
@@ -552,7 +581,7 @@ export const Layout = () => {
           )}
 
           {/* Thin divider */}
-          <div style={{ backgroundColor: SIDEBAR_BORDER }} className="mx-4 h-px" />
+          <div style={{ backgroundColor: isDark ? '#1e293b' : SIDEBAR_BORDER }} className="mx-4 h-px" />
 
           {/* Nav */}
           <nav className={`flex-1 overflow-y-auto ${sidebarCollapsed ? 'px-2' : 'px-4'} py-3 space-y-1.5`}>
@@ -578,11 +607,11 @@ export const Layout = () => {
                     /* Section Parent Item (Navigates to Landing Page + Expands) */
                     <div
                       style={{
-                        backgroundColor: isActiveParent ? SIDEBAR_ACTIVE_BG : undefined,
-                        color: isActiveParent ? COLOR_PRIMARY : TEXT_SECONDARY,
+                        backgroundColor: isActiveParent ? (isDark ? '#152547' : SIDEBAR_ACTIVE_BG) : undefined,
+                        color: isActiveParent ? COLOR_PRIMARY : (isDark ? '#cbd5e1' : TEXT_SECONDARY),
                       }}
                       onMouseEnter={(e) => {
-                        if (!isActiveParent) e.currentTarget.style.backgroundColor = SIDEBAR_HOVER_BG;
+                        if (!isActiveParent) e.currentTarget.style.backgroundColor = isDark ? '#0f1c35' : SIDEBAR_HOVER_BG;
                       }}
                       onMouseLeave={(e) => {
                         if (!isActiveParent) e.currentTarget.style.backgroundColor = 'transparent';
@@ -615,7 +644,7 @@ export const Layout = () => {
                       >
                         <item.icon
                           size={18}
-                          style={{ color: isActiveParent ? COLOR_PRIMARY : TEXT_MUTED }}
+                          style={{ color: isActiveParent ? COLOR_PRIMARY : (isDark ? '#94a3b8' : TEXT_MUTED) }}
                           className="transition-colors group-hover:text-[#155EEF] shrink-0"
                         />
                         {!sidebarCollapsed && (
@@ -633,12 +662,12 @@ export const Layout = () => {
                             if (item.name === 'Solutions') setSolutionsExpanded(!solutionsExpanded);
                             if (item.name === 'Reports') setReportsExpanded(!reportsExpanded);
                           }}
-                          className="p-1 rounded hover:bg-slate-200/50 transition-colors ml-1 cursor-pointer"
+                          className={`p-1 rounded transition-colors ml-1 cursor-pointer ${isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-200/50'}`}
                           title={`Toggle ${item.name} submenu`}
                         >
                           <ChevronDown
                             size={14}
-                            style={{ color: isActiveParent ? COLOR_PRIMARY : TEXT_MUTED }}
+                            style={{ color: isActiveParent ? COLOR_PRIMARY : (isDark ? '#94a3b8' : TEXT_MUTED) }}
                             className={`transition-transform duration-200 group-hover:text-[#155EEF] ${
                               isExpanded ? 'rotate-180' : ''
                             }`}
@@ -661,13 +690,13 @@ export const Layout = () => {
                         }`
                       }
                       style={({ isActive }) => ({
-                        backgroundColor: isActive ? (item.path === '/' ? '#155EEF' : SIDEBAR_ACTIVE_BG) : undefined,
-                        color: isActive ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : TEXT_SECONDARY,
+                        backgroundColor: isActive ? (item.path === '/' ? '#155EEF' : (isDark ? '#152547' : SIDEBAR_ACTIVE_BG)) : undefined,
+                        color: isActive ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : (isDark ? '#cbd5e1' : TEXT_SECONDARY),
                       })}
                       onMouseEnter={(e) => {
                         const isActive = location.pathname === item.path;
                         if (!isActive) {
-                          e.currentTarget.style.backgroundColor = SIDEBAR_HOVER_BG;
+                          e.currentTarget.style.backgroundColor = isDark ? '#0f1c35' : SIDEBAR_HOVER_BG;
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -682,7 +711,7 @@ export const Layout = () => {
                           <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
                             <item.icon
                               size={18}
-                              style={{ color: isActive ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : TEXT_MUTED }}
+                              style={{ color: isActive ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : (isDark ? '#94a3b8' : TEXT_MUTED) }}
                               className="transition-colors"
                             />
                             {!sidebarCollapsed && <span className="whitespace-nowrap">{item.name}</span>}
@@ -710,7 +739,7 @@ export const Layout = () => {
                   {isExpanded && !sidebarCollapsed && item.subItems && (
                     <div
                       className="mt-1 mb-2 ml-7 flex flex-col space-y-0.5 border-l"
-                      style={{ borderColor: SIDEBAR_BORDER }}
+                      style={{ borderColor: isDark ? '#26354a' : SIDEBAR_BORDER }}
                     >
                       {item.subItems.map((sub, idx) => {
                         const showCategoryHeader =
@@ -730,8 +759,8 @@ export const Layout = () => {
                               onClick={() => setSidebarOpen(false)}
                               className="group flex items-center justify-between px-3 py-1.5 text-[13.5px] sm:text-[14px] font-medium transition-colors"
                               style={({ isActive }) => ({
-                                color: isActive ? COLOR_PRIMARY : TEXT_SECONDARY,
-                                backgroundColor: isActive ? SIDEBAR_ACTIVE_BG : 'transparent',
+                                color: isActive ? COLOR_PRIMARY : (isDark ? '#94a3b8' : TEXT_SECONDARY),
+                                backgroundColor: isActive ? (isDark ? '#1a2c4e' : SIDEBAR_ACTIVE_BG) : 'transparent',
                                 borderRadius: '0 6px 6px 0',
                                 marginLeft: '-1px',
                                 borderLeft: isActive ? `2px solid ${COLOR_PRIMARY}` : '2px solid transparent',
@@ -761,31 +790,31 @@ export const Layout = () => {
             })}
           </nav>
 
-          <div style={{ borderTopColor: SIDEBAR_BORDER }} className="border-t p-3">
+          <div style={{ borderTopColor: isDark ? '#26354a' : SIDEBAR_BORDER }} className="border-t p-3">
             <button
               className={`group flex w-full items-center rounded-xl py-2 px-2.5 border transition-colors ${sidebarCollapsed ? 'justify-center px-0' : 'justify-between'
                 }`}
-              style={{ backgroundColor: '#ffffff', borderColor: SIDEBAR_BORDER }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = SIDEBAR_HOVER_BG}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+              style={{ backgroundColor: isDark ? '#141f32' : '#ffffff', borderColor: isDark ? '#26354a' : SIDEBAR_BORDER }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? '#1e293b' : SIDEBAR_HOVER_BG}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isDark ? '#141f32' : '#ffffff'}
               title={sidebarCollapsed ? (user?.store_name || 'Main Branch') : undefined}
             >
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: '#EAF1FF', color: COLOR_PRIMARY }}>
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: isDark ? '#1a2c4e' : '#EAF1FF', color: COLOR_PRIMARY }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path></svg>
                 </div>
                 {!sidebarCollapsed && (
                   <div className="text-left leading-tight whitespace-nowrap overflow-hidden">
-                    <div className="text-[13px] font-semibold" style={{ color: TEXT_PRIMARY }}>
+                    <div className="text-[13px] font-semibold" style={{ color: isDark ? '#f1f5f9' : TEXT_PRIMARY }}>
                       {user?.store_name || 'Main Branch'}
                     </div>
-                    <div className="text-[11px] mt-0.5" style={{ color: TEXT_MUTED }}>
+                    <div className="text-[11px] mt-0.5" style={{ color: isDark ? '#94a3b8' : TEXT_MUTED }}>
                       {user?.branch_id || 'SH'}
                     </div>
                   </div>
                 )}
               </div>
-              {!sidebarCollapsed && <ChevronRight size={15} style={{ color: TEXT_MUTED }} className="group-hover:text-[#155EEF]" />}
+              {!sidebarCollapsed && <ChevronRight size={15} style={{ color: isDark ? '#94a3b8' : TEXT_MUTED }} className="group-hover:text-[#155EEF]" />}
             </button>
           </div>
         </aside>
@@ -799,7 +828,9 @@ export const Layout = () => {
             location.pathname === '/reports';
 
           return (
-            <main className="flex min-w-0 flex-1 flex-col overflow-hidden relative bg-[#f0f6ff]">
+            <main className={`flex min-w-0 flex-1 flex-col overflow-hidden relative transition-colors duration-200 ${
+              isDark ? 'bg-[#0f172a]' : 'bg-[#f0f6ff]'
+            }`}>
               <div
                 className={`flex-1 overflow-y-auto overflow-x-hidden flex flex-col transition-all duration-300 ${
                   aiOpen

@@ -41,6 +41,7 @@ import { ContactPage } from './pages/ContactPage';
 import { CustomerReportPage } from './pages/reports/CustomerReportPage';
 import { AIGeneratedReportsPage } from './pages/reports/AIGeneratedReportsPage';
 import { AIAssistantProvider } from './contexts/AIAssistantContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -78,8 +79,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
-          <AIAssistantProvider>
+        <ThemeProvider>
+          <BrowserRouter>
+            <AIAssistantProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
@@ -153,6 +155,7 @@ function App() {
             </Routes>
           </AIAssistantProvider>
         </BrowserRouter>
+        </ThemeProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

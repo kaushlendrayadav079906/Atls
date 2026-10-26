@@ -26,6 +26,7 @@ import { apiClient } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import atlasLogo from '../assets/LOGO.png';
 import { useSystemHealth } from '../hooks/useSystemHealth';
+import { useTheme } from '../contexts/ThemeContext';
 
 type ReportType = 'sales' | 'invoice' | 'payment' | 'inventory' | 'low-stock' | 'returns';
 type RangeKey = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all_time';
@@ -117,6 +118,7 @@ export const ReportsPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isSapConnected } = useSystemHealth();
+  const { isDark } = useTheme();
   const [selectedReport, setSelectedReport] = useState<ReportType>('sales');
   const [range, setRange] = useState<RangeKey>('monthly');
   const [branch, setBranch] = useState(user?.branch_id || '');
@@ -320,34 +322,46 @@ export const ReportsPage = () => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#f0f6ff] text-slate-900 flex flex-col transition-all duration-300">
-      {/* ── Section A: Hero (Full-width edge-to-edge, Light Blue Enterprise Gradient) ── */}
-      <section className="relative w-full overflow-hidden border-b border-blue-200/90 bg-gradient-to-br from-blue-100 via-sky-50 to-indigo-100/70 px-6 sm:px-12 lg:px-16 xl:px-20 2xl:px-24 py-12 sm:py-16 shadow-xs">
-        {/* Ambient subtle light-blue glowing shapes */}
-        <div className="pointer-events-none absolute -right-20 -top-20 h-96 w-96 rounded-full bg-blue-300/30 blur-3xl" />
-        <div className="pointer-events-none absolute -left-20 -bottom-20 h-96 w-96 rounded-full bg-indigo-300/30 blur-3xl" />
+    <div className={`w-full min-h-screen flex flex-col transition-all duration-300 ${
+      isDark ? 'bg-[#0f172a] text-white' : 'bg-[#f0f6ff] text-slate-900'
+    }`}>
+      {/* ── Section A: Hero (Full-width edge-to-edge, Adaptive Gradient) ── */}
+      <section className={`relative w-full overflow-hidden border-b px-6 sm:px-12 lg:px-16 xl:px-20 2xl:px-24 py-12 sm:py-16 shadow-xs ${
+        isDark
+          ? 'border-slate-700 bg-gradient-to-br from-[#1e293b] via-[#141f32] to-[#1e3456]'
+          : 'border-blue-200/90 bg-gradient-to-br from-blue-100 via-sky-50 to-indigo-100/70'
+      }`}>
+        {/* Ambient subtle glowing shapes */}
+        <div className={`pointer-events-none absolute -right-20 -top-20 h-96 w-96 rounded-full blur-3xl ${
+          isDark ? 'bg-blue-600/15' : 'bg-blue-300/30'
+        }`} />
+        <div className={`pointer-events-none absolute -left-20 -bottom-20 h-96 w-96 rounded-full blur-3xl ${
+          isDark ? 'bg-indigo-600/15' : 'bg-indigo-300/30'
+        }`} />
 
         <div className="relative z-10 max-w-5xl space-y-6">
           {/* Logo & Section Badge */}
-          <div className="inline-flex items-center gap-3 px-4 py-2 rounded-2xl bg-white/95 backdrop-blur-md border border-blue-200 shadow-xs">
+          <div className={`inline-flex items-center gap-3 px-4 py-2 rounded-2xl backdrop-blur-md border shadow-xs ${
+            isDark ? 'bg-[#1e293b]/90 border-slate-700' : 'bg-white/95 border-blue-200'
+          }`}>
             <img
               src={atlasLogo}
               alt="ATLAS Logo"
               className="h-9 w-9 object-contain drop-shadow-xs"
             />
             <div className="flex items-center gap-2">
-              <span className="text-base font-black tracking-wider text-blue-700">ATLAS</span>
-              <span className="text-slate-500 text-xs font-semibold">• Reports Section</span>
+              <span className={`text-base font-black tracking-wider ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>ATLAS</span>
+              <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>• Reports Section</span>
             </div>
           </div>
 
           {/* Headline */}
-          <h1 className="atlas-page-title text-3xl sm:text-4xl lg:text-[42px] font-extrabold text-slate-900">
-            Reports & Analytics <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700">Hub</span>
+          <h1 className={`atlas-page-title text-3xl sm:text-4xl lg:text-[42px] font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            Reports & Analytics <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-500 to-indigo-400">Hub</span>
           </h1>
 
           {/* Description */}
-          <p className="atlas-body text-base sm:text-lg text-slate-600 max-w-3xl leading-relaxed">
+          <p className={`atlas-body text-base sm:text-lg max-w-3xl leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
             Access specialized report modules for sales, invoices, tender payments, warehouse inventory, and customer intelligence, or generate customized multi-format exports.
           </p>
 
@@ -366,7 +380,11 @@ export const ReportsPage = () => {
                 const el = document.getElementById('custom-report-builder');
                 if (el) el.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl bg-white hover:bg-blue-50 text-blue-700 text-[13.5px] sm:text-[14px] font-bold border border-blue-300 shadow-xs transition-all duration-150 cursor-pointer"
+              className={`inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-[13.5px] sm:text-[14px] font-bold border shadow-xs transition-all duration-150 cursor-pointer ${
+                isDark
+                  ? 'bg-[#1e293b] hover:bg-slate-800 text-blue-300 border-slate-700'
+                  : 'bg-white hover:bg-blue-50 text-blue-700 border-blue-300'
+              }`}
             >
               <Download size={16} />
               <span>Custom Data Exports</span>
@@ -374,39 +392,51 @@ export const ReportsPage = () => {
 
             <button
               onClick={() => window.dispatchEvent(new CustomEvent('atls-toggle-ai', { detail: { open: true } }))}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/90 hover:bg-indigo-50 text-indigo-700 text-[13.5px] sm:text-[14px] font-bold border border-indigo-200 shadow-xs transition-all duration-150 cursor-pointer"
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13.5px] sm:text-[14px] font-bold border shadow-xs transition-all duration-150 cursor-pointer ${
+                isDark
+                  ? 'bg-indigo-950/70 hover:bg-indigo-900/80 text-indigo-300 border-indigo-800'
+                  : 'bg-white/90 hover:bg-indigo-50 text-indigo-700 border-indigo-200'
+              }`}
             >
-              <Sparkles size={16} className="text-indigo-600" />
+              <Sparkles size={16} className={isDark ? 'text-indigo-400' : 'text-indigo-600'} />
               <span>Ask ATLAS AI</span>
             </button>
           </div>
 
           {/* Verified System Status Pills */}
-          <div className="pt-3 flex flex-wrap items-center gap-3 text-xs text-slate-700">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/90 border border-blue-200/90 shadow-2xs">
+          <div className={`pt-3 flex flex-wrap items-center gap-3 text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border shadow-2xs ${
+              isDark ? 'bg-[#1e293b]/90 border-slate-700' : 'bg-white/90 border-blue-200/90'
+            }`}>
               <span className={`h-2 w-2 rounded-full ${isSapConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
               <span className="font-semibold text-[12px]">{isSapConnected ? 'SAP Business One Live Connected' : 'SAP Offline'}</span>
             </div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/90 border border-blue-200/90 shadow-2xs">
-              <Layers size={13} className="text-blue-600" />
+            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border shadow-2xs ${
+              isDark ? 'bg-[#1e293b]/90 border-slate-700' : 'bg-white/90 border-blue-200/90'
+            }`}>
+              <Layers size={13} className={isDark ? 'text-blue-400' : 'text-blue-600'} />
               <span className="font-semibold text-[12px]">6 Report Modules + Visual Analytics</span>
             </div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/90 border border-blue-200/90 shadow-2xs">
-              <ShieldCheck size={13} className="text-emerald-600" />
+            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border shadow-2xs ${
+              isDark ? 'bg-[#1e293b]/90 border-slate-700' : 'bg-white/90 border-blue-200/90'
+            }`}>
+              <ShieldCheck size={13} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
               <span className="font-medium text-[12px]">On-Demand Multi-Format Data Exports</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Section B: Main Content (Full-width, Light Blue Background) ── */}
-      <section className="w-full py-10 sm:py-14 px-6 sm:px-12 lg:px-16 xl:px-20 2xl:px-24 space-y-8 bg-[#f0f6ff]">
+      {/* ── Section B: Main Content (Full-width, Adaptive Background) ── */}
+      <section className={`w-full py-10 sm:py-14 px-6 sm:px-12 lg:px-16 xl:px-20 2xl:px-24 space-y-8 ${
+        isDark ? 'bg-[#0f172a]' : 'bg-[#f0f6ff]'
+      }`}>
 
       {/* Reporting & Analytics Modules Grid */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="atlas-section-title text-lg sm:text-[21px] font-bold text-slate-900">Reporting & Analytics Modules</h2>
-          <span className="atlas-meta text-xs sm:text-sm text-slate-500 font-medium">6 Report Modules + Visual Analytics</span>
+          <h2 className={`atlas-section-title text-lg sm:text-[21px] font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Reporting & Analytics Modules</h2>
+          <span className={`atlas-meta text-xs sm:text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>6 Report Modules + Visual Analytics</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -416,12 +446,18 @@ export const ReportsPage = () => {
               <div
                 key={card.title}
                 onClick={() => navigate(card.path)}
-                className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs hover:shadow-md hover:border-blue-400 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col justify-between group"
+                className={`rounded-2xl border p-4 shadow-2xs hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col justify-between group ${
+                  isDark
+                    ? 'bg-[#1e293b] border-slate-700 hover:border-blue-500/60 shadow-[0_4px_25px_rgba(0,0,0,0.4)]'
+                    : 'bg-white border-slate-200/90 hover:shadow-md hover:border-blue-400'
+                }`}
               >
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-2.5">
-                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${card.iconBg} ${card.iconColor} shadow-2xs group-hover:scale-105 transition-transform`}>
-                      <Icon size={18} />
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-xl shadow-2xs group-hover:scale-105 transition-transform ${
+                      isDark ? 'bg-[#141f32] border border-slate-700' : `${card.iconBg} ${card.iconColor}`
+                    }`}>
+                      <Icon size={18} className={isDark ? 'text-blue-400' : undefined} />
                     </div>
                     {card.badge && (
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${card.badgeColor}`}>
@@ -430,15 +466,21 @@ export const ReportsPage = () => {
                     )}
                   </div>
 
-                  <h3 className="atlas-card-title text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                  <h3 className={`atlas-card-title text-base font-bold transition-colors ${
+                    isDark ? 'text-white group-hover:text-blue-400' : 'text-slate-900 group-hover:text-blue-600'
+                  }`}>
                     {card.title}
                   </h3>
-                  <p className="atlas-body-sm text-[13px] text-slate-500 mt-1 leading-relaxed">
+                  <p className={`atlas-body-sm text-[13px] mt-1 leading-relaxed ${
+                    isDark ? 'text-slate-400' : 'text-slate-500'
+                  }`}>
                     {card.description}
                   </p>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-blue-600 group-hover:text-blue-700">
+                <div className={`mt-4 pt-3 border-t flex items-center justify-between text-xs font-semibold text-blue-500 group-hover:text-blue-400 ${
+                  isDark ? 'border-slate-700' : 'border-slate-100'
+                }`}>
                   <span>Open {card.title}</span>
                   <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
                 </div>
@@ -449,9 +491,11 @@ export const ReportsPage = () => {
       </div>
 
       {/* Divider / Section Title for On-demand Report Builder */}
-      <div id="custom-report-builder" className="pt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between border-t border-blue-200/80">
+      <div id="custom-report-builder" className={`pt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between border-t ${
+        isDark ? 'border-slate-700' : 'border-blue-200/80'
+      }`}>
         <div>
-          <h2 className="atlas-section-title text-lg sm:text-[21px] font-bold tracking-tight text-slate-900">Custom Report Builder & Data Exports</h2>
+          <h2 className={`atlas-section-title text-lg sm:text-[21px] font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>Custom Report Builder & Data Exports</h2>
           <p className="mt-0.5 atlas-page-subtitle text-sm text-slate-500">Generate on-demand CSV / Excel data exports with custom date ranges and branch filters</p>
         </div>
 

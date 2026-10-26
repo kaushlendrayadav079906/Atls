@@ -113,7 +113,7 @@ const AIAssistantContext = createContext<AIAssistantContextType | undefined>(und
 export const AIAssistantProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const location = useLocation();
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [conversationId, setConversationId] = useState<string | null>(null);

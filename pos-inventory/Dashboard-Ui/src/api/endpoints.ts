@@ -120,8 +120,188 @@ export const dashboardApi = {
   getInventoryRisk: async (): Promise<InventoryRiskItem[]> => {
     const res = await apiClient.get('/dashboard/inventory-risk');
     return res.data;
+  },
+  getExecutiveCommand: async (params?: {
+    range?: string;
+    branch?: string;
+    from_date?: string;
+    to_date?: string;
+    date_from?: string;
+    date_to?: string;
+    force_refresh?: boolean;
+  }): Promise<ExecutiveCommandResponse> => {
+    const res = await apiClient.get('/dashboard/executive-command', { params });
+    return res.data;
   }
 };
+
+export interface ExecutiveIntelligenceBrief {
+  title: string;
+  summary_text: string;
+  confidence: number;
+  confidence_basis: string;
+  updated_at: string;
+  data_source_status: string;
+  key_findings: string[];
+  recommended_actions: Array<{
+    priority: number;
+    action: string;
+    route: string;
+    module: string;
+  }>;
+}
+
+export interface ExecutiveKpis {
+  cash_health: {
+    name: string;
+    value: number;
+    currency: string;
+    formatted: string;
+    growth: number;
+    subtext: string;
+    period_label: string;
+    status: string;
+    route: string;
+  };
+  operational_pulse: {
+    name: string;
+    value: string;
+    produced_units: number;
+    pending_units: number;
+    open_orders: number;
+    subtext: string;
+    period_label: string;
+    status: string;
+    route: string;
+  };
+  margin_integrity: {
+    name: string;
+    value: string;
+    gross_profit: number;
+    subtext: string;
+    period_label: string;
+    status: string;
+    route: string;
+  };
+  overall_risk_score: {
+    name: string;
+    value: string;
+    score: number;
+    max_score: number;
+    critical_actions: number;
+    subtext: string;
+    period_label: string;
+    status: string;
+    route: string;
+  };
+  sales_invoiced: {
+    name: string;
+    value: number;
+    invoice_count: number;
+    growth: number;
+    formatted: string;
+    period_label: string;
+    route: string;
+  };
+  receivables: {
+    name: string;
+    value: number;
+    formatted: string;
+    debtor_count: number;
+    overdue_top: number;
+    route: string;
+  };
+  payables: {
+    name: string;
+    value: number;
+    formatted: string;
+    open_po_count: number;
+    route: string;
+  };
+  bank_balance: {
+    name: string;
+    value: number | null;
+    formatted: string;
+    status: string;
+    subtext: string;
+    route: string;
+  };
+}
+
+export interface ExecutiveGapCard {
+  id: string;
+  rank: number;
+  title: string;
+  category: 'Finance' | 'Production' | 'Supply Chain' | 'Quality';
+  category_color: 'blue' | 'rose' | 'amber' | 'purple';
+  impact_value: string;
+  impact_label: string;
+  deviation: string;
+  deviation_type: 'negative' | 'neutral' | 'warning';
+  supporting_detail: string;
+  ai_recommendation: string;
+  owner: string;
+  route: string;
+}
+
+export interface ExecutiveActionItem {
+  id: string;
+  title: string;
+  category: string;
+  impact: string;
+  priority: 'High' | 'Medium' | 'Low';
+  route: string;
+  action_label: string;
+}
+
+export interface ExecutiveCommandResponse {
+  brief: ExecutiveIntelligenceBrief;
+  kpis: ExecutiveKpis;
+  gap_cards: ExecutiveGapCard[];
+  action_queue: ExecutiveActionItem[];
+  today_snapshot: {
+    revenue: { name: string; trend: string; is_positive: boolean };
+    gross_margin: { name: string; trend: string; is_positive: boolean };
+    production_oee: { name: string; trend: string; is_positive: boolean };
+    cash_flow: { name: string; trend: string; is_positive: boolean };
+  };
+  risk_radar: {
+    labels: string[];
+    values: number[];
+  };
+  charts: {
+    sales_vs_purchases: Array<{
+      period: string;
+      month: string;
+      sales: number;
+      revenue: number;
+      purchases: number;
+      cost: number;
+      gross_profit: number;
+      gross_margin: number;
+      margin_pct: number;
+    }>;
+    payments_trend: Array<{
+      period: string;
+      month: string;
+      incoming: number;
+      outgoing: number;
+    }>;
+    production: {
+      total_production: number;
+      pending_production: number;
+      planned_orders: number;
+      released_orders: number;
+      completed_orders: number;
+    };
+  };
+  period: {
+    from_date?: string;
+    to_date?: string;
+    label?: string;
+  };
+  refreshed_at: string;
+}
 
 export const atlasApi = {
   getSalesTrend: async (branch_id?: string, range: string = 'monthly', customer?: string, category?: string, payment_method?: string, from_date?: string, to_date?: string, group_by?: string): Promise<any> => {
