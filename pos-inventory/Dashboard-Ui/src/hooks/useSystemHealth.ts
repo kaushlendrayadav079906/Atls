@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useRef, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 
 export interface SapHealthDetails {
@@ -19,30 +19,67 @@ export interface SystemHealthState {
   checkHealth: () => Promise<void>;
 }
 
-export const useSystemHealth = (pollIntervalMs = 20000): SystemHealthState => {
-  const queryClient = useQueryClient();
-  const [isSapConnected, setIsSapConnected] = useState<boolean | null>(null);
-  const [isDbConnected, setIsDbConnected] = useState<boolean | null>(null);
-  const [sapDetails, setSapDetails] = useState<SapHealthDetails | null>(null);
-  const [lastChecked, setLastChecked] = useState<Date | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+interface RawHealthResult {
+  isSapConnected: boolean;
+  isDbConnected: boolean;
+  sapDetails: SapHealthDetails;
+}
 
+const fetchHealth = async (): Promise<RawHealthResult> => {
+  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3001/api/v1';
+
+  try {
+    // 1. Try dedicated SAP health endpoint (4s timeout max, never blocks the browser or server)
+    const sapRes = await axios.get<SapHealthDetails>(`${baseURL}/health/sap`, { timeout: 4000 });
+    const sapOk = sapRes.data?.status === 'connected';
+
+    return {
+      isSapConnected: sapOk,
+      isDbConnected: true,
+      sapDetails: sapRes.data,
+    };
+  } catch {
+    // 2. Fallback to top-level /health
+    try {
+      const rootHealthUrl = baseURL.replace(/\/api\/v1\/?$/, '/health');
+      const rootRes = await axios.get(rootHealthUrl, { timeout: 4000 });
+      const sapStatus = rootRes.data?.dependencies?.sap === 'connected';
+      const dbStatus = rootRes.data?.dependencies?.database === 'connected';
+
+      return {
+        isSapConnected: sapStatus,
+        isDbConnected: dbStatus,
+        sapDetails: {
+          status: sapStatus ? 'connected' : 'disconnected',
+          authenticated: sapStatus,
+          message: sapStatus ? 'SAP connected' : 'SAP unavailable',
+        },
+      };
+    } catch {
+      return {
+        isSapConnected: false,
+        isDbConnected: false,
+        sapDetails: {
+          status: 'disconnected',
+          authenticated: false,
+          message: 'Backend server unreachable',
+        },
+      };
+    }
+  }
+};
+
+export const useSystemHealth = (pollIntervalMs = 30000): SystemHealthState => {
+  const queryClient = useQueryClient();
   const prevSapConnectedRef = useRef<boolean | null>(null);
 
-  const checkHealth = useCallback(async () => {
-    setIsLoading(true);
-    const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3001/api/v1';
+  const { data, isLoading, refetch, dataUpdatedAt } = useQuery<RawHealthResult>({
+    queryKey: ['systemHealthState'],
+    queryFn: async () => {
+      const result = await fetchHealth();
+      const sapOk = result.isSapConnected;
 
-    try {
-      // 1. Try dedicated SAP health endpoint first (30s timeout for cold-start SAP login over VPN)
-      const sapRes = await axios.get<SapHealthDetails>(`${baseURL}/health/sap`, { timeout: 30000 });
-      const sapOk = sapRes.data?.status === 'connected';
-
-      setSapDetails(sapRes.data);
-      setIsSapConnected(sapOk);
-      setLastChecked(new Date());
-
-      // Check if SAP just reconnected after an outage
+      // Invalidate dashboard queries once SAP reconnects
       if (prevSapConnectedRef.current === false && sapOk) {
         queryClient.invalidateQueries({ queryKey: ['atlasOverview'] });
         queryClient.invalidateQueries({ queryKey: ['recentSales'] });
@@ -50,72 +87,28 @@ export const useSystemHealth = (pollIntervalMs = 20000): SystemHealthState => {
         queryClient.invalidateQueries({ queryKey: ['salesTrend'] });
         queryClient.invalidateQueries({ queryKey: ['inventoryRisk'] });
         queryClient.invalidateQueries({ queryKey: ['dashboardAlerts'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-overview'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-distribution'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-category-value'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-movements-list'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-valuation'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-low-stock'] });
-        queryClient.invalidateQueries({ queryKey: ['inventory-expiry'] });
+        queryClient.invalidateQueries({ queryKey: ['executiveCommand'] });
       }
       prevSapConnectedRef.current = sapOk;
-    } catch {
-      // Fallback to top-level /health
-      try {
-        const rootHealthUrl = baseURL.replace(/\/api\/v1\/?$/, '/health');
-        const rootRes = await axios.get(rootHealthUrl, { timeout: 30000 });
-        const sapStatus = rootRes.data?.dependencies?.sap === 'connected';
-        const dbStatus = rootRes.data?.dependencies?.database === 'connected';
+      return result;
+    },
+    staleTime: 20000,
+    refetchInterval: pollIntervalMs,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
-        setIsSapConnected(sapStatus);
-        setIsDbConnected(dbStatus);
-        setSapDetails({
-          status: sapStatus ? 'connected' : 'disconnected',
-          authenticated: sapStatus,
-          message: sapStatus ? 'SAP connected' : 'SAP unavailable',
-        });
-        setLastChecked(new Date());
-
-        if (prevSapConnectedRef.current === false && sapStatus) {
-          console.info('[useSystemHealth] SAP reconnected via fallback! Invalidating queries...');
-          queryClient.invalidateQueries({ queryKey: ['atlasOverview'] });
-          queryClient.invalidateQueries({ queryKey: ['recentSales'] });
-          queryClient.invalidateQueries({ queryKey: ['topProducts'] });
-          queryClient.invalidateQueries({ queryKey: ['salesTrend'] });
-          queryClient.invalidateQueries({ queryKey: ['inventoryRisk'] });
-          queryClient.invalidateQueries({ queryKey: ['dashboardAlerts'] });
-        }
-        prevSapConnectedRef.current = sapStatus;
-      } catch {
-        setIsSapConnected(false);
-        setIsDbConnected(false);
-        setSapDetails({
-          status: 'disconnected',
-          authenticated: false,
-          message: 'Backend server unreachable',
-        });
-        setLastChecked(new Date());
-        prevSapConnectedRef.current = false;
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [queryClient]);
-
-  useEffect(() => {
-    checkHealth();
-    const timer = setInterval(checkHealth, pollIntervalMs);
-    return () => clearInterval(timer);
-  }, [checkHealth, pollIntervalMs]);
+  const checkHealth = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   return {
-    isSapConnected,
-    isDbConnected,
-    sapDetails,
-    lastChecked,
+    isSapConnected: data ? data.isSapConnected : null,
+    isDbConnected: data ? data.isDbConnected : null,
+    sapDetails: data ? data.sapDetails : null,
+    lastChecked: dataUpdatedAt ? new Date(dataUpdatedAt) : null,
     isLoading,
     checkHealth,
   };
 };
+

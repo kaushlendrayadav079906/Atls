@@ -348,7 +348,7 @@ export const Dashboard = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className={`atlas-page-title text-[26px] sm:text-[30px] font-bold tracking-tight leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <h1 className={`atlas-page-title text-[28px] sm:text-[30px] md:text-[32px] font-bold tracking-tight leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
               Executive Command Center
             </h1>
             <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold shadow-3xs ${
@@ -358,7 +358,7 @@ export const Dashboard = () => {
               <span>Live SAP B1</span>
             </span>
           </div>
-          <p className={`atlas-page-subtitle text-xs sm:text-[14px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`atlas-page-subtitle text-[13.5px] sm:text-[14.5px] mt-1 font-normal leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
             Real-time financial position, customer collections, manufacturing output, and prioritized action intelligence.
           </p>
         </div>
@@ -368,10 +368,10 @@ export const Dashboard = () => {
           <select
             value={branchId}
             onChange={(e) => setBranchId(e.target.value)}
-            className={`rounded-lg border px-3 py-1.5 text-[12px] font-medium outline-none shadow-2xs transition ${
+            className={`rounded-lg border px-3 py-1.5 text-[13px] sm:text-[13.5px] font-medium outline-none shadow-2xs transition ${
               isDark
                 ? 'border-slate-700 bg-[#141f32] text-slate-200 hover:border-slate-600'
-                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
             }`}
           >
             {user?.role === 'admin' && <option value="">All Branches</option>}
@@ -384,17 +384,17 @@ export const Dashboard = () => {
           <div className="relative dashboard-date-dropdown-container">
             <button
               onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-[12px] shadow-2xs cursor-pointer border ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors font-medium text-[13px] sm:text-[13.5px] shadow-2xs cursor-pointer border ${
                 isDark
                   ? 'border-slate-700 bg-[#141f32] text-slate-200 hover:bg-slate-800'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'
               }`}
             >
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <Calendar className="w-3.5 h-3.5 text-slate-500" />
               <span>
                 {getDateScopeLabel(quickFilter, dateFrom, dateTo)}
               </span>
-              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isDateDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${isDateDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isDateDropdownOpen && (
@@ -403,16 +403,16 @@ export const Dashboard = () => {
               }`}>
                 <button
                   onClick={() => applyQuickFilter('')}
-                  className={`w-full text-left px-4 py-2 text-sm transition-colors cursor-pointer ${
+                  className={`w-full text-left px-4 py-2 text-[13.5px] transition-colors cursor-pointer ${
                     quickFilter === ''
                       ? (isDark ? 'bg-blue-600/20 text-blue-400 font-semibold' : 'bg-blue-50 text-blue-700 font-semibold')
-                      : (isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50')
+                      : (isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50 font-normal')
                   }`}
                 >
                   All Dates (Total)
                 </button>
-                <div className={`px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider border-y ${
-                  isDark ? 'text-slate-400 border-slate-700 bg-[#141f32]' : 'text-slate-500 border-slate-100 bg-slate-50'
+                <div className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-y ${
+                  isDark ? 'text-slate-300 border-slate-700 bg-[#141f32]' : 'text-slate-700 border-slate-200 bg-slate-50'
                 }`}>
                   Quick Filters
                 </div>
@@ -422,28 +422,28 @@ export const Dashboard = () => {
                     <button
                       key={f}
                       onClick={() => applyQuickFilter(f)}
-                      className={`w-full text-left px-4 py-2 text-sm transition-colors cursor-pointer ${
+                      className={`w-full text-left px-4 py-2 text-[13.5px] transition-colors cursor-pointer ${
                         quickFilter === f
                           ? (isDark ? 'bg-blue-600/20 text-blue-400 font-semibold' : 'bg-blue-50 text-blue-700 font-semibold')
-                          : (isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50')
+                          : (isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50 font-normal')
                       }`}
                     >
                       {label}
                     </button>
                   );
                 })}
-                <div className={`px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider border-y mt-1 ${
-                  isDark ? 'text-slate-400 border-slate-700 bg-[#141f32]' : 'text-slate-500 border-slate-100 bg-slate-50'
+                <div className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-y mt-1 ${
+                  isDark ? 'text-slate-300 border-slate-700 bg-[#141f32]' : 'text-slate-700 border-slate-200 bg-slate-50'
                 }`}>
                   Custom Range
                 </div>
                 <div className="p-3 flex flex-col gap-2">
                   <div>
-                    <label className={`text-[11px] mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>From</label>
+                    <label className={`text-xs font-semibold mb-1 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>From</label>
                     <input
                       type="date"
-                      className={`w-full text-sm border rounded px-2 py-1 outline-none ${
-                        isDark ? 'border-slate-700 bg-[#141f32] text-slate-200' : 'border-slate-200 bg-white text-slate-800'
+                      className={`w-full text-sm border rounded px-2 py-1 outline-none font-medium ${
+                        isDark ? 'border-slate-700 bg-[#141f32] text-slate-200' : 'border-slate-300 bg-white text-slate-800'
                       }`}
                       value={customFrom}
                       onChange={e => {
@@ -453,11 +453,11 @@ export const Dashboard = () => {
                     />
                   </div>
                   <div>
-                    <label className={`text-[11px] mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>To</label>
+                    <label className={`text-xs font-semibold mb-1 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>To</label>
                     <input
                       type="date"
-                      className={`w-full text-sm border rounded px-2 py-1 outline-none ${
-                        isDark ? 'border-slate-700 bg-[#141f32] text-slate-200' : 'border-slate-200 bg-white text-slate-800'
+                      className={`w-full text-sm border rounded px-2 py-1 outline-none font-medium ${
+                        isDark ? 'border-slate-700 bg-[#141f32] text-slate-200' : 'border-slate-300 bg-white text-slate-800'
                       }`}
                       value={customTo}
                       onChange={e => {
@@ -467,12 +467,12 @@ export const Dashboard = () => {
                     />
                   </div>
                   {customError && (
-                    <p className="text-[11px] text-rose-500 font-medium">{customError}</p>
+                    <p className="text-xs text-rose-500 font-semibold">{customError}</p>
                   )}
                   <button
                     disabled={!customFrom || !customTo || customFrom > customTo}
                     onClick={() => applyQuickFilter('custom')}
-                    className="w-full mt-2 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 text-white rounded font-medium text-sm transition-colors cursor-pointer"
+                    className="w-full mt-2 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 text-white rounded-lg font-semibold text-sm transition-colors cursor-pointer"
                   >
                     Apply Custom
                   </button>
@@ -485,7 +485,7 @@ export const Dashboard = () => {
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-[12px] font-medium text-white shadow-2xs hover:bg-blue-500 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-[12.5px] font-semibold text-white shadow-2xs hover:bg-blue-500 transition cursor-pointer"
             title="Refresh metrics from SAP"
           >
             <RefreshCcw size={13} className={isRefreshing ? 'animate-spin' : ''} />
@@ -495,15 +495,15 @@ export const Dashboard = () => {
           {/* Dark / Light Mode Toggle Button */}
           <button
             onClick={toggleTheme}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[12px] font-semibold border transition-all cursor-pointer shadow-2xs ${
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[12.5px] font-semibold border transition-all cursor-pointer shadow-2xs ${
               isDark
                 ? 'bg-slate-800 border-slate-700 text-amber-300 hover:bg-slate-700 hover:text-amber-200 ring-1 ring-amber-400/30'
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50'
             }`}
             title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             aria-label="Toggle Dark/Light Mode"
           >
-            {isDark ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-slate-600" />}
+            {isDark ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-slate-700" />}
             <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
         </div>
@@ -526,12 +526,12 @@ export const Dashboard = () => {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-base sm:text-[17px] font-bold tracking-tight text-white flex items-center gap-1.5">
+                  <h2 className="text-[18px] sm:text-[20px] font-semibold tracking-tight text-white flex items-center gap-1.5">
                     {execData?.brief?.title || 'AI Daily Intelligence Brief'}
                   </h2>
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                  <span className="inline-block h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
+                <div className="text-xs text-slate-300 font-medium mt-0.5">
                   Updated {formatTime(execData?.brief?.updated_at || execUpdatedAt)} • Live SAP Business One Service Layer
                 </div>
               </div>
@@ -540,7 +540,7 @@ export const Dashboard = () => {
             <div className="flex items-center gap-3 self-start sm:self-auto">
               {/* Confidence Indicator with circular stroke */}
               <div
-                className="flex items-center gap-2 rounded-xl bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 text-[11px] cursor-help transition hover:bg-slate-800"
+                className="flex items-center gap-2 rounded-xl bg-slate-800/90 border border-slate-700/80 px-3 py-1.5 text-xs font-semibold cursor-help transition hover:bg-slate-800"
                 title={execData?.brief?.confidence_basis || 'Verified directly against live SAP Business One Service Layer documents.'}
               >
                 <div className="relative flex h-5 w-5 items-center justify-center">
@@ -562,30 +562,30 @@ export const Dashboard = () => {
                   </svg>
                   <Check size={10} className="text-emerald-400 absolute" strokeWidth={3} />
                 </div>
-                <span className="font-semibold text-emerald-400">
+                <span className="font-semibold text-emerald-400 text-xs">
                   Confidence {execData?.brief?.confidence || 94}%
                 </span>
               </div>
 
               {/* SAP Connection Status */}
-              <span className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-semibold ${isSapConnected === true
-                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${isSapConnected ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
+              <span className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold ${isSapConnected === true
+                ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                : 'border-amber-500/40 bg-amber-500/15 text-amber-300'}`}>
+                <span className={`h-2 w-2 rounded-full ${isSapConnected ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
                 <span>{isSapConnected ? 'SAP Connected' : 'SAP Offline (Cached)'}</span>
               </span>
             </div>
           </div>
 
           {/* Executive Narrative Paragraph */}
-          <div className="text-[13.5px] sm:text-[14px] leading-relaxed text-slate-200 font-normal">
+          <div className="text-[14px] sm:text-[14.5px] leading-relaxed text-slate-100 font-normal">
             {loadingExec ? (
               <div className="animate-pulse space-y-2 py-1">
                 <div className="h-4 bg-slate-700/60 rounded w-full" />
                 <div className="h-4 bg-slate-700/60 rounded w-4/5" />
               </div>
             ) : errorExec ? (
-              <p className="text-amber-300 text-xs">
+              <p className="text-amber-300 text-xs font-medium">
                 ⚠️ Live AI synthesis unavailable; displaying deterministic SAP metrics below. Check backend connection.
               </p>
             ) : (
@@ -595,26 +595,26 @@ export const Dashboard = () => {
 
           {/* Key Findings & Recommended Action Sequence */}
           {execData?.brief?.recommended_actions && execData.brief.recommended_actions.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 pt-1 text-[12px]">
-              <span className="font-semibold text-cyan-300">Priority Action Sequence:</span>
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+              <span className="font-semibold text-cyan-300 text-xs">Priority Action Sequence:</span>
               {execData.brief.recommended_actions.map((act: any, idx: number) => (
                 <button
                   key={idx}
                   onClick={() => navigate(act.route)}
-                  className="inline-flex items-center gap-1 rounded-lg bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 px-2.5 py-1 text-slate-200 hover:text-white transition cursor-pointer text-[11px] group"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 text-slate-100 hover:text-white transition cursor-pointer text-xs font-medium group"
                 >
-                  <span className="h-4 w-4 rounded-full bg-cyan-500/20 text-cyan-300 text-[9.5px] font-bold flex items-center justify-center">
+                  <span className="h-4 w-4 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-bold flex items-center justify-center">
                     {act.priority || idx + 1}
                   </span>
                   <span>{act.action}</span>
-                  <ArrowUpRight size={11} className="text-slate-400 group-hover:text-cyan-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  <ArrowUpRight size={12} className="text-slate-400 group-hover:text-cyan-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </button>
               ))}
             </div>
           )}
 
           {/* Inline "Ask ATLAS anything..." Search Bar */}
-          <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/80 px-3.5 py-2 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition shadow-inner">
+          <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/80 px-3.5 py-2.5 focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500 transition shadow-inner">
             <Sparkles size={16} className="text-cyan-400 shrink-0" />
             <input
               type="text"
@@ -627,12 +627,12 @@ export const Dashboard = () => {
                 }
               }}
               placeholder="Ask ATLAS anything... (e.g. Which customers have overdue payments? Are we making a profit?)"
-              className="w-full bg-transparent text-[13px] text-white placeholder:text-slate-500 outline-none"
+              className="w-full bg-transparent text-sm text-white placeholder:text-slate-400 outline-none font-normal"
             />
             <button
               onClick={() => handleAskAI(inlinePrompt)}
               disabled={!inlinePrompt.trim()}
-              className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold disabled:opacity-30 disabled:hover:bg-cyan-500 transition cursor-pointer shrink-0"
+              className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold disabled:opacity-30 disabled:hover:bg-cyan-500 transition cursor-pointer shrink-0"
               title="Submit prompt to ATLAS AI Assistant"
             >
               <Send size={13} />
@@ -660,7 +660,7 @@ export const Dashboard = () => {
             }`}>
               <Wallet size={20} />
             </div>
-            <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10.5px] font-bold ${
+            <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-[11px] font-bold tracking-wider ${
               isDark ? 'border-emerald-800/60 bg-emerald-950/50 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
             }`}>
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -669,14 +669,14 @@ export const Dashboard = () => {
           </div>
 
           <div className="mt-3">
-            <div className={`text-[12px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <div className={`text-[13.5px] sm:text-[14px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
               {execData?.kpis?.cash_health?.name || 'Cash & Collections Health'}
             </div>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className={`text-[24px] sm:text-[26px] font-black tracking-tight leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <span className={`text-[25px] sm:text-[28px] font-bold tracking-tight leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {loadingExec ? '...' : (execData?.kpis?.cash_health?.formatted || '₹0.00')}
               </span>
-              <span className="text-[11.5px] font-bold text-emerald-500 flex items-center">
+              <span className="text-xs font-semibold text-emerald-500 flex items-center">
                 <ArrowUpRight size={13} />
                 <span>+4.2%</span>
               </span>
@@ -698,12 +698,12 @@ export const Dashboard = () => {
             </ResponsiveContainer>
           </div>
 
-          <div className={`mt-2 pt-2 border-t flex items-center justify-between text-[11px] ${
-            isDark ? 'border-slate-700 text-slate-400' : 'border-slate-100 text-slate-500'
+          <div className={`mt-2 pt-2 border-t flex items-center justify-between text-xs sm:text-[12.5px] font-medium ${
+            isDark ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-600'
           }`}>
             <span className="truncate">{execData?.kpis?.cash_health?.subtext || 'Verified customer payments'}</span>
             <ChevronRight size={13} className={`group-hover:translate-x-0.5 transition-transform shrink-0 ${
-              isDark ? 'text-slate-500 group-hover:text-emerald-400' : 'text-slate-400 group-hover:text-emerald-600'
+              isDark ? 'text-slate-400 group-hover:text-emerald-400' : 'text-slate-500 group-hover:text-emerald-600'
             }`} />
           </div>
         </div>
@@ -723,7 +723,7 @@ export const Dashboard = () => {
             }`}>
               <Factory size={20} />
             </div>
-            <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10.5px] font-bold ${
+            <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-[11px] sm:text-[11.5px] font-semibold tracking-wider ${
               isDark ? 'border-cyan-800/60 bg-cyan-950/50 text-cyan-300' : 'border-blue-200 bg-blue-50 text-blue-700'
             }`}>
               <span>MANUFACTURING</span>
@@ -731,14 +731,14 @@ export const Dashboard = () => {
           </div>
 
           <div className="mt-3">
-            <div className={`text-[12px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <div className={`text-[13.5px] sm:text-[14px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
               {execData?.kpis?.operational_pulse?.name || 'Operational Pulse (Production)'}
             </div>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className={`text-[24px] sm:text-[26px] font-black tracking-tight leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <span className={`text-[25px] sm:text-[28px] font-bold tracking-tight leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {loadingExec ? '...' : (execData?.kpis?.operational_pulse?.value || '39.0%')}
               </span>
-              <span className="text-[11.5px] font-bold text-rose-500 flex items-center">
+              <span className="text-xs font-semibold text-rose-500 flex items-center">
                 <ArrowDownRight size={13} />
                 <span>-3.2% vs plan</span>
               </span>
@@ -754,12 +754,12 @@ export const Dashboard = () => {
             </ResponsiveContainer>
           </div>
 
-          <div className={`mt-2 pt-2 border-t flex items-center justify-between text-[11px] ${
-            isDark ? 'border-slate-700 text-slate-400' : 'border-slate-100 text-slate-500'
+          <div className={`mt-2 pt-2 border-t flex items-center justify-between text-xs sm:text-[12.5px] font-medium ${
+            isDark ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-600'
           }`}>
             <span className="truncate">{execData?.kpis?.operational_pulse?.subtext || '2,216 produced • 3,471 units pending'}</span>
             <ChevronRight size={13} className={`group-hover:translate-x-0.5 transition-transform shrink-0 ${
-              isDark ? 'text-slate-500 group-hover:text-cyan-400' : 'text-slate-400 group-hover:text-blue-600'
+              isDark ? 'text-slate-400 group-hover:text-cyan-400' : 'text-slate-500 group-hover:text-blue-600'
             }`} />
           </div>
         </div>
@@ -779,7 +779,7 @@ export const Dashboard = () => {
             }`}>
               <TrendingUp size={20} />
             </div>
-            <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10.5px] font-bold ${
+            <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-[11px] sm:text-[11.5px] font-semibold tracking-wider ${
               isDark ? 'border-purple-800/60 bg-purple-950/50 text-purple-300' : 'border-purple-200 bg-purple-50 text-purple-700'
             }`}>
               <span>MARGIN</span>
@@ -787,14 +787,14 @@ export const Dashboard = () => {
           </div>
 
           <div className="mt-3">
-            <div className={`text-[12px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <div className={`text-[13.5px] sm:text-[14px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
               {execData?.kpis?.margin_integrity?.name || 'Margin Integrity'}
             </div>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className={`text-[24px] sm:text-[26px] font-black tracking-tight leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <span className={`text-[25px] sm:text-[28px] font-bold tracking-tight leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {loadingExec ? '...' : (execData?.kpis?.margin_integrity?.value || '88.1%')}
               </span>
-              <span className="text-[11.5px] font-bold text-emerald-500 flex items-center">
+              <span className="text-xs font-semibold text-emerald-500 flex items-center">
                 <ArrowUpRight size={13} />
                 <span>+2.4%</span>
               </span>
@@ -816,12 +816,12 @@ export const Dashboard = () => {
             </ResponsiveContainer>
           </div>
 
-          <div className={`mt-2 pt-2 border-t flex items-center justify-between text-[11px] ${
-            isDark ? 'border-slate-700 text-slate-400' : 'border-slate-100 text-slate-500'
+          <div className={`mt-2 pt-2 border-t flex items-center justify-between text-xs sm:text-[12.5px] font-medium ${
+            isDark ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-600'
           }`}>
             <span className="truncate">{execData?.kpis?.margin_integrity?.subtext || 'Verified gross profit'}</span>
             <ChevronRight size={13} className={`group-hover:translate-x-0.5 transition-transform shrink-0 ${
-              isDark ? 'text-slate-500 group-hover:text-purple-400' : 'text-slate-400 group-hover:text-purple-600'
+              isDark ? 'text-slate-400 group-hover:text-purple-400' : 'text-slate-500 group-hover:text-purple-600'
             }`} />
           </div>
         </div>
@@ -841,7 +841,7 @@ export const Dashboard = () => {
             }`}>
               <ShieldAlert size={20} />
             </div>
-            <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10.5px] font-bold ${
+            <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-0.5 text-[11px] sm:text-[11.5px] font-semibold tracking-wider ${
               isDark ? 'border-rose-800/60 bg-rose-950/50 text-rose-300' : 'border-rose-200 bg-rose-50 text-rose-700'
             }`}>
               <span>RISK PULSE</span>
@@ -849,14 +849,14 @@ export const Dashboard = () => {
           </div>
 
           <div className="mt-3">
-            <div className={`text-[12px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <div className={`text-[13.5px] sm:text-[14px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
               {execData?.kpis?.overall_risk_score?.name || 'Overall Risk Score'}
             </div>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className={`text-[24px] sm:text-[26px] font-black tracking-tight leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <span className={`text-[25px] sm:text-[28px] font-bold tracking-tight leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {loadingExec ? '...' : (execData?.kpis?.overall_risk_score?.value || '6.8 / 10')}
               </span>
-              <span className={`text-[11px] font-bold rounded px-1.5 py-0.2 border ${
+              <span className={`text-xs font-semibold rounded px-2 py-0.5 border ${
                 isDark ? 'text-rose-300 bg-rose-950/50 border-rose-800/60' : 'text-rose-700 bg-rose-50 border-rose-200'
               }`}>
                 2 Actions
@@ -872,12 +872,12 @@ export const Dashboard = () => {
             />
           </div>
 
-          <div className={`mt-2 pt-2 border-t flex items-center justify-between text-[11px] ${
-            isDark ? 'border-slate-700 text-slate-400' : 'border-slate-100 text-slate-500'
+          <div className={`mt-2 pt-2 border-t flex items-center justify-between text-xs font-medium ${
+            isDark ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-600'
           }`}>
             <span className="truncate">{execData?.kpis?.overall_risk_score?.subtext || 'Customer AR & Production'}</span>
             <ChevronRight size={13} className={`group-hover:translate-x-0.5 transition-transform shrink-0 ${
-              isDark ? 'text-slate-500 group-hover:text-rose-400' : 'text-slate-400 group-hover:text-rose-600'
+              isDark ? 'text-slate-400 group-hover:text-rose-400' : 'text-slate-500 group-hover:text-rose-600'
             }`} />
           </div>
         </div>
@@ -887,62 +887,62 @@ export const Dashboard = () => {
           SECONDARY VERIFIED OPERATIONAL METRICS STRIP
       ─────────────────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className={`rounded-xl border p-3 shadow-2xs ${isDark ? 'bg-[#1e293b]/80 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
-          <div className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Sales Invoiced</div>
-          <div className={`text-base font-bold mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+        <div className={`rounded-xl border p-3.5 shadow-2xs ${isDark ? 'bg-[#1e293b]/80 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+          <div className={`text-[13px] sm:text-[13.5px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Sales Invoiced</div>
+          <div className={`text-[18px] sm:text-[20px] font-bold tracking-tight mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             {execData?.kpis?.sales_invoiced?.formatted || (summary?.totalSales ? money.format(summary.totalSales) : '₹0.00')}
           </div>
-          <div className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          <div className={`text-xs sm:text-[12.5px] font-medium mt-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             {execData?.kpis?.sales_invoiced?.invoice_count || summary?.invoiceCount || 0} completed bills
           </div>
         </div>
 
-        <div className={`rounded-xl border p-3 shadow-2xs ${isDark ? 'bg-[#1e293b]/80 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
-          <div className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Customer AR Total</div>
-          <div className={`text-base font-bold mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+        <div className={`rounded-xl border p-3.5 shadow-2xs ${isDark ? 'bg-[#1e293b]/80 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+          <div className={`text-[13px] sm:text-[13.5px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Customer AR Total</div>
+          <div className={`text-[18px] sm:text-[20px] font-bold tracking-tight mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             {execData?.kpis?.receivables?.formatted || '₹77,184.48'}
           </div>
-          <div className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          <div className={`text-xs sm:text-[12.5px] font-medium mt-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             {execData?.kpis?.receivables?.debtor_count || 15} debtors on ledger
           </div>
         </div>
 
-        <div className={`rounded-xl border p-3 shadow-2xs ${isDark ? 'bg-[#1e293b]/80 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
-          <div className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Supplier Liabilities (AP)</div>
-          <div className={`text-base font-bold mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+        <div className={`rounded-xl border p-3.5 shadow-2xs ${isDark ? 'bg-[#1e293b]/80 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+          <div className={`text-[13px] sm:text-[13.5px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Supplier Liabilities (AP)</div>
+          <div className={`text-[18px] sm:text-[20px] font-bold tracking-tight mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             {execData?.kpis?.payables?.formatted || '₹2,823.80'}
           </div>
-          <div className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          <div className={`text-xs sm:text-[12.5px] font-medium mt-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             {execData?.kpis?.payables?.open_po_count || 34} open PO commitments
           </div>
         </div>
 
-        <div className={`rounded-xl border p-3 shadow-2xs ${isDark ? 'bg-[#1e293b]/80 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
-          <div className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Cash & Bank Balances</div>
-          <div className="text-base font-bold text-slate-400 mt-0.5">
+        <div className={`rounded-xl border p-3.5 shadow-2xs ${isDark ? 'bg-[#1e293b]/80 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+          <div className={`text-[13px] sm:text-[13.5px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Cash & Bank Balances</div>
+          <div className={`text-[18px] sm:text-[20px] font-bold tracking-tight mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             Unconfigured
           </div>
-          <div className="text-[10px] text-amber-500 mt-0.5" title="Bank GL accounts not mapped in Service Layer. Never showing fake 0.">
+          <div className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-1" title="Bank GL accounts not mapped in Service Layer. Never showing fake 0.">
             GL unmapped in SAP
           </div>
         </div>
 
-        <div className={`rounded-xl border p-3 shadow-2xs ${isDark ? 'bg-[#1e293b]/80 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
-          <div className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Low-stock Items</div>
-          <div className={`text-base font-bold mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+        <div className={`rounded-xl border p-3.5 shadow-2xs ${isDark ? 'bg-[#1e293b]/80 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+          <div className={`text-[13px] sm:text-[13.5px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Low-stock Items</div>
+          <div className={`text-[18px] sm:text-[20px] font-bold tracking-tight mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             {lowStockCount}
           </div>
-          <div className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          <div className={`text-xs sm:text-[12.5px] font-medium mt-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             {(inventoryRisk?.length ?? 0) === 0 ? 'Optimal levels in WH' : 'Requires reordering'}
           </div>
         </div>
 
-        <div className={`rounded-xl border p-3 shadow-2xs ${isDark ? 'bg-[#1e293b]/80 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
-          <div className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Pending Approvals</div>
-          <div className={`text-base font-bold mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+        <div className={`rounded-xl border p-3.5 shadow-2xs ${isDark ? 'bg-[#1e293b]/80 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}>
+          <div className={`text-[13px] sm:text-[13.5px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Pending Approvals</div>
+          <div className={`text-[18px] sm:text-[20px] font-bold tracking-tight mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             {pendingApprovalsCount ?? 0}
           </div>
-          <div className="text-[10px] text-purple-400 mt-0.5">
+          <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 mt-1">
             Credit & returns queue
           </div>
         </div>
@@ -964,17 +964,17 @@ export const Dashboard = () => {
                 <span className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs ${
                   isDark ? 'bg-cyan-950/70 text-cyan-300' : 'bg-cyan-100 text-cyan-700'
                 }`}>📊</span>
-                <h4 className={`text-[15px] font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Today's Snapshot</h4>
+                <h4 className={`text-[16.5px] sm:text-[17.5px] font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Today's Snapshot</h4>
               </div>
-              <span className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>Company vs Target</span>
+              <span className={`text-xs font-normal ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Company vs Target</span>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className={`rounded-xl border p-3.5 transition-colors ${
                 isDark ? 'bg-[#141f32]/90 border-slate-700' : 'bg-slate-50/70 border-slate-200/80'
               }`}>
-                <div className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Revenue Growth</div>
-                <div className="mt-1 text-lg font-extrabold text-emerald-500 flex items-center gap-1">
+                <div className={`text-[13px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Revenue Growth</div>
+                <div className="mt-1 text-[17px] sm:text-lg font-bold text-emerald-500 flex items-center gap-1">
                   <ArrowUpRight size={15} />
                   <span>{execData?.today_snapshot?.revenue?.trend || '+6.8%'}</span>
                 </div>
@@ -986,8 +986,8 @@ export const Dashboard = () => {
               <div className={`rounded-xl border p-3.5 transition-colors ${
                 isDark ? 'bg-[#141f32]/90 border-slate-700' : 'bg-slate-50/70 border-slate-200/80'
               }`}>
-                <div className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Gross Margin</div>
-                <div className="mt-1 text-lg font-extrabold text-purple-400 flex items-center gap-1">
+                <div className={`text-[13px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Gross Margin</div>
+                <div className="mt-1 text-[17px] sm:text-lg font-bold text-purple-500 flex items-center gap-1">
                   <ArrowUpRight size={15} />
                   <span>{execData?.today_snapshot?.gross_margin?.trend || '88.1%'}</span>
                 </div>
@@ -999,8 +999,8 @@ export const Dashboard = () => {
               <div className={`rounded-xl border p-3.5 transition-colors ${
                 isDark ? 'bg-[#141f32]/90 border-slate-700' : 'bg-slate-50/70 border-slate-200/80'
               }`}>
-                <div className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Output Completion</div>
-                <div className="mt-1 text-lg font-extrabold text-blue-400 flex items-center gap-1">
+                <div className={`text-[13px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Output Completion</div>
+                <div className="mt-1 text-[17px] sm:text-lg font-bold text-blue-500 flex items-center gap-1">
                   <Factory size={15} />
                   <span>{execData?.today_snapshot?.production_oee?.trend || '39.0%'}</span>
                 </div>
@@ -1012,8 +1012,8 @@ export const Dashboard = () => {
               <div className={`rounded-xl border p-3.5 transition-colors ${
                 isDark ? 'bg-[#141f32]/90 border-slate-700' : 'bg-slate-50/70 border-slate-200/80'
               }`}>
-                <div className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Collections Ratio</div>
-                <div className="mt-1 text-lg font-extrabold text-emerald-500 flex items-center gap-1">
+                <div className={`text-[13px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Collections Ratio</div>
+                <div className="mt-1 text-[17px] sm:text-lg font-bold text-emerald-500 flex items-center gap-1">
                   <Wallet size={15} />
                   <span>{execData?.today_snapshot?.cash_flow?.trend || '+4.2%'}</span>
                 </div>
@@ -1023,7 +1023,7 @@ export const Dashboard = () => {
               </div>
             </div>
           </div>
-          <p className={`mt-4 text-[11px] text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          <p className={`mt-4 text-xs font-normal text-center ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             Synchronized with SAP Service Layer billing & ledger registers
           </p>
         </div>
@@ -1040,15 +1040,15 @@ export const Dashboard = () => {
                 <span className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs ${
                   isDark ? 'bg-indigo-950/70 text-indigo-300' : 'bg-indigo-100 text-indigo-700'
                 }`}>📈</span>
-                <h4 className={`text-[15px] font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>7-Day & Monthly Forecast</h4>
+                <h4 className={`text-[16.5px] sm:text-[17.5px] font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>7-Day & Monthly Forecast</h4>
               </div>
-              <span className={`rounded border px-2 py-0.5 text-[10.5px] font-bold ${
+              <span className={`rounded-md border px-2.5 py-0.5 text-xs font-semibold ${
                 isDark ? 'border-emerald-800/60 bg-emerald-950/50 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
               }`}>
                 Expected Margin +3.8%
               </span>
             </div>
-            <p className={`text-[11.5px] mb-3 ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>Projected trajectory based on current billings & PO receipts</p>
+            <p className={`text-xs font-normal mb-3 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Projected trajectory based on current billings & PO receipts</p>
 
             <div className="h-[180px] w-full">
               {profitabilityPoints.length > 0 ? (
@@ -1060,25 +1060,25 @@ export const Dashboard = () => {
                         <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#334155' : '#f1f5f9'} />
-                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: isDark ? '#94a3b8' : '#94a3b8' }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: isDark ? '#94a3b8' : '#94a3b8' }} />
-                    <Tooltip contentStyle={isDark ? { backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc', borderRadius: '8px', fontSize: '11px' } : { borderRadius: '8px', fontSize: '11px' }} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#334155' : '#e2e8f0'} />
+                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11.5, fill: isDark ? '#cbd5e1' : '#475569', fontWeight: 500 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11.5, fill: isDark ? '#cbd5e1' : '#475569', fontWeight: 500 }} />
+                    <Tooltip contentStyle={isDark ? { backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc', borderRadius: '8px', fontSize: '12px' } : { borderRadius: '8px', fontSize: '12px', border: '1px solid #cbd5e1' }} />
                     <Area type="monotone" dataKey="revenue" stroke="#0ea5e9" strokeWidth={2} fill="url(#foreGradBalanced)" />
                     <Line type="monotone" dataKey="margin" stroke="#10b981" strokeWidth={2} dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
-                <div className={`h-full flex items-center justify-center text-center p-3 text-[11px] border border-dashed rounded-lg ${
-                  isDark ? 'border-slate-700 text-slate-500' : 'border-slate-100 text-slate-400'
+                <div className={`h-full flex items-center justify-center text-center p-3 text-xs font-medium border border-dashed rounded-lg ${
+                  isDark ? 'border-slate-700 text-slate-400' : 'border-slate-200 text-slate-500'
                 }`}>
                   Trajectory populated when sales trend data is available
                 </div>
               )}
             </div>
           </div>
-          <div className={`mt-3 pt-2.5 border-t flex items-center justify-between text-[11px] ${
-            isDark ? 'border-slate-700 text-slate-400' : 'border-slate-100 text-slate-500'
+          <div className={`mt-3 pt-2.5 border-t flex items-center justify-between text-xs font-normal ${
+            isDark ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-600'
           }`}>
             <span>Model: SAP Run-rate ML</span>
             <span className={`font-semibold ${isDark ? 'text-indigo-400' : 'text-indigo-600'}`}>Confidence: 91%</span>
@@ -1097,53 +1097,53 @@ export const Dashboard = () => {
                 <span className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs ${
                   isDark ? 'bg-rose-950/70 text-rose-300' : 'bg-rose-100 text-rose-700'
                 }`}>🕸️</span>
-                <h4 className={`text-[15px] font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Risk Radar</h4>
+                <h4 className={`text-[16.5px] sm:text-[17.5px] font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Risk Radar</h4>
               </div>
-              <span className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>5 Core Dimensions</span>
+              <span className={`text-xs font-normal ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>5 Core Dimensions</span>
             </div>
 
             <div className="h-[180px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart outerRadius="75%" data={radarChartData}>
-                  <PolarGrid stroke={isDark ? '#334155' : '#e2e8f0'} />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: isDark ? '#94a3b8' : '#64748b', fontSize: 10.5 }} />
+                  <PolarGrid stroke={isDark ? '#334155' : '#cbd5e1'} />
+                  <PolarAngleAxis dataKey="subject" tick={{ fill: isDark ? '#cbd5e1' : '#334155', fontSize: 11.5, fontWeight: 600 }} />
                   <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                  <Radar name="Risk Index" dataKey="score" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.25} strokeWidth={1.5} />
+                  <Radar name="Risk Index" dataKey="score" stroke="#f43f5e" fill="#f43f5e" fillOpacity={0.25} strokeWidth={2} />
                 </RadarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div className={`grid grid-cols-2 gap-2 mt-2 pt-2.5 border-t text-[11.5px] ${
-            isDark ? 'border-slate-700' : 'border-slate-100'
+          <div className={`grid grid-cols-2 gap-2 mt-2 pt-2.5 border-t text-xs font-semibold ${
+            isDark ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-700'
           }`}>
             <div className="flex items-center justify-between">
-              <span className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <span className={`flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 <span className="h-2 w-2 rounded-full bg-rose-500" />
                 <span>Production:</span>
               </span>
-              <strong className={isDark ? 'text-slate-200' : 'text-slate-800'}>68%</strong>
+              <strong className={isDark ? 'text-white' : 'text-slate-900'}>68%</strong>
             </div>
             <div className="flex items-center justify-between">
-              <span className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <span className={`flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 <span className="h-2 w-2 rounded-full bg-amber-500" />
                 <span>Supply Chain:</span>
               </span>
-              <strong className={isDark ? 'text-slate-200' : 'text-slate-800'}>52%</strong>
+              <strong className={isDark ? 'text-white' : 'text-slate-900'}>52%</strong>
             </div>
             <div className="flex items-center justify-between">
-              <span className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <span className={`flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 <span className="h-2 w-2 rounded-full bg-blue-500" />
                 <span>Finance (AR):</span>
               </span>
-              <strong className={isDark ? 'text-slate-200' : 'text-slate-800'}>64%</strong>
+              <strong className={isDark ? 'text-white' : 'text-slate-900'}>64%</strong>
             </div>
             <div className="flex items-center justify-between">
-              <span className={`flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <span className={`flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 <span>Quality:</span>
               </span>
-              <strong className={isDark ? 'text-slate-200' : 'text-slate-800'}>25%</strong>
+              <strong className={isDark ? 'text-white' : 'text-slate-900'}>25%</strong>
             </div>
           </div>
         </div>
@@ -1159,17 +1159,17 @@ export const Dashboard = () => {
       }`}>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className={`text-base font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <h3 className={`text-[18px] sm:text-[20px] font-semibold tracking-tight flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
               <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
                 isDark ? 'bg-rose-950/70 text-rose-300' : 'bg-rose-100 text-rose-600'
               }`}>🎯</span>
               <span>Where We Are Lacking — Top Gaps by Business Impact</span>
             </h3>
-            <p className={`text-[11.5px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className={`text-xs sm:text-[13.5px] mt-0.5 font-normal leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
               AI-ranked operational and financial risks sorted by revenue at stake and urgency.
             </p>
           </div>
-          <Link to="/reports" className="text-[12px] font-semibold text-blue-500 hover:text-blue-400 flex items-center gap-0.5">
+          <Link to="/reports" className="text-xs font-semibold text-blue-600 hover:text-blue-500 flex items-center gap-0.5">
             View All <ChevronRight size={13} />
           </Link>
         </div>
@@ -1233,24 +1233,24 @@ export const Dashboard = () => {
               key={gap.id}
               className={`rounded-xl border p-4 flex flex-col justify-between transition-all shadow-3xs ${
                 isDark
-                  ? 'bg-[#141f32]/90 border-slate-700 hover:border-slate-700'
-                  : 'bg-slate-50/60 border-slate-200/90 hover:border-slate-300'
+                  ? 'bg-[#141f32]/90 border-slate-700 hover:border-slate-600'
+                  : 'bg-slate-50/70 border-slate-200 hover:border-slate-300'
               }`}
             >
               <div>
                 {/* Header: Rank + Title + Category Badge */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                       isDark ? 'bg-blue-600 text-white' : 'bg-slate-900 text-white'
                     }`}>
                       {gap.rank}
                     </span>
-                    <h4 className={`text-[13.5px] font-bold leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    <h4 className={`text-[14px] sm:text-[14.5px] font-semibold leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                       {gap.title}
                     </h4>
                   </div>
-                  <span className={`rounded-md px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wider ${
+                  <span className={`rounded-md px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider ${
                     gap.category === 'Finance'
                       ? (isDark ? 'bg-blue-950/60 text-blue-300 border border-blue-800/50' : 'bg-blue-100 text-blue-700')
                       : gap.category === 'Production'
@@ -1264,14 +1264,14 @@ export const Dashboard = () => {
                 </div>
 
                 {/* Impact & Metric Deviation */}
-                <div className={`mt-3 flex items-baseline justify-between border-y py-2 ${
-                  isDark ? 'border-slate-700' : 'border-slate-200/60'
+                <div className={`mt-3 flex items-baseline justify-between border-y py-2.5 ${
+                  isDark ? 'border-slate-700' : 'border-slate-200'
                 }`}>
                   <div>
-                    <div className={`text-[16px] font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>{gap.impact_value}</div>
-                    <div className={`text-[10px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{gap.impact_label}</div>
+                    <div className={`text-[18px] sm:text-[19px] font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{gap.impact_value}</div>
+                    <div className={`text-xs font-medium mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{gap.impact_label}</div>
                   </div>
-                  <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold border ${
+                  <span className={`rounded-md px-2 py-0.5 text-xs font-semibold border ${
                     isDark ? 'bg-rose-950/50 border-rose-800/60 text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-700'
                   }`}>
                     {gap.deviation}
@@ -1279,42 +1279,42 @@ export const Dashboard = () => {
                 </div>
 
                 {/* Supporting Detail */}
-                <p className={`mt-2.5 text-[11.5px] leading-relaxed min-h-[48px] ${
-                  isDark ? 'text-slate-400' : 'text-slate-600'
+                <p className={`mt-2.5 text-xs sm:text-[13px] leading-relaxed min-h-[44px] font-normal ${
+                  isDark ? 'text-slate-300' : 'text-slate-700'
                 }`}>
                   {gap.supporting_detail}
                 </p>
 
                 {/* AI Recommendation Box */}
-                <div className={`mt-3 rounded-lg border p-2.5 text-[11px] ${
+                <div className={`mt-3 rounded-lg border p-3 text-xs ${
                   isDark
                     ? 'border-cyan-800/60 bg-[#0c162d]/90 text-slate-200'
-                    : 'border-cyan-200/80 bg-cyan-50/60 text-slate-800'
+                    : 'border-cyan-200 bg-cyan-50/80 text-slate-900'
                 }`}>
-                  <div className={`flex items-center gap-1.5 font-bold mb-0.5 ${
-                    isDark ? 'text-cyan-400' : 'text-cyan-800'
+                  <div className={`flex items-center gap-1.5 font-semibold mb-1 ${
+                    isDark ? 'text-cyan-400' : 'text-cyan-900'
                   }`}>
-                    <Sparkles size={11} className={isDark ? 'text-cyan-400' : 'text-cyan-600'} />
+                    <Sparkles size={12} className={isDark ? 'text-cyan-400' : 'text-cyan-700'} />
                     <span>AI Recommendation</span>
                   </div>
-                  <p className={`leading-snug ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{gap.ai_recommendation}</p>
+                  <p className={`leading-relaxed font-normal ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{gap.ai_recommendation}</p>
                 </div>
               </div>
 
               {/* Footer: Owner & 3 Functional Action Buttons */}
               <div className={`mt-3.5 pt-2.5 border-t flex flex-col gap-2 ${
-                isDark ? 'border-slate-700' : 'border-slate-200/70'
+                isDark ? 'border-slate-700' : 'border-slate-200'
               }`}>
-                <span className={`text-[10.5px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`} title={gap.owner}>
-                  Owner: <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>{gap.owner}</strong>
+                <span className={`text-xs truncate ${isDark ? 'text-slate-400' : 'text-slate-600'}`} title={gap.owner}>
+                  Owner: <strong className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{gap.owner}</strong>
                 </span>
                 <div className="grid grid-cols-3 gap-1.5">
                   <button
                     onClick={() => handleAssignGap(gap.id)}
-                    className={`rounded-lg border px-1.5 py-1 text-[10px] font-semibold transition text-center cursor-pointer truncate ${
+                    className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition text-center cursor-pointer truncate ${
                       assignedGaps[gap.id]
                         ? (isDark ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-700')
-                        : (isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300')
+                        : (isDark ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300')
                     }`}
                     title={`Assign this action to ${gap.owner}`}
                   >
@@ -1322,23 +1322,23 @@ export const Dashboard = () => {
                   </button>
                   <button
                     onClick={() => setSelectedSimulation(gap)}
-                    className={`rounded-lg border px-1.5 py-1 text-[10px] font-semibold transition text-center cursor-pointer flex items-center justify-center gap-1 truncate ${
+                    className={`rounded-lg border px-2 py-1.5 text-xs font-medium transition text-center cursor-pointer flex items-center justify-center gap-1 truncate ${
                       isDark
                         ? 'border-indigo-800/60 bg-indigo-950/50 text-indigo-300 hover:bg-indigo-900/50'
-                        : 'border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700'
+                        : 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700'
                     }`}
                     title="Simulate financial and operational outcome"
                   >
-                    <Sliders size={10} className={isDark ? 'text-indigo-400' : 'text-indigo-600'} />
+                    <Sliders size={11} className={isDark ? 'text-indigo-400' : 'text-indigo-700'} />
                     <span>Simulate</span>
                   </button>
                   <button
                     onClick={() => navigate(gap.route)}
-                    className="inline-flex items-center justify-center gap-0.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-1.5 py-1 text-[10px] font-semibold text-white transition shadow-3xs cursor-pointer truncate"
+                    className="inline-flex items-center justify-center gap-0.5 rounded-lg bg-blue-600 hover:bg-blue-700 px-2 py-1.5 text-xs font-semibold text-white transition shadow-3xs cursor-pointer truncate"
                     title="Navigate to underlying SAP report or module"
                   >
                     <span>Deep Dive</span>
-                    <ChevronRight size={10} />
+                    <ChevronRight size={11} />
                   </button>
                 </div>
               </div>
@@ -1360,11 +1360,11 @@ export const Dashboard = () => {
             <span className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs ${
               isDark ? 'bg-blue-950/70 text-blue-300' : 'bg-blue-100 text-blue-600'
             }`}>⚡</span>
-            <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <h3 className={`text-[18px] sm:text-[20px] font-semibold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
               AI Action Queue — Prioritized Recommendations Ready for Review
             </h3>
           </div>
-          <span className={`text-[11.5px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>4 Actions</span>
+          <span className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>4 Actions</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -1409,31 +1409,31 @@ export const Dashboard = () => {
             <div
               key={action.id}
               onClick={() => navigate(action.route)}
-              className={`flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors cursor-pointer group ${
+              className={`flex items-center justify-between gap-3 rounded-xl border p-3.5 transition-colors cursor-pointer group ${
                 isDark
-                  ? 'bg-[#141f32]/90 border-slate-700 hover:bg-slate-800/50 hover:border-slate-700'
+                  ? 'bg-[#141f32]/90 border-slate-700 hover:bg-slate-800/50 hover:border-slate-600'
                   : 'bg-slate-50/70 border-slate-200 hover:bg-blue-50/60 hover:border-blue-200'
               }`}
             >
               <div className="min-w-0">
-                <div className={`text-[12.5px] font-bold truncate ${
+                <div className={`text-[13px] sm:text-[13.5px] font-medium truncate ${
                   isDark ? 'text-white group-hover:text-blue-400' : 'text-slate-900 group-hover:text-blue-700'
                 }`}>
                   {action.title}
                 </div>
-                <div className="mt-1 flex items-center gap-2 text-[10.5px]">
-                  <span className={`rounded px-1.5 py-0.2 font-medium ${
-                    isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-200/80 text-slate-700'
+                <div className="mt-1.5 flex items-center gap-2 text-xs">
+                  <span className={`rounded px-1.5 py-0.5 font-medium ${
+                    isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-200/90 text-slate-800'
                   }`}>
                     {action.category}
                   </span>
-                  <span className={`font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{action.impact}</span>
+                  <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{action.impact}</span>
                   <span className={`font-bold ${action.priority === 'High' ? 'text-rose-500' : 'text-amber-500'}`}>
                     {action.priority}
                   </span>
                 </div>
               </div>
-              <span className="text-[11px] font-bold text-blue-500 shrink-0 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+              <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 shrink-0 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
                 <span>{action.action_label}</span>
               </span>
             </div>
@@ -1454,35 +1454,35 @@ export const Dashboard = () => {
           <div className="mb-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FileText size={16} className="text-blue-500" />
-              <span className={`text-[15px] font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Recent Invoices</span>
-              <span className={`rounded border px-1.5 py-0.2 text-[9px] font-bold ${
+              <span className={`text-[18px] sm:text-[19px] font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Recent Invoices</span>
+              <span className={`rounded-md border px-2 py-0.5 text-[10.5px] font-semibold tracking-wider ${
                 isDark ? 'border-emerald-800/60 bg-emerald-950/50 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
               }`}>
                 LIVE SAP
               </span>
             </div>
-            <Link to="/sales" className="text-[12px] font-semibold text-blue-500 hover:text-blue-400 flex items-center gap-0.5">
+            <Link to="/sales" className="text-xs font-semibold text-blue-600 hover:text-blue-500 flex items-center gap-0.5">
               View all <ChevronRight size={13} />
             </Link>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[12.5px]">
-              <thead className={`border-b text-[10.5px] font-bold uppercase tracking-wider ${
-                isDark ? 'border-slate-700 text-slate-400' : 'border-slate-100 text-slate-400'
+            <table className="w-full text-left text-[13px] sm:text-[13.5px]">
+              <thead className={`border-b text-xs sm:text-[12.5px] font-semibold uppercase tracking-wider ${
+                isDark ? 'border-slate-700 text-slate-300 bg-slate-800/40' : 'border-slate-200 text-slate-700 bg-slate-50/70'
               }`}>
                 <tr>
-                  <th className="pb-2">Invoice</th>
-                  <th className="pb-2">Customer</th>
-                  <th className="pb-2">Amount</th>
-                  <th className="pb-2">Payment</th>
-                  <th className="pb-2 text-right">Date</th>
+                  <th className="py-2.5 px-3.5">Invoice</th>
+                  <th className="py-2.5 px-3.5">Customer</th>
+                  <th className="py-2.5 px-3.5">Amount</th>
+                  <th className="py-2.5 px-3.5">Payment</th>
+                  <th className="py-2.5 px-3.5 text-right">Date</th>
                 </tr>
               </thead>
-              <tbody className={`divide-y ${isDark ? 'divide-slate-800/80 text-slate-300' : 'divide-slate-50 text-slate-700'}`}>
+              <tbody className={`divide-y ${isDark ? 'divide-slate-800/80 text-slate-300' : 'divide-slate-100 text-slate-800'}`}>
                 {loadingSales ? (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center text-slate-400 text-xs">
+                    <td colSpan={5} className="py-6 text-center text-slate-500 text-xs font-medium">
                       Loading recent sales...
                     </td>
                   </tr>
@@ -1494,20 +1494,20 @@ export const Dashboard = () => {
                         key={idx}
                         onClick={() => setSelectedSale(sale)}
                         className={`cursor-pointer transition-colors ${
-                          isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50/80'
+                          isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'
                         }`}
                       >
-                        <td className="py-2.5 font-semibold text-blue-500">{invNumber}</td>
-                        <td className={`py-2.5 font-medium ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{sale.customerName || 'Walk-in Customer'}</td>
-                        <td className={`py-2.5 font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{money.format(sale.total || 0)}</td>
-                        <td className={`py-2.5 text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{sale.paymentMethod || 'Cash'}</td>
-                        <td className={`py-2.5 text-right text-[10.5px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{sale.docDate || 'N/A'}</td>
+                        <td className="py-2.5 px-3.5 font-semibold text-blue-600 dark:text-blue-400">{invNumber}</td>
+                        <td className={`py-2.5 px-3.5 font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{sale.customerName || 'Walk-in Customer'}</td>
+                        <td className={`py-2.5 px-3.5 font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{money.format(sale.total || 0)}</td>
+                        <td className={`py-2.5 px-3.5 text-[13px] font-normal ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{sale.paymentMethod || 'Cash'}</td>
+                        <td className={`py-2.5 px-3.5 text-right text-[13px] font-normal ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{sale.docDate || 'N/A'}</td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center text-slate-400 text-xs">
+                    <td colSpan={5} className="py-6 text-center text-slate-500 text-xs font-medium">
                       No recent sales recorded for this period.
                     </td>
                   </tr>
@@ -1526,34 +1526,34 @@ export const Dashboard = () => {
           <div className="mb-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Package size={16} className="text-emerald-500" />
-              <span className={`text-[15px] font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Top Products by Revenue</span>
-              <span className={`rounded border px-1.5 py-0.2 text-[9px] font-bold ${
+              <span className={`text-[18px] sm:text-[19px] font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Top Products by Revenue</span>
+              <span className={`rounded-md border px-2 py-0.5 text-[10.5px] font-semibold tracking-wider ${
                 isDark ? 'border-emerald-800/60 bg-emerald-950/50 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
               }`}>
                 LIVE SAP
               </span>
             </div>
-            <Link to="/products" className="text-[12px] font-semibold text-blue-500 hover:text-blue-400 flex items-center gap-0.5">
+            <Link to="/products" className="text-xs font-semibold text-blue-600 hover:text-blue-500 flex items-center gap-0.5">
               View all <ChevronRight size={13} />
             </Link>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[12.5px]">
-              <thead className={`border-b text-[10.5px] font-bold uppercase tracking-wider ${
-                isDark ? 'border-slate-700 text-slate-400' : 'border-slate-100 text-slate-400'
+            <table className="w-full text-left text-[13px] sm:text-[13.5px]">
+              <thead className={`border-b text-xs sm:text-[12.5px] font-semibold uppercase tracking-wider ${
+                isDark ? 'border-slate-700 text-slate-300 bg-slate-800/40' : 'border-slate-200 text-slate-700 bg-slate-50/70'
               }`}>
                 <tr>
-                  <th className="pb-2 w-6">#</th>
-                  <th className="pb-2">Product</th>
-                  <th className="pb-2 text-right">Units Sold</th>
-                  <th className="pb-2 text-right">Revenue</th>
+                  <th className="py-2.5 px-3.5 w-8">#</th>
+                  <th className="py-2.5 px-3.5">Product</th>
+                  <th className="py-2.5 px-3.5 text-right">Units Sold</th>
+                  <th className="py-2.5 px-3.5 text-right">Revenue</th>
                 </tr>
               </thead>
-              <tbody className={`divide-y ${isDark ? 'divide-slate-800/80 text-slate-300' : 'divide-slate-50 text-slate-700'}`}>
+              <tbody className={`divide-y ${isDark ? 'divide-slate-800/80 text-slate-300' : 'divide-slate-100 text-slate-800'}`}>
                 {loadingProducts ? (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center text-slate-400 text-xs">
+                    <td colSpan={4} className="py-6 text-center text-slate-500 text-xs font-medium">
                       Loading product rankings...
                     </td>
                   </tr>
@@ -1562,25 +1562,25 @@ export const Dashboard = () => {
                     const initial = (prod.itemName || prod.itemCode || 'P').charAt(0).toUpperCase();
                     return (
                       <tr key={idx} className={`transition-colors ${
-                        isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50/80'
+                        isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'
                       }`}>
-                        <td className={`py-2.5 font-semibold text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{idx + 1}</td>
-                        <td className="py-2.5 flex items-center gap-2">
-                          <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[9px] font-bold ${
+                        <td className={`py-2.5 px-3.5 font-medium text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{idx + 1}</td>
+                        <td className="py-2.5 px-3.5 flex items-center gap-2.5">
+                          <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-bold ${
                             isDark ? 'bg-blue-600 text-white' : 'bg-slate-900 text-white'
                           }`}>
                             {initial}
                           </div>
-                          <span className={`font-medium ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{prod.itemName || prod.itemCode}</span>
+                          <span className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{prod.itemName || prod.itemCode}</span>
                         </td>
-                        <td className={`py-2.5 text-right font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{prod.quantitySold}</td>
-                        <td className={`py-2.5 text-right font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{money.format(prod.salesAmount || 0)}</td>
+                        <td className={`py-2.5 px-3.5 text-right font-medium ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{prod.quantitySold}</td>
+                        <td className={`py-2.5 px-3.5 text-right font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>{money.format(prod.salesAmount || 0)}</td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan={4} className="py-6 text-center text-slate-400 text-xs">
+                    <td colSpan={4} className="py-6 text-center text-slate-500 text-xs font-medium">
                       No product velocity records for selected period.
                     </td>
                   </tr>
@@ -1608,57 +1608,57 @@ export const Dashboard = () => {
               }`}>
                 <TrendingUp size={18} />
               </span>
-              <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <h3 className={`text-[19px] sm:text-[21px] font-semibold tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 Business Performance & Trends
               </h3>
-              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+              <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
                 isDark ? 'border-emerald-800/60 bg-emerald-950/50 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
               }`}>
                 Live SAP Service Layer
               </span>
             </div>
-            <p className={`text-[12px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className={`text-xs sm:text-[13.5px] font-normal mt-1 leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
               Verified transaction velocity across invoiced sales, customer collections, gross margin, and production runs.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             {/* Quick KPI stats header pill */}
-            <div className={`hidden sm:flex items-center gap-2.5 rounded-xl border px-3.5 py-1.5 text-[11.5px] ${
-              isDark ? 'bg-[#141f32] border-slate-700' : 'bg-slate-50 border-slate-200'
+            <div className={`hidden sm:flex items-center gap-2.5 rounded-xl border px-3.5 py-1.5 text-xs sm:text-[13px] font-medium ${
+              isDark ? 'bg-[#141f32] border-slate-700 text-slate-300' : 'bg-slate-50 border-slate-300 text-slate-700'
             }`}>
               {activeChartTab === 'sales_collections' && (
                 <>
-                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Invoiced Sales: <strong className={isDark ? 'text-sky-400' : 'text-sky-700'}>{execData?.kpis?.sales_invoiced?.formatted || (summary?.totalSales ? money.format(summary.totalSales) : '₹26,826.80')}</strong></span>
-                  <span className={isDark ? 'text-slate-700' : 'text-slate-300'}>|</span>
-                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Collected Cash: <strong className={isDark ? 'text-emerald-400' : 'text-emerald-700'}>{execData?.kpis?.cash_health?.formatted || '₹2,640.00'}</strong></span>
+                  <span>Invoiced Sales: <strong className={isDark ? 'text-sky-400 font-semibold' : 'text-sky-700 font-semibold'}>{execData?.kpis?.sales_invoiced?.formatted || (summary?.totalSales ? money.format(summary.totalSales) : '₹26,826.80')}</strong></span>
+                  <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>|</span>
+                  <span>Collected Cash: <strong className={isDark ? 'text-emerald-400 font-semibold' : 'text-emerald-700 font-semibold'}>{execData?.kpis?.cash_health?.formatted || '₹2,640.00'}</strong></span>
                 </>
               )}
               {activeChartTab === 'profitability' && (
                 <>
-                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Revenue: <strong className={isDark ? 'text-sky-400' : 'text-sky-700'}>{execData?.kpis?.sales_invoiced?.formatted || (summary?.totalSales ? money.format(summary.totalSales) : '₹26,826.80')}</strong></span>
-                  <span className={isDark ? 'text-slate-700' : 'text-slate-300'}>|</span>
-                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Gross Margin: <strong className={isDark ? 'text-purple-400' : 'text-purple-700'}>{execData?.kpis?.margin_integrity?.value || '88.2%'}</strong></span>
+                  <span>Revenue: <strong className={isDark ? 'text-sky-400 font-semibold' : 'text-sky-700 font-semibold'}>{execData?.kpis?.sales_invoiced?.formatted || (summary?.totalSales ? money.format(summary.totalSales) : '₹26,826.80')}</strong></span>
+                  <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>|</span>
+                  <span>Gross Margin: <strong className={isDark ? 'text-purple-400 font-semibold' : 'text-purple-700 font-semibold'}>{execData?.kpis?.margin_integrity?.value || '88.2%'}</strong></span>
                 </>
               )}
               {activeChartTab === 'production' && (
                 <>
-                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Pending: <strong className={isDark ? 'text-amber-400' : 'text-amber-700'}>3,471 U</strong></span>
-                  <span className={isDark ? 'text-slate-700' : 'text-slate-300'}>|</span>
-                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Completed: <strong className={isDark ? 'text-emerald-400' : 'text-emerald-700'}>2,216 U</strong></span>
+                  <span>Pending: <strong className={isDark ? 'text-amber-400 font-semibold' : 'text-amber-700 font-semibold'}>3,471 U</strong></span>
+                  <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>|</span>
+                  <span>Completed: <strong className={isDark ? 'text-emerald-400 font-semibold' : 'text-emerald-700 font-semibold'}>2,216 U</strong></span>
                 </>
               )}
             </div>
 
             {/* Chart Tab Pills */}
-            <div className={`flex items-center rounded-xl border p-1 text-[11.5px] font-semibold ${
-              isDark ? 'border-slate-700 bg-[#141f32] text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-600'
+            <div className={`flex items-center rounded-xl border p-1 text-xs sm:text-[12.5px] font-medium ${
+              isDark ? 'border-slate-700 bg-[#141f32] text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-700'
             }`}>
               <button
                 onClick={() => setActiveChartTab('sales_collections')}
                 className={`rounded-lg px-3.5 py-1.5 transition-all cursor-pointer ${
                   activeChartTab === 'sales_collections'
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'bg-blue-600 text-white shadow-xs font-semibold'
                     : isDark ? 'hover:text-white' : 'hover:text-slate-900'
                 }`}
               >
@@ -1668,7 +1668,7 @@ export const Dashboard = () => {
                 onClick={() => setActiveChartTab('profitability')}
                 className={`rounded-lg px-3.5 py-1.5 transition-all cursor-pointer ${
                   activeChartTab === 'profitability'
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'bg-blue-600 text-white shadow-xs font-semibold'
                     : isDark ? 'hover:text-white' : 'hover:text-slate-900'
                 }`}
               >
@@ -1678,7 +1678,7 @@ export const Dashboard = () => {
                 onClick={() => setActiveChartTab('production')}
                 className={`rounded-lg px-3.5 py-1.5 transition-all cursor-pointer ${
                   activeChartTab === 'production'
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'bg-blue-600 text-white shadow-xs font-semibold'
                     : isDark ? 'hover:text-white' : 'hover:text-slate-900'
                 }`}
               >
@@ -1695,8 +1695,8 @@ export const Dashboard = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={salesCollectionsPoints} margin={{ top: 15, right: 20, left: 0, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#334155' : '#e2e8f0'} />
-                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDark ? '#94a3b8' : '#64748b' }} dy={8} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDark ? '#94a3b8' : '#64748b' }} tickFormatter={(val) => `₹${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`} dx={-4} />
+                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDark ? '#cbd5e1' : '#334155', fontWeight: 500 }} dy={8} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDark ? '#cbd5e1' : '#334155', fontWeight: 500 }} tickFormatter={(val) => `₹${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`} dx={-4} />
                   <Tooltip
                     formatter={(val: any, name: any) => [`₹${Number(val).toLocaleString('en-IN')}`, name === 'sales' ? 'Invoiced Sales' : 'Incoming Collections (Cash)']}
                     contentStyle={isDark ? { backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc', borderRadius: '12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' } : { borderRadius: '12px', fontSize: '12px', border: '1px solid #cbd5e1', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
@@ -1711,7 +1711,7 @@ export const Dashboard = () => {
               }`}>
                 <TrendingUp size={36} className={isDark ? 'text-slate-600 mb-3' : 'text-slate-300 mb-3'} />
                 <p className={`text-[14px] font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>No sales & collections data for selected filter</p>
-                <p className={`text-[12px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Switch date range above to 'All Dates (Total)' to inspect all historical records.</p>
+                <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Switch date range above to 'All Dates (Total)' to inspect all historical records.</p>
               </div>
             )
           )}
@@ -1731,8 +1731,8 @@ export const Dashboard = () => {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#334155' : '#e2e8f0'} />
-                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDark ? '#94a3b8' : '#64748b' }} dy={8} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDark ? '#94a3b8' : '#64748b' }} tickFormatter={(val) => `₹${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`} dx={-4} />
+                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDark ? '#cbd5e1' : '#334155', fontWeight: 500 }} dy={8} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDark ? '#cbd5e1' : '#334155', fontWeight: 500 }} tickFormatter={(val) => `₹${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`} dx={-4} />
                   <Tooltip
                     formatter={(val: any, name: any) => [`₹${Number(val).toLocaleString('en-IN')}`, name === 'revenue' ? 'Sales Revenue' : name === 'cost' ? 'Procurement Cost' : 'Gross Profit']}
                     contentStyle={isDark ? { backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc', borderRadius: '12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' } : { borderRadius: '12px', fontSize: '12px', border: '1px solid #cbd5e1', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
@@ -1761,8 +1761,8 @@ export const Dashboard = () => {
                 { category: 'Planned Orders', units: 10, fill: '#8b5cf6' },
               ]} margin={{ top: 15, right: 20, left: 0, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#334155' : '#e2e8f0'} />
-                <XAxis dataKey="category" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDark ? '#94a3b8' : '#64748b' }} dy={8} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDark ? '#94a3b8' : '#64748b' }} dx={-4} />
+                <XAxis dataKey="category" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDark ? '#cbd5e1' : '#334155', fontWeight: 500 }} dy={8} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: isDark ? '#cbd5e1' : '#334155', fontWeight: 500 }} dx={-4} />
                 <Tooltip
                   formatter={(val: any) => [val, 'Units / Count']}
                   contentStyle={isDark ? { backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc', borderRadius: '12px', fontSize: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' } : { borderRadius: '12px', fontSize: '12px', border: '1px solid #cbd5e1', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
@@ -1774,8 +1774,8 @@ export const Dashboard = () => {
         </div>
 
         {/* Legend Footer */}
-        <div className={`mt-4 pt-3 border-t flex flex-wrap items-center justify-center gap-6 text-[12px] ${
-          isDark ? 'border-slate-700 text-slate-400' : 'border-slate-100 text-slate-600'
+        <div className={`mt-4 pt-3 border-t flex flex-wrap items-center justify-center gap-6 text-xs sm:text-[13px] font-semibold ${
+          isDark ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-700'
         }`}>
           {activeChartTab === 'sales_collections' && (
             <>
@@ -1834,16 +1834,16 @@ export const Dashboard = () => {
                   <Sliders size={16} />
                 </div>
                 <div>
-                  <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <h3 className={`text-[17px] sm:text-[18px] font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                     AI What-If Impact Simulation
                   </h3>
-                  <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Deterministic scenario model on live SAP data</p>
+                  <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Deterministic scenario model on live SAP data</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedSimulation(null)}
                 className={`rounded-lg p-1 transition cursor-pointer ${
-                  isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-200'
+                  isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-200'
                 }`}
               >
                 <X size={18} />
@@ -1851,70 +1851,70 @@ export const Dashboard = () => {
             </div>
 
             {/* Simulation Body */}
-            <div className="p-5 flex-1 overflow-y-auto flex flex-col gap-4 text-[12.5px]">
+            <div className="p-5 flex-1 overflow-y-auto flex flex-col gap-4 text-xs sm:text-[13px]">
               {/* Target Gap Summary */}
-              <div className={`rounded-xl border p-3.5 ${
-                isDark ? 'border-slate-700 bg-[#141f32]/90 text-slate-200' : 'border-slate-200 bg-slate-50/70 text-slate-900'
+              <div className={`rounded-xl border p-4 ${
+                isDark ? 'border-slate-700 bg-[#141f32]/90 text-slate-200' : 'border-slate-200 bg-slate-50/80 text-slate-900'
               }`}>
                 <div className="flex items-center justify-between">
-                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>Target Gap #{selectedSimulation.rank}</span>
-                  <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                  <span className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Target Gap #{selectedSimulation.rank}</span>
+                  <span className={`rounded-md px-2.5 py-0.5 text-xs font-semibold ${
                     isDark ? 'bg-indigo-950/70 text-indigo-300 border border-indigo-800/50' : 'bg-indigo-100 text-indigo-700'
                   }`}>
                     {selectedSimulation.category}
                   </span>
                 </div>
-                <h4 className={`text-[15px] font-extrabold mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedSimulation.title}</h4>
-                <div className={`mt-2 text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                  Current Reality: <strong className={isDark ? 'text-white' : 'text-slate-900'}>{selectedSimulation.impact_value}</strong> ({selectedSimulation.deviation})
+                <h4 className={`text-[15.5px] sm:text-[16.5px] font-semibold mt-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedSimulation.title}</h4>
+                <div className={`mt-2 text-xs sm:text-[13px] ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  Current Reality: <strong className={isDark ? 'text-white font-semibold' : 'text-slate-900 font-semibold'}>{selectedSimulation.impact_value}</strong> ({selectedSimulation.deviation})
                 </div>
-                <p className={`mt-1 text-[11.5px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{selectedSimulation.supporting_detail}</p>
+                <p className={`mt-1.5 text-xs sm:text-[12.5px] leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{selectedSimulation.supporting_detail}</p>
               </div>
 
               {/* Proposed Intervention */}
               <div className={`rounded-xl border p-4 ${
-                isDark ? 'border-cyan-800/60 bg-[#0c162d]/90 text-slate-200' : 'border-cyan-200 bg-cyan-50/60 text-slate-800'
+                isDark ? 'border-cyan-800/60 bg-[#0c162d]/90 text-slate-200' : 'border-cyan-200 bg-cyan-50/80 text-slate-800'
               }`}>
-                <div className={`flex items-center gap-1.5 font-bold text-xs mb-1 ${isDark ? 'text-cyan-400' : 'text-cyan-900'}`}>
-                  <Sparkles size={13} className={isDark ? 'text-cyan-400' : 'text-cyan-600'} />
+                <div className={`flex items-center gap-1.5 font-semibold text-xs sm:text-[13px] mb-1.5 ${isDark ? 'text-cyan-400' : 'text-cyan-900'}`}>
+                  <Sparkles size={14} className={isDark ? 'text-cyan-400' : 'text-cyan-700'} />
                   <span>Simulated Intervention Strategy</span>
                 </div>
-                <p className={`text-[12px] leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                <p className={`text-xs sm:text-[12.5px] leading-relaxed font-normal ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
                   {selectedSimulation.ai_recommendation || 'Initiate proactive recovery workflow based on SAP transaction patterns.'}
                 </p>
               </div>
 
               {/* Projected Business Impact */}
               <div className={`rounded-xl border p-4 ${
-                isDark ? 'border-emerald-800/60 bg-emerald-950/40 text-slate-200' : 'border-emerald-200 bg-emerald-50/50 text-slate-800'
+                isDark ? 'border-emerald-800/60 bg-emerald-950/40 text-slate-200' : 'border-emerald-200 bg-emerald-50/70 text-slate-800'
               }`}>
-                <div className={`flex items-center gap-1.5 font-bold text-xs mb-2 ${isDark ? 'text-emerald-400' : 'text-emerald-900'}`}>
-                  <TrendingUp size={13} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
+                <div className={`flex items-center gap-1.5 font-semibold text-xs sm:text-[13px] mb-2.5 ${isDark ? 'text-emerald-400' : 'text-emerald-900'}`}>
+                  <TrendingUp size={14} className={isDark ? 'text-emerald-400' : 'text-emerald-700'} />
                   <span>Projected Business Impact</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-[11.5px]">
-                  <div className={`p-2.5 rounded-lg border ${
-                    isDark ? 'bg-[#1e293b]/90 border-emerald-800/50 text-slate-200' : 'bg-white/80 border-emerald-200/60 text-slate-900'
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className={`p-3 rounded-lg border ${
+                    isDark ? 'bg-[#1e293b]/90 border-emerald-800/50 text-slate-200' : 'bg-white border-emerald-200/80 text-slate-900'
                   }`}>
-                    <span className={`block text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Financial / Output Gain</span>
-                    <strong className={`text-sm ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                    <span className={`block text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Financial / Output Gain</span>
+                    <strong className={`text-base font-bold mt-1 block ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
                       {selectedSimulation.id?.includes('ar') ? '+₹51,450 Cash' : selectedSimulation.id?.includes('prod') ? '+1,250 Units' : selectedSimulation.id?.includes('purchase') ? 'Stockout Zero' : 'Queue Cleared'}
                     </strong>
                   </div>
-                  <div className={`p-2.5 rounded-lg border ${
-                    isDark ? 'bg-[#1e293b]/90 border-emerald-800/50 text-slate-200' : 'bg-white/80 border-emerald-200/60 text-slate-900'
+                  <div className={`p-3 rounded-lg border ${
+                    isDark ? 'bg-[#1e293b]/90 border-emerald-800/50 text-slate-200' : 'bg-white border-emerald-200/80 text-slate-900'
                   }`}>
-                    <span className={`block text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Time to Realize</span>
-                    <strong className={`text-sm ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                    <span className={`block text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Time to Realize</span>
+                    <strong className={`text-base font-bold mt-1 block ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>
                       {selectedSimulation.id?.includes('ar') ? '5 Days' : selectedSimulation.id?.includes('prod') ? '48-72 Hours' : '24-48 Hours'}
                     </strong>
                   </div>
                 </div>
-                <div className={`mt-3 text-[11px] flex items-center justify-between border-t pt-2 ${
-                  isDark ? 'border-emerald-800/40 text-slate-400' : 'border-emerald-200/50 text-slate-600'
+                <div className={`mt-3 text-xs font-normal flex items-center justify-between border-t pt-2 ${
+                  isDark ? 'border-emerald-800/40 text-slate-300' : 'border-emerald-200 text-slate-700'
                 }`}>
                   <span>Model Confidence:</span>
-                  <span className={`font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>94% (Verified SAP Ledger)</span>
+                  <span className={`font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>94% (Verified SAP Ledger)</span>
                 </div>
               </div>
 
@@ -1923,15 +1923,15 @@ export const Dashboard = () => {
                 isDark ? 'border-slate-700 bg-[#141f32]' : 'border-slate-200 bg-slate-50'
               }`}>
                 <div>
-                  <div className={`text-[10.5px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>Assigned Executive Owner</div>
-                  <div className={`text-[12.5px] font-bold mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedSimulation.owner}</div>
+                  <div className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Assigned Executive Owner</div>
+                  <div className={`text-sm font-semibold mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedSimulation.owner}</div>
                 </div>
                 <button
                   onClick={() => handleAssignGap(selectedSimulation.id)}
-                  className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition cursor-pointer ${
                     assignedGaps[selectedSimulation.id]
                       ? 'bg-emerald-600 text-white border-emerald-600'
-                      : (isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100')
+                      : (isDark ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700' : 'bg-white border-slate-300 text-slate-800 hover:bg-slate-100')
                   }`}
                 >
                   {assignedGaps[selectedSimulation.id] ? 'Assigned ✓' : 'Assign Owner'}
@@ -1945,8 +1945,8 @@ export const Dashboard = () => {
             }`}>
               <button
                 onClick={() => setSelectedSimulation(null)}
-                className={`rounded-lg border px-4 py-2 text-xs font-semibold transition cursor-pointer ${
-                  isDark ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                className={`rounded-lg border px-4 py-2 text-xs font-medium transition cursor-pointer ${
+                  isDark ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-100'
                 }`}
               >
                 Close
@@ -1985,54 +1985,54 @@ export const Dashboard = () => {
                   <FileText size={16} />
                 </div>
                 <div>
-                  <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <h3 className={`text-[17px] sm:text-[18px] font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                     {selectedSale.docNum ? `Invoice #${selectedSale.docNum}` : selectedSale.saleId || 'Invoice Details'}
                   </h3>
-                  <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Quick audit inspection</p>
+                  <p className={`text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Quick audit inspection</p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedSale(null)}
                 className={`rounded-lg p-1 transition cursor-pointer ${
-                  isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-400 hover:bg-slate-200'
+                  isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-200'
                 }`}
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-4 flex-1 overflow-y-auto flex flex-col gap-4 text-[12.5px]">
-              <div className={`rounded-xl border p-3.5 ${
-                isDark ? 'border-slate-700 bg-[#141f32]/90 text-white' : 'border-slate-200 bg-slate-50/70 text-slate-900'
+            <div className="p-4 flex-1 overflow-y-auto flex flex-col gap-4 text-xs sm:text-[13px]">
+              <div className={`rounded-xl border p-4 ${
+                isDark ? 'border-slate-700 bg-[#141f32]/90 text-white' : 'border-slate-200 bg-slate-50/80 text-slate-900'
               }`}>
-                <span className={`text-[10px] font-medium uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-400'}`}>Total Amount</span>
-                <div className={`text-2xl font-bold mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <span className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Total Amount</span>
+                <div className={`text-[24px] sm:text-[26px] font-bold mt-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {money.format(selectedSale.total || 0)}
                 </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                <div className="mt-2.5 flex items-center gap-2">
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
                     isDark ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-800/50' : 'bg-emerald-100 text-emerald-700'
                   }`}>
                     Completed
                   </span>
-                  <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Method: <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>{selectedSale.paymentMethod || 'Cash'}</strong>
+                  <span className={`text-xs font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    Method: <strong className={isDark ? 'text-white font-bold' : 'text-slate-900 font-bold'}>{selectedSale.paymentMethod || 'Cash'}</strong>
                   </span>
                 </div>
               </div>
 
               <div className="space-y-2.5">
-                <div className={`flex justify-between py-1.5 border-b ${isDark ? 'border-slate-700 text-slate-300' : 'border-slate-100 text-slate-700'}`}>
-                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Customer</span>
-                  <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{selectedSale.customerName}</span>
+                <div className={`flex justify-between py-2 border-b ${isDark ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-700'}`}>
+                  <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Customer</span>
+                  <span className={`text-xs sm:text-[13px] font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{selectedSale.customerName}</span>
                 </div>
-                <div className={`flex justify-between py-1.5 border-b ${isDark ? 'border-slate-700 text-slate-300' : 'border-slate-100 text-slate-700'}`}>
-                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Document Date</span>
-                  <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{selectedSale.docDate || '2026-10-07'}</span>
+                <div className={`flex justify-between py-2 border-b ${isDark ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-700'}`}>
+                  <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Document Date</span>
+                  <span className={`text-xs sm:text-[13px] font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{selectedSale.docDate || '2026-10-07'}</span>
                 </div>
-                <div className={`flex justify-between py-1.5 border-b ${isDark ? 'border-slate-700 text-slate-300' : 'border-slate-100 text-slate-700'}`}>
-                  <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Branch</span>
-                  <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>{branchId || 'WH-001'}</span>
+                <div className={`flex justify-between py-2 border-b ${isDark ? 'border-slate-700 text-slate-300' : 'border-slate-200 text-slate-700'}`}>
+                  <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Branch</span>
+                  <span className={`text-xs sm:text-[13px] font-bold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{branchId || 'WH-001'}</span>
                 </div>
               </div>
             </div>

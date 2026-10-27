@@ -2,6 +2,7 @@
 
 import httpx
 import threading
+import time
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 import logging
@@ -51,17 +52,25 @@ class SAPServiceLayerClient:
         self.client: Optional[httpx.Client] = None
         self._session_lock = threading.Lock()  # Prevent concurrent re-logins
 
+        # Health check result cache (10s TTL) to prevent repeated network stalls
+        self._last_health_result: Optional[Dict[str, Any]] = None
+        self._last_health_time: float = 0.0
+
         self._init_client()
 
     def _init_client(self):
-        """Initialize HTTP client"""
-        self.client = httpx.Client(
+        """Initialize HTTP client with explicit connect timeout (avoids 21s Windows TCP hangs)"""
+        timeout = httpx.Timeout(
             timeout=settings.SAP_HTTP_TIMEOUT,
+            connect=3.0,
+        )
+        self.client = httpx.Client(
+            timeout=timeout,
             verify=self.verify_ssl,
             follow_redirects=True,
         )
 
-    def login(self) -> bool:
+    def login(self, timeout: Optional[Any] = None) -> bool:
         """
         Login to SAP Service Layer and obtain session cookie
 
@@ -80,7 +89,10 @@ class SAPServiceLayerClient:
             }
 
             logger.info(f"Logging in to SAP Service Layer: {self.company_db}")
-            response = self.client.post(login_url, json=payload)
+            post_kwargs: Dict[str, Any] = {"json": payload}
+            if timeout is not None:
+                post_kwargs["timeout"] = timeout
+            response = self.client.post(login_url, **post_kwargs)
             response.raise_for_status()
 
             # Extract session cookies
@@ -126,32 +138,56 @@ class SAPServiceLayerClient:
         """
         Check SAP Service Layer connectivity.
         Distinguishes application liveness from SAP service layer availability.
+        Includes a 10s result cache and fast 2.5s probe timeout to never block event loops.
         Returns:
             Dict containing status ("connected" | "disconnected"), authenticated (bool), details, and timestamp.
         """
+        now = time.monotonic()
+        if self._last_health_result and (now - self._last_health_time < 10.0):
+            return self._last_health_result
+
         if sap_breaker.state.name == "OPEN":
-            return {
+            res = {
                 "status": "disconnected",
                 "authenticated": False,
                 "circuit_breaker": "OPEN",
                 "message": "SAP circuit breaker is OPEN due to repeated failures",
                 "timestamp": datetime.utcnow().isoformat(),
             }
+            self._last_health_result = res
+            self._last_health_time = now
+            return res
 
         if not self.client:
             self._init_client()
 
+        fast_timeout = httpx.Timeout(connect=2.5, read=3.0, write=3.0, pool=2.5)
+
         try:
-            # If no active session or expired, attempt login
+            # If no active session or expired, attempt login with fast probe timeout
             if not self.session_id or (self.session_timeout and datetime.utcnow() >= self.session_timeout):
-                self.login()
-                return {
-                    "status": "connected",
-                    "authenticated": True,
-                    "circuit_breaker": sap_breaker.state.name,
-                    "message": "SAP authenticated and connected",
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
+                try:
+                    self.login(timeout=fast_timeout)
+                    sap_breaker.record_success()
+                    res = {
+                        "status": "connected",
+                        "authenticated": True,
+                        "circuit_breaker": sap_breaker.state.name,
+                        "message": "SAP authenticated and connected",
+                        "timestamp": datetime.utcnow().isoformat(),
+                    }
+                except Exception as exc:
+                    sap_breaker.record_failure()
+                    res = {
+                        "status": "disconnected",
+                        "authenticated": False,
+                        "circuit_breaker": sap_breaker.state.name,
+                        "message": str(exc),
+                        "timestamp": datetime.utcnow().isoformat(),
+                    }
+                self._last_health_result = res
+                self._last_health_time = time.monotonic()
+                return res
 
             # Probe active session with lightweight request
             probe_url = f"{self.base_url}/$metadata"
@@ -159,10 +195,11 @@ class SAPServiceLayerClient:
                 probe_url,
                 headers={"Accept": "application/xml"},
                 cookies=self._get_cookies(),
-                timeout=4.0,
+                timeout=fast_timeout,
             )
             if resp.status_code in (200, 204):
-                return {
+                sap_breaker.record_success()
+                res = {
                     "status": "connected",
                     "authenticated": True,
                     "circuit_breaker": sap_breaker.state.name,
@@ -171,16 +208,28 @@ class SAPServiceLayerClient:
                 }
             elif resp.status_code == 401:
                 self.session_id = None
-                self.login()
-                return {
-                    "status": "connected",
-                    "authenticated": True,
-                    "circuit_breaker": sap_breaker.state.name,
-                    "message": "SAP session re-authenticated",
-                    "timestamp": datetime.utcnow().isoformat(),
-                }
+                try:
+                    self.login(timeout=fast_timeout)
+                    sap_breaker.record_success()
+                    res = {
+                        "status": "connected",
+                        "authenticated": True,
+                        "circuit_breaker": sap_breaker.state.name,
+                        "message": "SAP session re-authenticated",
+                        "timestamp": datetime.utcnow().isoformat(),
+                    }
+                except Exception as exc:
+                    sap_breaker.record_failure()
+                    res = {
+                        "status": "disconnected",
+                        "authenticated": False,
+                        "circuit_breaker": sap_breaker.state.name,
+                        "message": f"SAP re-login failed: {exc}",
+                        "timestamp": datetime.utcnow().isoformat(),
+                    }
             else:
-                return {
+                sap_breaker.record_failure()
+                res = {
                     "status": "disconnected",
                     "authenticated": False,
                     "circuit_breaker": sap_breaker.state.name,
@@ -188,7 +237,8 @@ class SAPServiceLayerClient:
                     "timestamp": datetime.utcnow().isoformat(),
                 }
         except SAPConnectionError as exc:
-            return {
+            sap_breaker.record_failure()
+            res = {
                 "status": "disconnected",
                 "authenticated": False,
                 "circuit_breaker": sap_breaker.state.name,
@@ -196,13 +246,19 @@ class SAPServiceLayerClient:
                 "timestamp": datetime.utcnow().isoformat(),
             }
         except Exception as exc:
-            return {
+            sap_breaker.record_failure()
+            res = {
                 "status": "disconnected",
                 "authenticated": False,
                 "circuit_breaker": sap_breaker.state.name,
                 "message": f"Connection probe failed: {str(exc)}",
                 "timestamp": datetime.utcnow().isoformat(),
             }
+
+        self._last_health_result = res
+        self._last_health_time = time.monotonic()
+        return res
+
 
 
     def _ensure_session(self):

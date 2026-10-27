@@ -565,14 +565,14 @@ export const Layout = () => {
                   type="text"
                   readOnly
                   placeholder="Search menu, reports..."
-                  className={`w-full cursor-pointer rounded-lg border py-1.5 pl-8 pr-10 text-[11px] group-hover:border-blue-400 focus:outline-none transition shadow-2xs ${
+                  className={`w-full cursor-pointer rounded-lg border py-1.5 pl-8 pr-10 text-xs font-medium group-hover:border-blue-400 focus:outline-none transition shadow-2xs ${
                     isDark
                       ? 'border-slate-700 bg-[#141f32] text-slate-200 placeholder:text-slate-400'
-                      : 'border-slate-200 bg-white text-slate-700 placeholder:text-slate-400'
+                      : 'border-slate-300 bg-white text-slate-800 placeholder:text-slate-500'
                   }`}
                 />
-                <span className={`pointer-events-none absolute right-1.5 rounded border px-1 py-0.5 text-[8.5px] font-semibold shadow-3xs group-hover:border-blue-300 ${
-                  isDark ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-500'
+                <span className={`pointer-events-none absolute right-1.5 rounded border px-1.5 py-0.5 text-[9.5px] font-bold shadow-3xs group-hover:border-blue-300 ${
+                  isDark ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-300 bg-slate-100 text-slate-600'
                 }`}>
                   ⌘ K
                 </span>
@@ -808,7 +808,7 @@ export const Layout = () => {
                     <div className="text-[13px] font-semibold" style={{ color: isDark ? '#f1f5f9' : TEXT_PRIMARY }}>
                       {user?.store_name || 'Main Branch'}
                     </div>
-                    <div className="text-[11px] mt-0.5" style={{ color: isDark ? '#94a3b8' : TEXT_MUTED }}>
+                    <div className="text-xs font-medium mt-0.5" style={{ color: isDark ? '#cbd5e1' : '#475569' }}>
                       {user?.branch_id || 'SH'}
                     </div>
                   </div>

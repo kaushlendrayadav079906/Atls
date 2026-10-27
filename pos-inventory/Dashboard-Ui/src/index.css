@@ -167,7 +167,8 @@ html.dark {
 }
 
 html.dark body {
-  background-color: #0f172a !important; /* Soft Slate-900 base */
+  background-color: #0f172a !important;
+  /* Soft Slate-900 base */
   color: #f1f5f9 !important;
 }
 
@@ -242,9 +243,9 @@ html.dark .border-indigo-200 {
   border-color: #334155 !important;
 }
 
-html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
-html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
-html.dark .divide-slate-50 > :not([hidden]) ~ :not([hidden]) {
+html.dark .divide-slate-100> :not([hidden])~ :not([hidden]),
+html.dark .divide-slate-200> :not([hidden])~ :not([hidden]),
+html.dark .divide-slate-50> :not([hidden])~ :not([hidden]) {
   border-color: #334155 !important;
 }
 
