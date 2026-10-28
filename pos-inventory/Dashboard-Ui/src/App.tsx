@@ -21,6 +21,7 @@ import { InvoiceDetail } from './pages/sales/InvoiceDetail';
 import { SalesList } from './pages/sales/SalesList';
 import SalesOrdersPage from './pages/SalesOrdersPage';
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
+import { StockConfigurationPage } from './pages/StockConfigurationPage';
 import { SettingsUsersPage } from './pages/SettingsUsersPage';
 import { ProductionOverviewPage } from './pages/production/ProductionOverviewPage';
 import { ProductionOrdersPage } from './pages/production/ProductionOrdersPage';
@@ -103,6 +104,7 @@ function App() {
                 <Route path="sales" element={<RequirePermission permission="invoices.view"><SalesList /></RequirePermission>} />
                 <Route path="sales-orders" element={<RequirePermission permission="sales_orders.view"><SalesOrdersPage /></RequirePermission>} />
                 <Route path="purchase-orders" element={<RequirePermission permission="purchase_orders.view"><PurchaseOrdersPage /></RequirePermission>} />
+                <Route path="stock-configuration" element={<RequirePermission permission="products.view"><StockConfigurationPage /></RequirePermission>} />
                 <Route path="sales/:id" element={<RequirePermission permission="invoices.view"><InvoiceDetail /></RequirePermission>} />
                 <Route path="returns" element={<RequirePermission permission="returns.view"><ReturnsApprovalsPage /></RequirePermission>} />
                 <Route path="analytics" element={<RequirePermission permission="dashboard.view"><AtlasAnalyticsPage /></RequirePermission>} />
