@@ -20,9 +20,11 @@ async def get_sap_health() -> Dict[str, Any]:
     try:
         client = get_sap_client()
         result = client.check_health()
+        print(f"--> [SAP HEALTH] URL: {client.base_url} | DB: {client.company_db} | Status: {result.get('status')} | Msg: {result.get('message')}")
         return result
     except Exception as exc:
         logger.warning(f"Error checking SAP health: {exc}")
+        print(f"--> [SAP HEALTH] Probe exception: {exc}")
         return {
             "status": "disconnected",
             "authenticated": False,

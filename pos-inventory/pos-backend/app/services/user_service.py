@@ -506,6 +506,7 @@ def init_user_storage() -> None:
 
     logger.info("User and permission storage initialized with standard catalog.")
     ensure_bootstrap_admin()
+    ensure_configured_admin()
 
 
 def ensure_bootstrap_admin() -> Optional[Dict[str, Any]]:
@@ -668,6 +669,80 @@ def ensure_bootstrap_admin() -> Optional[Dict[str, Any]]:
     except Exception as exc:
         logger.error("Error during administrator bootstrap check: %s", exc)
         return None
+
+
+def ensure_configured_admin() -> None:
+    """
+    Ensure the admin user specified in settings/.env exists and is active
+    with the configured password hash and admin role.
+    """
+    admin_user = (getattr(settings, "ADMIN_USERNAME", "") or "admin").strip()
+    admin_email = (getattr(settings, "ADMIN_EMAIL", "") or "admin123@gmail.com").strip()
+    admin_password = (getattr(settings, "ADMIN_PASSWORD", "") or "Admin@123").strip()
+    admin_name = (getattr(settings, "ADMIN_NAME", "") or "System Administrator").strip()
+
+    if not admin_password or len(admin_password) < 8:
+        return
+
+    try:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, username, email, password_hash, role, is_active FROM users WHERE LOWER(username) = LOWER(%s) OR LOWER(email) = LOWER(%s)",
+                    (admin_user, admin_email),
+                )
+                row = cur.fetchone()
+
+                if row:
+                    user_id, curr_user, curr_email, curr_hash, curr_role, curr_active = row
+                    # If already active admin with correct password, do not touch or bump token_version
+                    if curr_active and curr_role == "admin" and curr_user == admin_user and verify_password(admin_password, curr_hash):
+                        return
+
+                    pwd_hash = get_password_hash(admin_password)
+                    cur.execute(
+                        """
+                        UPDATE users
+                        SET password_hash = %s, role = 'admin', is_active = TRUE,
+                            username = %s, email = %s
+                        WHERE id = %s
+                        """,
+                        (pwd_hash, admin_user, admin_email, user_id),
+                    )
+                    print(f"--> [AUTH DB] Synchronized admin user '{admin_user}' ({admin_email}) with .env password.")
+                else:
+                    pwd_hash = get_password_hash(admin_password)
+                    new_id = str(uuid.uuid4())
+                    cur.execute(
+                        """
+                        INSERT INTO users (
+                            id, username, email, name, password_hash, role,
+                            sap_user_code, branch_id, store_name, created_at, is_active, token_version,
+                            phone, job_role
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            new_id,
+                            admin_user,
+                            admin_email,
+                            admin_name,
+                            pwd_hash,
+                            "admin",
+                            None,
+                            None,
+                            "Main Headquarter",
+                            datetime.utcnow(),
+                            True,
+                            1,
+                            None,
+                            "System Administrator",
+                        ),
+                    )
+                    print(f"--> [AUTH DB] Created admin user '{admin_user}' ({admin_email}) in database.")
+    except Exception as exc:
+        logger.error("Failed to ensure configured admin: %s", exc)
+        print(f"--> [AUTH DB] Error ensuring configured admin: {exc}")
+
 
 
 def _fetchone(query: str, params: tuple[Any, ...]) -> Optional[tuple[Any, ...]]:
@@ -876,6 +951,27 @@ def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
             rows = cur.fetchall()
 
     if not rows:
+        admin_cfg_user = (getattr(settings, "ADMIN_USERNAME", "") or "admin").strip().lower()
+        admin_cfg_email = (getattr(settings, "ADMIN_EMAIL", "") or "admin123@gmail.com").strip().lower()
+        if identifier.lower() in ("admin", admin_cfg_user, admin_cfg_email):
+            print(f"--> [AUTH DB] Initializing admin user '{identifier}' from configuration...")
+            ensure_configured_admin()
+            with _get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        SELECT id, username, email, name, password_hash, role, sap_user_code,
+                               branch_id, store_name, created_at, is_active, token_version,
+                               phone, job_role
+                        FROM users
+                        WHERE LOWER(username) = LOWER(%s) OR LOWER(email) = LOWER(%s)
+                        """,
+                        (identifier, identifier),
+                    )
+                    rows = cur.fetchall()
+
+    if not rows:
+        print(f"--> [AUTH DB] No user found with username or email matching '{identifier}'")
         logger.warning("Login authentication failed: identifier '%s' not found in PostgreSQL users", identifier)
         log_security_event(
             action="LOGIN_FAILED_NOT_FOUND",
@@ -885,14 +981,18 @@ def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
         return None
 
     # Check each candidate matching the identifier (exact-case matches checked first)
+    print(f"--> [AUTH DB] Found {len(rows)} user record(s) matching '{identifier}'. Checking credentials...")
     matched_inactive = False
     for row in rows:
         user = _row_to_full_dict(row)
         if not user.get("is_active", True):
+            print(f"--> [AUTH DB] Account '{user.get('username')}' is marked inactive (is_active=False)")
             matched_inactive = True
             continue
 
-        if verify_password(password, user.get("password_hash", "")):
+        pw_valid = verify_password(password, user.get("password_hash", ""))
+        print(f"--> [AUTH DB] Checking password for user '{user.get('username')}': match={pw_valid}")
+        if pw_valid:
             user.pop("password_hash", None)
             user["permissions"] = get_effective_permissions(user["id"], user.get("role", "user"))
 
@@ -915,6 +1015,7 @@ def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
         raise ValueError("ACCOUNT_DEACTIVATED")
 
     logger.warning("Login authentication failed: password mismatch for identifier '%s'", identifier)
+    print(f"--> [AUTH DB] Password incorrect for identifier '{identifier}'")
     log_security_event(
         action="LOGIN_FAILED_CREDENTIALS",
         username=identifier,

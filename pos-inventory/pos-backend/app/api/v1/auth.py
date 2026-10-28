@@ -24,9 +24,11 @@ def login(credentials: UserLogin):
     """
     identifier = credentials.get_identifier()
     logger.info(f"Login attempt for user: {identifier}")
+    print(f"\n--> [AUTH] Login attempt for identifier: '{identifier}'")
 
     if not identifier:
         logger.warning("Login failed: No username or email provided")
+        print("--> [AUTH] Login failed: No identifier provided")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Provide username or email",
@@ -37,6 +39,7 @@ def login(credentials: UserLogin):
     except ValueError as val_err:
         if str(val_err) == "ACCOUNT_DEACTIVATED":
             logger.warning("Login rejected: deactivated account for %s", identifier)
+            print(f"--> [AUTH] Login rejected: Account deactivated for '{identifier}'")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Account is deactivated. Please contact an administrator.",
@@ -44,6 +47,7 @@ def login(credentials: UserLogin):
         raise
     except OperationalError:
         logger.exception("Login unavailable because PostgreSQL could not be reached")
+        print("--> [AUTH] PostgreSQL connection failure during login")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication service is unavailable. Check the PostgreSQL connection.",
@@ -51,12 +55,14 @@ def login(credentials: UserLogin):
 
     if not user:
         logger.warning(f"Login failed for user: {identifier}")
+        print(f"--> [AUTH] 401 Unauthorized: Invalid credentials for '{identifier}'")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
         )
 
     logger.info(f"User authenticated successfully: {user['username']}")
+    print(f"--> [AUTH] Login SUCCESS for user: '{user['username']}' (role={user.get('role')})\n")
 
     token = create_access_token(
         data={

@@ -32,12 +32,29 @@ export const Login = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('demo') === 'admin') {
+<<<<<<< Updated upstream
       authApi.login({ username: 'admin', password: 'Admin@123' }).then((res) => {
         if (res.user) {
           login(res.access_token, res.user);
           navigate('/', { replace: true });
+=======
+      const tryLogin = async () => {
+        try {
+          const res = await authApi.login({ username: 'admin', password: 'password123' });
+          if (res.user) {
+            login(res.access_token, res.user);
+            navigate('/', { replace: true });
+          }
+        } catch {
+          const res2 = await authApi.login({ username: 'admin', password: 'Admin@123' });
+          if (res2.user) {
+            login(res2.access_token, res2.user);
+            navigate('/', { replace: true });
+          }
+>>>>>>> Stashed changes
         }
-      }).catch(console.error);
+      };
+      tryLogin().catch(console.error);
     }
   }, [location.search]);
 
@@ -189,6 +206,100 @@ export const Login = () => {
                     required
                   />
                 </div>
+<<<<<<< Updated upstream
+=======
+              )}
+
+              <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+                <div>
+                  <label className="mb-1.5 block text-[14px] font-bold text-[#0b1f46]">Email or Username</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500" />
+                    <input
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      type="text"
+                      placeholder="Enter your email or username"
+                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-[14.5px] font-medium outline-none transition focus:border-[#0e6fe9] focus:ring-1 focus:ring-[#0e6fe9]"
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[14px] font-bold text-[#0b1f46]">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-500" />
+                    <input
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-11 text-[14.5px] outline-none transition focus:border-[#0e6fe9] focus:ring-1 focus:ring-[#0e6fe9] font-medium tracking-widest placeholder:tracking-normal"
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-600"
+                    >
+                      {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[14px] font-semibold text-[#0b1f46]">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="h-4.5 w-4.5 rounded border-slate-300 text-[#0e6fe9] focus:ring-[#0e6fe9]" defaultChecked />
+                    <span>Remember me</span>
+                  </label>
+                  <Link to="/register" className="text-[#0e6fe9] hover:underline font-bold">Forgot password?</Link>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0c6ce8] py-3.5 text-[15.5px] font-bold text-white transition hover:bg-[#0b5fd0] disabled:opacity-70 shadow-sm"
+                >
+                  <span>{loading ? 'Signing in...' : 'Sign in'}</span>
+                  <ArrowRight className="h-4.5 w-4.5" />
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-demo-admin-login"
+                  onClick={async () => {
+                    setLoading(true);
+                    setError('');
+                    try {
+                      let res;
+                      try {
+                        res = await authApi.login({ username: 'admin', password: 'Admin@123' });
+                      } catch {
+                        res = await authApi.login({ username: 'admin', password: 'password123' });
+                      }
+                      if (res && res.user) {
+                        login(res.access_token, res.user);
+                        navigate('/', { replace: true });
+                      }
+                    } catch (err: unknown) {
+                      setError('Demo login failed: Please verify admin credentials.');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="w-full mt-2.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-blue-700 text-[13px] font-bold hover:from-blue-100 hover:to-indigo-100 transition cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                >
+                  <Sparkles size={14} className="text-blue-600" />
+                  Quick Demo Admin Sign-In
+                </button>
+              </form>
+
+              <div className="mt-6 flex items-center justify-center gap-4">
+                <div className="h-px flex-1 bg-slate-200" />
+                <span className="text-[12px] font-bold uppercase tracking-wider text-slate-500">Or continue with</span>
+                <div className="h-px flex-1 bg-slate-200" />
+>>>>>>> Stashed changes
               </div>
 
               <div>

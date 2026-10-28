@@ -80,6 +80,7 @@ class SAPServiceLayerClient:
             }
 
             logger.info(f"Logging in to SAP Service Layer: {self.company_db}")
+            print(f"--> [SAP] Connecting to: {login_url} (CompanyDB: '{self.company_db}', User: '{self.username}')...")
             response = self.client.post(login_url, json=payload)
             response.raise_for_status()
 
@@ -96,15 +97,18 @@ class SAPServiceLayerClient:
             self.session_timeout = datetime.utcnow() + timedelta(minutes=25)
 
             logger.info("Successfully logged in to SAP Service Layer")
+            print("--> [SAP] Successfully authenticated and connected to SAP Service Layer!\n")
             return True
 
         except httpx.HTTPStatusError as e:
-            logger.error(
-                f"SAP login failed: {e.response.status_code} - {e.response.text}"
-            )
+            err_msg = f"HTTP {e.response.status_code}: {e.response.text}"
+            logger.error(f"SAP login failed: {err_msg}")
+            print(f"--> [SAP LOGIN FAILED] {err_msg}")
             raise SAPConnectionError(f"SAP login failed: {e.response.text}")
         except Exception as e:
-            logger.error(f"SAP login error: {str(e)}")
+            err_msg = f"{type(e).__name__}: {str(e)}"
+            logger.error(f"SAP login error: {err_msg}")
+            print(f"--> [SAP LOGIN ERROR] {err_msg}")
             raise SAPConnectionError(f"SAP login error: {str(e)}")
 
     def logout(self):
@@ -153,13 +157,12 @@ class SAPServiceLayerClient:
                     "timestamp": datetime.utcnow().isoformat(),
                 }
 
-            # Probe active session with lightweight request
-            probe_url = f"{self.base_url}/$metadata"
+            # Probe active session with lightweight request (fetch single field to avoid downloading 1.8MB $metadata)
+            probe_url = f"{self.base_url}/Items?$top=1&$select=ItemCode"
             resp = self.client.get(
                 probe_url,
-                headers={"Accept": "application/xml"},
                 cookies=self._get_cookies(),
-                timeout=4.0,
+                timeout=6.0,
             )
             if resp.status_code in (200, 204):
                 return {
