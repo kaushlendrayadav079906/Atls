@@ -18,11 +18,15 @@ _service = StockConfigurationService()
 @router.get("")
 async def get_stock_configuration(
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(10, ge=1, le=100, description="Items per page"),
+    page_size: int = Query(10, ge=1, le=10000, description="Items per page"),
     search: Optional[str] = Query(None, description="Search by SAP Code, Description, or Vendor Name"),
     vendor: Optional[str] = Query(None, description="Filter by Vendor"),
     group: Optional[str] = Query(None, description="Filter by Item Group"),
     warehouse: Optional[str] = Query(None, description="Filter by Warehouse"),
+    branch: Optional[str] = Query(None, description="Filter by Branch / Warehouse Code"),
+    period: Optional[str] = Query(None, description="Filter by Date Period (e.g. today, week, month, year, all)"),
+    date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
     current_user: dict = Depends(require_permission("products.view")),
 ) -> Dict[str, Any]:
     """Retrieve paginated stock configuration items, KPI statistics, filter options, and SAP connection state."""
@@ -34,10 +38,30 @@ async def get_stock_configuration(
             vendor=vendor,
             group=group,
             warehouse=warehouse,
+            branch=branch,
+            period=period,
+            date_from=date_from,
+            date_to=date_to,
         )
     except Exception as e:
         logger.error(f"Error fetching stock configuration items: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch stock configuration items: {str(e)}")
+
+
+@router.post("/bulk-update")
+async def bulk_update_stock_items(
+    payload: Dict[str, Any],
+    current_user: dict = Depends(require_permission("products.view")),
+) -> Dict[str, Any]:
+    """Bulk update stock configuration items with per-row transactional status tracking."""
+    items = payload.get("items")
+    if not isinstance(items, list):
+        raise HTTPException(status_code=400, detail="'items' must be a list of item objects.")
+    try:
+        return _service.bulk_update_items(items)
+    except Exception as e:
+        logger.error(f"Error during bulk update: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to execute bulk update: {str(e)}")
 
 
 @router.put("/items/{item_code}")
@@ -46,10 +70,15 @@ async def update_stock_item(
     data: Dict[str, Any],
     current_user: dict = Depends(require_permission("products.view")),
 ) -> Dict[str, Any]:
-    """Update user-editable stock configuration fields for a row."""
+    """Update user-editable stock configuration fields for a row and automatically sync to SAP."""
     try:
         updated = _service.update_item(item_code, data)
-        return {"success": True, "item": updated}
+        return {
+            "success": True,
+            "item": updated,
+            "sap_synced": updated.get("sap_synced", False),
+            "sap_message": updated.get("sap_message", ""),
+        }
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:
@@ -134,11 +163,24 @@ async def export_stock_excel(
     vendor: Optional[str] = Query(None),
     group: Optional[str] = Query(None),
     warehouse: Optional[str] = Query(None),
+    branch: Optional[str] = Query(None),
+    period: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     current_user: dict = Depends(require_permission("products.view")),
 ):
     """Export filtered stock items into a formatted Excel (.xlsx) workbook preserving all business columns."""
     try:
-        excel_bytes = _service.export_excel(search=search, vendor=vendor, group=group, warehouse=warehouse)
+        excel_bytes = _service.export_excel(
+            search=search,
+            vendor=vendor,
+            group=group,
+            warehouse=warehouse,
+            branch=branch,
+            period=period,
+            date_from=date_from,
+            date_to=date_to,
+        )
         return Response(
             content=excel_bytes,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

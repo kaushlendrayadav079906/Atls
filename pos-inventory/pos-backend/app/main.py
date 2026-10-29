@@ -74,7 +74,8 @@ async def warm_products_cache():
         base_url = None
         
         # Fetch all items from SAP (using parallel pagination)
-        sap_items = sap_service.get_items()
+        loop = asyncio.get_running_loop()
+        sap_items = await loop.run_in_executor(None, sap_service.get_items)
         
         # Convert to response format
         products = []
@@ -161,7 +162,8 @@ async def lifespan(app: FastAPI):
     # Connect to SAP Service Layer
     try:
         sap_client = get_sap_client()
-        sap_client.login()
+        # Connect non-blocking so startup is instantaneous
+        asyncio.get_running_loop().run_in_executor(None, sap_client.login)
         logger.info("Connected to SAP Business One Service Layer")
         
         # Start background cache warming (don't block startup)

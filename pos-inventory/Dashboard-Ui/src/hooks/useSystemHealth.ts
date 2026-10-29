@@ -29,8 +29,8 @@ const fetchHealth = async (): Promise<RawHealthResult> => {
   const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3001/api/v1';
 
   try {
-    // 1. Try dedicated SAP health endpoint (4s timeout max, never blocks the browser or server)
-    const sapRes = await axios.get<SapHealthDetails>(`${baseURL}/health/sap`, { timeout: 4000 });
+    // 1. Try dedicated SAP health endpoint (10s timeout to accommodate network/VPN latency)
+    const sapRes = await axios.get<SapHealthDetails>(`${baseURL}/health/sap`, { timeout: 10000 });
     const sapOk = sapRes.data?.status === 'connected';
 
     return {
@@ -42,7 +42,7 @@ const fetchHealth = async (): Promise<RawHealthResult> => {
     // 2. Fallback to top-level /health
     try {
       const rootHealthUrl = baseURL.replace(/\/api\/v1\/?$/, '/health');
-      const rootRes = await axios.get(rootHealthUrl, { timeout: 4000 });
+      const rootRes = await axios.get(rootHealthUrl, { timeout: 10000 });
       const sapStatus = rootRes.data?.dependencies?.sap === 'connected';
       const dbStatus = rootRes.data?.dependencies?.database === 'connected';
 

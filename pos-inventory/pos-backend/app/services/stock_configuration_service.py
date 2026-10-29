@@ -8,12 +8,14 @@ import json
 import logging
 import os
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import date, datetime
+import time
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 import psycopg2
+import psycopg2.extras
 
 from app.core.config import settings
 from app.services.sap.client import get_sap_client, SAPConnectionError
@@ -48,6 +50,7 @@ COLUMNS = [
     "items_group_code",
     "warehouse_code",
     "is_active",
+    "entry_date",
     "created_at",
     "updated_at",
 ]
@@ -737,12 +740,15 @@ class StockConfigurationService:
                             items_group_code VARCHAR(50) DEFAULT '',
                             warehouse_code VARCHAR(50) DEFAULT '01',
                             is_active BOOLEAN DEFAULT TRUE,
+                            entry_date DATE,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         );
                         """
                     )
                     cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS sr_no INTEGER DEFAULT 0;")
+                    cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS entry_date DATE;")
+                    cur.execute("UPDATE stock_configuration SET entry_date = '2025-01-07' WHERE entry_date IS NULL;")
                     # Ensure sr_no matches the sequence from the reference design
                     for idx, item_init in enumerate(INITIAL_ITEMS, start=1):
                         cur.execute(
@@ -781,7 +787,7 @@ class StockConfigurationService:
     def _ensure_fallback_json(self) -> None:
         if not os.path.exists(FALLBACK_JSON_PATH):
             now = datetime.utcnow().isoformat()
-            items = [{**it, "created_at": now, "updated_at": now} for it in INITIAL_ITEMS]
+            items = [{**it, "entry_date": it.get("entry_date", "2025-01-07"), "created_at": now, "updated_at": now} for it in INITIAL_ITEMS]
             with open(FALLBACK_JSON_PATH, "w", encoding="utf-8") as f:
                 json.dump(items, f, indent=2)
 
@@ -789,9 +795,13 @@ class StockConfigurationService:
         self._ensure_fallback_json()
         try:
             with open(FALLBACK_JSON_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
+                items = json.load(f)
+                for it in items:
+                    if not it.get("entry_date"):
+                        it["entry_date"] = "2025-01-07"
+                return items
         except Exception:
-            return INITIAL_ITEMS.copy()
+            return [{**it, "entry_date": it.get("entry_date", "2025-01-07")} for it in INITIAL_ITEMS]
 
     def _write_to_fallback(self, items: List[Dict[str, Any]]) -> None:
         with open(FALLBACK_JSON_PATH, "w", encoding="utf-8") as f:
@@ -805,24 +815,15 @@ class StockConfigurationService:
         vendor: Optional[str] = None,
         group: Optional[str] = None,
         warehouse: Optional[str] = None,
+        branch: Optional[str] = None,
+        period: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Fetch paginated stock configuration items, KPIs, filter options, and SAP connection status."""
         try:
             with self._get_connection() as conn:
                 with conn.cursor() as cur:
-                    # Global KPI totals across all items
-                    cur.execute("SELECT COUNT(*) FROM stock_configuration")
-                    total_items = cur.fetchone()[0] or 0
-
-                    cur.execute("SELECT COUNT(*) FROM stock_configuration WHERE is_active = TRUE")
-                    active_items = cur.fetchone()[0] or 0
-
-                    cur.execute("SELECT COUNT(*) FROM stock_configuration WHERE is_active = FALSE")
-                    inactive_items = cur.fetchone()[0] or 0
-
-                    cur.execute("SELECT COUNT(DISTINCT warehouse_code) FROM stock_configuration WHERE warehouse_code <> ''")
-                    warehouses_count = cur.fetchone()[0] or 0
-
                     # Filter options from distinct stored values
                     cur.execute("SELECT DISTINCT vendor_name FROM stock_configuration WHERE vendor_name <> '' ORDER BY vendor_name")
                     vendor_list = [r[0] for r in cur.fetchall()]
@@ -850,15 +851,56 @@ class StockConfigurationService:
                         conditions.append("items_group_code ILIKE %(group)s")
                         params["group"] = f"%{group.strip()}%"
 
-                    if warehouse and warehouse.strip() and warehouse.strip().lower() != "all warehouses":
+                    eff_wh = warehouse or branch
+                    if eff_wh and eff_wh.strip() and eff_wh.strip().lower() not in ("all warehouses", "all branches", "all"):
                         conditions.append("warehouse_code ILIKE %(warehouse)s")
-                        params["warehouse"] = f"%{warehouse.strip()}%"
+                        params["warehouse"] = f"%{eff_wh.strip()}%"
+
+                    # Date filter handling on actual SAP creation date (entry_date)
+                    eff_date = "COALESCE(entry_date, DATE(created_at))"
+                    if period and period.strip().lower() not in ("all dates (total)", "all_time", "all", ""):
+                        p = period.strip().lower()
+                        if p in ("today", "daily"):
+                            conditions.append(f"{eff_date} = CURRENT_DATE")
+                        elif p in ("week", "weekly", "this week"):
+                            conditions.append(f"{eff_date} >= DATE_TRUNC('week', CURRENT_DATE)::DATE")
+                        elif p in ("month", "monthly", "this month"):
+                            conditions.append(f"{eff_date} >= DATE_TRUNC('month', CURRENT_DATE)::DATE")
+                        elif p in ("year", "yearly", "this year"):
+                            conditions.append(f"{eff_date} >= DATE_TRUNC('year', CURRENT_DATE)::DATE")
+
+                    if date_from and date_from.strip():
+                        conditions.append(f"{eff_date} >= %(date_from)s")
+                        params["date_from"] = date_from.strip()
+
+                    if date_to and date_to.strip():
+                        conditions.append(f"{eff_date} <= %(date_to)s")
+                        params["date_to"] = date_to.strip()
 
                     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
                     # Count matching records
                     cur.execute(f"SELECT COUNT(*) FROM stock_configuration {where_clause}", params)
                     filtered_total = cur.fetchone()[0] or 0
+
+                    # Calculate KPIs matching current filters
+                    if where_clause:
+                        total_items = filtered_total
+                        cur.execute(f"SELECT COUNT(*) FROM stock_configuration {where_clause} AND is_active = TRUE", params)
+                        active_items = cur.fetchone()[0] or 0
+                        cur.execute(f"SELECT COUNT(*) FROM stock_configuration {where_clause} AND is_active = FALSE", params)
+                        inactive_items = cur.fetchone()[0] or 0
+                        cur.execute(f"SELECT COUNT(DISTINCT warehouse_code) FROM stock_configuration {where_clause} AND warehouse_code <> ''", params)
+                        warehouses_count = cur.fetchone()[0] or 0
+                    else:
+                        cur.execute("SELECT COUNT(*) FROM stock_configuration")
+                        total_items = cur.fetchone()[0] or 0
+                        cur.execute("SELECT COUNT(*) FROM stock_configuration WHERE is_active = TRUE")
+                        active_items = cur.fetchone()[0] or 0
+                        cur.execute("SELECT COUNT(*) FROM stock_configuration WHERE is_active = FALSE")
+                        inactive_items = cur.fetchone()[0] or 0
+                        cur.execute("SELECT COUNT(DISTINCT warehouse_code) FROM stock_configuration WHERE warehouse_code <> ''")
+                        warehouses_count = cur.fetchone()[0] or 0
 
                     # Fetch page records
                     offset = max(0, (page - 1) * page_size)
@@ -882,6 +924,10 @@ class StockConfigurationService:
                         for num_col in ["qty", "stock_qty", "rcvd_qty", "nt_weight", "ok_qty", "rej_qty"]:
                             if item_dict.get(num_col) is not None:
                                 item_dict[num_col] = float(item_dict[num_col])
+                        if isinstance(item_dict.get("entry_date"), (datetime, date)):
+                            item_dict["entry_date"] = item_dict["entry_date"].isoformat()
+                        elif not item_dict.get("entry_date"):
+                            item_dict["entry_date"] = "2025-01-07"
                         if isinstance(item_dict.get("created_at"), datetime):
                             item_dict["created_at"] = item_dict["created_at"].isoformat()
                         if isinstance(item_dict.get("updated_at"), datetime):
@@ -949,19 +995,114 @@ class StockConfigurationService:
         }
 
     def _get_sap_health_status(self) -> Dict[str, Any]:
-        """Check live SAP Service Layer status with 10s caching."""
+        """Check live SAP Service Layer status without blocking database queries."""
         try:
             client = get_sap_client()
-            return client.check_health()
+            if client._last_health_result:
+                return client._last_health_result
+            if client.session_id and (not client.session_timeout or datetime.utcnow() < client.session_timeout):
+                return {
+                    "status": "connected",
+                    "authenticated": True,
+                    "circuit_breaker": "CLOSED",
+                    "message": "SAP authenticated and connected",
+                }
+            return {
+                "status": "connected" if client.session_id else "disconnected",
+                "authenticated": bool(client.session_id),
+                "message": "SAP status ready",
+            }
         except Exception as e:
             return {"status": "disconnected", "message": str(e)}
+
+    def _sync_item_to_sap(self, item_code: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Synchronize updated item fields directly to SAP Business One Service Layer.
+        Updates standard SAP B1 fields (ItemName, NetWeight, User_Text) and UDFs if configured.
+        Handles offline/circuit-breaker states gracefully without failing PostgreSQL transactions.
+        """
+        code = str(item_code).strip()
+        sap_result = {
+            "item_code": code,
+            "sap_synced": False,
+            "message": "",
+        }
+
+        # Check if SAP Service Layer is connected
+        health = self._get_sap_health_status()
+        if health.get("status") != "connected":
+            sap_result["message"] = f"Saved locally. SAP Service Layer is offline ({health.get('message', 'Disconnected')})."
+            return sap_result
+
+        try:
+            sap_client = get_sap_client()
+
+            # Prepare standard SAP fields
+            sap_payload: Dict[str, Any] = {}
+            if "description" in data and data["description"]:
+                sap_payload["ItemName"] = str(data["description"]).strip()
+
+            if "nt_weight" in data and data["nt_weight"] is not None:
+                try:
+                    sap_payload["NetWeight"] = float(data["nt_weight"])
+                except (ValueError, TypeError):
+                    pass
+
+            grpo = str(data.get("grpo_no") or "").strip()
+            qc = "Pass" if data.get("qc") else "Pending"
+            ok = data.get("ok_qty", 0)
+            rej = data.get("rej_qty", 0)
+            sap_payload["User_Text"] = f"Stock Config | GRPO: {grpo} | QC: {qc} | OK: {ok} | Rej: {rej}"
+
+            endpoint = f"Items('{code}')"
+            try:
+                sap_client.patch(endpoint, sap_payload)
+                sap_result["sap_synced"] = True
+                sap_result["message"] = "Successfully updated in SAP Business One."
+                logger.info(f"Item {code} successfully synchronized to SAP Business One.")
+            except Exception as e:
+                # If NetWeight or User_Text caused schema rejection, retry with minimal ItemName
+                logger.warning(f"Standard PATCH to SAP failed for {code} ({e}). Retrying with minimal payload.")
+                min_payload = {}
+                if "ItemName" in sap_payload:
+                    min_payload["ItemName"] = sap_payload["ItemName"]
+                if min_payload:
+                    try:
+                        sap_client.patch(endpoint, min_payload)
+                        sap_result["sap_synced"] = True
+                        sap_result["message"] = "Updated in SAP Business One (basic fields)."
+                    except Exception as e2:
+                        sap_result["sap_synced"] = False
+                        sap_result["message"] = f"Database updated. SAP error: {str(e2)}"
+                        logger.error(f"SAP sync failed for {code}: {e2}")
+                else:
+                    sap_result["sap_synced"] = False
+                    sap_result["message"] = f"Database updated. SAP error: {str(e)}"
+
+        except Exception as ex:
+            sap_result["sap_synced"] = False
+            sap_result["message"] = f"Database updated. SAP error: {str(ex)}"
+            logger.error(f"Unexpected error syncing {code} to SAP: {ex}")
+
+        return sap_result
 
     def update_item(self, item_code: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Update user-editable fields for a specific stock configuration item."""
         code = str(item_code).strip()
         now = datetime.utcnow()
 
-        # Sanitize and validate editable fields
+        # Validate numeric fields against negative values
+        for field_name in ["qty", "rcvd_qty", "nt_weight", "ok_qty", "rej_qty"]:
+            if field_name in data and data[field_name] is not None:
+                try:
+                    val = float(data[field_name])
+                    if val < 0:
+                        raise ValueError(f"Quantity or weight field '{field_name}' cannot be negative.")
+                except (ValueError, TypeError) as ex:
+                    if "cannot be negative" in str(ex):
+                        raise
+                    raise ValueError(f"Invalid numeric value for '{field_name}'.")
+
         qty = max(0.0, float(data.get("qty", 0.0)))
         rcvd_qty = max(0.0, float(data.get("rcvd_qty", 0.0)))
         nt_weight = max(0.0, float(data.get("nt_weight", 0.0)))
@@ -984,7 +1125,7 @@ class StockConfigurationService:
 
         try:
             with self._get_connection() as conn:
-                with conn.cursor() as cur:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                     cur.execute(
                         """
                         UPDATE stock_configuration
@@ -1028,12 +1169,17 @@ class StockConfigurationService:
                     row = cur.fetchone()
                     if not row:
                         raise ValueError(f"Item {code} not found in stock configuration.")
-                    result = dict(zip(COLUMNS, row))
+                    result = dict(row)
                     for num_col in ["qty", "stock_qty", "rcvd_qty", "nt_weight", "ok_qty", "rej_qty"]:
                         if result.get(num_col) is not None:
                             result[num_col] = float(result[num_col])
                     if isinstance(result.get("updated_at"), datetime):
                         result["updated_at"] = result["updated_at"].isoformat()
+
+                    # Automatically sync update to SAP Business One
+                    sap_info = self._sync_item_to_sap(code, data)
+                    result["sap_synced"] = sap_info["sap_synced"]
+                    result["sap_message"] = sap_info["message"]
                     return result
         except Exception as e:
             logger.warning(f"Error updating item in PostgreSQL ({e}), falling back to JSON.")
@@ -1064,7 +1210,180 @@ class StockConfigurationService:
             if not found:
                 raise ValueError(f"Item {code} not found.")
             self._write_to_fallback(items)
+
+            # Automatically sync update to SAP Business One
+            sap_info = self._sync_item_to_sap(code, data)
+            result["sap_synced"] = sap_info["sap_synced"]
+            result["sap_message"] = sap_info["message"]
             return result
+
+    def bulk_update_items(self, items_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Bulk update user-editable stock configuration fields with transactional savepoints,
+        per-row status tracking, and automated SAP Business One synchronization.
+        """
+        results: List[Dict[str, Any]] = []
+        successful_count = 0
+        failed_count = 0
+        sap_synced_count = 0
+        now = datetime.utcnow()
+
+        try:
+            with self._get_connection() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    for idx, item_data in enumerate(items_data):
+                        code = str(item_data.get("item_code") or "").strip()
+                        if not code:
+                            failed_count += 1
+                            results.append({"item_code": "", "success": False, "error": "Missing item_code in update item."})
+                            continue
+
+                        # Validate numeric fields against negative values
+                        validation_error = None
+                        for field_name in ["qty", "rcvd_qty", "nt_weight", "ok_qty", "rej_qty"]:
+                            if field_name in item_data and item_data[field_name] is not None:
+                                try:
+                                    val = float(item_data[field_name])
+                                    if val < 0:
+                                        validation_error = f"Field '{field_name}' cannot be negative."
+                                        break
+                                except (ValueError, TypeError):
+                                    validation_error = f"Invalid numeric value for '{field_name}'."
+                                    break
+
+                        if validation_error:
+                            failed_count += 1
+                            results.append({"item_code": code, "success": False, "error": validation_error})
+                            continue
+
+                        def clean_yn(val: Any) -> str:
+                            s = str(val or "Y").strip().upper()
+                            return "Y" if s.startswith("Y") else "N"
+
+                        qty = max(0.0, float(item_data.get("qty", 0.0)))
+                        rcvd_qty = max(0.0, float(item_data.get("rcvd_qty", 0.0)))
+                        nt_weight = max(0.0, float(item_data.get("nt_weight", 0.0)))
+                        ok_qty = max(0.0, float(item_data.get("ok_qty", 0.0)))
+                        rej_qty = max(0.0, float(item_data.get("rej_qty", 0.0)))
+                        qc = bool(item_data.get("qc", False))
+                        drw_yn = clean_yn(item_data.get("drw_yn"))
+                        v_chk = clean_yn(item_data.get("v_chk"))
+                        lm = clean_yn(item_data.get("lm"))
+                        olng = clean_yn(item_data.get("olng"))
+                        lpk = clean_yn(item_data.get("lpk"))
+                        lbl = clean_yn(item_data.get("lbl"))
+                        mc_or_pt = clean_yn(item_data.get("mc_or_pt"))
+                        grpo_no = str(item_data.get("grpo_no") or "").strip()
+
+                        # Use PostgreSQL SAVEPOINT for granular transaction isolation
+                        sp_id = f"sp_{idx}"
+                        cur.execute(f"SAVEPOINT {sp_id};")
+                        try:
+                            cur.execute(
+                                """
+                                UPDATE stock_configuration
+                                SET qty = %(qty)s,
+                                    rcvd_qty = %(rcvd_qty)s,
+                                    nt_weight = %(nt_weight)s,
+                                    qc = %(qc)s,
+                                    drw_yn = %(drw_yn)s,
+                                    v_chk = %(v_chk)s,
+                                    ok_qty = %(ok_qty)s,
+                                    rej_qty = %(rej_qty)s,
+                                    lm = %(lm)s,
+                                    olng = %(olng)s,
+                                    lpk = %(lpk)s,
+                                    lbl = %(lbl)s,
+                                    mc_or_pt = %(mc_or_pt)s,
+                                    grpo_no = %(grpo_no)s,
+                                    updated_at = %(now)s
+                                WHERE item_code = %(code)s
+                                RETURNING *;
+                                """,
+                                {
+                                    "qty": qty,
+                                    "rcvd_qty": rcvd_qty,
+                                    "nt_weight": nt_weight,
+                                    "qc": qc,
+                                    "drw_yn": drw_yn,
+                                    "v_chk": v_chk,
+                                    "ok_qty": ok_qty,
+                                    "rej_qty": rej_qty,
+                                    "lm": lm,
+                                    "olng": olng,
+                                    "lpk": lpk,
+                                    "lbl": lbl,
+                                    "mc_or_pt": mc_or_pt,
+                                    "grpo_no": grpo_no,
+                                    "now": now,
+                                    "code": code,
+                                },
+                            )
+                            row = cur.fetchone()
+                            if not row:
+                                cur.execute(f"ROLLBACK TO SAVEPOINT {sp_id};")
+                                failed_count += 1
+                                results.append({"item_code": code, "success": False, "error": f"Item {code} not found in database."})
+                            else:
+                                cur.execute(f"RELEASE SAVEPOINT {sp_id};")
+                                result = dict(row)
+                                for num_col in ["qty", "stock_qty", "rcvd_qty", "nt_weight", "ok_qty", "rej_qty"]:
+                                    if result.get(num_col) is not None:
+                                        result[num_col] = float(result[num_col])
+                                if isinstance(result.get("updated_at"), datetime):
+                                    result["updated_at"] = result["updated_at"].isoformat()
+                                successful_count += 1
+
+                                # Automatically sync update to SAP Business One
+                                sap_info = self._sync_item_to_sap(code, item_data)
+                                result["sap_synced"] = sap_info["sap_synced"]
+                                result["sap_message"] = sap_info["message"]
+                                if sap_info["sap_synced"]:
+                                    sap_synced_count += 1
+
+                                results.append({
+                                    "item_code": code,
+                                    "success": True,
+                                    "item": result,
+                                    "sap_synced": sap_info["sap_synced"],
+                                    "sap_message": sap_info["message"],
+                                })
+                        except Exception as row_err:
+                            cur.execute(f"ROLLBACK TO SAVEPOINT {sp_id};")
+                            failed_count += 1
+                            results.append({"item_code": code, "success": False, "error": str(row_err)})
+
+        except Exception as e:
+            logger.warning(f"PostgreSQL bulk update connection failed ({e}), falling back to individual updates.")
+            results = []
+            successful_count = 0
+            failed_count = 0
+            sap_synced_count = 0
+            for item_data in items_data:
+                code = str(item_data.get("item_code") or "").strip()
+                try:
+                    res = self.update_item(code, item_data)
+                    successful_count += 1
+                    if res.get("sap_synced"):
+                        sap_synced_count += 1
+                    results.append({
+                        "item_code": code,
+                        "success": True,
+                        "item": res,
+                        "sap_synced": res.get("sap_synced", False),
+                        "sap_message": res.get("sap_message", ""),
+                    })
+                except Exception as ex:
+                    failed_count += 1
+                    results.append({"item_code": code, "success": False, "error": str(ex)})
+
+        return {
+            "total": len(items_data),
+            "successful": successful_count,
+            "failed": failed_count,
+            "sap_synced_count": sap_synced_count,
+            "results": results,
+        }
 
     def add_item(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Add a new item to the stock configuration table."""
@@ -1173,9 +1492,12 @@ class StockConfigurationService:
         Synchronize stock configuration with genuine SAP Business One data.
         Fetches live Items, Stock, and Vendor details only when SAP Service Layer is connected.
         """
-        health = self._get_sap_health_status()
-        if health.get("status") != "connected":
-            raise RuntimeError(f"SAP Business One Service Layer is not connected ({health.get('message', 'Offline')}). Cannot perform live synchronization.")
+        client = get_sap_client()
+        try:
+            if not client.session_id or (client.session_timeout and datetime.utcnow() >= client.session_timeout):
+                client.login()
+        except Exception as err:
+            raise RuntimeError(f"SAP Business One Service Layer is not connected ({str(err)}). Cannot perform live synchronization.")
 
         sap_service = SAPItemsService()
         warehouses_service = SAPWarehousesService()
@@ -1198,20 +1520,60 @@ class StockConfigurationService:
                         group = str(s_item.get("U_SUBG") or s_item.get("ItemsGroupCode") or "Standard")
                         vendor_code = s_item.get("Mainsupplier") or ""
 
-                        # If item exists in stock_configuration, update stock_qty and is_active
+                        raw_create = s_item.get("CreateDate")
+                        entry_date = None
+                        if raw_create:
+                            try:
+                                entry_date = str(raw_create).split("T")[0]
+                            except Exception:
+                                entry_date = None
+
+                        # If item exists in stock_configuration, update stock_qty, is_active, description, and entry_date
                         cur.execute(
                             """
                             UPDATE stock_configuration
                             SET stock_qty = %(stock)s,
                                 is_active = %(is_active)s,
                                 description = %(name)s,
+                                entry_date = COALESCE(%(entry_date)s, entry_date),
                                 updated_at = %(now)s
                             WHERE item_code = %(code)s;
                             """,
-                            {"stock": stock, "is_active": is_active, "name": name, "now": now, "code": code},
+                            {"stock": stock, "is_active": is_active, "name": name, "entry_date": entry_date, "now": now, "code": code},
                         )
                         if cur.rowcount > 0:
                             synced_count += 1
+                        else:
+                            cur.execute(
+                                """
+                                INSERT INTO stock_configuration (
+                                    sr_no, item_code, description, qty, stock_qty, vendor_name, vendor_code,
+                                    grpo_no, rcvd_qty, nt_weight, qc, drw_yn, v_chk, ok_qty, rej_qty,
+                                    lm, olng, lpk, lbl, mc_or_pt, items_group_code, warehouse_code,
+                                    is_active, entry_date, created_at, updated_at
+                                ) VALUES (
+                                    (SELECT COALESCE(MAX(sr_no), 0) + 1 FROM stock_configuration),
+                                    %(code)s, %(name)s, %(stock)s, %(stock)s, %(vendor_name)s, %(vendor_code)s,
+                                    '', %(stock)s, 0, false, 'Y', 'Y', %(stock)s, 0,
+                                    'Y', 'Y', 'Y', 'Y', 'Y', %(group)s, '01',
+                                    %(is_active)s, %(entry_date)s, %(now)s, %(now)s
+                                )
+                                ON CONFLICT (item_code) DO NOTHING;
+                                """,
+                                {
+                                    "code": code,
+                                    "name": name,
+                                    "stock": stock,
+                                    "vendor_name": vendor_code,
+                                    "vendor_code": vendor_code,
+                                    "group": group,
+                                    "is_active": is_active,
+                                    "entry_date": entry_date,
+                                    "now": now,
+                                },
+                            )
+                            if cur.rowcount > 0:
+                                synced_count += 1
 
             StockConfigurationService._last_synced_at = now.strftime("%Y-%m-%d %H:%M:%S")
             return {
@@ -1229,13 +1591,28 @@ class StockConfigurationService:
         vendor: Optional[str] = None,
         group: Optional[str] = None,
         warehouse: Optional[str] = None,
+        branch: Optional[str] = None,
+        period: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
     ) -> bytes:
         """
         Export all matching stock configuration records to an Excel .xlsx workbook.
         Matches the exact column order and headers from the reference spreadsheet.
         """
         # Fetch all matching records without pagination limit
-        data = self.get_items(page=1, page_size=100000, search=search, vendor=vendor, group=group, warehouse=warehouse)
+        data = self.get_items(
+            page=1,
+            page_size=100000,
+            search=search,
+            vendor=vendor,
+            group=group,
+            warehouse=warehouse,
+            branch=branch,
+            period=period,
+            date_from=date_from,
+            date_to=date_to,
+        )
         items = data["items"]
 
         wb = openpyxl.Workbook()
@@ -1262,6 +1639,7 @@ class StockConfigurationService:
             "LPK",
             "LBL",
             "MC or PT",
+            "ENTRY DATE",
         ]
 
         # Header styling
@@ -1289,6 +1667,21 @@ class StockConfigurationService:
 
         # Append data rows
         for idx, it in enumerate(items, start=1):
+            raw_ed = it.get("entry_date")
+            formatted_entry_date = "—"
+            if raw_ed:
+                try:
+                    if isinstance(raw_ed, (datetime, date)):
+                        formatted_entry_date = raw_ed.strftime("%d-%m-%Y")
+                    else:
+                        d_parts = str(raw_ed).split("T")[0].split("-")
+                        if len(d_parts) == 3:
+                            formatted_entry_date = f"{d_parts[2]}-{d_parts[1]}-{d_parts[0]}"
+                        else:
+                            formatted_entry_date = str(raw_ed)
+                except Exception:
+                    formatted_entry_date = str(raw_ed)
+
             row_data = [
                 idx,
                 it.get("item_code", ""),
@@ -1309,6 +1702,7 @@ class StockConfigurationService:
                 it.get("lpk", "Y"),
                 it.get("lbl", "Y"),
                 it.get("mc_or_pt", "Y"),
+                formatted_entry_date,
             ]
             ws.append(row_data)
             row_num = idx + 1
@@ -1317,7 +1711,7 @@ class StockConfigurationService:
                 cell = ws.cell(row=row_num, column=col_idx)
                 cell.border = thin_border
                 cell.font = Font(name="Calibri", size=10)
-                if col_idx in [1, 2, 7, 10, 11, 12, 15, 16, 17, 18, 19]:
+                if col_idx in [1, 2, 7, 10, 11, 12, 15, 16, 17, 18, 19, 20]:
                     cell.alignment = center_align
                 elif col_idx in [3, 6]:
                     cell.alignment = left_align

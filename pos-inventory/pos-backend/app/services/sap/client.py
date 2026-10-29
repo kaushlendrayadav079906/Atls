@@ -161,7 +161,7 @@ class SAPServiceLayerClient:
         if not self.client:
             self._init_client()
 
-        fast_timeout = httpx.Timeout(connect=2.5, read=3.0, write=3.0, pool=2.5)
+        fast_timeout = httpx.Timeout(connect=2.5, read=15.0, write=5.0, pool=2.5)
 
         try:
             # If no active session or expired, attempt login with fast probe timeout
@@ -190,7 +190,7 @@ class SAPServiceLayerClient:
                 return res
 
             # Probe active session with lightweight request
-            probe_url = f"{self.base_url}/$metadata"
+            probe_url = self.base_url
             resp = self.client.get(
                 probe_url,
                 headers={"Accept": "application/xml"},

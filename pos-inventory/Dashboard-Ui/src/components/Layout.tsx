@@ -830,6 +830,10 @@ export const Layout = () => {
             location.pathname === '/solutions' ||
             location.pathname === '/reports';
 
+          const isWidePage =
+            location.pathname === '/stock-configuration' ||
+            location.pathname.startsWith('/stock-configuration');
+
           return (
             <main className={`flex min-w-0 flex-1 flex-col overflow-hidden relative transition-colors duration-200 ${
               isDark ? 'bg-[#0f172a]' : 'bg-[#f0f6ff]'
@@ -843,10 +847,20 @@ export const Layout = () => {
               >
                 <div
                   className={`flex-1 w-full ${
-                    isFullBleedPage ? 'p-0' : 'p-4 sm:p-5 lg:p-6'
+                    isFullBleedPage
+                      ? 'p-0'
+                      : isWidePage
+                      ? 'p-2 sm:p-3 md:p-4 lg:p-5'
+                      : 'p-4 sm:p-5 lg:p-6'
                   } transition-all duration-300`}
                 >
-                  <div className={isFullBleedPage ? 'w-full h-full' : 'w-full max-w-7xl 2xl:max-w-[1440px] mx-auto'}>
+                  <div className={
+                    isFullBleedPage
+                      ? 'w-full h-full'
+                      : isWidePage
+                      ? 'w-full max-w-[1920px] mx-auto min-w-0'
+                      : 'w-full max-w-7xl 2xl:max-w-[1440px] mx-auto'
+                  }>
                     <Outlet />
                   </div>
                 </div>

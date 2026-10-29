@@ -23,6 +23,7 @@ export interface StockConfigurationItem {
   items_group_code?: string;
   warehouse_code?: string;
   is_active?: boolean;
+  entry_date?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -60,6 +61,10 @@ export interface StockQueryParams {
   vendor?: string;
   group?: string;
   warehouse?: string;
+  branch?: string;
+  period?: string;
+  date_from?: string;
+  date_to?: string;
 }
 
 export interface ImportPreviewResponse {
@@ -73,14 +78,39 @@ export interface ImportPreviewResponse {
   success?: boolean;
 }
 
+export interface BulkUpdateItemResult {
+  item_code: string;
+  success: boolean;
+  item?: StockConfigurationItem;
+  sap_synced?: boolean;
+  sap_message?: string;
+  error?: string;
+}
+
+export interface BulkUpdateResponse {
+  total: number;
+  successful: number;
+  failed: number;
+  sap_synced_count?: number;
+  results: BulkUpdateItemResult[];
+}
+
 export const stockConfigurationApi = {
   getItems: async (params?: StockQueryParams): Promise<StockConfigurationResponse> => {
     const res = await apiClient.get<StockConfigurationResponse>('/stock-configuration', { params });
     return res.data;
   },
 
-  updateItem: async (itemCode: string, data: Partial<StockConfigurationItem>): Promise<{ success: boolean; item: StockConfigurationItem }> => {
+  updateItem: async (
+    itemCode: string,
+    data: Partial<StockConfigurationItem>
+  ): Promise<{ success: boolean; item: StockConfigurationItem; sap_synced?: boolean; sap_message?: string }> => {
     const res = await apiClient.put(`/stock-configuration/items/${encodeURIComponent(itemCode)}`, data);
+    return res.data;
+  },
+
+  bulkUpdateItems: async (items: Partial<StockConfigurationItem>[]): Promise<BulkUpdateResponse> => {
+    const res = await apiClient.post<BulkUpdateResponse>('/stock-configuration/bulk-update', { items });
     return res.data;
   },
 

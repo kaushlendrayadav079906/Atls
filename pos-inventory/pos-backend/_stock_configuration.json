@@ -7,13 +7,13 @@
     "vendor_name": "Bajaj Alliance",
     "vendor_code": "V001",
     "grpo_no": "5099",
-    "rcvd_qty": 115.0,
-    "nt_weight": 14.2,
-    "qc": true,
+    "rcvd_qty": 0.0,
+    "nt_weight": 0.0,
+    "qc": false,
     "drw_yn": "Y",
     "v_chk": "Y",
-    "ok_qty": 110.0,
-    "rej_qty": 5.0,
+    "ok_qty": 0.0,
+    "rej_qty": 0.0,
     "lm": "Y",
     "olng": "Y",
     "lpk": "Y",
@@ -23,7 +23,8 @@
     "warehouse_code": "01",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.018428"
+    "updated_at": "2026-10-29T07:33:58.589806",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "RM002",
@@ -49,7 +50,8 @@
     "warehouse_code": "02",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "PKG003",
@@ -75,7 +77,8 @@
     "warehouse_code": "01",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "SP004",
@@ -101,7 +104,8 @@
     "warehouse_code": "SH",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "CHEM005",
@@ -127,7 +131,8 @@
     "warehouse_code": "03",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "SUB006",
@@ -153,7 +158,8 @@
     "warehouse_code": "02",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "TOOL007",
@@ -179,7 +185,8 @@
     "warehouse_code": "04",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "MAT008",
@@ -205,7 +212,8 @@
     "warehouse_code": "01",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "FG009",
@@ -231,7 +239,8 @@
     "warehouse_code": "01",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "RM010",
@@ -257,7 +266,8 @@
     "warehouse_code": "02",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "FG011",
@@ -283,7 +293,8 @@
     "warehouse_code": "01",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "RM012",
@@ -309,7 +320,8 @@
     "warehouse_code": "02",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "PKG013",
@@ -335,7 +347,8 @@
     "warehouse_code": "03",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "SP014",
@@ -361,7 +374,8 @@
     "warehouse_code": "SH",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "CHEM015",
@@ -387,7 +401,8 @@
     "warehouse_code": "03",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "SUB016",
@@ -413,7 +428,8 @@
     "warehouse_code": "04",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "TOOL017",
@@ -439,7 +455,8 @@
     "warehouse_code": "04",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "MAT018",
@@ -465,7 +482,8 @@
     "warehouse_code": "01",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "FG019",
@@ -491,7 +509,8 @@
     "warehouse_code": "02",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "RM020",
@@ -517,7 +536,8 @@
     "warehouse_code": "01",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "SP021",
@@ -543,7 +563,8 @@
     "warehouse_code": "SH",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "SUB022",
@@ -569,7 +590,8 @@
     "warehouse_code": "02",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "CHEM023",
@@ -595,7 +617,8 @@
     "warehouse_code": "03",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "FG024",
@@ -621,7 +644,8 @@
     "warehouse_code": "01",
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "DISC025",
@@ -647,7 +671,8 @@
     "warehouse_code": "SH",
     "is_active": false,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   },
   {
     "item_code": "OBS026",
@@ -673,6 +698,7 @@
     "warehouse_code": "02",
     "is_active": false,
     "created_at": "2026-10-28T10:43:51.066431",
-    "updated_at": "2026-10-28T10:43:51.066431"
+    "updated_at": "2026-10-28T10:43:51.066431",
+    "entry_date": "2025-01-07"
   }
 ]
