@@ -62,12 +62,13 @@ class SAPServiceLayerClient:
         """Initialize HTTP client with explicit connect timeout (avoids 21s Windows TCP hangs)"""
         timeout = httpx.Timeout(
             timeout=settings.SAP_HTTP_TIMEOUT,
-            connect=3.0,
+            connect=10.0,
         )
         self.client = httpx.Client(
             timeout=timeout,
             verify=self.verify_ssl,
             follow_redirects=True,
+            limits=httpx.Limits(max_keepalive_connections=50, max_connections=100, keepalive_expiry=60.0),
         )
 
     def login(self, timeout: Optional[Any] = None) -> bool:
@@ -161,7 +162,7 @@ class SAPServiceLayerClient:
         if not self.client:
             self._init_client()
 
-        fast_timeout = httpx.Timeout(connect=2.5, read=15.0, write=5.0, pool=2.5)
+        fast_timeout = httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=15.0)
 
         try:
             # If no active session or expired, attempt login with fast probe timeout
@@ -190,10 +191,9 @@ class SAPServiceLayerClient:
                 return res
 
             # Probe active session with lightweight request
-            probe_url = self.base_url
+            probe_url = f"{self.base_url}/ItemGroups?$top=1&$select=Number"
             resp = self.client.get(
                 probe_url,
-                headers={"Accept": "application/xml"},
                 cookies=self._get_cookies(),
                 timeout=fast_timeout,
             )
