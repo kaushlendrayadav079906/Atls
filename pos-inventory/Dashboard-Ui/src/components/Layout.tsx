@@ -222,7 +222,7 @@ export const Layout = () => {
     if (pathname === '/returns') return 'returns';
     if (pathname === '/analytics') return 'analytics';
     if (pathname === '/contact') return 'dashboard';
-    if (pathname === '/settings') return 'settings';
+    if (pathname.startsWith('/settings')) return 'settings';
 
     if (pathname === '/production/orders') return 'production_orders';
     if (pathname === '/production/item-wise') return 'production_item_wise';
@@ -692,49 +692,55 @@ export const Layout = () => {
                             : 'w-full justify-between rounded-lg py-[9px] px-3 text-[14.5px] font-semibold'
                         }`
                       }
-                      style={({ isActive }) => ({
-                        backgroundColor: isActive ? (item.path === '/' ? '#155EEF' : (isDark ? '#152547' : SIDEBAR_ACTIVE_BG)) : undefined,
-                        color: isActive ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : (isDark ? '#cbd5e1' : TEXT_SECONDARY),
-                      })}
+                      style={({ isActive }) => {
+                        const active = isActive || (item.path === '/settings' && location.pathname.startsWith('/settings'));
+                        return {
+                          backgroundColor: active ? (item.path === '/' ? '#155EEF' : (isDark ? '#152547' : SIDEBAR_ACTIVE_BG)) : undefined,
+                          color: active ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : (isDark ? '#cbd5e1' : TEXT_SECONDARY),
+                        };
+                      }}
                       onMouseEnter={(e) => {
-                        const isActive = location.pathname === item.path;
+                        const isActive = location.pathname === item.path || (item.path === '/settings' && location.pathname.startsWith('/settings'));
                         if (!isActive) {
                           e.currentTarget.style.backgroundColor = isDark ? '#0f1c35' : SIDEBAR_HOVER_BG;
                         }
                       }}
                       onMouseLeave={(e) => {
-                        const isActive = location.pathname === item.path;
+                        const isActive = location.pathname === item.path || (item.path === '/settings' && location.pathname.startsWith('/settings'));
                         if (!isActive) {
                           e.currentTarget.style.backgroundColor = 'transparent';
                         }
                       }}
                     >
-                      {({ isActive }) => (
-                        <>
-                          <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
-                            <item.icon
-                              size={18}
-                              style={{ color: isActive ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : (isDark ? '#94a3b8' : TEXT_MUTED) }}
-                              className="transition-colors"
-                            />
-                            {!sidebarCollapsed && <span className="whitespace-nowrap">{item.name}</span>}
-                          </div>
-                          {item.badge && !sidebarCollapsed && (
-                            <span
-                              className="flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white shadow-xs"
-                              style={{ backgroundColor: COLOR_BADGE }}
-                            >
-                              {item.badge}
-                            </span>
-                          )}
-                          {item.badge && sidebarCollapsed && (
-                            <span
-                              className="absolute right-1 top-1 h-2 w-2 rounded-full"
-                              style={{ backgroundColor: COLOR_BADGE }}
-                            />
-                          )}
-                        </>
-                      )}
+                      {({ isActive }) => {
+                        const active = isActive || (item.path === '/settings' && location.pathname.startsWith('/settings'));
+                        return (
+                          <>
+                            <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
+                              <item.icon
+                                size={18}
+                                style={{ color: active ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : (isDark ? '#94a3b8' : TEXT_MUTED) }}
+                                className="transition-colors"
+                              />
+                              {!sidebarCollapsed && <span className="whitespace-nowrap">{item.name}</span>}
+                            </div>
+                            {item.badge && !sidebarCollapsed && (
+                              <span
+                                className="flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white shadow-xs"
+                                style={{ backgroundColor: COLOR_BADGE }}
+                              >
+                                {item.badge}
+                              </span>
+                            )}
+                            {item.badge && sidebarCollapsed && (
+                              <span
+                                className="absolute right-1 top-1 h-2 w-2 rounded-full"
+                                style={{ backgroundColor: COLOR_BADGE }}
+                              />
+                            )}
+                          </>
+                        );
+                      }}
                     </NavLink>
                   )}
 

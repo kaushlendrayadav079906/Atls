@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { NavLink } from 'react-router-dom';
 import {
   CheckCircle2,
   XCircle,
@@ -22,11 +23,12 @@ import {
   X,
   FileSpreadsheet,
   Calendar,
+  ShieldCheck,
 } from 'lucide-react';
 import { stockConfigurationApi } from '../api/stockConfiguration';
+import { googleSheetsApi } from '../api/googleSheets';
 import type {
   StockConfigurationItem,
-  StockQueryParams,
   ImportPreviewResponse,
 } from '../api/stockConfiguration';
 import { useTheme } from '../contexts/ThemeContext';
@@ -36,7 +38,6 @@ import {
   validateCustomDateRange,
   getDateScopeLabel,
   type QuickFilter,
-  type DashboardPeriod,
 } from '../utils/date';
 
 export const StockConfigurationPage: React.FC = () => {
@@ -47,7 +48,6 @@ export const StockConfigurationPage: React.FC = () => {
   // Branch & Date Filter States
   const [branchId, setBranchId] = useState<string>('');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('');
-  const [period, setPeriod] = useState<DashboardPeriod>('all_time');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [customFrom, setCustomFrom] = useState('');
@@ -134,7 +134,6 @@ export const StockConfigurationPage: React.FC = () => {
       setCustomError(null);
       const resolved = resolveDashboardDateRange('custom', customFrom, customTo);
       setQuickFilter(resolved.quickFilter);
-      setPeriod(resolved.period);
       setDateFrom(resolved.dateFrom);
       setDateTo(resolved.dateTo);
       setIsDateDropdownOpen(false);
@@ -145,7 +144,6 @@ export const StockConfigurationPage: React.FC = () => {
     setCustomError(null);
     const resolved = resolveDashboardDateRange(filter);
     setQuickFilter(resolved.quickFilter);
-    setPeriod(resolved.period);
     setDateFrom(resolved.dateFrom);
     setDateTo(resolved.dateTo);
     if (!filter) {
@@ -171,139 +169,335 @@ export const StockConfigurationPage: React.FC = () => {
     return () => document.removeEventListener('click', handleOutsideClick);
   }, [isDateDropdownOpen]);
 
-  // Query Params
-  const queryParams: StockQueryParams = useMemo(() => ({
-    page,
-    page_size: pageSize,
-    search: appliedSearch || undefined,
-    vendor: selectedVendor && selectedVendor !== 'All Vendors' ? selectedVendor : undefined,
-    group: selectedGroup && selectedGroup !== 'All Groups' ? selectedGroup : undefined,
-    warehouse: selectedWarehouse && selectedWarehouse !== 'All Warehouses' ? selectedWarehouse : undefined,
-    branch: branchId && branchId !== 'All Branches' ? branchId : undefined,
-    period: period && period !== 'all_time' ? period : undefined,
-    date_from: dateFrom || undefined,
-    date_to: dateTo || undefined,
-  }), [page, pageSize, appliedSearch, selectedVendor, selectedGroup, selectedWarehouse, branchId, period, dateFrom, dateTo]);
-
-  // Fetch Data
-  const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['stock-configuration', queryParams],
-    queryFn: () => stockConfigurationApi.getItems(queryParams),
+  // Google Sheets Integration Status
+  const { data: sheetsStatus, refetch: refetchStatus } = useQuery({
+    queryKey: ['google-sheets-status'],
+    queryFn: () => googleSheetsApi.getStatus(),
+    refetchInterval: 15000,
   });
 
-  // Mutate Row Save
-  const saveMutation = useMutation({
-    mutationFn: async ({ itemCode, updates }: { itemCode: string; updates: Partial<StockConfigurationItem> }) => {
-      setSavingItemCode(itemCode);
-      return stockConfigurationApi.updateItem(itemCode, updates);
+  const isSheetsConnected = Boolean(
+    sheetsStatus?.configured && sheetsStatus?.connection_status === 'connected'
+  );
+
+  // Status Badge Helper
+  const getStatusBadge = () => {
+    const status = sheetsStatus?.connection_status;
+    switch (status) {
+      case 'connected':
+        return { label: 'Connected', color: 'emerald', bg: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-300', badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200' };
+      case 'api_not_enabled':
+        return { label: 'API Not Enabled', color: 'amber', bg: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300', badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200' };
+      case 'permission_denied':
+        return { label: 'Permission Denied (403)', color: 'rose', bg: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-300', badge: 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200' };
+      case 'spreadsheet_not_found':
+        return { label: 'Spreadsheet Not Found', color: 'rose', bg: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-300', badge: 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200' };
+      case 'worksheet_not_found':
+        return { label: 'Worksheet Not Found', color: 'amber', bg: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300', badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200' };
+      case 'not_a_google_sheet':
+        return { label: 'Excel File (.xlsx) - Convert to Google Sheet', color: 'amber', bg: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300', badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200' };
+      case 'authentication_failed':
+        return { label: 'Authentication Failed', color: 'rose', bg: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-300', badge: 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200' };
+      case 'configuration_missing':
+        return { label: 'Configuration Missing', color: 'amber', bg: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300', badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200' };
+      default:
+        return { label: status ? status.replace(/_/g, ' ').toUpperCase() : 'Not Connected', color: 'slate', bg: 'bg-slate-400', text: 'text-slate-700 dark:text-slate-300', badge: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200' };
+    }
+  };
+
+  // Live Connection Test Mutation
+  const testConnectionMutation = useMutation({
+    mutationFn: () => googleSheetsApi.testConnection(),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-status'] });
+      if (res.connection_status === 'connected') {
+        queryClient.invalidateQueries({ queryKey: ['google-sheets-stock-records'] });
+        setNotification({
+          type: 'success',
+          message: `Connected successfully to Google Sheet "${res.spreadsheet_name || 'Stock Configuration'}"!`,
+        });
+      } else {
+        setNotification({
+          type: 'error',
+          message: `Connection test result: ${res.connection_status.replace(/_/g, ' ').toUpperCase()}. ${res.message || ''}`,
+        });
+      }
     },
-    onSuccess: (res, variables) => {
+    onError: (err: any) => {
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-status'] });
+      const detail = err.response?.data?.detail;
+      const msg = typeof detail === 'object' && detail?.message ? detail.message : detail || 'Connection test failed.';
+      setNotification({ type: 'error', message: msg });
+    },
+  });
+
+  // Fetch Data directly from Google Sheets (active when connected)
+  const {
+    data: sheetsData,
+    isLoading: isSheetsLoading,
+    isError: isSheetsError,
+    error: sheetsError,
+    refetch: refetchSheets,
+  } = useQuery({
+    queryKey: ['google-sheets-stock-records', sheetsStatus?.spreadsheet_id, sheetsStatus?.worksheet_name],
+    queryFn: () =>
+      googleSheetsApi.getStockRecords({
+        limit: 1000,
+        worksheet_name: sheetsStatus?.worksheet_name || undefined,
+        spreadsheet_id: sheetsStatus?.spreadsheet_id || undefined,
+      }),
+    enabled: isSheetsConnected,
+  });
+
+  // Unified Data Adapter: Google Sheets as the SOLE source of truth
+  const data = useMemo(() => {
+    if (!isSheetsConnected || !sheetsData?.records) {
+      return {
+        items: [] as StockConfigurationItem[],
+        total: 0,
+        page,
+        page_size: pageSize,
+        total_pages: 1,
+        kpis: {
+          total_items: 0,
+          active_items: 0,
+          inactive_items: 0,
+          warehouses_count: 0,
+        },
+        filters: {
+          vendors: [],
+          groups: ['Finished Goods', 'Raw Materials', 'Work In Progress'],
+          warehouses: ['01 - Main Warehouse'],
+        },
+      };
+    }
+
+    let items: StockConfigurationItem[] = sheetsData.records.map((r, i) => ({
+      record_id: r.record_id || `REC-${i + 1}`,
+      item_code: r.item_code || `ITEM-${i + 1}`,
+      description: r.description || '',
+      qty: Number(r.qty ?? 0),
+      stock_qty: Number(r.stock_qty ?? 0),
+      vendor_name: r.vendor_name || '',
+      grpo_no: r.grpo_no || '',
+      rcvd_qty: Number(r.rcvd_qty ?? 0),
+      nt_weight: Number(r.nt_weight ?? 0),
+      qc: Boolean(r.qc),
+      drw_yn: (r.drw_yn === 'N' ? 'N' : 'Y') as 'Y' | 'N',
+      v_chk: (r.v_chk === 'N' ? 'N' : 'Y') as 'Y' | 'N',
+      ok_qty: Number(r.ok_qty ?? 0),
+      rej_qty: Number(r.rej_qty ?? 0),
+      lm: (r.lm === 'N' ? 'N' : 'Y') as 'Y' | 'N',
+      olng: (r.olng === 'N' ? 'N' : 'Y') as 'Y' | 'N',
+      lpk: (r.lpk === 'N' ? 'N' : 'Y') as 'Y' | 'N',
+      lbl: (r.lbl === 'N' ? 'N' : 'Y') as 'Y' | 'N',
+      mc_or_pt: (r.mc_or_pt === 'N' ? 'N' : 'Y') as 'Y' | 'N',
+      entry_date: r.entry_date || null,
+      updated_at: r.updated_at || undefined,
+      is_active: true,
+    }));
+
+    if (appliedSearch) {
+      const q = appliedSearch.toLowerCase();
+      items = items.filter(
+        (it) =>
+          it.item_code.toLowerCase().includes(q) ||
+          it.description.toLowerCase().includes(q) ||
+          (it.vendor_name && it.vendor_name.toLowerCase().includes(q)) ||
+          (it.record_id && it.record_id.toLowerCase().includes(q))
+      );
+    }
+
+    if (selectedVendor && selectedVendor !== 'All Vendors') {
+      items = items.filter((it) => it.vendor_name === selectedVendor);
+    }
+
+    const total = items.length;
+    const total_pages = pageSize >= 10000 ? 1 : Math.max(1, Math.ceil(total / pageSize));
+    const startIdx = (page - 1) * pageSize;
+    const paginatedItems = pageSize >= 10000 ? items : items.slice(startIdx, startIdx + pageSize);
+
+    const allVendors = Array.from(
+      new Set(sheetsData.records.map((r) => r.vendor_name).filter(Boolean))
+    ) as string[];
+
+    return {
+      items: paginatedItems,
+      total,
+      page,
+      page_size: pageSize,
+      total_pages,
+      kpis: {
+        total_items: total,
+        active_items: total,
+        inactive_items: 0,
+        warehouses_count: 1,
+      },
+      filters: {
+        vendors: allVendors,
+        groups: ['Finished Goods', 'Raw Materials', 'Work In Progress'],
+        warehouses: ['01 - Main Warehouse'],
+      },
+    };
+  }, [isSheetsConnected, sheetsData, appliedSearch, selectedVendor, page, pageSize]);
+
+  const isLoading = isSheetsConnected ? isSheetsLoading : false;
+  const isError = isSheetsConnected ? isSheetsError : false;
+  const error = isSheetsConnected ? sheetsError : null;
+  const refetch = isSheetsConnected ? refetchSheets : refetchStatus;
+
+  // Mutate Row Save (Google Sheets write with ZERO SAP impact)
+  const saveMutation = useMutation({
+    mutationFn: async ({
+      itemCode,
+      updates,
+      recordId,
+      expectedUpdatedAt,
+    }: {
+      itemCode: string;
+      updates: Partial<StockConfigurationItem>;
+      recordId?: string | null;
+      expectedUpdatedAt?: string | null;
+    }) => {
+      setSavingItemCode(itemCode);
+      if (isSheetsConnected) {
+        const targetId = recordId || itemCode;
+        return googleSheetsApi.updateStockRecord(targetId, {
+          ...updates,
+          expected_updated_at: expectedUpdatedAt || undefined,
+        });
+      }
+      throw new Error('Google Sheets is not connected. Edits cannot be saved.');
+    },
+    onSuccess: (res: any, variables) => {
       setSavingItemCode(null);
       setEditedRows((prev) => {
         const next = { ...prev };
         delete next[variables.itemCode];
         return next;
       });
-      queryClient.invalidateQueries({ queryKey: ['stock-configuration'] });
-      if (res.sap_synced) {
-        setNotification({
-          type: 'success',
-          message: `Item ${variables.itemCode} updated in database & synced to SAP Business One!`,
-        });
-      } else {
-        setNotification({
-          type: 'success',
-          message: `Item ${variables.itemCode} saved to database. ${res.sap_message ? `(${res.sap_message})` : ''}`,
-        });
-      }
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-stock-records'] });
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-status'] });
+      setNotification({
+        type: 'success',
+        message: `Record ${variables.itemCode} saved to Google Sheets! (Record ID: ${res.item?.record_id || variables.recordId || variables.itemCode})`,
+      });
     },
     onError: (err: any) => {
       setSavingItemCode(null);
-      setNotification({ type: 'error', message: err.response?.data?.detail || 'Failed to save changes.' });
+      const detail = err.response?.data?.detail;
+      const msg = typeof detail === 'object' && detail?.message ? detail.message : detail || 'Failed to save changes.';
+      setNotification({ type: 'error', message: msg });
     },
   });
 
-  // Mutate Bulk Update
+  // Mutate Bulk Update (batch Google Sheets update with ZERO SAP impact)
   const bulkMutation = useMutation({
-    mutationFn: (items: Partial<StockConfigurationItem>[]) => stockConfigurationApi.bulkUpdateItems(items),
-    onSuccess: (res) => {
-      const successCodes = new Set(res.results.filter((r) => r.success).map((r) => r.item_code));
+    mutationFn: async (
+      items: Array<Partial<StockConfigurationItem> & { expected_updated_at?: string; record_id?: string }>
+    ) => {
+      if (isSheetsConnected) {
+        return googleSheetsApi.bulkUpdateStockRecords(items);
+      }
+      throw new Error('Google Sheets is not connected. Batch update cannot proceed.');
+    },
+    onSuccess: (res: any) => {
+      const successCodes = new Set<string>(
+        res.results
+          .filter((r: any) => r.success)
+          .map((r: any) => String(r.item_code || r.record_id || ''))
+      );
       setEditedRows((prev) => {
         const next = { ...prev };
-        for (const code of successCodes) {
-          delete next[code];
-        }
+        successCodes.forEach((code) => {
+          if (code) delete next[code];
+        });
         return next;
       });
-      queryClient.invalidateQueries({ queryKey: ['stock-configuration'] });
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-stock-records'] });
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-status'] });
 
-      const failedResults = res.results.filter((r) => !r.success);
+      const failedResults = res.results.filter((r: any) => !r.success);
       setBulkStatus({
         successful: res.successful,
         failed: res.failed,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        errors: failedResults.map((r) => ({ item_code: r.item_code, error: r.error || 'Failed to update' })),
+        errors: failedResults.map((r: any) => ({
+          item_code: r.item_code || r.record_id,
+          error: r.error || 'Failed to update',
+        })),
       });
 
       if (res.failed === 0) {
-        const sapCount = res.sap_synced_count ?? 0;
         setNotification({
           type: 'success',
-          message: `Bulk save successful: ${res.successful} item(s) updated in database${sapCount > 0 ? ` & ${sapCount} synchronized to SAP!` : '!'}`,
+          message: `Bulk save successful: ${res.successful} item(s) updated in Google Sheets! (SAP write-protection active)`,
         });
       } else {
         setNotification({
           type: 'error',
-          message: `Bulk save: ${res.successful} succeeded, ${res.failed} failed. Unsaved edits remain in table.`,
+          message: `Bulk save: ${res.successful} succeeded, ${res.failed} failed in Google Sheets. Unsaved edits remain.`,
         });
       }
     },
     onError: (err: any) => {
+      const detail = err.response?.data?.detail;
+      const msg = typeof detail === 'object' && detail?.message ? detail.message : detail || 'Bulk update failed.';
       setNotification({
         type: 'error',
-        message: err.response?.data?.detail || 'Bulk update failed.',
+        message: msg,
       });
     },
   });
 
-  // Mutate Delete Item
+  // Mutate Delete Item (Protected: Google Sheets row deletions are disabled)
   const deleteMutation = useMutation({
-    mutationFn: (itemCode: string) => stockConfigurationApi.deleteItem(itemCode),
-    onSuccess: (_, itemCode) => {
-      setDeleteConfirmItem(null);
-      queryClient.invalidateQueries({ queryKey: ['stock-configuration'] });
-      setNotification({ type: 'success', message: `Item ${itemCode} deleted.` });
+    mutationFn: async (_itemCode: string) => {
+      throw new Error('Row deletion in Google Sheets is disabled to protect row references. Please clear the values in the sheet if required.');
     },
     onError: (err: any) => {
-      setNotification({ type: 'error', message: err.response?.data?.detail || 'Failed to delete item.' });
+      setDeleteConfirmItem(null);
+      setNotification({ type: 'error', message: err.message || 'Row deletion is disabled.' });
     },
   });
 
-  // Mutate SAP Sync
-  const syncMutation = useMutation({
-    mutationFn: () => stockConfigurationApi.syncFromSap(),
+  // Mutate Google Sheets Refresh
+  const sheetsRefreshMutation = useMutation({
+    mutationFn: () => googleSheetsApi.refreshStockRecords(),
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['stock-configuration'] });
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-stock-records'] });
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-status'] });
       setNotification({
         type: 'success',
-        message: `Synced ${res.synced_count} items from SAP Business One.`,
+        message: `Refreshed ${res.total_records} records directly from Google Sheets!`,
       });
     },
     onError: (err: any) => {
+      const detail = err.response?.data?.detail;
+      const msg = typeof detail === 'object' && detail?.message ? detail.message : detail || 'Google Sheets refresh failed.';
       setNotification({
         type: 'error',
-        message: err.response?.data?.detail || 'SAP synchronization failed. Verify SAP Service Layer connection.',
+        message: msg,
       });
     },
   });
 
-  // Mutate Add Item
+  // Mutate Add Item (Google Sheets write with ZERO SAP impact)
   const addMutation = useMutation({
-    mutationFn: (itemData: typeof newItem) => stockConfigurationApi.addItem(itemData),
-    onSuccess: (res) => {
+    mutationFn: async (itemData: typeof newItem) => {
+      if (isSheetsConnected) {
+        return googleSheetsApi.createStockRecord(itemData);
+      }
+      throw new Error('Google Sheets is not connected. New item cannot be added.');
+    },
+    onSuccess: (res: any) => {
       setAddItemModalOpen(false);
-      queryClient.invalidateQueries({ queryKey: ['stock-configuration'] });
-      setNotification({ type: 'success', message: `Item ${res.item.item_code} added successfully.` });
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-stock-records'] });
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-status'] });
+      setNotification({
+        type: 'success',
+        message: `Stock item ${res.item?.item_code || newItem.item_code} added to Google Sheets (Record ID: ${res.item?.record_id || 'generated'})!`,
+      });
       // Reset form
       setNewItem({
         item_code: '',
@@ -329,7 +523,9 @@ export const StockConfigurationPage: React.FC = () => {
       });
     },
     onError: (err: any) => {
-      setNotification({ type: 'error', message: err.response?.data?.detail || 'Failed to add item.' });
+      const detail = err.response?.data?.detail;
+      const msg = typeof detail === 'object' && detail?.message ? detail.message : detail || 'Failed to add item.';
+      setNotification({ type: 'error', message: msg });
     },
   });
 
@@ -419,10 +615,12 @@ export const StockConfigurationPage: React.FC = () => {
     return null;
   };
 
-  // Handle Save / Submit row (syncs to Database & SAP)
+  // Handle Save / Submit row (syncs to Google Sheets or Database & SAP)
   const handleSaveRow = (item: StockConfigurationItem) => {
     const edits = editedRows[item.item_code] || {};
     const effectiveUpdates: Partial<StockConfigurationItem> = {
+      record_id: item.record_id,
+      item_code: item.item_code,
       qty: edits.qty !== undefined ? edits.qty : item.qty,
       stock_qty: edits.stock_qty !== undefined ? edits.stock_qty : item.stock_qty,
       grpo_no: edits.grpo_no !== undefined ? edits.grpo_no : item.grpo_no,
@@ -439,6 +637,7 @@ export const StockConfigurationPage: React.FC = () => {
       lbl: edits.lbl !== undefined ? edits.lbl : item.lbl,
       mc_or_pt: edits.mc_or_pt !== undefined ? edits.mc_or_pt : item.mc_or_pt,
       description: item.description,
+      vendor_name: item.vendor_name,
     };
 
     const valError = validateRow(item, effectiveUpdates);
@@ -446,7 +645,12 @@ export const StockConfigurationPage: React.FC = () => {
       setNotification({ type: 'error', message: valError });
       return;
     }
-    saveMutation.mutate({ itemCode: item.item_code, updates: effectiveUpdates });
+    saveMutation.mutate({
+      itemCode: item.item_code,
+      updates: effectiveUpdates,
+      recordId: item.record_id,
+      expectedUpdatedAt: item.updated_at,
+    });
   };
 
   // Bulk Actions
@@ -467,10 +671,15 @@ export const StockConfigurationPage: React.FC = () => {
       }
     }
 
-    const payload = codes.map((code) => ({
-      item_code: code,
-      ...editedRows[code],
-    }));
+    const payload = codes.map((code) => {
+      const origItem = data?.items?.find((it) => it.item_code === code);
+      return {
+        record_id: origItem?.record_id,
+        item_code: code,
+        expected_updated_at: origItem?.updated_at,
+        ...editedRows[code],
+      };
+    });
 
     bulkMutation.mutate(payload);
   };
@@ -478,53 +687,69 @@ export const StockConfigurationPage: React.FC = () => {
   const handleConfirmSubmitAll = async () => {
     setConfirmSubmitAllOpen(false);
     try {
-      const allRes = await stockConfigurationApi.getItems({
-        ...queryParams,
-        page: 1,
-        page_size: 10000,
-      });
+      if (isSheetsConnected) {
+        const recordsToSubmit = sheetsData?.records || [];
+        const payload: Array<Partial<StockConfigurationItem> & { expected_updated_at?: string; record_id?: string }> = [];
 
-      const payload: Partial<StockConfigurationItem>[] = [];
-      for (const it of allRes.items) {
-        const edits = editedRows[it.item_code] || {};
-        const effQty = edits.qty !== undefined ? edits.qty : it.qty;
-        const effRcvd = edits.rcvd_qty !== undefined ? edits.rcvd_qty : it.rcvd_qty;
-        const effWeight = edits.nt_weight !== undefined ? edits.nt_weight : it.nt_weight;
-        const effOk = edits.ok_qty !== undefined ? edits.ok_qty : it.ok_qty;
-        const effRej = edits.rej_qty !== undefined ? edits.rej_qty : it.rej_qty;
+        for (const it of recordsToSubmit) {
+          const itemCode = it.item_code || it.record_id || '';
+          const edits = editedRows[itemCode] || {};
+          const effQty = edits.qty !== undefined ? edits.qty : it.qty;
+          const effRcvd = edits.rcvd_qty !== undefined ? edits.rcvd_qty : it.rcvd_qty;
+          const effWeight = edits.nt_weight !== undefined ? edits.nt_weight : it.nt_weight;
+          const effOk = edits.ok_qty !== undefined ? edits.ok_qty : it.ok_qty;
+          const effRej = edits.rej_qty !== undefined ? edits.rej_qty : it.rej_qty;
 
-        if (effQty < 0 || effRcvd < 0 || effWeight < 0 || effOk < 0 || effRej < 0) {
-          setNotification({
-            type: 'error',
-            message: `Validation error in item ${it.item_code}: Quantities or weights cannot be negative.`,
+          if (
+            Number(effQty) < 0 ||
+            Number(effRcvd) < 0 ||
+            Number(effWeight) < 0 ||
+            Number(effOk) < 0 ||
+            Number(effRej) < 0
+          ) {
+            setNotification({
+              type: 'error',
+              message: `Validation error in item ${itemCode}: Quantities or weights cannot be negative.`,
+            });
+            return;
+          }
+
+          payload.push({
+            record_id: it.record_id || undefined,
+            item_code: itemCode,
+            expected_updated_at: it.updated_at || undefined,
+            description: it.description || undefined,
+            vendor_name: it.vendor_name || undefined,
+            qty: Number(effQty ?? 0),
+            stock_qty: Number(it.stock_qty ?? 0),
+            grpo_no: edits.grpo_no !== undefined ? edits.grpo_no : it.grpo_no || undefined,
+            rcvd_qty: Number(effRcvd ?? 0),
+            nt_weight: Number(effWeight ?? 0),
+            qc: edits.qc !== undefined ? edits.qc : Boolean(it.qc),
+            drw_yn: (edits.drw_yn !== undefined ? edits.drw_yn : it.drw_yn || 'Y') as 'Y' | 'N',
+            v_chk: (edits.v_chk !== undefined ? edits.v_chk : it.v_chk || 'Y') as 'Y' | 'N',
+            ok_qty: Number(effOk ?? 0),
+            rej_qty: Number(effRej ?? 0),
+            lm: (edits.lm !== undefined ? edits.lm : it.lm || 'Y') as 'Y' | 'N',
+            olng: (edits.olng !== undefined ? edits.olng : it.olng || 'Y') as 'Y' | 'N',
+            lpk: (edits.lpk !== undefined ? edits.lpk : it.lpk || 'Y') as 'Y' | 'N',
+            lbl: (edits.lbl !== undefined ? edits.lbl : it.lbl || 'Y') as 'Y' | 'N',
+            mc_or_pt: (edits.mc_or_pt !== undefined ? edits.mc_or_pt : it.mc_or_pt || 'Y') as 'Y' | 'N',
           });
-          return;
         }
 
-        payload.push({
-          item_code: it.item_code,
-          qty: effQty,
-          grpo_no: edits.grpo_no !== undefined ? edits.grpo_no : it.grpo_no,
-          rcvd_qty: effRcvd,
-          nt_weight: effWeight,
-          qc: edits.qc !== undefined ? edits.qc : it.qc,
-          drw_yn: edits.drw_yn !== undefined ? edits.drw_yn : it.drw_yn,
-          v_chk: edits.v_chk !== undefined ? edits.v_chk : it.v_chk,
-          ok_qty: effOk,
-          rej_qty: effRej,
-          lm: edits.lm !== undefined ? edits.lm : it.lm,
-          olng: edits.olng !== undefined ? edits.olng : it.olng,
-          lpk: edits.lpk !== undefined ? edits.lpk : it.lpk,
-          lbl: edits.lbl !== undefined ? edits.lbl : it.lbl,
-          mc_or_pt: edits.mc_or_pt !== undefined ? edits.mc_or_pt : it.mc_or_pt,
-        });
+        bulkMutation.mutate(payload);
+        return;
       }
 
-      bulkMutation.mutate(payload);
+      setNotification({
+        type: 'error',
+        message: 'Google Sheets is disconnected. Please connect Google Sheets before submitting entries.',
+      });
     } catch (err: any) {
       setNotification({
         type: 'error',
-        message: err.response?.data?.detail || 'Failed to retrieve all entries for submission.',
+        message: err.response?.data?.detail || 'Failed to submit entries to Google Sheets.',
       });
     }
   };
@@ -552,21 +777,54 @@ export const StockConfigurationPage: React.FC = () => {
     setPage(1);
   };
 
-  // Handle Excel Export
+  // Handle Export (Exports current Google Sheets stock configuration)
   const handleExport = async () => {
     try {
-      const blob = await stockConfigurationApi.exportExcel(queryParams);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Stock_Configuration_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      setNotification({ type: 'success', message: 'Excel exported successfully.' });
+      if (isSheetsConnected && sheetsData?.records && sheetsData.records.length > 0) {
+        const headers = [
+          'Record ID', 'SAP Item Code', 'Description', 'Quantity', 'Stock Quantity',
+          'Vendor Name', 'GRPO Number', 'Received Quantity', 'Net Weight', 'QC',
+          'Drawing', 'V Check', 'OK Quantity', 'Rejected Quantity', 'LM', 'OLNG',
+          'LPK', 'LBL', 'MC or PT', 'Entry Date'
+        ];
+        const rows = sheetsData.records.map((r) => [
+          `"${r.record_id || ''}"`,
+          `"${r.item_code || ''}"`,
+          `"${(r.description || '').replace(/"/g, '""')}"`,
+          r.qty ?? 0,
+          r.stock_qty ?? 0,
+          `"${(r.vendor_name || '').replace(/"/g, '""')}"`,
+          `"${r.grpo_no || ''}"`,
+          r.rcvd_qty ?? 0,
+          r.nt_weight ?? 0,
+          r.qc ? 'Y' : 'N',
+          r.drw_yn || 'Y',
+          r.v_chk || 'Y',
+          r.ok_qty ?? 0,
+          r.rej_qty ?? 0,
+          r.lm || 'Y',
+          r.olng || 'Y',
+          r.lpk || 'Y',
+          r.lbl || 'Y',
+          r.mc_or_pt || 'Y',
+          `"${r.entry_date || ''}"`,
+        ]);
+        const csvContent = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Stock_Configuration_GoogleSheets_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        setNotification({ type: 'success', message: 'Google Sheets records exported successfully.' });
+        return;
+      }
+      setNotification({ type: 'error', message: 'No Google Sheets records available to export.' });
     } catch (e) {
-      setNotification({ type: 'error', message: 'Failed to export Excel file.' });
+      setNotification({ type: 'error', message: 'Failed to export records.' });
     }
   };
 
@@ -652,44 +910,64 @@ export const StockConfigurationPage: React.FC = () => {
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
         <div>
           <h1 className="text-[24px] sm:text-[28px] font-black tracking-tight text-slate-900 dark:text-white leading-tight">
-            Stock Configuration (SAP Items)
+            Stock Configuration
           </h1>
           <p className="text-[13.5px] sm:text-[14px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-            Manage stock items and warehouse configuration from SAP Business One.
+            Manage stock items and warehouse configuration directly with Google Sheets as the active source of truth.
           </p>
         </div>
 
-        {/* Top Action Buttons Matching Reference Design */}
+        {/* Top Action Buttons */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
-          {/* Sync from SAP */}
-          <button
-            onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
-              isDark
-                ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700'
-                : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300'
-            }`}
-            title="Fetch live updates from SAP Service Layer"
-          >
-            <RotateCw size={15} className={`text-blue-600 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-            <span>{syncMutation.isPending ? 'Syncing...' : 'Sync from SAP'}</span>
-          </button>
+          {/* Sync / Refresh / Test Connection */}
+          {isSheetsConnected ? (
+            <button
+              onClick={() => sheetsRefreshMutation.mutate()}
+              disabled={sheetsRefreshMutation.isPending}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
+                isDark
+                  ? 'bg-emerald-950/40 border-emerald-700 text-emerald-400 hover:bg-emerald-900/50'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300'
+              }`}
+              title="Refresh stock configuration records directly from Google Sheets"
+            >
+              <RotateCw size={15} className={`text-emerald-600 ${sheetsRefreshMutation.isPending ? 'animate-spin' : ''}`} />
+              <span>{sheetsRefreshMutation.isPending ? 'Refreshing...' : 'Refresh Google Sheets'}</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => testConnectionMutation.mutate()}
+              disabled={testConnectionMutation.isPending}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
+                isDark
+                  ? 'bg-amber-950/40 border-amber-700 text-amber-300 hover:bg-amber-900/50'
+                  : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
+              }`}
+              title="Test live connection to Google Sheets"
+            >
+              <RotateCw size={15} className={`text-amber-600 ${testConnectionMutation.isPending ? 'animate-spin' : ''}`} />
+              <span>{testConnectionMutation.isPending ? 'Testing...' : 'Test Connection'}</span>
+            </button>
+          )}
 
           {/* Import Excel */}
           <button
             onClick={() => setImportModalOpen(true)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
-              isDark
-                ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700'
-                : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300'
+            disabled={!isSheetsConnected}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all shadow-2xs ${
+              isSheetsConnected
+                ? isDark
+                  ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700 cursor-pointer'
+                  : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300 cursor-pointer'
+                : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
             }`}
+            title={isSheetsConnected ? "Import Excel records" : "Connect Google Sheets first"}
           >
-            <Upload size={15} className="text-blue-600" />
+            <Upload size={15} className={isSheetsConnected ? "text-blue-600" : "text-slate-400"} />
             <span>Import Excel</span>
           </button>
 
-          {/* Export Excel */}
+          {/* Export Excel / CSV */}
           <button
             onClick={handleExport}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
@@ -697,21 +975,126 @@ export const StockConfigurationPage: React.FC = () => {
                 ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700'
                 : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300'
             }`}
+            title="Export Google Sheets records to CSV"
           >
             <Download size={15} className="text-blue-600" />
-            <span>Export Excel</span>
+            <span>Export CSV</span>
           </button>
+
+          {/* Google Sheets Integration Link */}
+          <NavLink
+            to="/settings/integrations/google-sheets"
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
+              isSheetsConnected
+                ? isDark
+                  ? 'bg-emerald-950/40 border-emerald-600 text-emerald-300 hover:bg-emerald-900/50'
+                  : 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                : isDark
+                ? 'bg-slate-800 border-slate-700 text-emerald-400 hover:bg-slate-700'
+                : 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50/70 hover:border-emerald-300'
+            }`}
+            title="Configure Google Sheets connection and preview stock records"
+          >
+            <FileSpreadsheet size={15} className="text-emerald-600" />
+            <span>Google Sheets {isSheetsConnected ? '●' : ''}</span>
+          </NavLink>
 
           {/* + Add New Item */}
           <button
             onClick={() => setAddItemModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#155EEF] hover:bg-blue-700 text-white text-[13.5px] font-semibold transition-all cursor-pointer shadow-xs active:scale-98"
+            disabled={!isSheetsConnected}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13.5px] font-semibold transition-all shadow-xs active:scale-98 ${
+              isSheetsConnected
+                ? 'bg-[#155EEF] hover:bg-blue-700 text-white cursor-pointer'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed border border-slate-200 dark:border-slate-700'
+            }`}
+            title={isSheetsConnected ? "Add new stock item to Google Sheets" : "Connect Google Sheets first to add items"}
           >
             <Plus size={16} strokeWidth={2.5} />
             <span>Add New Item</span>
           </button>
         </div>
       </div>
+
+      {/* ── Google Sheets Live Banner & Status ── */}
+      {isSheetsConnected ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-xl border bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-[13px]">
+          <div className="flex flex-wrap items-center gap-2 font-semibold">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <FileSpreadsheet size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span>Source of Truth: Google Sheets</span>
+            <span className="text-slate-400 font-normal">|</span>
+            <span className="font-medium text-emerald-800 dark:text-emerald-300">
+              {sheetsStatus?.spreadsheet_name || sheetsStatus?.spreadsheet_id} ({sheetsStatus?.worksheet_name || 'Stock Configuration'})
+            </span>
+            {sheetsStatus?.last_successful_sync_at && (
+              <>
+                <span className="text-slate-400 font-normal">|</span>
+                <span className="font-normal text-slate-500 dark:text-slate-400 text-xs">
+                  Last Synced: {new Date(sheetsStatus.last_successful_sync_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-700">
+              <ShieldCheck size={13} className="text-emerald-600 dark:text-emerald-400" />
+              SAP Write-Protection Active (Read-Only)
+            </span>
+            <NavLink
+              to="/settings/integrations/google-sheets"
+              className="text-xs text-emerald-700 dark:text-emerald-300 underline font-medium hover:text-emerald-900"
+            >
+              Settings
+            </NavLink>
+          </div>
+        </div>
+      ) : (
+        <div className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-xl border text-[13px] ${
+          sheetsStatus?.connection_status === 'api_not_enabled'
+            ? 'bg-amber-50/90 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200'
+            : 'bg-rose-50/90 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800 text-rose-950 dark:text-rose-200'
+        }`}>
+          <div className="flex items-center gap-2.5 font-medium">
+            <AlertCircle size={18} className={sheetsStatus?.connection_status === 'api_not_enabled' ? 'text-amber-600 shrink-0' : 'text-rose-600 shrink-0'} />
+            <div>
+              <span className="font-bold">Google Sheets: {getStatusBadge().label}</span>
+              <span className="mx-2 text-slate-400 font-normal">|</span>
+              <span className="text-xs">
+                {sheetsStatus?.connection_status === 'api_not_enabled'
+                  ? 'Google Sheets API is disabled on GCP Project 767613266689. Enable it to load live spreadsheet records. (SAP 1,008 fallback records are hidden).'
+                  : sheetsStatus?.error_message || 'Connect Google Sheets to view and edit stock records. (SAP 1,008 fallback records are hidden).'}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {sheetsStatus?.connection_status === 'api_not_enabled' && (
+              <a
+                href={sheetsStatus?.activation_url || 'https://console.developers.google.com/apis/api/sheets.googleapis.com/overview?project=767613266689'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 transition"
+              >
+                Enable in Google Console
+              </a>
+            )}
+            <button
+              type="button"
+              onClick={() => testConnectionMutation.mutate()}
+              disabled={testConnectionMutation.isPending}
+              className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 font-semibold text-xs hover:bg-slate-50 transition cursor-pointer"
+            >
+              {testConnectionMutation.isPending ? 'Testing...' : 'Test Connection'}
+            </button>
+            <NavLink
+              to="/settings/integrations/google-sheets"
+              className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-semibold text-xs hover:bg-amber-700 transition"
+            >
+              Configure
+            </NavLink>
+          </div>
+        </div>
+      )}
 
       {/* ── Top Filters: Branch Selector & Date Filter (Directly above KPI Cards) ── */}
       <div className="flex items-center gap-2.5">
@@ -863,7 +1246,9 @@ export const StockConfigurationPage: React.FC = () => {
                 data?.kpis?.total_items ?? 0
               )}
             </p>
-            <p className="text-[12px] font-medium text-slate-400 leading-tight">From SAP</p>
+            <p className="text-[12px] font-medium text-slate-400 leading-tight">
+              {isSheetsConnected ? 'In Google Sheet' : 'Google Sheets Offline'}
+            </p>
           </div>
         </div>
 
@@ -883,7 +1268,7 @@ export const StockConfigurationPage: React.FC = () => {
                 data?.kpis?.active_items ?? 0
               )}
             </p>
-            <p className="text-[12px] font-medium text-slate-400 leading-tight">Available for sale</p>
+            <p className="text-[12px] font-medium text-slate-400 leading-tight">Populated records</p>
           </div>
         </div>
 
@@ -903,11 +1288,11 @@ export const StockConfigurationPage: React.FC = () => {
                 data?.kpis?.inactive_items ?? 0
               )}
             </p>
-            <p className="text-[12px] font-medium text-slate-400 leading-tight">Not available</p>
+            <p className="text-[12px] font-medium text-slate-400 leading-tight">Unmapped / empty</p>
           </div>
         </div>
 
-        {/* Warehouses */}
+        {/* Warehouses / Worksheet */}
         <div className={`p-3.5 sm:p-4 rounded-xl border transition-all duration-200 shadow-xs flex items-center gap-3.5 ${
           isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
         }`}>
@@ -915,15 +1300,13 @@ export const StockConfigurationPage: React.FC = () => {
             <Warehouse size={22} className="text-purple-600" />
           </div>
           <div className="space-y-0.5 min-w-0">
-            <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Warehouses</p>
-            <p className="text-[24px] sm:text-[26px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
-              {isLoading ? (
-                <span className="inline-block w-8 h-6 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
-              ) : (
-                data?.kpis?.warehouses_count ?? 0
-              )}
+            <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Target Worksheet</p>
+            <p className="text-[18px] sm:text-[20px] font-bold text-slate-900 dark:text-white leading-none tracking-tight truncate max-w-[150px]" title={sheetsStatus?.worksheet_name || 'Stock Configuration'}>
+              {sheetsStatus?.worksheet_name || 'Stock Configuration'}
             </p>
-            <p className="text-[12px] font-medium text-slate-400 leading-tight">Configured in SAP</p>
+            <p className="text-[12px] font-medium text-slate-400 leading-tight">
+              {isSheetsConnected ? 'Live source' : 'Source sheet'}
+            </p>
           </div>
         </div>
       </div>
@@ -1042,8 +1425,15 @@ export const StockConfigurationPage: React.FC = () => {
         {/* Status Information */}
         <div className="flex flex-wrap items-center gap-2.5 text-[13px]">
           <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
-            <Box size={16} className="text-blue-600" />
-            <span>Dataset: {isLoading ? 'Loading...' : `${data?.total ?? 0} entries`}</span>
+            <Box size={16} className={isSheetsConnected ? "text-emerald-600" : "text-amber-500"} />
+            <span>
+              Dataset:{' '}
+              {isLoading
+                ? 'Loading...'
+                : isSheetsConnected
+                ? `${data?.total ?? 0} entries`
+                : `0 entries (Google Sheets: ${getStatusBadge().label})`}
+            </span>
           </div>
 
           <span className="text-slate-300 dark:text-slate-600">|</span>
@@ -1083,13 +1473,13 @@ export const StockConfigurationPage: React.FC = () => {
           {/* Submit Modified Entries */}
           <button
             onClick={handleSubmitModified}
-            disabled={modifiedCount === 0 || bulkMutation.isPending}
+            disabled={modifiedCount === 0 || bulkMutation.isPending || !isSheetsConnected}
             className={`h-9 px-3.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-xs border ${
-              modifiedCount > 0 && !bulkMutation.isPending
+              modifiedCount > 0 && !bulkMutation.isPending && isSheetsConnected
                 ? 'bg-emerald-50 border-emerald-400 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-700 dark:text-emerald-300 cursor-pointer active:scale-98'
                 : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
             }`}
-            title="Save all modified rows across the entire dataset to Database & SAP"
+            title="Save all modified rows across the entire dataset to Google Sheets"
           >
             {bulkMutation.isPending ? (
               <RotateCw size={14} className="animate-spin" />
@@ -1102,13 +1492,15 @@ export const StockConfigurationPage: React.FC = () => {
           {/* Submit All Entries */}
           <button
             onClick={() => setConfirmSubmitAllOpen(true)}
-            disabled={bulkMutation.isPending || !data?.total}
+            disabled={bulkMutation.isPending || !data?.total || !isSheetsConnected}
             className={`h-9 px-3.5 rounded-lg border text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-2xs ${
-              isDark
-                ? 'bg-slate-800 border-blue-500/40 text-blue-400 hover:bg-slate-700'
-                : 'bg-white border-blue-400 text-blue-600 hover:bg-blue-50'
-            } cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed`}
-            title="Validate and submit all entries in the dataset to Database & SAP"
+              isSheetsConnected && data?.total
+                ? isDark
+                  ? 'bg-slate-800 border-emerald-500/40 text-emerald-400 hover:bg-slate-700 cursor-pointer active:scale-98'
+                  : 'bg-white border-emerald-400 text-emerald-700 hover:bg-emerald-50 cursor-pointer active:scale-98'
+                : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+            }`}
+            title={isSheetsConnected ? "Validate and submit all entries in the dataset to Google Sheets" : "Connect Google Sheets to submit entries"}
           >
             <Upload size={14} />
             <span>Submit All Entries ({data?.total ?? 0})</span>
@@ -1217,12 +1609,91 @@ export const StockConfigurationPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {isLoading ? (
+              {!isSheetsConnected ? (
+                <tr>
+                  <td colSpan={21} className="py-12 px-6 text-center border border-slate-300 dark:border-slate-600">
+                    <div className="max-w-xl mx-auto flex flex-col items-center justify-center gap-3.5 py-4">
+                      <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                        <FileSpreadsheet size={32} />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-[17px] font-bold text-slate-900 dark:text-white">
+                          Google Sheets Connection Required
+                        </h4>
+                        <p className="text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                          Google Sheets is the designated active data source for Stock Configuration.
+                          Automatic fallback to the 1,008 SAP ERP records has been disabled to prevent accidental data contamination and maintain spreadsheet parity.
+                        </p>
+                      </div>
+
+                      <div className="w-full mt-2 p-3.5 rounded-xl border bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700 text-left text-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">Live Status:</span>
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold text-xs ${getStatusBadge().badge}`}>
+                            <span className={`w-2 h-2 rounded-full ${getStatusBadge().bg}`} />
+                            {getStatusBadge().label}
+                          </span>
+                        </div>
+                        {sheetsStatus?.spreadsheet_id && (
+                          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                            <span>Configured Spreadsheet ID:</span>
+                            <span className="font-mono text-[11px]">{sheetsStatus.spreadsheet_id}</span>
+                          </div>
+                        )}
+                        {sheetsStatus?.service_account_email && (
+                          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                            <span>Service Account:</span>
+                            <span className="font-mono text-[11px] truncate max-w-[280px]" title={sheetsStatus.service_account_email}>
+                              {sheetsStatus.service_account_email}
+                            </span>
+                          </div>
+                        )}
+                        {sheetsStatus?.error_message && (
+                          <div className="p-2 rounded bg-amber-100/60 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 text-[11.5px] leading-snug">
+                            {sheetsStatus.error_message}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-center gap-2.5 mt-2">
+                        {sheetsStatus?.connection_status === 'api_not_enabled' && (
+                          <a
+                            href={sheetsStatus?.activation_url || 'https://console.developers.google.com/apis/api/sheets.googleapis.com/overview?project=767613266689'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[13px] transition shadow-xs"
+                          >
+                            <span>Enable Google Sheets API in GCP Console</span>
+                            <ChevronRight size={14} />
+                          </a>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => testConnectionMutation.mutate()}
+                          disabled={testConnectionMutation.isPending}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-[13px] transition cursor-pointer"
+                        >
+                          <RotateCw size={14} className={testConnectionMutation.isPending ? 'animate-spin' : ''} />
+                          <span>{testConnectionMutation.isPending ? 'Testing Connection...' : 'Test / Retry Connection'}</span>
+                        </button>
+
+                        <NavLink
+                          to="/settings/integrations/google-sheets"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-[13px] transition"
+                        >
+                          <span>Integration Settings</span>
+                        </NavLink>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : isLoading ? (
                 <tr>
                   <td colSpan={21} className="py-14 text-center border border-slate-300 dark:border-slate-600">
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="w-8 h-8 rounded-full border-3 border-blue-600 border-t-transparent animate-spin" />
-                      <span className="text-[14.5px] font-medium text-slate-500">Loading stock configuration from backend...</span>
+                      <div className="w-8 h-8 rounded-full border-3 border-emerald-600 border-t-transparent animate-spin" />
+                      <span className="text-[14.5px] font-medium text-slate-500">Loading stock configuration records from Google Sheets...</span>
                     </div>
                   </td>
                 </tr>
@@ -1232,11 +1703,11 @@ export const StockConfigurationPage: React.FC = () => {
                     <div className="flex flex-col items-center justify-center gap-3">
                       <AlertCircle className="w-8 h-8 text-rose-500" />
                       <span className="text-slate-600 font-medium">
-                        {(error as any)?.message || 'Failed to load stock configuration records.'}
+                        {(error as any)?.message || 'Failed to load stock configuration records from Google Sheets.'}
                       </span>
                       <button
                         onClick={() => refetch()}
-                        className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 cursor-pointer"
+                        className="px-4 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 cursor-pointer"
                       >
                         Retry
                       </button>
@@ -1272,9 +1743,14 @@ export const StockConfigurationPage: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* 2. SAP CODE (Read-only SAP field) */}
-                      <td className="py-2.5 px-2.5 text-left align-middle font-bold text-slate-900 dark:text-white text-[12px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={item.item_code}>
-                        {item.item_code}
+                      {/* 2. SAP CODE */}
+                      <td className="py-2 px-2.5 text-left align-middle font-bold text-slate-900 dark:text-white text-[12px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={item.item_code}>
+                        <div>{item.item_code}</div>
+                        {item.record_id && (
+                          <div className="text-[10px] font-mono font-medium text-emerald-600 dark:text-emerald-400 mt-0.5 tracking-tight" title={`Permanent Google Sheets Record ID: ${item.record_id}`}>
+                            {item.record_id}
+                          </div>
+                        )}
                       </td>
 
                       {/* 3. DESCRIPTION (Read-only SAP field) */}
@@ -1756,6 +2232,16 @@ export const StockConfigurationPage: React.FC = () => {
               </button>
             </div>
 
+            {isSheetsConnected && (
+              <div className="flex items-center gap-2 p-3 mt-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs">
+                <FileSpreadsheet size={16} className="text-emerald-600 shrink-0" />
+                <span>
+                  Destination: Google Sheets (<strong>{sheetsStatus?.worksheet_name || 'Stock Configuration'}</strong>).
+                  A stable Record ID will be generated automatically. SAP Business One will not be modified.
+                </span>
+              </div>
+            )}
+
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1777,6 +2263,21 @@ export const StockConfigurationPage: React.FC = () => {
                     className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:border-slate-700"
                   />
                 </div>
+
+                {isSheetsConnected && (
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">
+                      Record ID (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={(newItem as any).record_id || ''}
+                      onChange={(e) => setNewItem({ ...newItem, record_id: e.target.value } as any)}
+                      placeholder="Auto-generated if blank (e.g. REC-2026...)"
+                      className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:border-slate-700"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">
@@ -2005,9 +2506,15 @@ export const StockConfigurationPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={addMutation.isPending}
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold cursor-pointer shadow-xs"
+                  className={`px-5 py-2 rounded-xl text-white text-sm font-semibold cursor-pointer shadow-xs ${
+                    isSheetsConnected ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
                 >
-                  {addMutation.isPending ? 'Adding Item...' : 'Add Item'}
+                  {addMutation.isPending
+                    ? 'Adding Item...'
+                    : isSheetsConnected
+                    ? 'Add to Google Sheets'
+                    : 'Add Item'}
                 </button>
               </div>
             </form>
@@ -2184,7 +2691,7 @@ export const StockConfigurationPage: React.FC = () => {
             </div>
             <p className="text-sm text-slate-600 dark:text-slate-300">
               Are you sure you want to delete item <strong className="text-slate-900 dark:text-white">{deleteConfirmItem.item_code}</strong> ({deleteConfirmItem.description})?
-              This action removes the configured row from your local database.
+              Note: Row deletion in Google Sheets is disabled to protect row indices and spreadsheet structure.
             </p>
             <div className="flex items-center justify-end gap-3 mt-6">
               <button
@@ -2214,18 +2721,39 @@ export const StockConfigurationPage: React.FC = () => {
             isDark ? 'bg-slate-850 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
           }`}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                <CheckCircle2 size={22} />
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                isSheetsConnected
+                  ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
+              }`}>
+                {isSheetsConnected ? <FileSpreadsheet size={22} /> : <CheckCircle2 size={22} />}
               </div>
               <div>
-                <h3 className="text-lg font-bold">Submit All Entries</h3>
-                <p className="text-xs text-slate-500">Bulk submit dataset verification</p>
+                <h3 className="text-lg font-bold">
+                  {isSheetsConnected ? 'Submit All to Google Sheets' : 'Submit All Entries'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {isSheetsConnected ? 'Batch update Google Spreadsheet records' : 'Bulk submit dataset verification'}
+                </p>
               </div>
             </div>
-            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
-              You are about to validate and submit all <strong className="text-blue-600 dark:text-blue-400 font-bold">{data?.total ?? 0} entries</strong> in the current dataset to the database.
-              Any modified values will be updated and committed.
-            </p>
+            <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-6 space-y-2">
+              {isSheetsConnected ? (
+                <>
+                  <p>
+                    You are about to validate and update all <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{data?.total ?? 0} entries</strong> directly in Google Sheets (<strong>{sheetsStatus?.worksheet_name || 'Stock Configuration'}</strong>).
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 pt-1">
+                    <ShieldCheck size={15} className="text-emerald-600 shrink-0" />
+                    <span><strong>SAP Write-Protection Active:</strong> No records will be modified in SAP Business One.</span>
+                  </p>
+                </>
+              ) : (
+                <p>
+                  Google Sheets is disconnected. Please connect Google Sheets before submitting entries.
+                </p>
+              )}
+            </div>
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
@@ -2238,7 +2766,9 @@ export const StockConfigurationPage: React.FC = () => {
                 type="button"
                 onClick={handleConfirmSubmitAll}
                 disabled={bulkMutation.isPending}
-                className="px-5 py-2 rounded-xl bg-[#155EEF] hover:bg-blue-700 text-white text-sm font-semibold cursor-pointer shadow-xs active:scale-98"
+                className={`px-5 py-2 rounded-xl text-white text-sm font-semibold cursor-pointer shadow-xs active:scale-98 ${
+                  isSheetsConnected ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#155EEF] hover:bg-blue-700'
+                }`}
               >
                 {bulkMutation.isPending ? 'Submitting...' : `Yes, Submit All (${data?.total ?? 0})`}
               </button>
@@ -2264,7 +2794,7 @@ export const StockConfigurationPage: React.FC = () => {
             </div>
             <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
               Are you sure you want to discard unsaved edits for <strong className="text-rose-600 dark:text-rose-400 font-bold">{modifiedCount} modified item(s)</strong>?
-              All table cells will revert to their saved database values.
+              All table cells will revert to their saved Google Sheets values.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button

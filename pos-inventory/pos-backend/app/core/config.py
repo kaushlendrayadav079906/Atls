@@ -129,10 +129,22 @@ class Settings(BaseSettings):
     SMTP_USE_SSL: bool = False
     SMTP_TIMEOUT: float = 15.0
 
+    # Google Sheets Integration Configuration
+    GOOGLE_SHEETS_ENABLED: bool = False
+    GOOGLE_SERVICE_ACCOUNT_FILE: str = "./secrets/google-service-account.json"
+    GOOGLE_SERVICE_ACCOUNT_JSON: str = ""
+    GOOGLE_SPREADSHEET_ID: str = ""
+    GOOGLE_SHEET_NAME: str = "Stock Configuration"
+    GOOGLE_SHEET_HEADER_ROW: int = 1
+    GOOGLE_SHEET_DATA_START_ROW: int = 2
+    GOOGLE_SHEETS_TIMEOUT: int = 30
+    GOOGLE_SHEETS_READ_ONLY: bool = True
+
     
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 
 # Global settings instance

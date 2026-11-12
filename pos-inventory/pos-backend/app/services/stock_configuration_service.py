@@ -1017,74 +1017,21 @@ class StockConfigurationService:
 
     def _sync_item_to_sap(self, item_code: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Synchronize updated item fields directly to SAP Business One Service Layer.
-        Updates standard SAP B1 fields (ItemName, NetWeight, User_Text) and UDFs if configured.
-        Handles offline/circuit-breaker states gracefully without failing PostgreSQL transactions.
+        SAP Business One Write-Protection (Phase 2):
+        Google Sheets is the designated source of truth for Stock Configuration records.
+        SAP Business One remains strictly read-only for master data, goods receipts, and inventory.
+        No write/patch operations are sent to SAP Business One items or documents.
         """
         code = str(item_code).strip()
-        sap_result = {
+        logger.info(
+            "SAP write-protection active for item %s. Google Sheets is the source of truth for Stock Configuration. No SAP write operations performed.",
+            code,
+        )
+        return {
             "item_code": code,
             "sap_synced": False,
-            "message": "",
+            "message": "SAP Business One write-protection active. Google Sheets is the source of truth for Stock Configuration.",
         }
-
-        # Check if SAP Service Layer is connected
-        health = self._get_sap_health_status()
-        if health.get("status") != "connected":
-            sap_result["message"] = f"Saved locally. SAP Service Layer is offline ({health.get('message', 'Disconnected')})."
-            return sap_result
-
-        try:
-            sap_client = get_sap_client()
-
-            # Prepare standard SAP fields
-            sap_payload: Dict[str, Any] = {}
-            if "description" in data and data["description"]:
-                sap_payload["ItemName"] = str(data["description"]).strip()
-
-            if "nt_weight" in data and data["nt_weight"] is not None:
-                try:
-                    sap_payload["NetWeight"] = float(data["nt_weight"])
-                except (ValueError, TypeError):
-                    pass
-
-            grpo = str(data.get("grpo_no") or "").strip()
-            qc = "Pass" if data.get("qc") else "Pending"
-            ok = data.get("ok_qty", 0)
-            rej = data.get("rej_qty", 0)
-            sap_payload["User_Text"] = f"Stock Config | GRPO: {grpo} | QC: {qc} | OK: {ok} | Rej: {rej}"
-
-            endpoint = f"Items('{code}')"
-            try:
-                sap_client.patch(endpoint, sap_payload)
-                sap_result["sap_synced"] = True
-                sap_result["message"] = "Successfully updated in SAP Business One."
-                logger.info(f"Item {code} successfully synchronized to SAP Business One.")
-            except Exception as e:
-                # If NetWeight or User_Text caused schema rejection, retry with minimal ItemName
-                logger.warning(f"Standard PATCH to SAP failed for {code} ({e}). Retrying with minimal payload.")
-                min_payload = {}
-                if "ItemName" in sap_payload:
-                    min_payload["ItemName"] = sap_payload["ItemName"]
-                if min_payload:
-                    try:
-                        sap_client.patch(endpoint, min_payload)
-                        sap_result["sap_synced"] = True
-                        sap_result["message"] = "Updated in SAP Business One (basic fields)."
-                    except Exception as e2:
-                        sap_result["sap_synced"] = False
-                        sap_result["message"] = f"Database updated. SAP error: {str(e2)}"
-                        logger.error(f"SAP sync failed for {code}: {e2}")
-                else:
-                    sap_result["sap_synced"] = False
-                    sap_result["message"] = f"Database updated. SAP error: {str(e)}"
-
-        except Exception as ex:
-            sap_result["sap_synced"] = False
-            sap_result["message"] = f"Database updated. SAP error: {str(ex)}"
-            logger.error(f"Unexpected error syncing {code} to SAP: {ex}")
-
-        return sap_result
 
     def update_item(self, item_code: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Update user-editable fields for a specific stock configuration item."""

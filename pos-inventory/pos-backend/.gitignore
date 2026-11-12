@@ -63,3 +63,10 @@ Thumbs.db
 # Alembic
 alembic/versions/*.py
 !alembic/versions/__init__.py
+
+# Google Service Account & Credentials Security
+secrets/
+*service-account*.json
+*.json.key
+*_google_sheets_config.json
+

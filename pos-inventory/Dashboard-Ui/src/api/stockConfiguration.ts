@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 
 export interface StockConfigurationItem {
+  record_id?: string;
   item_code: string;
   description: string;
   qty: number;

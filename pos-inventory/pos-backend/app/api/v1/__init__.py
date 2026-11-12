@@ -2,7 +2,29 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import auth, inventory_report, products, sales, sales_orders, purchase_orders, dashboard, admin, returns, customers, atlas, payments_report, invoices_report, production, ai, health, finance, email, common, stock_configuration
+from app.api.v1 import (
+    auth,
+    inventory_report,
+    products,
+    sales,
+    sales_orders,
+    purchase_orders,
+    dashboard,
+    admin,
+    returns,
+    customers,
+    atlas,
+    payments_report,
+    invoices_report,
+    production,
+    ai,
+    health,
+    finance,
+    email,
+    common,
+    stock_configuration,
+    google_sheets,
+)
 
 
 router = APIRouter()
@@ -23,6 +45,7 @@ router.include_router(customers.router, prefix="/customers", tags=["Customers"])
 router.include_router(atlas.router, prefix="/atlas", tags=["Atlas Analytics"])
 router.include_router(finance.router, prefix="/finance", tags=["Finance"])
 router.include_router(common.router, prefix="/common", tags=["Common"])
+router.include_router(google_sheets.router, prefix="/integrations/google-sheets", tags=["Google Sheets Integration"])
 
 router.include_router(payments_report.router, prefix="/reports/payments", tags=["Payment Reports"])
 router.include_router(invoices_report.router, prefix="/reports/invoices", tags=["Invoice Reports"])

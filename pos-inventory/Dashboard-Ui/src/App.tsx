@@ -23,6 +23,7 @@ import SalesOrdersPage from './pages/SalesOrdersPage';
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
 import { StockConfigurationPage } from './pages/StockConfigurationPage';
 import { SettingsUsersPage } from './pages/SettingsUsersPage';
+import { GoogleSheetsIntegrationPage } from './pages/GoogleSheetsIntegrationPage';
 import { ProductionOverviewPage } from './pages/production/ProductionOverviewPage';
 import { ProductionOrdersPage } from './pages/production/ProductionOrdersPage';
 import { ProductionItemWisePage } from './pages/production/ProductionItemWisePage';
@@ -150,7 +151,11 @@ function App() {
                   />
                 </Route>
                 <Route path="contact" element={<ContactPage />} />
-                <Route path="settings" element={<RequirePermission requireAdmin={true}><SettingsUsersPage /></RequirePermission>} />
+                <Route path="settings">
+                  <Route index element={<RequirePermission requireAdmin={true}><SettingsUsersPage /></RequirePermission>} />
+                  <Route path="users" element={<RequirePermission requireAdmin={true}><SettingsUsersPage /></RequirePermission>} />
+                  <Route path="integrations/google-sheets" element={<RequirePermission requireAdmin={true}><GoogleSheetsIntegrationPage /></RequirePermission>} />
+                </Route>
                 {/* Fallback routes for "Coming soon" */}
                 <Route path="*" element={<div className="p-8 text-center text-gray-500">Coming soon</div>} />
               </Route>
