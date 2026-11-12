@@ -2,7 +2,29 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import auth, inventory_report, products, sales, sales_orders, purchase_orders, dashboard, admin, returns, customers, atlas, payments_report, invoices_report, production, ai, health, finance, email, common
+from app.api.v1 import (
+    auth,
+    inventory_report,
+    products,
+    sales,
+    sales_orders,
+    purchase_orders,
+    dashboard,
+    admin,
+    returns,
+    customers,
+    atlas,
+    payments_report,
+    invoices_report,
+    production,
+    ai,
+    health,
+    finance,
+    email,
+    common,
+    stock_configuration,
+    google_sheets,
+)
 
 
 router = APIRouter()
@@ -11,6 +33,7 @@ router = APIRouter()
 router.include_router(health.router, prefix="/health", tags=["Health"])
 router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 router.include_router(products.router, prefix="/products", tags=["Products"])
+router.include_router(stock_configuration.router, prefix="/stock-configuration", tags=["Stock Configuration"])
 router.include_router(sales.router, prefix="/sales", tags=["Sales"])
 router.include_router(sales_orders.router, prefix="/sales-orders", tags=["Sales Orders"])
 router.include_router(purchase_orders.router, prefix="/purchase-orders", tags=["Purchase Orders"])
@@ -22,6 +45,7 @@ router.include_router(customers.router, prefix="/customers", tags=["Customers"])
 router.include_router(atlas.router, prefix="/atlas", tags=["Atlas Analytics"])
 router.include_router(finance.router, prefix="/finance", tags=["Finance"])
 router.include_router(common.router, prefix="/common", tags=["Common"])
+router.include_router(google_sheets.router, prefix="/integrations/google-sheets", tags=["Google Sheets Integration"])
 
 router.include_router(payments_report.router, prefix="/reports/payments", tags=["Payment Reports"])
 router.include_router(invoices_report.router, prefix="/reports/invoices", tags=["Invoice Reports"])
@@ -29,5 +53,6 @@ router.include_router(invoices_report.router, prefix="/reports/invoices", tags=[
 router.include_router(inventory_report.router, prefix="/reports/inventory", tags=["Inventory Reports"])
 router.include_router(ai.router, prefix="/ai-assistant", tags=["AI Assistant"])
 router.include_router(email.router, prefix="/email", tags=["Email"])
+
 
 

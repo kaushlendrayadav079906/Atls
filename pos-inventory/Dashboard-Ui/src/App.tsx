@@ -21,7 +21,9 @@ import { InvoiceDetail } from './pages/sales/InvoiceDetail';
 import { SalesList } from './pages/sales/SalesList';
 import SalesOrdersPage from './pages/SalesOrdersPage';
 import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
+import { StockConfigurationPage } from './pages/StockConfigurationPage';
 import { SettingsUsersPage } from './pages/SettingsUsersPage';
+import { GoogleSheetsIntegrationPage } from './pages/GoogleSheetsIntegrationPage';
 import { ProductionOverviewPage } from './pages/production/ProductionOverviewPage';
 import { ProductionOrdersPage } from './pages/production/ProductionOrdersPage';
 import { ProductionItemWisePage } from './pages/production/ProductionItemWisePage';
@@ -103,6 +105,7 @@ function App() {
                 <Route path="sales" element={<RequirePermission permission="invoices.view"><SalesList /></RequirePermission>} />
                 <Route path="sales-orders" element={<RequirePermission permission="sales_orders.view"><SalesOrdersPage /></RequirePermission>} />
                 <Route path="purchase-orders" element={<RequirePermission permission="purchase_orders.view"><PurchaseOrdersPage /></RequirePermission>} />
+                <Route path="stock-configuration" element={<RequirePermission permission="products.view"><StockConfigurationPage /></RequirePermission>} />
                 <Route path="sales/:id" element={<RequirePermission permission="invoices.view"><InvoiceDetail /></RequirePermission>} />
                 <Route path="returns" element={<RequirePermission permission="returns.view"><ReturnsApprovalsPage /></RequirePermission>} />
                 <Route path="analytics" element={<RequirePermission permission="dashboard.view"><AtlasAnalyticsPage /></RequirePermission>} />
@@ -148,7 +151,11 @@ function App() {
                   />
                 </Route>
                 <Route path="contact" element={<ContactPage />} />
-                <Route path="settings" element={<RequirePermission requireAdmin={true}><SettingsUsersPage /></RequirePermission>} />
+                <Route path="settings">
+                  <Route index element={<RequirePermission requireAdmin={true}><SettingsUsersPage /></RequirePermission>} />
+                  <Route path="users" element={<RequirePermission requireAdmin={true}><SettingsUsersPage /></RequirePermission>} />
+                  <Route path="integrations/google-sheets" element={<RequirePermission requireAdmin={true}><GoogleSheetsIntegrationPage /></RequirePermission>} />
+                </Route>
                 {/* Fallback routes for "Coming soon" */}
                 <Route path="*" element={<div className="p-8 text-center text-gray-500">Coming soon</div>} />
               </Route>

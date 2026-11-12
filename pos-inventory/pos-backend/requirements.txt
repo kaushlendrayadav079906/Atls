@@ -18,8 +18,12 @@ python-dotenv==1.0.0
 python-dateutil==2.8.2
 openpyxl==3.1.5
 psycopg2-binary==2.9.10
+<<<<<<< HEAD
 cachetools>=5.3.0
 pytz>=2024.1
+=======
+pymysql>=1.1.0
+>>>>>>> b249092d7d86f7bee1ff38aac1b849e62efc6f94
 
 
 # Rate limiting
@@ -39,3 +43,7 @@ loguru==0.7.2
 
 # AI / LLM
 openai>=1.12.0
+
+# Google Sheets Integration
+google-auth>=2.20.0
+google-api-python-client>=2.100.0

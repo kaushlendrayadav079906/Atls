@@ -74,7 +74,8 @@ async def warm_products_cache():
         base_url = None
         
         # Fetch all items from SAP (using parallel pagination)
-        sap_items = sap_service.get_items()
+        loop = asyncio.get_running_loop()
+        sap_items = await loop.run_in_executor(None, sap_service.get_items)
         
         # Convert to response format
         products = []
@@ -161,7 +162,8 @@ async def lifespan(app: FastAPI):
     # Connect to SAP Service Layer
     try:
         sap_client = get_sap_client()
-        sap_client.login()
+        # Connect non-blocking so startup is instantaneous
+        asyncio.get_running_loop().run_in_executor(None, sap_client.login)
         logger.info("Connected to SAP Business One Service Layer")
         
         # Start background cache warming (don't block startup)
@@ -213,6 +215,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -291,29 +294,34 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Health check endpoint
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Health check endpoint distinguishing app liveness from SAP/DB liveness"""
+    """Health check endpoint distinguishing app liveness from SAP/DB liveness (non-blocking)"""
+    import anyio
     sap_status = "unavailable"
     db_status = "unavailable"
     
-    # Check SAP
+    # Check SAP off-thread
     try:
         from app.services.sap.client import get_sap_client
         client = get_sap_client()
-        sap_info = client.check_health()
+        sap_info = await anyio.to_thread.run_sync(client.check_health)
         sap_status = sap_info.get("status", "unavailable")
     except Exception as e:
         logger.warning(f"Health check SAP failure: {e}")
 
-    # Check DB
-    try:
-        from app.services.user_service import _get_connection
-        with _get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1")
-                if cur.fetchone():
-                    db_status = "connected"
-    except Exception as e:
-        logger.warning(f"Health check DB failure: {e}")
+    # Check DB off-thread
+    def _check_db() -> str:
+        try:
+            from app.services.user_service import _get_connection
+            with _get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+                    if cur.fetchone():
+                        return "connected"
+        except Exception as e:
+            logger.warning(f"Health check DB failure: {e}")
+        return "unavailable"
+
+    db_status = await anyio.to_thread.run_sync(_check_db)
 
     return {
         "status": "healthy",

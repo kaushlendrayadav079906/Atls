@@ -59,6 +59,7 @@ const navItems: NavSectionItem[] = [
       { name: 'Sales Orders', path: '/sales-orders', permission: 'sales_orders.view' },
       { name: 'Sales Invoices', path: '/sales', permission: 'invoices.view' },
       { name: 'Purchase Orders', path: '/purchase-orders', permission: 'purchase_orders.view' },
+      { name: 'Stock Configuration', path: '/stock-configuration', permission: 'products.view' },
       { name: 'Customers', path: '/customers', permission: 'customers.view' },
       { name: 'Returns & Approvals', path: '/returns', badge: '5', permission: 'returns.view' },
     ],
@@ -138,6 +139,7 @@ export const Layout = () => {
     location.pathname === '/sales' ||
     location.pathname.startsWith('/sales/') ||
     location.pathname === '/purchase-orders' ||
+    location.pathname === '/stock-configuration' ||
     location.pathname === '/customers' ||
     location.pathname === '/returns';
 
@@ -215,11 +217,12 @@ export const Layout = () => {
     if (pathname === '/pos') return 'pos';
     if (pathname === '/sales-orders') return 'sales_orders';
     if (pathname === '/purchase-orders') return 'purchase_orders';
+    if (pathname === '/stock-configuration') return 'products';
     if (pathname === '/sales' || pathname.startsWith('/sales/')) return 'invoices';
     if (pathname === '/returns') return 'returns';
     if (pathname === '/analytics') return 'analytics';
     if (pathname === '/contact') return 'dashboard';
-    if (pathname === '/settings') return 'settings';
+    if (pathname.startsWith('/settings')) return 'settings';
 
     if (pathname === '/production/orders') return 'production_orders';
     if (pathname === '/production/item-wise') return 'production_item_wise';
@@ -565,14 +568,14 @@ export const Layout = () => {
                   type="text"
                   readOnly
                   placeholder="Search menu, reports..."
-                  className={`w-full cursor-pointer rounded-lg border py-1.5 pl-8 pr-10 text-[11px] group-hover:border-blue-400 focus:outline-none transition shadow-2xs ${
+                  className={`w-full cursor-pointer rounded-lg border py-1.5 pl-8 pr-10 text-xs font-medium group-hover:border-blue-400 focus:outline-none transition shadow-2xs ${
                     isDark
                       ? 'border-slate-700 bg-[#141f32] text-slate-200 placeholder:text-slate-400'
-                      : 'border-slate-200 bg-white text-slate-700 placeholder:text-slate-400'
+                      : 'border-slate-300 bg-white text-slate-800 placeholder:text-slate-500'
                   }`}
                 />
-                <span className={`pointer-events-none absolute right-1.5 rounded border px-1 py-0.5 text-[8.5px] font-semibold shadow-3xs group-hover:border-blue-300 ${
-                  isDark ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-500'
+                <span className={`pointer-events-none absolute right-1.5 rounded border px-1.5 py-0.5 text-[9.5px] font-bold shadow-3xs group-hover:border-blue-300 ${
+                  isDark ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-300 bg-slate-100 text-slate-600'
                 }`}>
                   ⌘ K
                 </span>
@@ -689,49 +692,55 @@ export const Layout = () => {
                             : 'w-full justify-between rounded-lg py-[9px] px-3 text-[14.5px] font-semibold'
                         }`
                       }
-                      style={({ isActive }) => ({
-                        backgroundColor: isActive ? (item.path === '/' ? '#155EEF' : (isDark ? '#152547' : SIDEBAR_ACTIVE_BG)) : undefined,
-                        color: isActive ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : (isDark ? '#cbd5e1' : TEXT_SECONDARY),
-                      })}
+                      style={({ isActive }) => {
+                        const active = isActive || (item.path === '/settings' && location.pathname.startsWith('/settings'));
+                        return {
+                          backgroundColor: active ? (item.path === '/' ? '#155EEF' : (isDark ? '#152547' : SIDEBAR_ACTIVE_BG)) : undefined,
+                          color: active ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : (isDark ? '#cbd5e1' : TEXT_SECONDARY),
+                        };
+                      }}
                       onMouseEnter={(e) => {
-                        const isActive = location.pathname === item.path;
+                        const isActive = location.pathname === item.path || (item.path === '/settings' && location.pathname.startsWith('/settings'));
                         if (!isActive) {
                           e.currentTarget.style.backgroundColor = isDark ? '#0f1c35' : SIDEBAR_HOVER_BG;
                         }
                       }}
                       onMouseLeave={(e) => {
-                        const isActive = location.pathname === item.path;
+                        const isActive = location.pathname === item.path || (item.path === '/settings' && location.pathname.startsWith('/settings'));
                         if (!isActive) {
                           e.currentTarget.style.backgroundColor = 'transparent';
                         }
                       }}
                     >
-                      {({ isActive }) => (
-                        <>
-                          <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
-                            <item.icon
-                              size={18}
-                              style={{ color: isActive ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : (isDark ? '#94a3b8' : TEXT_MUTED) }}
-                              className="transition-colors"
-                            />
-                            {!sidebarCollapsed && <span className="whitespace-nowrap">{item.name}</span>}
-                          </div>
-                          {item.badge && !sidebarCollapsed && (
-                            <span
-                              className="flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white shadow-xs"
-                              style={{ backgroundColor: COLOR_BADGE }}
-                            >
-                              {item.badge}
-                            </span>
-                          )}
-                          {item.badge && sidebarCollapsed && (
-                            <span
-                              className="absolute right-1 top-1 h-2 w-2 rounded-full"
-                              style={{ backgroundColor: COLOR_BADGE }}
-                            />
-                          )}
-                        </>
-                      )}
+                      {({ isActive }) => {
+                        const active = isActive || (item.path === '/settings' && location.pathname.startsWith('/settings'));
+                        return (
+                          <>
+                            <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
+                              <item.icon
+                                size={18}
+                                style={{ color: active ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : (isDark ? '#94a3b8' : TEXT_MUTED) }}
+                                className="transition-colors"
+                              />
+                              {!sidebarCollapsed && <span className="whitespace-nowrap">{item.name}</span>}
+                            </div>
+                            {item.badge && !sidebarCollapsed && (
+                              <span
+                                className="flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold text-white shadow-xs"
+                                style={{ backgroundColor: COLOR_BADGE }}
+                              >
+                                {item.badge}
+                              </span>
+                            )}
+                            {item.badge && sidebarCollapsed && (
+                              <span
+                                className="absolute right-1 top-1 h-2 w-2 rounded-full"
+                                style={{ backgroundColor: COLOR_BADGE }}
+                              />
+                            )}
+                          </>
+                        );
+                      }}
                     </NavLink>
                   )}
 
@@ -808,7 +817,7 @@ export const Layout = () => {
                     <div className="text-[13px] font-semibold" style={{ color: isDark ? '#f1f5f9' : TEXT_PRIMARY }}>
                       {user?.store_name || 'Main Branch'}
                     </div>
-                    <div className="text-[11px] mt-0.5" style={{ color: isDark ? '#94a3b8' : TEXT_MUTED }}>
+                    <div className="text-xs font-medium mt-0.5" style={{ color: isDark ? '#cbd5e1' : '#475569' }}>
                       {user?.branch_id || 'SH'}
                     </div>
                   </div>
@@ -827,6 +836,10 @@ export const Layout = () => {
             location.pathname === '/solutions' ||
             location.pathname === '/reports';
 
+          const isWidePage =
+            location.pathname === '/stock-configuration' ||
+            location.pathname.startsWith('/stock-configuration');
+
           return (
             <main className={`flex min-w-0 flex-1 flex-col overflow-hidden relative transition-colors duration-200 ${
               isDark ? 'bg-[#0f172a]' : 'bg-[#f0f6ff]'
@@ -840,10 +853,20 @@ export const Layout = () => {
               >
                 <div
                   className={`flex-1 w-full ${
-                    isFullBleedPage ? 'p-0' : 'p-4 sm:p-5 lg:p-6'
+                    isFullBleedPage
+                      ? 'p-0'
+                      : isWidePage
+                      ? 'p-2 sm:p-3 md:p-4 lg:p-5'
+                      : 'p-4 sm:p-5 lg:p-6'
                   } transition-all duration-300`}
                 >
-                  <div className={isFullBleedPage ? 'w-full h-full' : 'w-full max-w-7xl 2xl:max-w-[1440px] mx-auto'}>
+                  <div className={
+                    isFullBleedPage
+                      ? 'w-full h-full'
+                      : isWidePage
+                      ? 'w-full max-w-[1920px] mx-auto min-w-0'
+                      : 'w-full max-w-7xl 2xl:max-w-[1440px] mx-auto'
+                  }>
                     <Outlet />
                   </div>
                 </div>

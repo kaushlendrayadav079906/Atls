@@ -1111,6 +1111,17 @@ export const emailApi = {
   },
 };
 
+export { googleSheetsApi } from './googleSheets';
+export type {
+  GoogleSheetsStatus,
+  WorksheetInfo,
+  GoogleSheetsHeaders,
+  GoogleSheetsConnectPayload,
+  GoogleSheetsTestPayload,
+  GoogleSheetsConfigPayload,
+  GoogleSheetsTestResponse,
+} from './googleSheets';
+
 export type {
   PurchaseInvoiceItem,
   PurchaseInvoiceSummary,

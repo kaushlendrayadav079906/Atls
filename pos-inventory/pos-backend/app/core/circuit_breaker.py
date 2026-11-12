@@ -68,6 +68,14 @@ class CircuitBreaker:
         self._record_success()
         return result
 
+    def record_failure(self) -> None:
+        """Explicitly record a failure from connection attempt or health probe."""
+        self._record_failure()
+
+    def record_success(self) -> None:
+        """Explicitly record a success and transition to CLOSED."""
+        self._record_success()
+
     # ── internals ───────────────────────────────────────────────────────────
 
     def _evaluated_state(self) -> CircuitState:
@@ -103,13 +111,12 @@ class CircuitBreaker:
 
 
 # ── global SAP instance (imported by client.py) ─────────────────────────────
-# failure_threshold=10: parallel hydration can produce simultaneous failures;
-#   raising the threshold prevents a single slow batch from opening the circuit.
-# recovery_timeout=15.0: recover faster so a brief SAP hiccup doesn't stall
-#   dashboards for 30 seconds.
+# failure_threshold=3: fail-fast to prevent socket hang from freezing workers/event-loop
+# recovery_timeout=30.0: give unreachable hosts sufficient cooldown
 sap_breaker = CircuitBreaker(
     name="sap",
-    failure_threshold=10,
-    recovery_timeout=15.0,
+    failure_threshold=3,
+    recovery_timeout=30.0,
     expected_exception=Exception,
 )
+

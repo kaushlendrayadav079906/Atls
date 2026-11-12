@@ -70,6 +70,8 @@ class SAPItemsService:
                 "MovingAveragePrice",
                 "ItemPrices",
                 "ItemWarehouseInfoCollection",
+                "CreateDate",
+                "UpdateDate",
             ]
 
             all_items: List[Dict[str, Any]] = []

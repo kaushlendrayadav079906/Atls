@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { NavLink } from 'react-router-dom';
 import {
   PencilLine,
   Plus,
@@ -11,6 +12,8 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  FileSpreadsheet,
+  Users,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { apiClient } from '../api/client';
@@ -303,14 +306,42 @@ export const SettingsUsersPage = () => {
           <h1 className="atlas-page-title mt-1 text-[28px] sm:text-[32px] md:text-[34px] font-bold text-slate-900 leading-tight">Users & Roles</h1>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsCreateOpen(true)}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-[14px] sm:text-[14.5px] font-bold text-white shadow-sm transition hover:bg-blue-500"
-        >
-          <Plus className="h-4 w-4" />
-          Add user
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5 rounded-xl bg-slate-100 p-1 border border-slate-200">
+            <NavLink
+              to="/settings"
+              end
+              className={({ isActive }) =>
+                `flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs sm:text-sm font-semibold transition ${
+                  isActive ? 'bg-white text-blue-600 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
+                }`
+              }
+            >
+              <Users className="h-4 w-4 text-slate-500" />
+              Users & Roles
+            </NavLink>
+            <NavLink
+              to="/settings/integrations/google-sheets"
+              className={({ isActive }) =>
+                `flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs sm:text-sm font-semibold transition ${
+                  isActive ? 'bg-white text-blue-600 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
+                }`
+              }
+            >
+              <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+              Google Sheets
+            </NavLink>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-[14px] sm:text-[14.5px] font-bold text-white shadow-sm transition hover:bg-blue-500"
+          >
+            <Plus className="h-4 w-4" />
+            Add user
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">

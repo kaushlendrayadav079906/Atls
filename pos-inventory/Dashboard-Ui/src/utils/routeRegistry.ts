@@ -281,6 +281,14 @@ export const INTERNAL_ROUTES: InternalRoute[] = [
     description: 'System configuration, user accounts, store and warehouse management',
     supportedFilters: [],
   },
+  {
+    id: 'settings_google_sheets',
+    name: 'Google Sheets Integration',
+    path: '/settings/integrations/google-sheets',
+    module: 'settings',
+    description: 'Google Sheets integration settings, connection testing, and worksheet mapping',
+    supportedFilters: [],
+  },
 ];
 
 /**

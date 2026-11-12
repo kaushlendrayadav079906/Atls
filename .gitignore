@@ -1,2 +1,6 @@
 
 pos-inventory.rar
+secrets/
+*service-account*.json
+*.json.key
+
