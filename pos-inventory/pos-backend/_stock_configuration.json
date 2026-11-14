@@ -2,7 +2,7 @@
   {
     "item_code": "FG001",
     "description": "Finished Good 1",
-    "qty": 115.0,
+    "qty": 0.0,
     "stock_qty": 95.0,
     "vendor_name": "Bajaj Alliance",
     "vendor_code": "V001",
@@ -24,12 +24,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-29T07:33:58.589806",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "RM002",
     "description": "Raw Material 2",
-    "qty": 50.0,
+    "qty": 0.0,
     "stock_qty": 48.0,
     "vendor_name": "Amit Traders",
     "vendor_code": "V002",
@@ -51,12 +55,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "PKG003",
     "description": "Packaging Material",
-    "qty": 200.0,
+    "qty": 0.0,
     "stock_qty": 180.0,
     "vendor_name": "Kaushal Supplies",
     "vendor_code": "V003",
@@ -78,12 +86,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "SP004",
     "description": "Spare Part",
-    "qty": 75.0,
+    "qty": 0.0,
     "stock_qty": 72.0,
     "vendor_name": "AMIK KR",
     "vendor_code": "V004",
@@ -105,12 +117,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "CHEM005",
     "description": "Chemical Item",
-    "qty": 60.0,
+    "qty": 0.0,
     "stock_qty": 60.0,
     "vendor_name": "Global Chem",
     "vendor_code": "V005",
@@ -132,12 +148,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "SUB006",
     "description": "Sub Assembly",
-    "qty": 40.0,
+    "qty": 0.0,
     "stock_qty": 38.0,
     "vendor_name": "Tech Parts",
     "vendor_code": "V006",
@@ -159,12 +179,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "TOOL007",
     "description": "Tooling Item",
-    "qty": 30.0,
+    "qty": 0.0,
     "stock_qty": 28.0,
     "vendor_name": "Industrial Tools",
     "vendor_code": "V007",
@@ -186,12 +210,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "MAT008",
     "description": "Material Item",
-    "qty": 120.0,
+    "qty": 0.0,
     "stock_qty": 115.0,
     "vendor_name": "Neha Enterprises",
     "vendor_code": "V008",
@@ -213,12 +241,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "FG009",
     "description": "Finished Good 2",
-    "qty": 85.0,
+    "qty": 0.0,
     "stock_qty": 80.0,
     "vendor_name": "Starlet Vendors",
     "vendor_code": "V009",
@@ -240,12 +272,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "RM010",
     "description": "Raw Material 3",
-    "qty": 90.0,
+    "qty": 0.0,
     "stock_qty": 88.0,
     "vendor_name": "IKIO Traders",
     "vendor_code": "V010",
@@ -267,12 +303,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "FG011",
     "description": "Standard Assembly A",
-    "qty": 45.0,
+    "qty": 0.0,
     "stock_qty": 45.0,
     "vendor_name": "Bajaj Alliance",
     "vendor_code": "V001",
@@ -294,12 +334,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "RM012",
     "description": "Alloy Sheet 4mm",
-    "qty": 110.0,
+    "qty": 0.0,
     "stock_qty": 105.0,
     "vendor_name": "Amit Traders",
     "vendor_code": "V002",
@@ -321,12 +365,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "PKG013",
     "description": "Corrugated Boxes XL",
-    "qty": 350.0,
+    "qty": 0.0,
     "stock_qty": 340.0,
     "vendor_name": "Kaushal Supplies",
     "vendor_code": "V003",
@@ -348,12 +396,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "SP014",
     "description": "Ball Bearing 6204",
-    "qty": 150.0,
+    "qty": 0.0,
     "stock_qty": 145.0,
     "vendor_name": "Tech Parts",
     "vendor_code": "V006",
@@ -375,12 +427,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "CHEM015",
     "description": "Industrial Solvent 20L",
-    "qty": 25.0,
+    "qty": 0.0,
     "stock_qty": 25.0,
     "vendor_name": "Global Chem",
     "vendor_code": "V005",
@@ -402,12 +458,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "SUB016",
     "description": "Motor Housing Sub-Unit",
-    "qty": 65.0,
+    "qty": 0.0,
     "stock_qty": 62.0,
     "vendor_name": "AMIK KR",
     "vendor_code": "V004",
@@ -429,12 +489,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "TOOL017",
     "description": "Carbide End Mill 10mm",
-    "qty": 80.0,
+    "qty": 0.0,
     "stock_qty": 78.0,
     "vendor_name": "Industrial Tools",
     "vendor_code": "V007",
@@ -456,12 +520,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "MAT018",
     "description": "Copper Busbar 50x5mm",
-    "qty": 95.0,
+    "qty": 0.0,
     "stock_qty": 90.0,
     "vendor_name": "Neha Enterprises",
     "vendor_code": "V008",
@@ -483,12 +551,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "FG019",
     "description": "Control Panel Box CP-2",
-    "qty": 35.0,
+    "qty": 0.0,
     "stock_qty": 33.0,
     "vendor_name": "Starlet Vendors",
     "vendor_code": "V009",
@@ -510,12 +582,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "RM020",
     "description": "Steel Rod 25mm dia",
-    "qty": 140.0,
+    "qty": 0.0,
     "stock_qty": 135.0,
     "vendor_name": "IKIO Traders",
     "vendor_code": "V010",
@@ -537,12 +613,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "SP021",
     "description": "Sealing O-Ring Kit",
-    "qty": 300.0,
+    "qty": 0.0,
     "stock_qty": 295.0,
     "vendor_name": "Tech Parts",
     "vendor_code": "V006",
@@ -564,12 +644,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "SUB022",
     "description": "Gearbox Bracket Assembly",
-    "qty": 50.0,
+    "qty": 0.0,
     "stock_qty": 48.0,
     "vendor_name": "Bajaj Alliance",
     "vendor_code": "V001",
@@ -591,12 +675,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "CHEM023",
     "description": "Zinc Primer Coating 5L",
-    "qty": 40.0,
+    "qty": 0.0,
     "stock_qty": 40.0,
     "vendor_name": "Global Chem",
     "vendor_code": "V005",
@@ -618,12 +706,16 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "FG024",
     "description": "Hydraulic Pump Unit",
-    "qty": 18.0,
+    "qty": 0.0,
     "stock_qty": 18.0,
     "vendor_name": "AMIK KR",
     "vendor_code": "V004",
@@ -645,7 +737,11 @@
     "is_active": true,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": [],
+    "so_qty": 0.0,
+    "so_no": ""
   },
   {
     "item_code": "DISC025",
@@ -672,7 +768,9 @@
     "is_active": false,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": []
   },
   {
     "item_code": "OBS026",
@@ -699,6 +797,8 @@
     "is_active": false,
     "created_at": "2026-10-28T10:43:51.066431",
     "updated_at": "2026-10-28T10:43:51.066431",
-    "entry_date": "2025-01-07"
+    "entry_date": "2025-01-07",
+    "remark": "",
+    "remark_history": []
   }
 ]

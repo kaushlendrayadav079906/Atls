@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { UserResponse } from '../api/endpoints';
 import { authApi } from '../api/endpoints';
 
@@ -19,6 +20,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  let queryClient: ReturnType<typeof useQueryClient> | null = null;
+  try {
+    queryClient = useQueryClient();
+  } catch {
+    // If mounted outside QueryClientProvider in isolated test
+  }
 
   const refreshUser = async () => {
     const token = localStorage.getItem('token');
@@ -29,6 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         localStorage.removeItem('token');
         setUser(null);
+        queryClient?.clear();
       }
     }
   };
@@ -42,6 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = (token: string, user: UserResponse) => {
+    queryClient?.clear();
     localStorage.setItem('token', token);
     setUser(user);
   };
@@ -52,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // ignore
     } finally {
+      queryClient?.clear();
       localStorage.removeItem('token');
       setUser(null);
       window.location.href = '/login';

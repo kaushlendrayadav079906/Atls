@@ -134,7 +134,7 @@ export default function PurchaseOrdersPage() {
     }
   }, [isDrawerOpen]);
   
-  const { data: summary, isLoading: summaryLoading } = useQuery({
+  const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useQuery({
     queryKey: ['purchase-orders-summary', appliedFilters, dateFrom, dateTo],
     queryFn: () => purchaseOrdersApi.getSummary({
       search: appliedFilters.search || undefined,
@@ -146,9 +146,11 @@ export default function PurchaseOrdersPage() {
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined
     }),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
-  const { data: ordersData, isLoading: ordersLoading, isError } = useQuery({
+  const { data: ordersData, isLoading: ordersLoading, isFetching: ordersFetching, isError, refetch: refetchOrders } = useQuery({
     queryKey: ['purchase-orders', page, limit, appliedFilters, dateFrom, dateTo],
     queryFn: () => purchaseOrdersApi.getOrders({
       page,
@@ -161,13 +163,17 @@ export default function PurchaseOrdersPage() {
       warehouse_code: appliedFilters.warehouse || undefined,
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined
-    })
+    }),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const { data: detailData, isLoading: detailLoading, isError: detailError } = useQuery({
     queryKey: ['purchaseOrder', selectedDocEntry],
     queryFn: () => purchaseOrdersApi.getOrderDetail(selectedDocEntry!),
     enabled: !!selectedDocEntry && isDrawerOpen,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const handleApplyFilters = () => {
@@ -295,6 +301,15 @@ export default function PurchaseOrdersPage() {
               </div>
             )}
           </div>
+          <button
+            onClick={() => { refetchSummary(); refetchOrders(); }}
+            disabled={ordersFetching}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors font-semibold text-[13.5px] cursor-pointer disabled:opacity-50"
+            title="Refresh Purchase Orders"
+          >
+            <RotateCcw className={`w-4 h-4 text-slate-500 ${ordersFetching ? 'animate-spin text-blue-600' : ''}`} />
+            <span>Refresh</span>
+          </button>
           <button className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 bg-white">
             <MoreVertical className="w-5 h-5" />
           </button>

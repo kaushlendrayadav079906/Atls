@@ -170,7 +170,8 @@ export const ReturnsApprovalsPage = () => {
         search: debouncedSearch || undefined,
       });
     },
-    staleTime: 30_000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const rows: ApprovalRequestRow[] = data.items;
@@ -183,6 +184,8 @@ export const ReturnsApprovalsPage = () => {
   const mutationConfig = {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['returns-approvals'] });
+      await queryClient.invalidateQueries({ queryKey: ['sales'] });
+      await queryClient.invalidateQueries({ queryKey: ['executiveCommand'] });
       setActionError(null);
     },
     onError: (error: any) => {

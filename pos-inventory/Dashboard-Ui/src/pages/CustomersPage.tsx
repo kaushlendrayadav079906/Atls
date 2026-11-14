@@ -19,6 +19,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Calendar,
+    RefreshCw,
 } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { customersApi } from '../api/customers';
@@ -76,20 +77,28 @@ export const CustomersPage = () => {
     return () => document.removeEventListener('click', handleOutsideClick);
   }, [isDateDropdownOpen]);
 
-  const { data: insights, isLoading: insightsLoading, isError: insightsError, error: insightsErr } = useQuery({
+  const { data: insights, isLoading: insightsLoading, isFetching: insightsFetching, isError: insightsError, error: insightsErr, refetch: refetchInsights } = useQuery({
     queryKey: ['customer-insights', range],
     queryFn: () => customersApi.getInsights(range),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
-  const { data: customers = [], isLoading, isError, error, refetch } = useQuery<CustomerListItem[]>({
+  const { data: customers = [], isLoading, isFetching: customersFetching, isError, error, refetch: refetchCustomers } = useQuery<CustomerListItem[]>({
     queryKey: ['customers-list', debouncedSearch, cardTypeFilter, statusFilter],
     queryFn: () => customersApi.searchCustomers({
       search: debouncedSearch || undefined,
       card_type: cardTypeFilter || undefined,
       status: statusFilter || undefined,
     }),
-    staleTime: 60_000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
+
+  const refetch = () => {
+    refetchInsights();
+    refetchCustomers();
+  };
 
   const filteredCustomers = customers;
 
@@ -140,18 +149,24 @@ export const CustomersPage = () => {
     queryKey: ['customer-profile', currentCardCode],
     queryFn: () => currentCardCode ? customersApi.getCustomerProfile(currentCardCode) : null,
     enabled: !!currentCardCode,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const { data: purchases } = useQuery({
     queryKey: ['customer-purchases', currentCardCode],
     queryFn: () => currentCardCode ? customersApi.getCustomerPurchases(currentCardCode) : null,
     enabled: !!currentCardCode,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const { data: returns } = useQuery({
     queryKey: ['customer-returns', currentCardCode],
     queryFn: () => currentCardCode ? customersApi.getCustomerReturns(currentCardCode) : null,
     enabled: !!currentCardCode,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const modalLimit = 5;
@@ -235,6 +250,16 @@ export const CustomersPage = () => {
               )}
             </div>
 
+            <button
+              type="button"
+              onClick={() => { refetchInsights(); refetchCustomers(); }}
+              disabled={insightsFetching || customersFetching}
+              className="atlas-btn-sm inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-[13px] font-semibold text-slate-700 hover:bg-slate-50 shadow-sm cursor-pointer disabled:opacity-50"
+              title="Refresh Customers"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 text-slate-500 ${(insightsFetching || customersFetching) ? 'animate-spin text-blue-600' : ''}`} />
+              Refresh
+            </button>
             <button
               type="button"
               onClick={handleExportCSV}

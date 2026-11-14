@@ -117,7 +117,7 @@ async def warm_products_cache():
         logger.info(f"Products cache warmed: {len(products)} items cached")
         
     except Exception as e:
-        logger.error(f"Failed to warm products cache: {e}")
+        logger.warning(f"Products cache warming skipped (SAP unavailable): {e}")
         # Don't fail startup - cache will be populated on first request
 
 
@@ -159,24 +159,30 @@ async def lifespan(app: FastAPI):
         logger.error(f"User storage initialization failed: {str(e)}")
         logger.warning("Authentication endpoints will be unavailable until PostgreSQL is configured")
 
-    # Connect to SAP Service Layer
-    try:
-        sap_client = get_sap_client()
-        # Connect non-blocking so startup is instantaneous
-        asyncio.get_running_loop().run_in_executor(None, sap_client.login)
-        logger.info("Connected to SAP Business One Service Layer")
-        
-        # Start background cache warming (don't block startup)
-        asyncio.create_task(warm_products_cache())
+    # Connect to SAP Service Layer in background without blocking startup
+    async def _init_sap_background():
+        try:
+            sap_client = get_sap_client()
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, sap_client.login)
+            logger.info("Connected to SAP Business One Service Layer")
 
-        # Start the long-lived product store background refresh (every ~60 min)
-        from app.services.sap.items_service import SAPItemsService as _SAPItemsService
-        _items_svc = _SAPItemsService()
-        await product_store.start_background_refresh_task(_items_svc.get_items)
-        
-    except Exception as e:
-        logger.error(f"SAP connection failed: {str(e)}")
-        logger.warning("Application will continue with limited functionality")
+            # Start background cache warming once SAP is connected
+            await warm_products_cache()
+
+            # Start the long-lived product store background refresh (every ~60 min)
+            from app.services.sap.items_service import SAPItemsService as _SAPItemsService
+            _items_svc = _SAPItemsService()
+            await product_store.start_background_refresh_task(_items_svc.get_items)
+        except Exception as e:
+            logger.warning(
+                "SAP Business One Service Layer is unavailable at %s (%s). "
+                "Application running with local database, authentication, and Google Sheets integration active.",
+                sap_host,
+                e,
+            )
+
+    asyncio.create_task(_init_sap_background())
 
     logger.info(f"{settings.APP_NAME} v{settings.APP_VERSION} is ready!")
 

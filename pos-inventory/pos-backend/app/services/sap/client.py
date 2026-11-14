@@ -52,6 +52,13 @@ class SAPServiceLayerClient:
         self.client: Optional[httpx.Client] = None
         self._session_lock = threading.Lock()  # Prevent concurrent re-logins
 
+        # Performance & Observability metrics
+        self._metrics_lock = threading.Lock()
+        self._request_count: int = 0
+        self._total_duration_ms: float = 0.0
+        self._last_duration_ms: float = 0.0
+        self._failed_requests: int = 0
+
         # Health check result cache (10s TTL) to prevent repeated network stalls
         self._last_health_result: Optional[Dict[str, Any]] = None
         self._last_health_time: float = 0.0
@@ -313,6 +320,7 @@ class SAPServiceLayerClient:
         def _inner():
             self._ensure_session()
             url = f"{self.base_url}/{endpoint}"
+            t0 = time.perf_counter()
             try:
                 response = self.client.get(
                     url,
@@ -321,15 +329,32 @@ class SAPServiceLayerClient:
                     params=params or {},
                 )
                 response.raise_for_status()
-                logger.debug(f"SAP GET {url} -> {response.status_code}")
+                dur_ms = (time.perf_counter() - t0) * 1000.0
+                with self._metrics_lock:
+                    self._request_count += 1
+                    self._total_duration_ms += dur_ms
+                    self._last_duration_ms = dur_ms
+                logger.debug(f"SAP GET {endpoint} -> {response.status_code} in {dur_ms:.1f}ms")
                 return response.json()
             except httpx.HTTPStatusError as e:
+                dur_ms = (time.perf_counter() - t0) * 1000.0
+                with self._metrics_lock:
+                    self._request_count += 1
+                    self._failed_requests += 1
+                    self._total_duration_ms += dur_ms
+                    self._last_duration_ms = dur_ms
                 logger.error(
-                    f"SAP GET failed: {e.response.status_code} - {e.response.text}"
+                    f"SAP GET failed: {e.response.status_code} in {dur_ms:.1f}ms - {e.response.text}"
                 )
                 self._handle_http_error(e)
             except Exception as e:
-                logger.error(f"SAP GET error: {str(e)}")
+                dur_ms = (time.perf_counter() - t0) * 1000.0
+                with self._metrics_lock:
+                    self._request_count += 1
+                    self._failed_requests += 1
+                    self._total_duration_ms += dur_ms
+                    self._last_duration_ms = dur_ms
+                logger.error(f"SAP GET error in {dur_ms:.1f}ms: {str(e)}")
                 raise SAPConnectionError(f"SAP request error: {str(e)}")
 
         for attempt in range(2):
@@ -342,6 +367,18 @@ class SAPServiceLayerClient:
                 raise
             except CircuitBreakerOpen as exc:
                 raise SAPConnectionError(str(exc))
+
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """Return SAP Service Layer call counts and latency metrics."""
+        with self._metrics_lock:
+            avg_ms = (self._total_duration_ms / self._request_count) if self._request_count > 0 else 0.0
+            return {
+                "total_requests": self._request_count,
+                "total_duration_ms": round(self._total_duration_ms, 2),
+                "avg_duration_ms": round(avg_ms, 2),
+                "last_duration_ms": round(self._last_duration_ms, 2),
+                "failed_requests": self._failed_requests,
+            }
 
     def get_binary(
         self,
@@ -565,6 +602,7 @@ class SAPServiceLayerClient:
         select: Optional[List[str]] = None,
         top: int = 100,
         skip: int = 0,
+        orderby: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Query Items from SAP
@@ -574,22 +612,11 @@ class SAPServiceLayerClient:
             select: Fields to select
             top: Number of records to return
             skip: Number of records to skip
+            orderby: OData orderby expression (e.g. "UpdateDate desc")
 
         Returns:
             SAP response with 'value' array
         """
-        # params = {
-        #     "$top": top,
-        #     "$skip": skip,
-        # }
-
-        # if filter_str:
-        #     params["$filter"] = filter_str
-
-        # if select:
-        #     params["$select"] = ",".join(select)
-
-        # params["$expand"] = "ItemPricesCollection($select=Price,PriceList)"
         params = {
             "$top": top,
             "$skip": skip,
@@ -600,6 +627,9 @@ class SAPServiceLayerClient:
 
         if select:
             params["$select"] = ",".join(select)
+
+        if orderby:
+            params["$orderby"] = orderby
 
         # NOTE: On this SAP B1 version, ItemPrices and ItemWarehouseInfoCollection
         # are returned INLINE in the response and do NOT support $expand.

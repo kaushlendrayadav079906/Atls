@@ -1,0 +1,443 @@
+[
+  {
+    "id": "AUD-DA7B2A37",
+    "timestamp": "2026-11-14T12:39:18.302780+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Batch inspected and approved by Admin",
+        "new": "Packaging QC verified; ready for dispatch"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-D0154B64",
+    "timestamp": "2026-11-14T12:39:17.997848+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Packaging QC verified; ready for dispatch",
+        "new": "Batch inspected and approved by Admin"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-A6D26316",
+    "timestamp": "2026-11-14T11:49:05.155631+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "CS0227",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "test remark",
+        "new": "fast test"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-62C1CF34",
+    "timestamp": "2026-11-14T11:43:51.725322+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "CS0227",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "",
+        "new": "test remark"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-BD38931C",
+    "timestamp": "2026-11-14T11:31:55.451392+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Batch inspected and approved by Admin",
+        "new": "Packaging QC verified; ready for dispatch"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-B93A1B41",
+    "timestamp": "2026-11-14T11:31:55.273675+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Packaging QC verified; ready for dispatch",
+        "new": "Batch inspected and approved by Admin"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-406F4235",
+    "timestamp": "2026-11-14T11:04:43.270574+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Batch inspected and approved by Admin",
+        "new": "Packaging QC verified; ready for dispatch"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-353C0D12",
+    "timestamp": "2026-11-14T11:04:43.094354+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Packaging QC verified; ready for dispatch",
+        "new": "Batch inspected and approved by Admin"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-03D46CEF",
+    "timestamp": "2026-11-14T10:56:29.942668+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG2145",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "",
+        "new": "yes"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-4577AF32",
+    "timestamp": "2026-11-14T10:41:09.327382+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "CS1124",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "",
+        "new": "yes"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-D274677A",
+    "timestamp": "2026-11-14T10:32:35.064588+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Batch inspected and approved by Admin",
+        "new": "Packaging QC verified; ready for dispatch"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-C0826503",
+    "timestamp": "2026-11-14T10:32:34.882646+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Packaging QC verified; ready for dispatch",
+        "new": "Batch inspected and approved by Admin"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-FDE50C23",
+    "timestamp": "2026-11-14T10:27:02.871249+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Batch inspected and approved by Admin",
+        "new": "Packaging QC verified; ready for dispatch"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-E7130DCF",
+    "timestamp": "2026-11-14T10:27:02.700086+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Packaging QC verified; ready for dispatch",
+        "new": "Batch inspected and approved by Admin"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-3306325D",
+    "timestamp": "2026-11-14T10:25:42.488266+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Batch inspected and approved by Admin",
+        "new": "Packaging QC verified; ready for dispatch"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-F40A9BAC",
+    "timestamp": "2026-11-14T10:25:42.197143+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Packaging QC verified; ready for dispatch",
+        "new": "Batch inspected and approved by Admin"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-8A546C88",
+    "timestamp": "2026-11-14T06:26:32.007972+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Batch inspected and approved by Admin",
+        "new": "Packaging QC verified; ready for dispatch"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-611324A9",
+    "timestamp": "2026-11-14T06:26:31.823074+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Packaging QC verified; ready for dispatch",
+        "new": "Batch inspected and approved by Admin"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-89FB8D58",
+    "timestamp": "2026-11-14T06:25:00.189128+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "RM002",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "",
+        "new": "Special Raw Material Grade A"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-DB0861FB",
+    "timestamp": "2026-11-14T06:24:59.385920+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "Batch inspected and approved by Admin",
+        "new": "Packaging QC verified; ready for dispatch"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  },
+  {
+    "id": "AUD-96298C94",
+    "timestamp": "2026-11-14T06:24:59.206857+00:00",
+    "user_id": "admin",
+    "username": "admin",
+    "role": "admin",
+    "entity_type": "stock_configuration",
+    "record_id": "FG001",
+    "action": "UPDATE_REMARK",
+    "changes": [
+      {
+        "field": "remark",
+        "previous": "",
+        "new": "Batch inspected and approved by Admin"
+      }
+    ],
+    "status": "SUCCESS",
+    "sap_response": {},
+    "error_message": null,
+    "ip_address": null
+  }
+]

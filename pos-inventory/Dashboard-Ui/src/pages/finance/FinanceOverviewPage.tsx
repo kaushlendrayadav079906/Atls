@@ -89,6 +89,7 @@ export const FinanceOverviewPage: React.FC = () => {
   const {
     data,
     isLoading: loading,
+    isFetching,
     isError,
     error: queryError,
     refetch,
@@ -102,7 +103,8 @@ export const FinanceOverviewPage: React.FC = () => {
         to_date: dateTo || undefined,
       });
     },
-    staleTime: 60_000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   // Currency formatters
@@ -201,10 +203,10 @@ export const FinanceOverviewPage: React.FC = () => {
           {/* Refresh Button */}
           <button
             onClick={() => refetch()}
-            disabled={loading}
+            disabled={isFetching}
             className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-[13px] sm:text-[13.5px] font-semibold shadow-2xs transition cursor-pointer disabled:opacity-50"
           >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
             <span>Refresh</span>
           </button>
         </div>

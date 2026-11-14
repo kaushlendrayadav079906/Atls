@@ -90,36 +90,48 @@ export const ProductionOverviewPage = () => {
     queryKey: ['production', 'summary', warehouseFilter, date_from, date_to],
     queryFn: () => getProductionSummary(queryFilters),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const { data: statusDist, isLoading: loadingStatus, refetch: refetchStatus } = useQuery({
     queryKey: ['production', 'status-distribution', warehouseFilter, date_from, date_to],
     queryFn: () => getStatusDistribution(queryFilters),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const { data: trendData, isLoading: loadingTrend, refetch: refetchTrend } = useQuery({
     queryKey: ['production', 'date-wise', warehouseFilter, date_from, date_to],
     queryFn: () => getDateWiseProduction({ ...queryFilters, granularity: 'daily' }),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const { data: recentOrders, isLoading: loadingOrders, refetch: refetchOrders } = useQuery({
     queryKey: ['production', 'orders', warehouseFilter, date_from, date_to, ordersPage, ordersPageSize],
     queryFn: () => getProductionOrders({ ...queryFilters, page: ordersPage, page_size: ordersPageSize }),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const { data: warehouseData, isLoading: loadingWarehouse, refetch: refetchWarehouse } = useQuery({
     queryKey: ['production', 'warehouses', warehouseFilter, date_from, date_to],
     queryFn: () => getWarehouseSummary(queryFilters),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const { data: topItems, isLoading: loadingItems, refetch: refetchItems } = useQuery({
     queryKey: ['production', 'item-wise', warehouseFilter, date_from, date_to],
     queryFn: () => getItemWiseProduction(queryFilters),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const handleRefresh = () => {

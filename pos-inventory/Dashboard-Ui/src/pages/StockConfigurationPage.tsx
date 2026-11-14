@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { NavLink } from 'react-router-dom';
 import {
   CheckCircle2,
   XCircle,
@@ -23,12 +22,11 @@ import {
   X,
   FileSpreadsheet,
   Calendar,
-  ShieldCheck,
 } from 'lucide-react';
 import { stockConfigurationApi } from '../api/stockConfiguration';
-import { googleSheetsApi } from '../api/googleSheets';
 import type {
   StockConfigurationItem,
+  StockQueryParams,
   ImportPreviewResponse,
 } from '../api/stockConfiguration';
 import { useTheme } from '../contexts/ThemeContext';
@@ -38,16 +36,20 @@ import {
   validateCustomDateRange,
   getDateScopeLabel,
   type QuickFilter,
+  type DashboardPeriod,
 } from '../utils/date';
 
 export const StockConfigurationPage: React.FC = () => {
   const { isDark } = useTheme();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const roleLower = (user?.role || '').trim().toLowerCase();
+  const isUserAdmin = Boolean(isAdmin || roleLower === 'admin' || roleLower === 'administrator');
   const queryClient = useQueryClient();
 
   // Branch & Date Filter States
   const [branchId, setBranchId] = useState<string>('');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('');
+  const [period, setPeriod] = useState<DashboardPeriod>('all_time');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [customFrom, setCustomFrom] = useState('');
@@ -68,6 +70,7 @@ export const StockConfigurationPage: React.FC = () => {
   // Row Edit Buffers (stores modified values keyed by item_code)
   const [editedRows, setEditedRows] = useState<Record<string, Partial<StockConfigurationItem>>>({});
   const [savingItemCode, setSavingItemCode] = useState<string | null>(null);
+  const [submittedCodes, setSubmittedCodes] = useState<Set<string>>(new Set());
 
   // Modals & Banners
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -134,6 +137,7 @@ export const StockConfigurationPage: React.FC = () => {
       setCustomError(null);
       const resolved = resolveDashboardDateRange('custom', customFrom, customTo);
       setQuickFilter(resolved.quickFilter);
+      setPeriod(resolved.period);
       setDateFrom(resolved.dateFrom);
       setDateTo(resolved.dateTo);
       setIsDateDropdownOpen(false);
@@ -144,6 +148,7 @@ export const StockConfigurationPage: React.FC = () => {
     setCustomError(null);
     const resolved = resolveDashboardDateRange(filter);
     setQuickFilter(resolved.quickFilter);
+    setPeriod(resolved.period);
     setDateFrom(resolved.dateFrom);
     setDateTo(resolved.dateTo);
     if (!filter) {
@@ -169,335 +174,178 @@ export const StockConfigurationPage: React.FC = () => {
     return () => document.removeEventListener('click', handleOutsideClick);
   }, [isDateDropdownOpen]);
 
-  // Google Sheets Integration Status
-  const { data: sheetsStatus, refetch: refetchStatus } = useQuery({
-    queryKey: ['google-sheets-status'],
-    queryFn: () => googleSheetsApi.getStatus(),
-    refetchInterval: 15000,
+  // Query Params
+  const queryParams: StockQueryParams = useMemo(() => ({
+    page,
+    page_size: pageSize,
+    search: appliedSearch || undefined,
+    vendor: selectedVendor && selectedVendor !== 'All Vendors' ? selectedVendor : undefined,
+    group: selectedGroup && selectedGroup !== 'All Groups' ? selectedGroup : undefined,
+    warehouse: selectedWarehouse && selectedWarehouse !== 'All Warehouses' ? selectedWarehouse : undefined,
+    branch: branchId && branchId !== 'All Branches' ? branchId : undefined,
+    period: period && period !== 'all_time' ? period : undefined,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
+  }), [page, pageSize, appliedSearch, selectedVendor, selectedGroup, selectedWarehouse, branchId, period, dateFrom, dateTo]);
+
+  // Fetch Data
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['stock-configuration', queryParams],
+    queryFn: () => stockConfigurationApi.getItems(queryParams),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
-  const isSheetsConnected = Boolean(
-    sheetsStatus?.configured && sheetsStatus?.connection_status === 'connected'
-  );
-
-  // Status Badge Helper
-  const getStatusBadge = () => {
-    const status = sheetsStatus?.connection_status;
-    switch (status) {
-      case 'connected':
-        return { label: 'Connected', color: 'emerald', bg: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-300', badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200' };
-      case 'api_not_enabled':
-        return { label: 'API Not Enabled', color: 'amber', bg: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300', badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200' };
-      case 'permission_denied':
-        return { label: 'Permission Denied (403)', color: 'rose', bg: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-300', badge: 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200' };
-      case 'spreadsheet_not_found':
-        return { label: 'Spreadsheet Not Found', color: 'rose', bg: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-300', badge: 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200' };
-      case 'worksheet_not_found':
-        return { label: 'Worksheet Not Found', color: 'amber', bg: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300', badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200' };
-      case 'not_a_google_sheet':
-        return { label: 'Excel File (.xlsx) - Convert to Google Sheet', color: 'amber', bg: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300', badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200' };
-      case 'authentication_failed':
-        return { label: 'Authentication Failed', color: 'rose', bg: 'bg-rose-500', text: 'text-rose-700 dark:text-rose-300', badge: 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200' };
-      case 'configuration_missing':
-        return { label: 'Configuration Missing', color: 'amber', bg: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-300', badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200' };
-      default:
-        return { label: status ? status.replace(/_/g, ' ').toUpperCase() : 'Not Connected', color: 'slate', bg: 'bg-slate-400', text: 'text-slate-700 dark:text-slate-300', badge: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200' };
-    }
-  };
-
-  // Live Connection Test Mutation
-  const testConnectionMutation = useMutation({
-    mutationFn: () => googleSheetsApi.testConnection(),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['google-sheets-status'] });
-      if (res.connection_status === 'connected') {
-        queryClient.invalidateQueries({ queryKey: ['google-sheets-stock-records'] });
-        setNotification({
-          type: 'success',
-          message: `Connected successfully to Google Sheet "${res.spreadsheet_name || 'Stock Configuration'}"!`,
-        });
-      } else {
-        setNotification({
-          type: 'error',
-          message: `Connection test result: ${res.connection_status.replace(/_/g, ' ').toUpperCase()}. ${res.message || ''}`,
-        });
-      }
-    },
-    onError: (err: any) => {
-      queryClient.invalidateQueries({ queryKey: ['google-sheets-status'] });
-      const detail = err.response?.data?.detail;
-      const msg = typeof detail === 'object' && detail?.message ? detail.message : detail || 'Connection test failed.';
-      setNotification({ type: 'error', message: msg });
-    },
-  });
-
-  // Fetch Data directly from Google Sheets (active when connected)
-  const {
-    data: sheetsData,
-    isLoading: isSheetsLoading,
-    isError: isSheetsError,
-    error: sheetsError,
-    refetch: refetchSheets,
-  } = useQuery({
-    queryKey: ['google-sheets-stock-records', sheetsStatus?.spreadsheet_id, sheetsStatus?.worksheet_name],
-    queryFn: () =>
-      googleSheetsApi.getStockRecords({
-        limit: 1000,
-        worksheet_name: sheetsStatus?.worksheet_name || undefined,
-        spreadsheet_id: sheetsStatus?.spreadsheet_id || undefined,
-      }),
-    enabled: isSheetsConnected,
-  });
-
-  // Unified Data Adapter: Google Sheets as the SOLE source of truth
-  const data = useMemo(() => {
-    if (!isSheetsConnected || !sheetsData?.records) {
-      return {
-        items: [] as StockConfigurationItem[],
-        total: 0,
-        page,
-        page_size: pageSize,
-        total_pages: 1,
-        kpis: {
-          total_items: 0,
-          active_items: 0,
-          inactive_items: 0,
-          warehouses_count: 0,
-        },
-        filters: {
-          vendors: [],
-          groups: ['Finished Goods', 'Raw Materials', 'Work In Progress'],
-          warehouses: ['01 - Main Warehouse'],
-        },
-      };
-    }
-
-    let items: StockConfigurationItem[] = sheetsData.records.map((r, i) => ({
-      record_id: r.record_id || `REC-${i + 1}`,
-      item_code: r.item_code || `ITEM-${i + 1}`,
-      description: r.description || '',
-      qty: Number(r.qty ?? 0),
-      stock_qty: Number(r.stock_qty ?? 0),
-      vendor_name: r.vendor_name || '',
-      grpo_no: r.grpo_no || '',
-      rcvd_qty: Number(r.rcvd_qty ?? 0),
-      nt_weight: Number(r.nt_weight ?? 0),
-      qc: Boolean(r.qc),
-      drw_yn: (r.drw_yn === 'N' ? 'N' : 'Y') as 'Y' | 'N',
-      v_chk: (r.v_chk === 'N' ? 'N' : 'Y') as 'Y' | 'N',
-      ok_qty: Number(r.ok_qty ?? 0),
-      rej_qty: Number(r.rej_qty ?? 0),
-      lm: (r.lm === 'N' ? 'N' : 'Y') as 'Y' | 'N',
-      olng: (r.olng === 'N' ? 'N' : 'Y') as 'Y' | 'N',
-      lpk: (r.lpk === 'N' ? 'N' : 'Y') as 'Y' | 'N',
-      lbl: (r.lbl === 'N' ? 'N' : 'Y') as 'Y' | 'N',
-      mc_or_pt: (r.mc_or_pt === 'N' ? 'N' : 'Y') as 'Y' | 'N',
-      entry_date: r.entry_date || null,
-      updated_at: r.updated_at || undefined,
-      is_active: true,
-    }));
-
-    if (appliedSearch) {
-      const q = appliedSearch.toLowerCase();
-      items = items.filter(
-        (it) =>
-          it.item_code.toLowerCase().includes(q) ||
-          it.description.toLowerCase().includes(q) ||
-          (it.vendor_name && it.vendor_name.toLowerCase().includes(q)) ||
-          (it.record_id && it.record_id.toLowerCase().includes(q))
-      );
-    }
-
-    if (selectedVendor && selectedVendor !== 'All Vendors') {
-      items = items.filter((it) => it.vendor_name === selectedVendor);
-    }
-
-    const total = items.length;
-    const total_pages = pageSize >= 10000 ? 1 : Math.max(1, Math.ceil(total / pageSize));
-    const startIdx = (page - 1) * pageSize;
-    const paginatedItems = pageSize >= 10000 ? items : items.slice(startIdx, startIdx + pageSize);
-
-    const allVendors = Array.from(
-      new Set(sheetsData.records.map((r) => r.vendor_name).filter(Boolean))
-    ) as string[];
-
-    return {
-      items: paginatedItems,
-      total,
-      page,
-      page_size: pageSize,
-      total_pages,
-      kpis: {
-        total_items: total,
-        active_items: total,
-        inactive_items: 0,
-        warehouses_count: 1,
-      },
-      filters: {
-        vendors: allVendors,
-        groups: ['Finished Goods', 'Raw Materials', 'Work In Progress'],
-        warehouses: ['01 - Main Warehouse'],
-      },
-    };
-  }, [isSheetsConnected, sheetsData, appliedSearch, selectedVendor, page, pageSize]);
-
-  const isLoading = isSheetsConnected ? isSheetsLoading : false;
-  const isError = isSheetsConnected ? isSheetsError : false;
-  const error = isSheetsConnected ? sheetsError : null;
-  const refetch = isSheetsConnected ? refetchSheets : refetchStatus;
-
-  // Mutate Row Save (Google Sheets write with ZERO SAP impact)
+  // Mutate Row Save
   const saveMutation = useMutation({
-    mutationFn: async ({
-      itemCode,
-      updates,
-      recordId,
-      expectedUpdatedAt,
-    }: {
-      itemCode: string;
-      updates: Partial<StockConfigurationItem>;
-      recordId?: string | null;
-      expectedUpdatedAt?: string | null;
-    }) => {
+    mutationFn: async ({ itemCode, updates }: { itemCode: string; updates: Partial<StockConfigurationItem> }) => {
       setSavingItemCode(itemCode);
-      if (isSheetsConnected) {
-        const targetId = recordId || itemCode;
-        return googleSheetsApi.updateStockRecord(targetId, {
-          ...updates,
-          expected_updated_at: expectedUpdatedAt || undefined,
-        });
-      }
-      throw new Error('Google Sheets is not connected. Edits cannot be saved.');
+      return stockConfigurationApi.updateItem(itemCode, updates);
     },
-    onSuccess: (res: any, variables) => {
+    onSuccess: (res, variables) => {
       setSavingItemCode(null);
+      setSubmittedCodes((prev) => new Set(prev).add(variables.itemCode));
       setEditedRows((prev) => {
         const next = { ...prev };
         delete next[variables.itemCode];
         return next;
       });
-      queryClient.invalidateQueries({ queryKey: ['google-sheets-stock-records'] });
-      queryClient.invalidateQueries({ queryKey: ['google-sheets-status'] });
-      setNotification({
-        type: 'success',
-        message: `Record ${variables.itemCode} saved to Google Sheets! (Record ID: ${res.item?.record_id || variables.recordId || variables.itemCode})`,
-      });
+      // Immediately update query cache with newly saved item so last_submitted_at and remark update instantly on screen
+      if (res?.item) {
+        queryClient.setQueriesData({ queryKey: ['stock-configuration'] }, (oldData: any) => {
+          if (!oldData || !oldData.items) return oldData;
+          return {
+            ...oldData,
+            items: oldData.items.map((it: StockConfigurationItem) =>
+              it.item_code === variables.itemCode ? { ...it, ...res.item } : it
+            ),
+          };
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['stock-configuration'] });
+      queryClient.invalidateQueries({ queryKey: ['products-stock'] });
+      if (res.sap_synced) {
+        setNotification({
+          type: 'success',
+          message: `Item ${variables.itemCode} updated in database & synced to SAP Business One!`,
+        });
+      } else {
+        setNotification({
+          type: 'success',
+          message: `Item ${variables.itemCode} saved to database. ${res.sap_message ? `(${res.sap_message})` : ''}`,
+        });
+      }
     },
     onError: (err: any) => {
       setSavingItemCode(null);
-      const detail = err.response?.data?.detail;
-      const msg = typeof detail === 'object' && detail?.message ? detail.message : detail || 'Failed to save changes.';
-      setNotification({ type: 'error', message: msg });
+      setNotification({ type: 'error', message: err.response?.data?.detail || 'Failed to save changes.' });
     },
   });
 
-  // Mutate Bulk Update (batch Google Sheets update with ZERO SAP impact)
+  // Mutate Bulk Update
   const bulkMutation = useMutation({
-    mutationFn: async (
-      items: Array<Partial<StockConfigurationItem> & { expected_updated_at?: string; record_id?: string }>
-    ) => {
-      if (isSheetsConnected) {
-        return googleSheetsApi.bulkUpdateStockRecords(items);
-      }
-      throw new Error('Google Sheets is not connected. Batch update cannot proceed.');
-    },
-    onSuccess: (res: any) => {
-      const successCodes = new Set<string>(
-        res.results
-          .filter((r: any) => r.success)
-          .map((r: any) => String(r.item_code || r.record_id || ''))
-      );
+    mutationFn: (items: Partial<StockConfigurationItem>[]) => stockConfigurationApi.bulkUpdateItems(items),
+    onSuccess: (res) => {
+      const successCodes = new Set(res.results.filter((r) => r.success).map((r) => r.item_code));
+      setSubmittedCodes((prev) => new Set([...prev, ...successCodes]));
       setEditedRows((prev) => {
         const next = { ...prev };
-        successCodes.forEach((code) => {
-          if (code) delete next[code];
-        });
+        for (const code of successCodes) {
+          delete next[code];
+        }
         return next;
       });
-      queryClient.invalidateQueries({ queryKey: ['google-sheets-stock-records'] });
-      queryClient.invalidateQueries({ queryKey: ['google-sheets-status'] });
 
-      const failedResults = res.results.filter((r: any) => !r.success);
+      // Immediately update query cache with all successfully updated items
+      const updatedMap = new Map(
+        (res.results || []).filter((r: any) => r.success && r.item).map((r: any) => [r.item_code, r.item])
+      );
+      if (updatedMap.size > 0) {
+        queryClient.setQueriesData({ queryKey: ['stock-configuration'] }, (oldData: any) => {
+          if (!oldData || !oldData.items) return oldData;
+          return {
+            ...oldData,
+            items: oldData.items.map((it: StockConfigurationItem) => {
+              const updated = updatedMap.get(it.item_code);
+              return updated ? { ...it, ...updated } : it;
+            }),
+          };
+        });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['stock-configuration'] });
+      queryClient.invalidateQueries({ queryKey: ['products-stock'] });
+
+      const failedResults = res.results.filter((r) => !r.success);
       setBulkStatus({
         successful: res.successful,
         failed: res.failed,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        errors: failedResults.map((r: any) => ({
-          item_code: r.item_code || r.record_id,
-          error: r.error || 'Failed to update',
-        })),
+        errors: failedResults.map((r) => ({ item_code: r.item_code, error: r.error || 'Failed to update' })),
       });
 
       if (res.failed === 0) {
+        const sapCount = res.sap_synced_count ?? 0;
         setNotification({
           type: 'success',
-          message: `Bulk save successful: ${res.successful} item(s) updated in Google Sheets! (SAP write-protection active)`,
+          message: `Bulk save successful: ${res.successful} item(s) updated in database${sapCount > 0 ? ` & ${sapCount} synchronized to SAP!` : '!'}`,
         });
       } else {
         setNotification({
           type: 'error',
-          message: `Bulk save: ${res.successful} succeeded, ${res.failed} failed in Google Sheets. Unsaved edits remain.`,
+          message: `Bulk save: ${res.successful} succeeded, ${res.failed} failed. Unsaved edits remain in table.`,
         });
       }
     },
     onError: (err: any) => {
-      const detail = err.response?.data?.detail;
-      const msg = typeof detail === 'object' && detail?.message ? detail.message : detail || 'Bulk update failed.';
       setNotification({
         type: 'error',
-        message: msg,
+        message: err.response?.data?.detail || 'Bulk update failed.',
       });
     },
   });
 
-  // Mutate Delete Item (Protected: Google Sheets row deletions are disabled)
+  // Mutate Delete Item
   const deleteMutation = useMutation({
-    mutationFn: async (_itemCode: string) => {
-      throw new Error('Row deletion in Google Sheets is disabled to protect row references. Please clear the values in the sheet if required.');
+    mutationFn: (itemCode: string) => stockConfigurationApi.deleteItem(itemCode),
+    onSuccess: (_, itemCode) => {
+      setDeleteConfirmItem(null);
+      queryClient.invalidateQueries({ queryKey: ['stock-configuration'] });
+      queryClient.invalidateQueries({ queryKey: ['products-stock'] });
+      setNotification({ type: 'success', message: `Item ${itemCode} deleted.` });
     },
     onError: (err: any) => {
-      setDeleteConfirmItem(null);
-      setNotification({ type: 'error', message: err.message || 'Row deletion is disabled.' });
+      setNotification({ type: 'error', message: err.response?.data?.detail || 'Failed to delete item.' });
     },
   });
 
-  // Mutate Google Sheets Refresh
-  const sheetsRefreshMutation = useMutation({
-    mutationFn: () => googleSheetsApi.refreshStockRecords(),
+  // Mutate SAP Sync
+  const syncMutation = useMutation({
+    mutationFn: () => stockConfigurationApi.syncFromSap(),
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ['google-sheets-stock-records'] });
-      queryClient.invalidateQueries({ queryKey: ['google-sheets-status'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-configuration'] });
+      queryClient.invalidateQueries({ queryKey: ['products-stock'] });
       setNotification({
         type: 'success',
-        message: `Refreshed ${res.total_records} records directly from Google Sheets!`,
+        message: `Synced ${res.synced_count} items from SAP Business One.`,
       });
     },
     onError: (err: any) => {
-      const detail = err.response?.data?.detail;
-      const msg = typeof detail === 'object' && detail?.message ? detail.message : detail || 'Google Sheets refresh failed.';
       setNotification({
         type: 'error',
-        message: msg,
+        message: err.response?.data?.detail || 'SAP synchronization failed. Verify SAP Service Layer connection.',
       });
     },
   });
 
-  // Mutate Add Item (Google Sheets write with ZERO SAP impact)
+  // Mutate Add Item
   const addMutation = useMutation({
-    mutationFn: async (itemData: typeof newItem) => {
-      if (isSheetsConnected) {
-        return googleSheetsApi.createStockRecord(itemData);
-      }
-      throw new Error('Google Sheets is not connected. New item cannot be added.');
-    },
-    onSuccess: (res: any) => {
+    mutationFn: (itemData: typeof newItem) => stockConfigurationApi.addItem(itemData),
+    onSuccess: (res) => {
       setAddItemModalOpen(false);
-      queryClient.invalidateQueries({ queryKey: ['google-sheets-stock-records'] });
-      queryClient.invalidateQueries({ queryKey: ['google-sheets-status'] });
-      setNotification({
-        type: 'success',
-        message: `Stock item ${res.item?.item_code || newItem.item_code} added to Google Sheets (Record ID: ${res.item?.record_id || 'generated'})!`,
-      });
+      queryClient.invalidateQueries({ queryKey: ['stock-configuration'] });
+      queryClient.invalidateQueries({ queryKey: ['products-stock'] });
+      setNotification({ type: 'success', message: `Item ${res.item.item_code} added successfully.` });
       // Reset form
       setNewItem({
         item_code: '',
@@ -523,21 +371,47 @@ export const StockConfigurationPage: React.FC = () => {
       });
     },
     onError: (err: any) => {
-      const detail = err.response?.data?.detail;
-      const msg = typeof detail === 'object' && detail?.message ? detail.message : detail || 'Failed to add item.';
-      setNotification({ type: 'error', message: msg });
+      setNotification({ type: 'error', message: err.response?.data?.detail || 'Failed to add item.' });
     },
   });
 
   // Change Tracking & Modified Status
   const modifiedCount = Object.keys(editedRows).length;
 
+  const getEffectiveQc = (item: StockConfigurationItem): string => {
+    const edit = editedRows[item.item_code];
+    if (edit && 'qc' in edit) {
+      const val = edit.qc;
+      if (val === null || val === undefined || val === '') return '';
+      if (typeof val === 'boolean') return val ? 'Y' : 'N';
+      return String(val).toUpperCase() === 'Y' ? 'Y' : String(val).toUpperCase() === 'N' ? 'N' : '';
+    }
+    if (item.qc === null || item.qc === undefined || (item.qc as any) === '') return '';
+    if (typeof item.qc === 'boolean') return item.qc ? 'Y' : 'N';
+    const s = String(item.qc).toUpperCase();
+    return s === 'Y' ? 'Y' : s === 'N' ? 'N' : '';
+  };
+
   const handleCellChange = (item: StockConfigurationItem, field: keyof StockConfigurationItem, value: any) => {
+    setSubmittedCodes((prev) => {
+      if (!prev.has(item.item_code)) return prev;
+      const next = new Set(prev);
+      next.delete(item.item_code);
+      return next;
+    });
     setEditedRows((prev) => {
       const current: Record<string, any> = { ...(prev[item.item_code] || {}) };
       current[field as string] = value;
-      // If changed back to original value, clean up from diff
-      if (value === item[field]) {
+      // Clean up diff if restored to original
+      if (field === 'qc') {
+        const itemQc = (item.qc === true || item.qc === 'Y') ? 'Y' : (item.qc === false || item.qc === 'N') ? 'N' : '';
+        const newQc = value === 'Y' ? 'Y' : value === 'N' ? 'N' : '';
+        if (itemQc === newQc) {
+          delete current.qc;
+        } else {
+          current.qc = newQc === 'Y' ? true : newQc === 'N' ? false : null;
+        }
+      } else if (value === item[field]) {
         delete current[field as string];
       }
       if (Object.keys(current).length === 0) {
@@ -554,7 +428,13 @@ export const StockConfigurationPage: React.FC = () => {
 
   const isCellModified = (item: StockConfigurationItem, field: keyof StockConfigurationItem): boolean => {
     const edit = editedRows[item.item_code];
-    return Boolean(edit && field in edit && edit[field] !== item[field]);
+    if (!edit || !(field in edit)) return false;
+    if (field === 'qc') {
+      const itemQc = (item.qc === true || item.qc === 'Y') ? 'Y' : 'N';
+      const editQc = (edit.qc === true || edit.qc === 'Y') ? 'Y' : 'N';
+      return itemQc !== editQc;
+    }
+    return edit[field] !== item[field];
   };
 
   // Get effective row values (buffer or original)
@@ -574,70 +454,94 @@ export const StockConfigurationPage: React.FC = () => {
     return String(item[field] ?? '');
   };
 
-  const getEffectiveBool = (item: StockConfigurationItem, field: keyof StockConfigurationItem): boolean => {
-    const edit = editedRows[item.item_code];
-    if (edit && field in edit) {
-      return Boolean(edit[field]);
+  // Format Entry Date & Time (Date on line 1, Time on line 2 if present in source)
+  const formatEntryDateTime = (rawStr?: string | null): { date: string; time: string | null } => {
+    if (!rawStr) return { date: '—', time: null };
+    const raw = String(rawStr).trim();
+    if (!raw || raw === '—') return { date: '—', time: null };
+
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return { date: raw, time: null };
+
+    const hasTime = raw.includes(':') && (raw.includes('T') || raw.includes(' '));
+    const isPureMidnight = (raw.endsWith('T00:00:00') || raw.endsWith('T00:00:00Z') || raw.endsWith(' 00:00:00')) && !raw.includes('+');
+
+    const parts = new Intl.DateTimeFormat('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata',
+    }).formatToParts(d);
+
+    const getPart = (t: string) => parts.find((p) => p.type === t)?.value || '';
+    const dateFormatted = `${getPart('day')}-${getPart('month')}-${getPart('year')}`;
+    const timeFormatted = `${getPart('hour')}:${getPart('minute')} ${(getPart('dayPeriod') || '')}`.trim().toUpperCase();
+
+    // Do not generate or invent an entry time if the source does not contain one
+    if (!hasTime || isPureMidnight) {
+      return { date: dateFormatted, time: null };
     }
-    return Boolean(item[field]);
+
+    return { date: dateFormatted, time: timeFormatted };
   };
 
-  // Format Entry Date (OITM.CreateDate from SAP Business One in DD-MM-YYYY)
-  const formatEntryDate = (dateStr?: string | null): string => {
-    if (!dateStr) return '—';
-    try {
-      const raw = String(dateStr).trim();
-      if (!raw) return '—';
-      const cleanDate = raw.split('T')[0];
-      const parts = cleanDate.split('-');
-      if (parts.length === 3 && parts[0].length === 4) {
-        return `${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[0]}`;
-      }
-      const d = new Date(raw);
-      if (isNaN(d.getTime())) return raw;
-      const day = String(d.getDate()).padStart(2, '0');
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = d.getFullYear();
-      return `${day}-${month}-${year}`;
-    } catch {
-      return '—';
+  // Format Last Updated Timestamp (Asia/Kolkata timezone: DD-MM-YYYY on line 1, hh:mm A on line 2)
+  const formatLastUpdated = (rawStr?: string | null): { date: string; time: string | null } => {
+    if (!rawStr) return { date: '—', time: null };
+    const raw = String(rawStr).trim();
+    if (!raw || raw === '—') return { date: '—', time: null };
+
+    // If string has T but no offset or Z (naive server timestamp), ensure Asia/Kolkata offset
+    let parseable = raw;
+    if (parseable.includes('T') && !parseable.includes('Z') && !parseable.includes('+') && !parseable.slice(10).includes('-')) {
+      parseable = parseable + '+05:30';
     }
+
+    const d = new Date(parseable);
+    if (isNaN(d.getTime())) return { date: '—', time: null };
+
+    const parts = new Intl.DateTimeFormat('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata',
+    }).formatToParts(d);
+
+    const getPart = (t: string) => parts.find((p) => p.type === t)?.value || '';
+    const dateFormatted = `${getPart('day')}-${getPart('month')}-${getPart('year')}`;
+    const timeFormatted = `${getPart('hour')}:${getPart('minute')} ${(getPart('dayPeriod') || '')}`.trim().toUpperCase();
+
+    return { date: dateFormatted, time: timeFormatted };
   };
 
   // Validation
   const validateRow = (item: StockConfigurationItem, updates: Partial<StockConfigurationItem>): string | null => {
-    for (const f of ['qty', 'rcvd_qty', 'nt_weight', 'ok_qty', 'rej_qty'] as const) {
-      const val = updates[f] !== undefined ? Number(updates[f]) : Number(item[f]);
-      if (val < 0) {
-        return `Item ${item.item_code}: Field '${f.replace('_', ' ').toUpperCase()}' cannot be negative.`;
-      }
+    if (updates.nt_weight !== undefined && Number(updates.nt_weight) < 0) {
+      return `Item ${item.item_code}: Field 'NT. WEIGHT' cannot be negative.`;
     }
     return null;
   };
 
-  // Handle Save / Submit row (syncs to Google Sheets or Database & SAP)
+  // Handle Save / Submit row (syncs to Database & SAP - SAP-owned fields are protected)
   const handleSaveRow = (item: StockConfigurationItem) => {
     const edits = editedRows[item.item_code] || {};
     const effectiveUpdates: Partial<StockConfigurationItem> = {
-      record_id: item.record_id,
-      item_code: item.item_code,
-      qty: edits.qty !== undefined ? edits.qty : item.qty,
-      stock_qty: edits.stock_qty !== undefined ? edits.stock_qty : item.stock_qty,
-      grpo_no: edits.grpo_no !== undefined ? edits.grpo_no : item.grpo_no,
-      rcvd_qty: edits.rcvd_qty !== undefined ? edits.rcvd_qty : item.rcvd_qty,
       nt_weight: edits.nt_weight !== undefined ? edits.nt_weight : item.nt_weight,
       qc: edits.qc !== undefined ? edits.qc : item.qc,
       drw_yn: edits.drw_yn !== undefined ? edits.drw_yn : item.drw_yn,
       v_chk: edits.v_chk !== undefined ? edits.v_chk : item.v_chk,
-      ok_qty: edits.ok_qty !== undefined ? edits.ok_qty : item.ok_qty,
-      rej_qty: edits.rej_qty !== undefined ? edits.rej_qty : item.rej_qty,
       lm: edits.lm !== undefined ? edits.lm : item.lm,
       olng: edits.olng !== undefined ? edits.olng : item.olng,
       lpk: edits.lpk !== undefined ? edits.lpk : item.lpk,
       lbl: edits.lbl !== undefined ? edits.lbl : item.lbl,
       mc_or_pt: edits.mc_or_pt !== undefined ? edits.mc_or_pt : item.mc_or_pt,
-      description: item.description,
-      vendor_name: item.vendor_name,
+      remark: edits.remark !== undefined ? edits.remark : (item.remark || ''),
     };
 
     const valError = validateRow(item, effectiveUpdates);
@@ -645,12 +549,7 @@ export const StockConfigurationPage: React.FC = () => {
       setNotification({ type: 'error', message: valError });
       return;
     }
-    saveMutation.mutate({
-      itemCode: item.item_code,
-      updates: effectiveUpdates,
-      recordId: item.record_id,
-      expectedUpdatedAt: item.updated_at,
-    });
+    saveMutation.mutate({ itemCode: item.item_code, updates: effectiveUpdates });
   };
 
   // Bulk Actions
@@ -662,23 +561,34 @@ export const StockConfigurationPage: React.FC = () => {
     }
 
     for (const code of codes) {
-      const edits = editedRows[code];
-      for (const f of ['qty', 'rcvd_qty', 'nt_weight', 'ok_qty', 'rej_qty'] as const) {
-        if (edits[f] !== undefined && Number(edits[f]) < 0) {
-          setNotification({ type: 'error', message: `Validation error in item ${code}: ${f} cannot be negative.` });
-          return;
-        }
+      const edits = editedRows[code] || {};
+      if (edits.nt_weight !== undefined && Number(edits.nt_weight) < 0) {
+        setNotification({ type: 'error', message: `Validation error in item ${code}: Net weight cannot be negative.` });
+        return;
       }
     }
 
     const payload = codes.map((code) => {
-      const origItem = data?.items?.find((it) => it.item_code === code);
-      return {
-        record_id: origItem?.record_id,
+      const edits = editedRows[code] || {};
+      const originalItem = data?.items?.find((it) => it.item_code === code);
+      const safeUpdates: Partial<StockConfigurationItem> = {
         item_code: code,
-        expected_updated_at: origItem?.updated_at,
-        ...editedRows[code],
       };
+      if (edits.nt_weight !== undefined) safeUpdates.nt_weight = edits.nt_weight;
+      if (edits.qc !== undefined) safeUpdates.qc = edits.qc;
+      if (edits.drw_yn !== undefined) safeUpdates.drw_yn = edits.drw_yn;
+      if (edits.v_chk !== undefined) safeUpdates.v_chk = edits.v_chk;
+      if (edits.lm !== undefined) safeUpdates.lm = edits.lm;
+      if (edits.olng !== undefined) safeUpdates.olng = edits.olng;
+      if (edits.lpk !== undefined) safeUpdates.lpk = edits.lpk;
+      if (edits.lbl !== undefined) safeUpdates.lbl = edits.lbl;
+      if (edits.mc_or_pt !== undefined) safeUpdates.mc_or_pt = edits.mc_or_pt;
+      if (edits.remark !== undefined) {
+        safeUpdates.remark = edits.remark;
+      } else if (originalItem?.remark) {
+        safeUpdates.remark = originalItem.remark;
+      }
+      return safeUpdates;
     });
 
     bulkMutation.mutate(payload);
@@ -687,69 +597,45 @@ export const StockConfigurationPage: React.FC = () => {
   const handleConfirmSubmitAll = async () => {
     setConfirmSubmitAllOpen(false);
     try {
-      if (isSheetsConnected) {
-        const recordsToSubmit = sheetsData?.records || [];
-        const payload: Array<Partial<StockConfigurationItem> & { expected_updated_at?: string; record_id?: string }> = [];
+      const allRes = await stockConfigurationApi.getItems({
+        ...queryParams,
+        page: 1,
+        page_size: 10000,
+      });
 
-        for (const it of recordsToSubmit) {
-          const itemCode = it.item_code || it.record_id || '';
-          const edits = editedRows[itemCode] || {};
-          const effQty = edits.qty !== undefined ? edits.qty : it.qty;
-          const effRcvd = edits.rcvd_qty !== undefined ? edits.rcvd_qty : it.rcvd_qty;
-          const effWeight = edits.nt_weight !== undefined ? edits.nt_weight : it.nt_weight;
-          const effOk = edits.ok_qty !== undefined ? edits.ok_qty : it.ok_qty;
-          const effRej = edits.rej_qty !== undefined ? edits.rej_qty : it.rej_qty;
+      const payload: Partial<StockConfigurationItem>[] = [];
+      for (const it of allRes.items) {
+        const edits = editedRows[it.item_code] || {};
+        const effWeight = edits.nt_weight !== undefined ? edits.nt_weight : it.nt_weight;
 
-          if (
-            Number(effQty) < 0 ||
-            Number(effRcvd) < 0 ||
-            Number(effWeight) < 0 ||
-            Number(effOk) < 0 ||
-            Number(effRej) < 0
-          ) {
-            setNotification({
-              type: 'error',
-              message: `Validation error in item ${itemCode}: Quantities or weights cannot be negative.`,
-            });
-            return;
-          }
-
-          payload.push({
-            record_id: it.record_id || undefined,
-            item_code: itemCode,
-            expected_updated_at: it.updated_at || undefined,
-            description: it.description || undefined,
-            vendor_name: it.vendor_name || undefined,
-            qty: Number(effQty ?? 0),
-            stock_qty: Number(it.stock_qty ?? 0),
-            grpo_no: edits.grpo_no !== undefined ? edits.grpo_no : it.grpo_no || undefined,
-            rcvd_qty: Number(effRcvd ?? 0),
-            nt_weight: Number(effWeight ?? 0),
-            qc: edits.qc !== undefined ? edits.qc : Boolean(it.qc),
-            drw_yn: (edits.drw_yn !== undefined ? edits.drw_yn : it.drw_yn || 'Y') as 'Y' | 'N',
-            v_chk: (edits.v_chk !== undefined ? edits.v_chk : it.v_chk || 'Y') as 'Y' | 'N',
-            ok_qty: Number(effOk ?? 0),
-            rej_qty: Number(effRej ?? 0),
-            lm: (edits.lm !== undefined ? edits.lm : it.lm || 'Y') as 'Y' | 'N',
-            olng: (edits.olng !== undefined ? edits.olng : it.olng || 'Y') as 'Y' | 'N',
-            lpk: (edits.lpk !== undefined ? edits.lpk : it.lpk || 'Y') as 'Y' | 'N',
-            lbl: (edits.lbl !== undefined ? edits.lbl : it.lbl || 'Y') as 'Y' | 'N',
-            mc_or_pt: (edits.mc_or_pt !== undefined ? edits.mc_or_pt : it.mc_or_pt || 'Y') as 'Y' | 'N',
+        if (effWeight < 0) {
+          setNotification({
+            type: 'error',
+            message: `Validation error in item ${it.item_code}: Net weight cannot be negative.`,
           });
+          return;
         }
 
-        bulkMutation.mutate(payload);
-        return;
+        payload.push({
+          item_code: it.item_code,
+          nt_weight: effWeight,
+          qc: edits.qc !== undefined ? edits.qc : it.qc,
+          drw_yn: edits.drw_yn !== undefined ? edits.drw_yn : it.drw_yn,
+          v_chk: edits.v_chk !== undefined ? edits.v_chk : it.v_chk,
+          lm: edits.lm !== undefined ? edits.lm : it.lm,
+          olng: edits.olng !== undefined ? edits.olng : it.olng,
+          lpk: edits.lpk !== undefined ? edits.lpk : it.lpk,
+          lbl: edits.lbl !== undefined ? edits.lbl : it.lbl,
+          mc_or_pt: edits.mc_or_pt !== undefined ? edits.mc_or_pt : it.mc_or_pt,
+          remark: edits.remark !== undefined ? edits.remark : (it.remark || ''),
+        });
       }
 
-      setNotification({
-        type: 'error',
-        message: 'Google Sheets is disconnected. Please connect Google Sheets before submitting entries.',
-      });
+      bulkMutation.mutate(payload);
     } catch (err: any) {
       setNotification({
         type: 'error',
-        message: err.response?.data?.detail || 'Failed to submit entries to Google Sheets.',
+        message: err.response?.data?.detail || 'Failed to retrieve all entries for submission.',
       });
     }
   };
@@ -777,54 +663,21 @@ export const StockConfigurationPage: React.FC = () => {
     setPage(1);
   };
 
-  // Handle Export (Exports current Google Sheets stock configuration)
+  // Handle Excel Export
   const handleExport = async () => {
     try {
-      if (isSheetsConnected && sheetsData?.records && sheetsData.records.length > 0) {
-        const headers = [
-          'Record ID', 'SAP Item Code', 'Description', 'Quantity', 'Stock Quantity',
-          'Vendor Name', 'GRPO Number', 'Received Quantity', 'Net Weight', 'QC',
-          'Drawing', 'V Check', 'OK Quantity', 'Rejected Quantity', 'LM', 'OLNG',
-          'LPK', 'LBL', 'MC or PT', 'Entry Date'
-        ];
-        const rows = sheetsData.records.map((r) => [
-          `"${r.record_id || ''}"`,
-          `"${r.item_code || ''}"`,
-          `"${(r.description || '').replace(/"/g, '""')}"`,
-          r.qty ?? 0,
-          r.stock_qty ?? 0,
-          `"${(r.vendor_name || '').replace(/"/g, '""')}"`,
-          `"${r.grpo_no || ''}"`,
-          r.rcvd_qty ?? 0,
-          r.nt_weight ?? 0,
-          r.qc ? 'Y' : 'N',
-          r.drw_yn || 'Y',
-          r.v_chk || 'Y',
-          r.ok_qty ?? 0,
-          r.rej_qty ?? 0,
-          r.lm || 'Y',
-          r.olng || 'Y',
-          r.lpk || 'Y',
-          r.lbl || 'Y',
-          r.mc_or_pt || 'Y',
-          `"${r.entry_date || ''}"`,
-        ]);
-        const csvContent = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Stock_Configuration_GoogleSheets_${new Date().toISOString().slice(0, 10)}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        setNotification({ type: 'success', message: 'Google Sheets records exported successfully.' });
-        return;
-      }
-      setNotification({ type: 'error', message: 'No Google Sheets records available to export.' });
+      const blob = await stockConfigurationApi.exportExcel(queryParams);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Stock_Configuration_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setNotification({ type: 'success', message: 'Excel exported successfully.' });
     } catch (e) {
-      setNotification({ type: 'error', message: 'Failed to export records.' });
+      setNotification({ type: 'error', message: 'Failed to export Excel file.' });
     }
   };
 
@@ -855,6 +708,7 @@ export const StockConfigurationPage: React.FC = () => {
       setImportFile(null);
       setImportPreview(null);
       queryClient.invalidateQueries({ queryKey: ['stock-configuration'] });
+      queryClient.invalidateQueries({ queryKey: ['products-stock'] });
       setNotification({
         type: 'success',
         message: `Successfully imported ${result.imported_count} stock configuration items!`,
@@ -910,64 +764,44 @@ export const StockConfigurationPage: React.FC = () => {
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
         <div>
           <h1 className="text-[24px] sm:text-[28px] font-black tracking-tight text-slate-900 dark:text-white leading-tight">
-            Stock Configuration
+            Stock Configuration (SAP Items)
           </h1>
           <p className="text-[13.5px] sm:text-[14px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-            Manage stock items and warehouse configuration directly with Google Sheets as the active source of truth.
+            Manage stock items and warehouse configuration from SAP Business One.
           </p>
         </div>
 
-        {/* Top Action Buttons */}
+        {/* Top Action Buttons Matching Reference Design */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
-          {/* Sync / Refresh / Test Connection */}
-          {isSheetsConnected ? (
-            <button
-              onClick={() => sheetsRefreshMutation.mutate()}
-              disabled={sheetsRefreshMutation.isPending}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
-                isDark
-                  ? 'bg-emerald-950/40 border-emerald-700 text-emerald-400 hover:bg-emerald-900/50'
-                  : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300'
-              }`}
-              title="Refresh stock configuration records directly from Google Sheets"
-            >
-              <RotateCw size={15} className={`text-emerald-600 ${sheetsRefreshMutation.isPending ? 'animate-spin' : ''}`} />
-              <span>{sheetsRefreshMutation.isPending ? 'Refreshing...' : 'Refresh Google Sheets'}</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => testConnectionMutation.mutate()}
-              disabled={testConnectionMutation.isPending}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
-                isDark
-                  ? 'bg-amber-950/40 border-amber-700 text-amber-300 hover:bg-amber-900/50'
-                  : 'bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100'
-              }`}
-              title="Test live connection to Google Sheets"
-            >
-              <RotateCw size={15} className={`text-amber-600 ${testConnectionMutation.isPending ? 'animate-spin' : ''}`} />
-              <span>{testConnectionMutation.isPending ? 'Testing...' : 'Test Connection'}</span>
-            </button>
-          )}
+          {/* Sync from SAP */}
+          <button
+            onClick={() => syncMutation.mutate()}
+            disabled={syncMutation.isPending}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
+              isDark
+                ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700'
+                : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300'
+            }`}
+            title="Fetch live updates from SAP Service Layer"
+          >
+            <RotateCw size={15} className={`text-blue-600 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+            <span>{syncMutation.isPending ? 'Syncing...' : 'Sync from SAP'}</span>
+          </button>
 
           {/* Import Excel */}
           <button
             onClick={() => setImportModalOpen(true)}
-            disabled={!isSheetsConnected}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all shadow-2xs ${
-              isSheetsConnected
-                ? isDark
-                  ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700 cursor-pointer'
-                  : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300 cursor-pointer'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
+              isDark
+                ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700'
+                : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300'
             }`}
-            title={isSheetsConnected ? "Import Excel records" : "Connect Google Sheets first"}
           >
-            <Upload size={15} className={isSheetsConnected ? "text-blue-600" : "text-slate-400"} />
+            <Upload size={15} className="text-blue-600" />
             <span>Import Excel</span>
           </button>
 
-          {/* Export Excel / CSV */}
+          {/* Export Excel */}
           <button
             onClick={handleExport}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
@@ -975,126 +809,21 @@ export const StockConfigurationPage: React.FC = () => {
                 ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700'
                 : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300'
             }`}
-            title="Export Google Sheets records to CSV"
           >
             <Download size={15} className="text-blue-600" />
-            <span>Export CSV</span>
+            <span>Export Excel</span>
           </button>
-
-          {/* Google Sheets Integration Link */}
-          <NavLink
-            to="/settings/integrations/google-sheets"
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
-              isSheetsConnected
-                ? isDark
-                  ? 'bg-emerald-950/40 border-emerald-600 text-emerald-300 hover:bg-emerald-900/50'
-                  : 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
-                : isDark
-                ? 'bg-slate-800 border-slate-700 text-emerald-400 hover:bg-slate-700'
-                : 'bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50/70 hover:border-emerald-300'
-            }`}
-            title="Configure Google Sheets connection and preview stock records"
-          >
-            <FileSpreadsheet size={15} className="text-emerald-600" />
-            <span>Google Sheets {isSheetsConnected ? '●' : ''}</span>
-          </NavLink>
 
           {/* + Add New Item */}
           <button
             onClick={() => setAddItemModalOpen(true)}
-            disabled={!isSheetsConnected}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13.5px] font-semibold transition-all shadow-xs active:scale-98 ${
-              isSheetsConnected
-                ? 'bg-[#155EEF] hover:bg-blue-700 text-white cursor-pointer'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed border border-slate-200 dark:border-slate-700'
-            }`}
-            title={isSheetsConnected ? "Add new stock item to Google Sheets" : "Connect Google Sheets first to add items"}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#155EEF] hover:bg-blue-700 text-white text-[13.5px] font-semibold transition-all cursor-pointer shadow-xs active:scale-98"
           >
             <Plus size={16} strokeWidth={2.5} />
             <span>Add New Item</span>
           </button>
         </div>
       </div>
-
-      {/* ── Google Sheets Live Banner & Status ── */}
-      {isSheetsConnected ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-xl border bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-[13px]">
-          <div className="flex flex-wrap items-center gap-2 font-semibold">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <FileSpreadsheet size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span>Source of Truth: Google Sheets</span>
-            <span className="text-slate-400 font-normal">|</span>
-            <span className="font-medium text-emerald-800 dark:text-emerald-300">
-              {sheetsStatus?.spreadsheet_name || sheetsStatus?.spreadsheet_id} ({sheetsStatus?.worksheet_name || 'Stock Configuration'})
-            </span>
-            {sheetsStatus?.last_successful_sync_at && (
-              <>
-                <span className="text-slate-400 font-normal">|</span>
-                <span className="font-normal text-slate-500 dark:text-slate-400 text-xs">
-                  Last Synced: {new Date(sheetsStatus.last_successful_sync_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-2.5">
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-700">
-              <ShieldCheck size={13} className="text-emerald-600 dark:text-emerald-400" />
-              SAP Write-Protection Active (Read-Only)
-            </span>
-            <NavLink
-              to="/settings/integrations/google-sheets"
-              className="text-xs text-emerald-700 dark:text-emerald-300 underline font-medium hover:text-emerald-900"
-            >
-              Settings
-            </NavLink>
-          </div>
-        </div>
-      ) : (
-        <div className={`flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-xl border text-[13px] ${
-          sheetsStatus?.connection_status === 'api_not_enabled'
-            ? 'bg-amber-50/90 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200'
-            : 'bg-rose-50/90 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800 text-rose-950 dark:text-rose-200'
-        }`}>
-          <div className="flex items-center gap-2.5 font-medium">
-            <AlertCircle size={18} className={sheetsStatus?.connection_status === 'api_not_enabled' ? 'text-amber-600 shrink-0' : 'text-rose-600 shrink-0'} />
-            <div>
-              <span className="font-bold">Google Sheets: {getStatusBadge().label}</span>
-              <span className="mx-2 text-slate-400 font-normal">|</span>
-              <span className="text-xs">
-                {sheetsStatus?.connection_status === 'api_not_enabled'
-                  ? 'Google Sheets API is disabled on GCP Project 767613266689. Enable it to load live spreadsheet records. (SAP 1,008 fallback records are hidden).'
-                  : sheetsStatus?.error_message || 'Connect Google Sheets to view and edit stock records. (SAP 1,008 fallback records are hidden).'}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {sheetsStatus?.connection_status === 'api_not_enabled' && (
-              <a
-                href={sheetsStatus?.activation_url || 'https://console.developers.google.com/apis/api/sheets.googleapis.com/overview?project=767613266689'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 transition"
-              >
-                Enable in Google Console
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={() => testConnectionMutation.mutate()}
-              disabled={testConnectionMutation.isPending}
-              className="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-slate-200 font-semibold text-xs hover:bg-slate-50 transition cursor-pointer"
-            >
-              {testConnectionMutation.isPending ? 'Testing...' : 'Test Connection'}
-            </button>
-            <NavLink
-              to="/settings/integrations/google-sheets"
-              className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-semibold text-xs hover:bg-amber-700 transition"
-            >
-              Configure
-            </NavLink>
-          </div>
-        </div>
-      )}
 
       {/* ── Top Filters: Branch Selector & Date Filter (Directly above KPI Cards) ── */}
       <div className="flex items-center gap-2.5">
@@ -1246,9 +975,7 @@ export const StockConfigurationPage: React.FC = () => {
                 data?.kpis?.total_items ?? 0
               )}
             </p>
-            <p className="text-[12px] font-medium text-slate-400 leading-tight">
-              {isSheetsConnected ? 'In Google Sheet' : 'Google Sheets Offline'}
-            </p>
+            <p className="text-[12px] font-medium text-slate-400 leading-tight">From SAP</p>
           </div>
         </div>
 
@@ -1268,7 +995,7 @@ export const StockConfigurationPage: React.FC = () => {
                 data?.kpis?.active_items ?? 0
               )}
             </p>
-            <p className="text-[12px] font-medium text-slate-400 leading-tight">Populated records</p>
+            <p className="text-[12px] font-medium text-slate-400 leading-tight">Available for sale</p>
           </div>
         </div>
 
@@ -1288,11 +1015,11 @@ export const StockConfigurationPage: React.FC = () => {
                 data?.kpis?.inactive_items ?? 0
               )}
             </p>
-            <p className="text-[12px] font-medium text-slate-400 leading-tight">Unmapped / empty</p>
+            <p className="text-[12px] font-medium text-slate-400 leading-tight">Not available</p>
           </div>
         </div>
 
-        {/* Warehouses / Worksheet */}
+        {/* Warehouses */}
         <div className={`p-3.5 sm:p-4 rounded-xl border transition-all duration-200 shadow-xs flex items-center gap-3.5 ${
           isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
         }`}>
@@ -1300,13 +1027,15 @@ export const StockConfigurationPage: React.FC = () => {
             <Warehouse size={22} className="text-purple-600" />
           </div>
           <div className="space-y-0.5 min-w-0">
-            <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Target Worksheet</p>
-            <p className="text-[18px] sm:text-[20px] font-bold text-slate-900 dark:text-white leading-none tracking-tight truncate max-w-[150px]" title={sheetsStatus?.worksheet_name || 'Stock Configuration'}>
-              {sheetsStatus?.worksheet_name || 'Stock Configuration'}
+            <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Warehouses</p>
+            <p className="text-[24px] sm:text-[26px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
+              {isLoading ? (
+                <span className="inline-block w-8 h-6 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
+              ) : (
+                data?.kpis?.warehouses_count ?? 0
+              )}
             </p>
-            <p className="text-[12px] font-medium text-slate-400 leading-tight">
-              {isSheetsConnected ? 'Live source' : 'Source sheet'}
-            </p>
+            <p className="text-[12px] font-medium text-slate-400 leading-tight">Configured in SAP</p>
           </div>
         </div>
       </div>
@@ -1425,15 +1154,8 @@ export const StockConfigurationPage: React.FC = () => {
         {/* Status Information */}
         <div className="flex flex-wrap items-center gap-2.5 text-[13px]">
           <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
-            <Box size={16} className={isSheetsConnected ? "text-emerald-600" : "text-amber-500"} />
-            <span>
-              Dataset:{' '}
-              {isLoading
-                ? 'Loading...'
-                : isSheetsConnected
-                ? `${data?.total ?? 0} entries`
-                : `0 entries (Google Sheets: ${getStatusBadge().label})`}
-            </span>
+            <Box size={16} className="text-blue-600" />
+            <span>Dataset: {isLoading ? 'Loading...' : `${data?.total ?? 0} entries`}</span>
           </div>
 
           <span className="text-slate-300 dark:text-slate-600">|</span>
@@ -1473,13 +1195,13 @@ export const StockConfigurationPage: React.FC = () => {
           {/* Submit Modified Entries */}
           <button
             onClick={handleSubmitModified}
-            disabled={modifiedCount === 0 || bulkMutation.isPending || !isSheetsConnected}
+            disabled={modifiedCount === 0 || bulkMutation.isPending}
             className={`h-9 px-3.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-xs border ${
-              modifiedCount > 0 && !bulkMutation.isPending && isSheetsConnected
+              modifiedCount > 0 && !bulkMutation.isPending
                 ? 'bg-emerald-50 border-emerald-400 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-700 dark:text-emerald-300 cursor-pointer active:scale-98'
                 : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
             }`}
-            title="Save all modified rows across the entire dataset to Google Sheets"
+            title="Save all modified rows across the entire dataset to Database & SAP"
           >
             {bulkMutation.isPending ? (
               <RotateCw size={14} className="animate-spin" />
@@ -1492,15 +1214,13 @@ export const StockConfigurationPage: React.FC = () => {
           {/* Submit All Entries */}
           <button
             onClick={() => setConfirmSubmitAllOpen(true)}
-            disabled={bulkMutation.isPending || !data?.total || !isSheetsConnected}
+            disabled={bulkMutation.isPending || !data?.total}
             className={`h-9 px-3.5 rounded-lg border text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-2xs ${
-              isSheetsConnected && data?.total
-                ? isDark
-                  ? 'bg-slate-800 border-emerald-500/40 text-emerald-400 hover:bg-slate-700 cursor-pointer active:scale-98'
-                  : 'bg-white border-emerald-400 text-emerald-700 hover:bg-emerald-50 cursor-pointer active:scale-98'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
-            }`}
-            title={isSheetsConnected ? "Validate and submit all entries in the dataset to Google Sheets" : "Connect Google Sheets to submit entries"}
+              isDark
+                ? 'bg-slate-800 border-blue-500/40 text-blue-400 hover:bg-slate-700'
+                : 'bg-white border-blue-400 text-blue-600 hover:bg-blue-50'
+            } cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed`}
+            title="Validate and submit all entries in the dataset to Database & SAP"
           >
             <Upload size={14} />
             <span>Submit All Entries ({data?.total ?? 0})</span>
@@ -1529,9 +1249,9 @@ export const StockConfigurationPage: React.FC = () => {
       <div className={`rounded-xl border transition-all duration-200 shadow-xs overflow-hidden ${
         isDark ? 'bg-slate-800/90 border-slate-700/80' : 'bg-white border-slate-200/90'
       }`}>
-        {/* Table Card Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-slate-100 dark:border-slate-700/80 gap-2.5">
-          <div className="flex items-center gap-2">
+        {/* Table Card Header (Clean title and count badge) */}
+        <div className="flex items-center justify-between px-3.5 py-3 sm:px-4 sm:py-3.5 border-b border-slate-100 dark:border-slate-700/80">
+          <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-md bg-orange-100 dark:bg-orange-950/60 flex items-center justify-center text-orange-600 dark:text-orange-400 shrink-0">
               <Box size={16} />
             </div>
@@ -1539,44 +1259,11 @@ export const StockConfigurationPage: React.FC = () => {
               Stock Items {isLoading ? '(Loading...)' : `(${data?.total ?? 0})`}
             </h2>
           </div>
-
-          <div className="flex items-center gap-3 text-[13px] text-slate-500 dark:text-slate-400">
-            <span>
-              {isLoading
-                ? 'Loading entries...'
-                : !data?.total
-                ? 'No entries'
-                : `Showing ${startRow} - ${endRow} of ${data?.total}`}
-            </span>
-
-            {/* Rows Per Page Dropdown */}
-            <div className="relative">
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className={`h-8 px-2.5 pr-6 text-[12.5px] font-medium rounded-lg border appearance-none cursor-pointer ${
-                  isDark
-                    ? 'bg-slate-900 border-slate-700 text-white'
-                    : 'bg-white border-slate-200 text-slate-700'
-                }`}
-              >
-                <option value={10}>10 per page</option>
-                <option value={25}>25 per page</option>
-                <option value={50}>50 per page</option>
-                <option value={100}>100 per page</option>
-                <option value={10000}>All entries</option>
-              </select>
-              <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            </div>
-          </div>
         </div>
 
-        {/* ── Table View with 21 Business Columns ── */}
-        <div className="overflow-x-auto w-full">
-          <table className={`w-full border-collapse text-left text-[12.5px] sm:text-[13px] min-w-[1450px] border ${
+        {/* ── Table View with Comfortable ERP Column Geometry and Subtle Controlled Scrolling ── */}
+        <div className="overflow-x-auto w-full [scrollbar-width:thin] [scrollbar-color:#CBD5E1_transparent] dark:[scrollbar-color:#475569_transparent]">
+          <table className={`w-full border-collapse text-left text-[12px] sm:text-[12.5px] min-w-[1520px] border ${
             isDark ? 'border-slate-600' : 'border-slate-300'
           }`}>
             <thead className="sticky top-0 z-10">
@@ -1585,129 +1272,52 @@ export const StockConfigurationPage: React.FC = () => {
                   ? 'bg-slate-800 text-slate-300'
                   : 'bg-[#EAF2FE] text-[#1E3A8A]'
               }`}>
-                <th className="py-2.5 px-2 text-center whitespace-nowrap w-[48px] min-w-[48px] border border-slate-300 dark:border-slate-600">SR. NO.</th>
+                <th className="py-2.5 px-2 text-center whitespace-nowrap w-[50px] min-w-[50px] border border-slate-300 dark:border-slate-600">SR. NO.</th>
                 <th className="py-2.5 px-2.5 text-left whitespace-nowrap w-[95px] min-w-[95px] border border-slate-300 dark:border-slate-600">SAP CODE</th>
-                <th className="py-2.5 px-2.5 text-left whitespace-nowrap min-w-[150px] max-w-[220px] border border-slate-300 dark:border-slate-600">DESCRIPTION</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[72px] min-w-[72px] border border-slate-300 dark:border-slate-600">QTY.</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[72px] min-w-[72px] border border-slate-300 dark:border-slate-600">STOCK QTY.</th>
-                <th className="py-2.5 px-2.5 text-left whitespace-nowrap min-w-[120px] max-w-[170px] border border-slate-300 dark:border-slate-600">VENDOR NAME</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[72px] min-w-[72px] border border-slate-300 dark:border-slate-600">GRPO NO.</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[72px] min-w-[72px] border border-slate-300 dark:border-slate-600">RCVD. QTY.</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[72px] min-w-[72px] border border-slate-300 dark:border-slate-600">NT. WEIGHT</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[44px] min-w-[44px] border border-slate-300 dark:border-slate-600">QC</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[54px] min-w-[54px] border border-slate-300 dark:border-slate-600">DRW. Y/N</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[54px] min-w-[54px] border border-slate-300 dark:border-slate-600">V CHK</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[72px] min-w-[72px] border border-slate-300 dark:border-slate-600">OK QTY.</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[72px] min-w-[72px] border border-slate-300 dark:border-slate-600">REJ. QTY.</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[48px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Laser Marking / Line Marking">LM</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[48px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Oiling / Loading">OLNG</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[48px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Loose Packing / Line Packing">LPK</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[48px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Labeling">LBL</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[60px] min-w-[60px] border border-slate-300 dark:border-slate-600" title="Machining / Coating / Certificate">MC OR PT</th>
-                <th className="py-2.5 px-2 text-center whitespace-nowrap w-[100px] min-w-[100px] border border-slate-300 dark:border-slate-600" title="SAP Business One Item Creation Date (OITM.CreateDate)">ENTRY DATE</th>
-                <th className="py-2.5 px-2 text-center whitespace-nowrap w-[90px] min-w-[90px] border border-slate-300 dark:border-slate-600">ACTIONS</th>
+                <th className="py-2.5 px-3 text-left whitespace-nowrap min-w-[170px] max-w-[220px] border border-slate-300 dark:border-slate-600">DESCRIPTION</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[60px] min-w-[58px] border border-slate-300 dark:border-slate-600">QTY.</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[80px] min-w-[75px] border border-slate-300 dark:border-slate-600">STOCK QTY.</th>
+                <th className="py-2.5 px-3 text-left whitespace-nowrap min-w-[140px] max-w-[180px] border border-slate-300 dark:border-slate-600">VENDOR NAME</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[72px] min-w-[68px] border border-slate-300 dark:border-slate-600">GRPO NO.</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[75px] min-w-[70px] border border-slate-300 dark:border-slate-600">RCVD. QTY.</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[78px] min-w-[72px] border border-slate-300 dark:border-slate-600">NT. WEIGHT</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[58px] min-w-[54px] border border-slate-300 dark:border-slate-600">QC</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[60px] min-w-[56px] border border-slate-300 dark:border-slate-600">DRW. Y/N</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[58px] min-w-[54px] border border-slate-300 dark:border-slate-600">V CHK</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[68px] min-w-[62px] border border-slate-300 dark:border-slate-600">OK QTY.</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[68px] min-w-[62px] border border-slate-300 dark:border-slate-600">REJ. QTY.</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[52px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Laser Marking / Line Marking">LM</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[56px] min-w-[50px] border border-slate-300 dark:border-slate-600" title="Oiling / Loading">OLNG</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[52px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Loose Packing / Line Packing">LPK</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[52px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Labeling">LBL</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[66px] min-w-[62px] border border-slate-300 dark:border-slate-600" title="Machining / Coating / Certificate">MC OR PT</th>
+                <th className="py-2.5 px-2 text-center whitespace-nowrap w-[104px] min-w-[100px] border border-slate-300 dark:border-slate-600" title="SAP Business One Item Creation Date (OITM.CreateDate)">ENTRY DATE</th>
+                <th className="py-2.5 px-2 text-center whitespace-nowrap w-[114px] min-w-[108px] border border-slate-300 dark:border-slate-600" title="Last successful individual submission date and time (Asia/Kolkata)">LAST UPDATED</th>
+                <th className="py-2.5 px-2.5 text-center whitespace-nowrap w-[155px] min-w-[145px] border border-slate-300 dark:border-slate-600" title="Admin remarks on stock configuration and submission">REMARKS</th>
+                <th className="sticky right-0 z-20 py-2.5 px-2 text-center whitespace-nowrap w-[125px] min-w-[120px] bg-[#EAF2FE] dark:bg-slate-800 text-[#1E3A8A] dark:text-slate-300 border border-slate-300 dark:border-slate-600 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
-              {!isSheetsConnected ? (
+              {isLoading ? (
                 <tr>
-                  <td colSpan={21} className="py-12 px-6 text-center border border-slate-300 dark:border-slate-600">
-                    <div className="max-w-xl mx-auto flex flex-col items-center justify-center gap-3.5 py-4">
-                      <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center justify-center text-amber-600 dark:text-amber-400">
-                        <FileSpreadsheet size={32} />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="text-[17px] font-bold text-slate-900 dark:text-white">
-                          Google Sheets Connection Required
-                        </h4>
-                        <p className="text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                          Google Sheets is the designated active data source for Stock Configuration.
-                          Automatic fallback to the 1,008 SAP ERP records has been disabled to prevent accidental data contamination and maintain spreadsheet parity.
-                        </p>
-                      </div>
-
-                      <div className="w-full mt-2 p-3.5 rounded-xl border bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700 text-left text-xs space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-700 dark:text-slate-300">Live Status:</span>
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold text-xs ${getStatusBadge().badge}`}>
-                            <span className={`w-2 h-2 rounded-full ${getStatusBadge().bg}`} />
-                            {getStatusBadge().label}
-                          </span>
-                        </div>
-                        {sheetsStatus?.spreadsheet_id && (
-                          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                            <span>Configured Spreadsheet ID:</span>
-                            <span className="font-mono text-[11px]">{sheetsStatus.spreadsheet_id}</span>
-                          </div>
-                        )}
-                        {sheetsStatus?.service_account_email && (
-                          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                            <span>Service Account:</span>
-                            <span className="font-mono text-[11px] truncate max-w-[280px]" title={sheetsStatus.service_account_email}>
-                              {sheetsStatus.service_account_email}
-                            </span>
-                          </div>
-                        )}
-                        {sheetsStatus?.error_message && (
-                          <div className="p-2 rounded bg-amber-100/60 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 text-[11.5px] leading-snug">
-                            {sheetsStatus.error_message}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-center gap-2.5 mt-2">
-                        {sheetsStatus?.connection_status === 'api_not_enabled' && (
-                          <a
-                            href={sheetsStatus?.activation_url || 'https://console.developers.google.com/apis/api/sheets.googleapis.com/overview?project=767613266689'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[13px] transition shadow-xs"
-                          >
-                            <span>Enable Google Sheets API in GCP Console</span>
-                            <ChevronRight size={14} />
-                          </a>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => testConnectionMutation.mutate()}
-                          disabled={testConnectionMutation.isPending}
-                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-[13px] transition cursor-pointer"
-                        >
-                          <RotateCw size={14} className={testConnectionMutation.isPending ? 'animate-spin' : ''} />
-                          <span>{testConnectionMutation.isPending ? 'Testing Connection...' : 'Test / Retry Connection'}</span>
-                        </button>
-
-                        <NavLink
-                          to="/settings/integrations/google-sheets"
-                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-semibold text-[13px] transition"
-                        >
-                          <span>Integration Settings</span>
-                        </NavLink>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ) : isLoading ? (
-                <tr>
-                  <td colSpan={21} className="py-14 text-center border border-slate-300 dark:border-slate-600">
+                  <td colSpan={23} className="py-14 text-center border border-slate-300 dark:border-slate-600">
                     <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="w-8 h-8 rounded-full border-3 border-emerald-600 border-t-transparent animate-spin" />
-                      <span className="text-[14.5px] font-medium text-slate-500">Loading stock configuration records from Google Sheets...</span>
+                      <div className="w-8 h-8 rounded-full border-3 border-blue-600 border-t-transparent animate-spin" />
+                      <span className="text-[14.5px] font-medium text-slate-500">Loading stock configuration from backend...</span>
                     </div>
                   </td>
                 </tr>
               ) : isError ? (
                 <tr>
-                  <td colSpan={21} className="py-12 text-center border border-slate-300 dark:border-slate-600">
+                  <td colSpan={23} className="py-12 text-center border border-slate-300 dark:border-slate-600">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <AlertCircle className="w-8 h-8 text-rose-500" />
                       <span className="text-slate-600 font-medium">
-                        {(error as any)?.message || 'Failed to load stock configuration records from Google Sheets.'}
+                        {(error as any)?.message || 'Failed to load stock configuration records.'}
                       </span>
                       <button
                         onClick={() => refetch()}
-                        className="px-4 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 cursor-pointer"
+                        className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 cursor-pointer"
                       >
                         Retry
                       </button>
@@ -1716,7 +1326,7 @@ export const StockConfigurationPage: React.FC = () => {
                 </tr>
               ) : data?.items?.length === 0 ? (
                 <tr>
-                  <td colSpan={21} className="py-12 text-center text-slate-500 border border-slate-300 dark:border-slate-600">
+                  <td colSpan={23} className="py-12 text-center text-slate-500 border border-slate-300 dark:border-slate-600">
                     No items found matching the selected filters.
                   </td>
                 </tr>
@@ -1725,6 +1335,8 @@ export const StockConfigurationPage: React.FC = () => {
                   const srNo = (page - 1) * (pageSize >= 10000 ? 0 : pageSize) + idx + 1;
                   const isModified = Boolean(editedRows[item.item_code]);
                   const isSaving = savingItemCode === item.item_code;
+                  // Point 2: Show Submitted in green if submitted in current session OR previously saved in backend, as long as not modified
+                  const isSubmitted = (submittedCodes.has(item.item_code) || Boolean(item.last_submitted_at)) && !isModified;
 
                   return (
                     <tr
@@ -1743,89 +1355,39 @@ export const StockConfigurationPage: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* 2. SAP CODE */}
-                      <td className="py-2 px-2.5 text-left align-middle font-bold text-slate-900 dark:text-white text-[12px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={item.item_code}>
-                        <div>{item.item_code}</div>
-                        {item.record_id && (
-                          <div className="text-[10px] font-mono font-medium text-emerald-600 dark:text-emerald-400 mt-0.5 tracking-tight" title={`Permanent Google Sheets Record ID: ${item.record_id}`}>
-                            {item.record_id}
-                          </div>
-                        )}
+                      {/* 2. SAP CODE (Read-only SAP field) */}
+                      <td className="py-2.5 px-2.5 text-left align-middle font-bold text-slate-900 dark:text-white text-[12px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={item.item_code}>
+                        {item.item_code}
                       </td>
 
                       {/* 3. DESCRIPTION (Read-only SAP field) */}
-                      <td className="py-2.5 px-2.5 text-left align-middle text-slate-800 dark:text-slate-200 font-medium text-[12px] truncate max-w-[200px] border border-slate-300 dark:border-slate-600" title={item.description}>
+                      <td className="py-2.5 px-3 text-left align-middle text-slate-800 dark:text-slate-200 font-medium text-[12px] truncate max-w-[220px] border border-slate-300 dark:border-slate-600" title={item.description}>
                         {item.description}
                       </td>
 
-                      {/* 4. QTY. (Editable number input) */}
-                      <td className="py-2 px-1 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600">
-                        <div className="flex items-center justify-center">
-                          <input
-                            type="number"
-                            min="0"
-                            value={getEffectiveNum(item, 'qty')}
-                            onChange={(e) => handleCellChange(item, 'qty', Number(e.target.value))}
-                            className={`w-14 h-8 text-center text-[12.5px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
-                              isCellModified(item, 'qty')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : getEffectiveNum(item, 'qty') < 0
-                                ? 'border-rose-500 bg-rose-50/30'
-                                : isDark
-                                ? 'bg-slate-900 border-slate-700 text-white'
-                                : 'bg-white border-slate-300 text-slate-900'
-                            }`}
-                          />
-                        </div>
+                      {/* 4. QTY. (Sales Order Quantity from RDR1: SUM(RDR1.Quantity); 0 for regular POs where OPOR.ImportEnt IS NULL) */}
+                      <td className="py-2.5 px-1.5 text-center align-middle font-medium text-slate-800 dark:text-slate-200 text-[12.5px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={item.so_no ? `Linked Sales Order #${item.so_no}: ${item.qty ?? 0}` : 'Regular Purchase Order (SO QTY = 0)'}>
+                        {item.qty !== undefined && item.qty !== null ? item.qty : 0}
                       </td>
 
                       {/* 5. STOCK QTY. (From SAP) */}
-                      <td className="py-2.5 px-1 text-center align-middle font-bold text-slate-700 dark:text-slate-300 text-[12.5px] whitespace-nowrap border border-slate-300 dark:border-slate-600">
+                      <td className="py-2.5 px-1.5 text-center align-middle font-bold text-slate-800 dark:text-slate-200 text-[12.5px] whitespace-nowrap border border-slate-300 dark:border-slate-600">
                         {item.stock_qty}
                       </td>
 
                       {/* 6. VENDOR NAME (SAP-owned field) */}
-                      <td className="py-2.5 px-2.5 text-left align-middle text-slate-800 dark:text-slate-200 font-medium text-[12px] truncate max-w-[160px] border border-slate-300 dark:border-slate-600" title={item.vendor_name || '—'}>
+                      <td className="py-2.5 px-3 text-left align-middle text-slate-800 dark:text-slate-200 font-medium text-[12px] truncate max-w-[180px] border border-slate-300 dark:border-slate-600" title={item.vendor_name || '—'}>
                         {item.vendor_name || '—'}
                       </td>
 
-                      {/* 7. GRPO NO. (Editable text/number input) */}
-                      <td className="py-2 px-1 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600">
-                        <div className="flex items-center justify-center">
-                          <input
-                            type="text"
-                            value={getEffectiveStr(item, 'grpo_no')}
-                            onChange={(e) => handleCellChange(item, 'grpo_no', e.target.value)}
-                            className={`w-14 h-8 text-center text-[12px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
-                              isCellModified(item, 'grpo_no')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : isDark
-                                ? 'bg-slate-900 border-slate-700 text-white'
-                                : 'bg-white border-slate-300 text-slate-900'
-                            }`}
-                          />
-                        </div>
+                      {/* 7. GRPO NO. (Read-only SAP field) */}
+                      <td className="py-2.5 px-1.5 text-center align-middle font-medium text-slate-800 dark:text-slate-200 text-[12px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={item.grpo_no ? `SAP GRPO: ${item.grpo_no}` : '—'}>
+                        {item.grpo_no || '—'}
                       </td>
 
-                      {/* 8. RCVD. QTY. (Editable number input) */}
-                      <td className="py-2 px-1 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600">
-                        <div className="flex items-center justify-center">
-                          <input
-                            type="number"
-                            min="0"
-                            value={getEffectiveNum(item, 'rcvd_qty')}
-                            onChange={(e) => handleCellChange(item, 'rcvd_qty', Number(e.target.value))}
-                            className={`w-14 h-8 text-center text-[12.5px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
-                              isCellModified(item, 'rcvd_qty')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : getEffectiveNum(item, 'rcvd_qty') < 0
-                                ? 'border-rose-500 bg-rose-50/30'
-                                : isDark
-                                ? 'bg-slate-900 border-slate-700 text-white'
-                                : 'bg-white border-slate-300 text-slate-900'
-                            }`}
-                          />
-                        </div>
+                      {/* 8. RCVD. QTY. (Read-only SAP field) */}
+                      <td className="py-2.5 px-1.5 text-center align-middle font-medium text-slate-800 dark:text-slate-200 text-[12.5px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={`SAP Received Qty: ${item.rcvd_qty ?? 0}`}>
+                        {item.rcvd_qty ?? 0}
                       </td>
 
                       {/* 9. NT. WEIGHT (Editable float input) */}
@@ -1837,7 +1399,7 @@ export const StockConfigurationPage: React.FC = () => {
                             min="0"
                             value={getEffectiveNum(item, 'nt_weight')}
                             onChange={(e) => handleCellChange(item, 'nt_weight', Number(e.target.value))}
-                            className={`w-14 h-8 text-center text-[12.5px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
+                            className={`w-14 h-8 text-center text-[12px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
                               isCellModified(item, 'nt_weight')
                                 ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
                                 : getEffectiveNum(item, 'nt_weight') < 0
@@ -1850,15 +1412,27 @@ export const StockConfigurationPage: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* 10. QC (Checkbox) */}
+                      {/* 10. QC (Select Y/N Dropdown with dropdown arrow) */}
                       <td className="py-2 px-1 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600">
                         <div className="flex items-center justify-center">
-                          <input
-                            type="checkbox"
-                            checked={getEffectiveBool(item, 'qc')}
-                            onChange={(e) => handleCellChange(item, 'qc', e.target.checked)}
-                            className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer transition-colors"
-                          />
+                          <div className="relative inline-flex items-center">
+                            <select
+                              value={getEffectiveQc(item)}
+                              onChange={(e) => handleCellChange(item, 'qc', e.target.value === '' ? null : e.target.value === 'Y')}
+                              className={`w-11 h-8 pl-1.5 pr-4 text-center text-[12px] font-semibold rounded-md border appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                                isCellModified(item, 'qc')
+                                  ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
+                                  : isDark
+                                  ? 'bg-slate-900 border-slate-700 text-white'
+                                  : 'bg-white border-slate-300 text-slate-900'
+                              }`}
+                            >
+                              <option value="">—</option>
+                              <option value="Y">Y</option>
+                              <option value="N">N</option>
+                            </select>
+                            <ChevronDown size={11} className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                          </div>
                         </div>
                       </td>
 
@@ -1868,7 +1442,7 @@ export const StockConfigurationPage: React.FC = () => {
                           <select
                             value={getEffectiveStr(item, 'drw_yn')}
                             onChange={(e) => handleCellChange(item, 'drw_yn', e.target.value)}
-                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                            className={`w-11 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
                               isCellModified(item, 'drw_yn')
                                 ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
                                 : isDark
@@ -1876,6 +1450,7 @@ export const StockConfigurationPage: React.FC = () => {
                                 : 'bg-white border-slate-300 text-slate-900'
                             }`}
                           >
+                            <option value="">—</option>
                             <option value="Y">Y</option>
                             <option value="N">N</option>
                           </select>
@@ -1888,7 +1463,7 @@ export const StockConfigurationPage: React.FC = () => {
                           <select
                             value={getEffectiveStr(item, 'v_chk')}
                             onChange={(e) => handleCellChange(item, 'v_chk', e.target.value)}
-                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                            className={`w-11 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
                               isCellModified(item, 'v_chk')
                                 ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
                                 : isDark
@@ -1896,52 +1471,21 @@ export const StockConfigurationPage: React.FC = () => {
                                 : 'bg-white border-slate-300 text-slate-900'
                             }`}
                           >
+                            <option value="">—</option>
                             <option value="Y">Y</option>
                             <option value="N">N</option>
                           </select>
                         </div>
                       </td>
 
-                      {/* 13. OK QTY. (Editable number input) */}
-                      <td className="py-2 px-1 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600">
-                        <div className="flex items-center justify-center">
-                          <input
-                            type="number"
-                            min="0"
-                            value={getEffectiveNum(item, 'ok_qty')}
-                            onChange={(e) => handleCellChange(item, 'ok_qty', Number(e.target.value))}
-                            className={`w-14 h-8 text-center text-[12.5px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
-                              isCellModified(item, 'ok_qty')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : getEffectiveNum(item, 'ok_qty') < 0
-                                ? 'border-rose-500 bg-rose-50/30'
-                                : isDark
-                                ? 'bg-slate-900 border-slate-700 text-white'
-                                : 'bg-white border-slate-300 text-slate-900'
-                            }`}
-                          />
-                        </div>
+                      {/* 13. OK QTY. (Read-only SAP field) */}
+                      <td className="py-2.5 px-1.5 text-center align-middle font-medium text-slate-800 dark:text-slate-200 text-[12.5px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={`SAP OK Qty: ${item.ok_qty ?? 0}`}>
+                        {item.ok_qty ?? 0}
                       </td>
 
-                      {/* 14. REJ. QTY. (Editable number input) */}
-                      <td className="py-2 px-1 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600">
-                        <div className="flex items-center justify-center">
-                          <input
-                            type="number"
-                            min="0"
-                            value={getEffectiveNum(item, 'rej_qty')}
-                            onChange={(e) => handleCellChange(item, 'rej_qty', Number(e.target.value))}
-                            className={`w-14 h-8 text-center text-[12.5px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
-                              isCellModified(item, 'rej_qty')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : getEffectiveNum(item, 'rej_qty') < 0
-                                ? 'border-rose-500 bg-rose-50/30'
-                                : isDark
-                                ? 'bg-slate-900 border-slate-700 text-white'
-                                : 'bg-white border-slate-300 text-slate-900'
-                            }`}
-                          />
-                        </div>
+                      {/* 14. REJ. QTY. (Read-only SAP field) */}
+                      <td className="py-2.5 px-1.5 text-center align-middle font-medium text-slate-800 dark:text-slate-200 text-[12.5px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={`SAP Rejected Qty: ${item.rej_qty ?? 0}`}>
+                        {item.rej_qty ?? 0}
                       </td>
 
                       {/* 15. LM (Select Y/N) */}
@@ -1950,7 +1494,7 @@ export const StockConfigurationPage: React.FC = () => {
                           <select
                             value={getEffectiveStr(item, 'lm')}
                             onChange={(e) => handleCellChange(item, 'lm', e.target.value)}
-                            className={`w-9.5 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
                               isCellModified(item, 'lm')
                                 ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
                                 : isDark
@@ -1958,6 +1502,7 @@ export const StockConfigurationPage: React.FC = () => {
                                 : 'bg-white border-slate-300 text-slate-900'
                             }`}
                           >
+                            <option value="">—</option>
                             <option value="Y">Y</option>
                             <option value="N">N</option>
                           </select>
@@ -1970,7 +1515,7 @@ export const StockConfigurationPage: React.FC = () => {
                           <select
                             value={getEffectiveStr(item, 'olng')}
                             onChange={(e) => handleCellChange(item, 'olng', e.target.value)}
-                            className={`w-9.5 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
                               isCellModified(item, 'olng')
                                 ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
                                 : isDark
@@ -1978,6 +1523,7 @@ export const StockConfigurationPage: React.FC = () => {
                                 : 'bg-white border-slate-300 text-slate-900'
                             }`}
                           >
+                            <option value="">—</option>
                             <option value="Y">Y</option>
                             <option value="N">N</option>
                           </select>
@@ -1990,7 +1536,7 @@ export const StockConfigurationPage: React.FC = () => {
                           <select
                             value={getEffectiveStr(item, 'lpk')}
                             onChange={(e) => handleCellChange(item, 'lpk', e.target.value)}
-                            className={`w-9.5 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
                               isCellModified(item, 'lpk')
                                 ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
                                 : isDark
@@ -1998,6 +1544,7 @@ export const StockConfigurationPage: React.FC = () => {
                                 : 'bg-white border-slate-300 text-slate-900'
                             }`}
                           >
+                            <option value="">—</option>
                             <option value="Y">Y</option>
                             <option value="N">N</option>
                           </select>
@@ -2010,7 +1557,7 @@ export const StockConfigurationPage: React.FC = () => {
                           <select
                             value={getEffectiveStr(item, 'lbl')}
                             onChange={(e) => handleCellChange(item, 'lbl', e.target.value)}
-                            className={`w-9.5 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
                               isCellModified(item, 'lbl')
                                 ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
                                 : isDark
@@ -2018,6 +1565,7 @@ export const StockConfigurationPage: React.FC = () => {
                                 : 'bg-white border-slate-300 text-slate-900'
                             }`}
                           >
+                            <option value="">—</option>
                             <option value="Y">Y</option>
                             <option value="N">N</option>
                           </select>
@@ -2030,7 +1578,7 @@ export const StockConfigurationPage: React.FC = () => {
                           <select
                             value={getEffectiveStr(item, 'mc_or_pt')}
                             onChange={(e) => handleCellChange(item, 'mc_or_pt', e.target.value)}
-                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
+                            className={`w-11 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
                               isCellModified(item, 'mc_or_pt')
                                 ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
                                 : isDark
@@ -2038,39 +1586,111 @@ export const StockConfigurationPage: React.FC = () => {
                                 : 'bg-white border-slate-300 text-slate-900'
                             }`}
                           >
+                            <option value="">—</option>
                             <option value="Y">Y</option>
                             <option value="N">N</option>
                           </select>
                         </div>
                       </td>
 
-                      {/* 20. ENTRY DATE (Read-only SAP Creation Date: OITM.CreateDate formatted as DD-MM-YYYY) */}
-                      <td className="py-2.5 px-2 text-center align-middle whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium text-[12px] border border-slate-300 dark:border-slate-600 bg-slate-50/40 dark:bg-slate-900/20" title={item.entry_date ? `SAP Created: ${item.entry_date}` : 'Not available in SAP'}>
-                        {formatEntryDate(item.entry_date)}
+                      {/* 20. ENTRY DATE (Date on line 1, Time on line 2 if present in source) */}
+                      <td className="py-2 px-2 text-center align-middle whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium text-[12px] border border-slate-300 dark:border-slate-600 bg-slate-50/40 dark:bg-slate-900/20" title={item.grn_date ? `GRN Date: ${item.grn_date}${item.grpo_no ? ` (GRPO #${item.grpo_no})` : ''}` : item.item_create_date ? `SAP Created: ${item.item_create_date}` : item.entry_date ? `Entry Date: ${item.entry_date}` : 'Not available in SAP'}>
+                        {(() => {
+                          const { date, time } = formatEntryDateTime(item.entry_date);
+                          return (
+                            <div className="flex flex-col items-center justify-center leading-tight">
+                              <span className="font-medium text-slate-800 dark:text-slate-200 text-[12px]">{date}</span>
+                              {time && (
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-normal">
+                                  {time}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
-                      {/* 21. ACTIONS (Blue Submit button + Red Delete button) */}
-                      <td className="py-2 px-1.5 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600">
+                      {/* 21. LAST UPDATED (Exact server submission timestamp, or '—' if never submitted) */}
+                      <td className="py-2 px-2 text-center align-middle whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium text-[12px] border border-slate-300 dark:border-slate-600 bg-slate-50/40 dark:bg-slate-900/20" title={item.last_submitted_at ? `Server Timestamp: ${item.last_submitted_at}` : 'Not submitted'}>
+                        {(() => {
+                          const { date, time } = formatLastUpdated(item.last_submitted_at);
+                          if (!time) {
+                            return <span className="text-slate-400 dark:text-slate-500 text-[12px] font-normal">—</span>;
+                          }
+                          return (
+                            <div className="flex flex-col items-center justify-center leading-tight">
+                              <span className="font-medium text-slate-800 dark:text-slate-200 text-[12px]">{date}</span>
+                              <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-normal">
+                                {time}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </td>
+
+                      {/* 22. REMARKS (Compact text input for Admin users, read-only for other users) */}
+                      <td className="py-2 px-2.5 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600">
+                        <div className="flex items-center justify-center">
+                          <input
+                            type="text"
+                            placeholder="Enter remark..."
+                            value={getEffectiveStr(item, 'remark')}
+                            onChange={(e) => handleCellChange(item, 'remark', e.target.value)}
+                            disabled={!isUserAdmin}
+                            title={
+                              isUserAdmin
+                                ? (getEffectiveStr(item, 'remark') || 'Enter admin remark...')
+                                : (item.remark ? `Admin Remark: ${item.remark}` : 'Only authorized Admin users can add or modify remarks')
+                            }
+                            className={`w-[145px] h-8 px-2.5 text-left text-[12px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all truncate focus:truncate-none ${
+                              isCellModified(item, 'remark')
+                                ? 'border-amber-400 bg-amber-50/40 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100 ring-1 ring-amber-300'
+                                : !isUserAdmin
+                                ? 'bg-slate-100/70 border-slate-200 text-slate-500 dark:bg-slate-800/40 dark:border-slate-700 dark:text-slate-400 cursor-not-allowed select-text'
+                                : isDark
+                                ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500'
+                                : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-blue-500'
+                            }`}
+                          />
+                        </div>
+                      </td>
+
+                      {/* 23. ACTIONS (Submit / Submitted + Delete) - Sticky Right Column */}
+                      <td className={`sticky right-0 z-10 py-2 px-2 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)] ${
+                        isModified
+                          ? 'bg-[#FFFBEB] dark:bg-amber-950/90'
+                          : isDark
+                          ? 'bg-slate-800'
+                          : 'bg-white'
+                      }`}>
                         <div className="flex items-center justify-center gap-1.5">
-                          {/* Submit Button */}
+                          {/* Submit / Submitted Button */}
                           <button
                             onClick={() => handleSaveRow(item)}
                             disabled={isSaving}
-                            className={`h-7 px-2.5 rounded-md text-[11.5px] font-semibold flex items-center justify-center gap-1 transition-all shadow-2xs ${
+                            className={`h-8 px-3 rounded-md text-[11.5px] font-semibold flex items-center justify-center gap-1.5 transition-all shadow-2xs border ${
                               isSaving
-                                ? 'bg-blue-600 text-white cursor-wait'
-                                : 'bg-[#155EEF] hover:bg-blue-700 text-white cursor-pointer active:scale-95'
+                                ? 'bg-blue-600 border-blue-600 text-white cursor-wait'
+                                : isSubmitted
+                                ? 'bg-[#10B981] hover:bg-emerald-600 border-emerald-500 text-white cursor-pointer active:scale-95'
+                                : 'bg-[#155EEF] hover:bg-blue-700 border-blue-600 text-white cursor-pointer active:scale-95'
                             }`}
-                            title="Submit row to database and SAP"
+                            title={isSubmitted ? 'Entry successfully submitted to database & SAP' : 'Submit row to database and SAP'}
                           >
-                            {isSaving ? <RotateCw size={12} className="animate-spin" /> : <Save size={12} />}
-                            <span>{isSaving ? 'Submitting...' : 'Submit'}</span>
+                            {isSaving ? (
+                              <RotateCw size={12} className="animate-spin" />
+                            ) : isSubmitted ? (
+                              <CheckCircle2 size={13} />
+                            ) : (
+                              <Save size={12} />
+                            )}
+                            <span>{isSaving ? 'Submitting...' : isSubmitted ? 'Submitted' : 'Submit'}</span>
                           </button>
 
                           {/* Delete Button */}
                           <button
                             onClick={() => setDeleteConfirmItem(item)}
-                            className="w-7 h-7 rounded-md bg-[#EF4444] hover:bg-red-600 text-white flex items-center justify-center transition-all shadow-2xs cursor-pointer active:scale-95"
+                            className="w-8 h-8 rounded-md bg-[#EF4444] hover:bg-red-600 text-white flex items-center justify-center transition-all shadow-2xs cursor-pointer active:scale-95"
                             title="Delete this item"
                           >
                             <Trash2 size={13} />
@@ -2085,33 +1705,43 @@ export const StockConfigurationPage: React.FC = () => {
           </table>
         </div>
 
-        {/* ── Table Pagination Bar (Matching Reference Design) ── */}
-        <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 border-t border-slate-200 dark:border-slate-700/80 flex flex-col sm:flex-row items-center justify-between gap-3">
-          {/* Left: Show [10] entries */}
-          <div className="flex items-center gap-2 text-[13px] text-slate-500 dark:text-slate-400">
-            <span>Show</span>
-            <div className="relative">
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className={`h-7.5 px-2.5 pr-6 text-[12.5px] font-medium rounded-md border appearance-none cursor-pointer ${
-                  isDark
-                    ? 'bg-slate-900 border-slate-700 text-white'
-                    : 'bg-white border-slate-300 text-slate-800'
-                }`}
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={10000}>All</option>
-              </select>
-              <ChevronDown size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+        {/* ── Table Pagination Bar (Single Unified Section) ── */}
+        <div className="px-3.5 py-2.5 sm:px-4 sm:py-3 border-t border-slate-200 dark:border-slate-700/80 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-900/30">
+          {/* Left: Showing X - Y of Z entries | Show [10] entries per page */}
+          <div className="flex flex-wrap items-center gap-2.5 text-[12.5px] sm:text-[13px] text-slate-500 dark:text-slate-400">
+            <span className="font-medium text-slate-700 dark:text-slate-300">
+              {isLoading
+                ? 'Loading entries...'
+                : !data?.total
+                ? 'No entries'
+                : `Showing ${startRow} - ${endRow} of ${data?.total} entries`}
+            </span>
+            <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">|</span>
+            <div className="flex items-center gap-1.5">
+              <span>Show</span>
+              <div className="relative">
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className={`h-7 px-2 pr-6 text-[12px] font-medium rounded-md border appearance-none cursor-pointer ${
+                    isDark
+                      ? 'bg-slate-900 border-slate-700 text-white'
+                      : 'bg-white border-slate-300 text-slate-800'
+                  }`}
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={10000}>All</option>
+                </select>
+                <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+              <span>entries per page</span>
             </div>
-            <span>entries</span>
 
             {/* Jump to Page */}
             {totalPages > 1 && (
@@ -2232,16 +1862,6 @@ export const StockConfigurationPage: React.FC = () => {
               </button>
             </div>
 
-            {isSheetsConnected && (
-              <div className="flex items-center gap-2 p-3 mt-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs">
-                <FileSpreadsheet size={16} className="text-emerald-600 shrink-0" />
-                <span>
-                  Destination: Google Sheets (<strong>{sheetsStatus?.worksheet_name || 'Stock Configuration'}</strong>).
-                  A stable Record ID will be generated automatically. SAP Business One will not be modified.
-                </span>
-              </div>
-            )}
-
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -2263,21 +1883,6 @@ export const StockConfigurationPage: React.FC = () => {
                     className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:border-slate-700"
                   />
                 </div>
-
-                {isSheetsConnected && (
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">
-                      Record ID (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={(newItem as any).record_id || ''}
-                      onChange={(e) => setNewItem({ ...newItem, record_id: e.target.value } as any)}
-                      placeholder="Auto-generated if blank (e.g. REC-2026...)"
-                      className="w-full h-10 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:border-slate-700"
-                    />
-                  </div>
-                )}
 
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">
@@ -2399,15 +2004,17 @@ export const StockConfigurationPage: React.FC = () => {
                   Inspection & Packaging Checks (Y/N)
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newItem.qc}
-                      onChange={(e) => setNewItem({ ...newItem, qc: e.target.checked })}
-                      className="w-4 h-4 rounded text-blue-600"
-                    />
-                    <span>QC Passed</span>
-                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-semibold">QC:</span>
+                    <select
+                      value={newItem.qc ? 'Y' : 'N'}
+                      onChange={(e) => setNewItem({ ...newItem, qc: e.target.value === 'Y' })}
+                      className="h-8 px-2 rounded-md border border-slate-300 dark:bg-slate-900 dark:border-slate-700 text-xs font-semibold cursor-pointer"
+                    >
+                      <option value="Y">Y</option>
+                      <option value="N">N</option>
+                    </select>
+                  </div>
 
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500">DRW:</span>
@@ -2506,15 +2113,9 @@ export const StockConfigurationPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={addMutation.isPending}
-                  className={`px-5 py-2 rounded-xl text-white text-sm font-semibold cursor-pointer shadow-xs ${
-                    isSheetsConnected ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold cursor-pointer shadow-xs"
                 >
-                  {addMutation.isPending
-                    ? 'Adding Item...'
-                    : isSheetsConnected
-                    ? 'Add to Google Sheets'
-                    : 'Add Item'}
+                  {addMutation.isPending ? 'Adding Item...' : 'Add Item'}
                 </button>
               </div>
             </form>
@@ -2691,7 +2292,7 @@ export const StockConfigurationPage: React.FC = () => {
             </div>
             <p className="text-sm text-slate-600 dark:text-slate-300">
               Are you sure you want to delete item <strong className="text-slate-900 dark:text-white">{deleteConfirmItem.item_code}</strong> ({deleteConfirmItem.description})?
-              Note: Row deletion in Google Sheets is disabled to protect row indices and spreadsheet structure.
+              This action removes the configured row from your local database.
             </p>
             <div className="flex items-center justify-end gap-3 mt-6">
               <button
@@ -2721,39 +2322,18 @@ export const StockConfigurationPage: React.FC = () => {
             isDark ? 'bg-slate-850 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
           }`}>
             <div className="flex items-center gap-3 mb-4">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                isSheetsConnected
-                  ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
-              }`}>
-                {isSheetsConnected ? <FileSpreadsheet size={22} /> : <CheckCircle2 size={22} />}
+              <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={22} />
               </div>
               <div>
-                <h3 className="text-lg font-bold">
-                  {isSheetsConnected ? 'Submit All to Google Sheets' : 'Submit All Entries'}
-                </h3>
-                <p className="text-xs text-slate-500">
-                  {isSheetsConnected ? 'Batch update Google Spreadsheet records' : 'Bulk submit dataset verification'}
-                </p>
+                <h3 className="text-lg font-bold">Submit All Entries</h3>
+                <p className="text-xs text-slate-500">Bulk submit dataset verification</p>
               </div>
             </div>
-            <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-6 space-y-2">
-              {isSheetsConnected ? (
-                <>
-                  <p>
-                    You are about to validate and update all <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{data?.total ?? 0} entries</strong> directly in Google Sheets (<strong>{sheetsStatus?.worksheet_name || 'Stock Configuration'}</strong>).
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 pt-1">
-                    <ShieldCheck size={15} className="text-emerald-600 shrink-0" />
-                    <span><strong>SAP Write-Protection Active:</strong> No records will be modified in SAP Business One.</span>
-                  </p>
-                </>
-              ) : (
-                <p>
-                  Google Sheets is disconnected. Please connect Google Sheets before submitting entries.
-                </p>
-              )}
-            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
+              You are about to validate and submit all <strong className="text-blue-600 dark:text-blue-400 font-bold">{data?.total ?? 0} entries</strong> in the current dataset to the database.
+              Any modified values will be updated and committed.
+            </p>
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
@@ -2766,9 +2346,7 @@ export const StockConfigurationPage: React.FC = () => {
                 type="button"
                 onClick={handleConfirmSubmitAll}
                 disabled={bulkMutation.isPending}
-                className={`px-5 py-2 rounded-xl text-white text-sm font-semibold cursor-pointer shadow-xs active:scale-98 ${
-                  isSheetsConnected ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#155EEF] hover:bg-blue-700'
-                }`}
+                className="px-5 py-2 rounded-xl bg-[#155EEF] hover:bg-blue-700 text-white text-sm font-semibold cursor-pointer shadow-xs active:scale-98"
               >
                 {bulkMutation.isPending ? 'Submitting...' : `Yes, Submit All (${data?.total ?? 0})`}
               </button>
@@ -2794,7 +2372,7 @@ export const StockConfigurationPage: React.FC = () => {
             </div>
             <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
               Are you sure you want to discard unsaved edits for <strong className="text-rose-600 dark:text-rose-400 font-bold">{modifiedCount} modified item(s)</strong>?
-              All table cells will revert to their saved Google Sheets values.
+              All table cells will revert to their saved database values.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button

@@ -14,7 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 
-from app.core.cache import cache_get, cache_set, cache_delete
+from app.core.cache import cache_get, cache_set, cache_delete, cache_delete_prefix
+from app.services.sap.finance_service import invalidate_finance_cache
 from app.core.security import require_admin, get_current_user
 
 # Shared thread pool for blocking SAP calls
@@ -461,12 +462,17 @@ def _get_fallback_branches_from_users() -> List[Dict[str, Optional[str]]]:
 
 @router.get("/branches")
 async def list_branches(current_user: dict = Depends(require_admin)):
-    """List all active SAP warehouses available as branches."""
+    """List all active SAP warehouses available as branches (cached for 30 minutes)."""
+    cache_key = "branches:lookup:list"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
+
     try:
         service = SAPWarehousesService()
         loop = asyncio.get_running_loop()
         warehouses = await loop.run_in_executor(_executor, service.get_warehouses)
-        return [
+        result = [
             {
                 "id": w.get("WarehouseCode"),
                 "name": w.get("WarehouseName"),
@@ -474,6 +480,8 @@ async def list_branches(current_user: dict = Depends(require_admin)):
             }
             for w in warehouses
         ]
+        await cache_set(cache_key, result, ttl=1800)
+        return result
     except Exception as e:
         logger.warning(f"SAP branches unavailable, using local fallback: {e}")
         return _get_fallback_branches_from_users()
@@ -1044,6 +1052,8 @@ async def approve_request(req_id: str, current_user: dict = Depends(require_admi
             req["payload"]["creditNoteDocEntry"] = result.get("DocEntry")
             req["payload"]["creditNoteDocNum"] = result.get("DocNum")
             _complete_approval_request(req_id, reviewer_id, req["payload"])
+            await cache_delete_prefix("pos:dashboard:executive")
+            invalidate_finance_cache(req.get("branch_id"))
             
             return {"status": "success", "message": "Approved and executed", "docEntry": result.get("DocEntry")}
             
@@ -1137,6 +1147,8 @@ async def approve_request(req_id: str, current_user: dict = Depends(require_admi
             req["payload"]["newInvoiceDocNum"] = invoice_result.get("DocNum")
             
             _complete_approval_request(req_id, reviewer_id, req["payload"])
+            await cache_delete_prefix("pos:dashboard:executive")
+            invalidate_finance_cache(req.get("branch_id"))
             return {"status": "success", "message": "Approved and exchange completed", "returnDocEntry": return_result.get("DocEntry"), "newInvoiceDocEntry": invoice_result.get("DocEntry")}
             
         else:

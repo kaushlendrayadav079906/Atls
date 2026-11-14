@@ -45,11 +45,14 @@ import { AIGeneratedReportsPage } from './pages/reports/AIGeneratedReportsPage';
 import { AIAssistantProvider } from './contexts/AIAssistantContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes fresh data window
+      gcTime: 15 * 60 * 1000,    // 15 minutes garbage collection window
       retry: 1,
       refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
     },
   },
 });

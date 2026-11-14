@@ -275,6 +275,9 @@ export const PosCheckoutPage: React.FC = () => {
       setCheckoutResult({ success: true, response: data });
       setStep('result');
       queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['recentSales'] });
+      queryClient.invalidateQueries({ queryKey: ['executiveCommand'] });
+      queryClient.invalidateQueries({ queryKey: ['products-stock'] });
     },
     onError: (err: unknown) => {
       const axiosErr = err as any;

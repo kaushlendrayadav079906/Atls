@@ -166,7 +166,8 @@ export const Dashboard = () => {
       from_date: dateFrom || undefined,
       to_date: dateTo || undefined,
     }),
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const {
@@ -182,7 +183,8 @@ export const Dashboard = () => {
       from_date: dateFrom || undefined,
       to_date: dateTo || undefined
     }),
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const {
@@ -192,7 +194,8 @@ export const Dashboard = () => {
   } = useQuery({
     queryKey: ['recentPayments', branchId, period, dateFrom, dateTo],
     queryFn: () => paymentsReportApi.getTransactions({ limit: 8 }),
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const {
@@ -202,7 +205,8 @@ export const Dashboard = () => {
   } = useQuery({
     queryKey: ['recentPurchaseOrders', branchId],
     queryFn: () => purchaseOrdersApi.getOrders({ limit: 8 }),
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const {
@@ -212,7 +216,8 @@ export const Dashboard = () => {
   } = useQuery({
     queryKey: ['topProducts', branchId, period, dateFrom, dateTo],
     queryFn: () => atlasApi.getTopProducts(branchId, period, undefined, undefined, undefined, dateFrom || undefined, dateTo || undefined),
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const {
@@ -223,7 +228,8 @@ export const Dashboard = () => {
     queryFn: () => dashboardApi.getInventoryRisk(),
     enabled: isManagerOrAdmin,
     retry: false,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const handleRefresh = async () => {

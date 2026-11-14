@@ -27,7 +27,10 @@ class SAPItemsService:
     _SAP_PAGE_SIZE = 100
 
     def get_items(
-        self, search: Optional[str] = None, top: int = 1000
+        self,
+        search: Optional[str] = None,
+        top: Optional[int] = 1000,
+        orderby: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Fetch available items from SAP with optional search.
@@ -77,12 +80,16 @@ class SAPItemsService:
             all_items: List[Dict[str, Any]] = []
             skip = 0
 
-            while len(all_items) < top:
+            while top is None or len(all_items) < top:
+                batch_limit = self._SAP_PAGE_SIZE if top is None else min(self._SAP_PAGE_SIZE, top - len(all_items))
+                if batch_limit <= 0:
+                    break
                 response = self.client.query_items(
                     filter_str=filter_str,
                     select=select_fields,
-                    top=self._SAP_PAGE_SIZE,
+                    top=batch_limit,
                     skip=skip,
+                    orderby=orderby,
                 )
                 page = response.get("value", [])
                 
@@ -92,14 +99,14 @@ class SAPItemsService:
                 
                 all_items.extend(page)
                 
-                if len(page) < self._SAP_PAGE_SIZE:
+                if len(page) < batch_limit:
                     # Last page (less than full page) - done
                     break
                 
-                skip += self._SAP_PAGE_SIZE
+                skip += len(page)
 
             logger.info(f"Fetched {len(all_items)} available items from SAP")
-            return all_items[:top]
+            return all_items if top is None else all_items[:top]
 
         except Exception as e:
             logger.error(f"Error fetching items from SAP: {str(e)}")

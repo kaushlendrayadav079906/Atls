@@ -12,7 +12,8 @@ import {
     Warehouse,
     Eye,
     XCircle,
-    Download
+    Download,
+    RefreshCw
 } from 'lucide-react';
 import { useMemo, useState, useEffect, type ReactNode } from 'react';
 import { useSearchParams, useParams } from 'react-router-dom';
@@ -102,14 +103,15 @@ export const ProductsStockPage = () => {
     }
   }, [isModalOpen]);
 
-  const { data: products = fallbackProducts, isLoading, isError, error, refetch } = useQuery<Product[]>({
+  const { data: products = fallbackProducts, isLoading, isFetching, isError, error, refetch } = useQuery<Product[]>({
     queryKey: ['products-stock', debouncedSearch, warehouseFilter, stockStatus],
     queryFn: () => posApi.searchProducts({
       search: debouncedSearch,
       warehouse: warehouseFilter || undefined,
       stock_status: stockStatus === 'all' ? undefined : stockStatus,
     }),
-    staleTime: 60_000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const baseProducts = Array.isArray(products) ? products : [];
@@ -189,6 +191,15 @@ export const ProductsStockPage = () => {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <button 
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition cursor-pointer disabled:opacity-50"
+            title="Refresh Products & Stock"
+          >
+            <RefreshCw className={`h-4 w-4 text-slate-500 ${isFetching ? 'animate-spin text-blue-600' : ''}`} />
+            <span>Refresh</span>
+          </button>
           <button 
             onClick={handleExportCSV}
             className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13.5px] font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition cursor-pointer"
