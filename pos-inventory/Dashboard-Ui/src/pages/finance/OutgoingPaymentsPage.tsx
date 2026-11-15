@@ -77,7 +77,8 @@ export const OutgoingPaymentsPage: React.FC = () => {
         page_size: pageSize,
       });
     },
-    staleTime: 30_000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const summary = data?.summary || data?.kpis;

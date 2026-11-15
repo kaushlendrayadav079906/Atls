@@ -1,0 +1,184 @@
+<USER_REQUEST>
+# ATLAS – Fix Today's Missing Stock Configuration Records from SAP Business One
+
+Act as a Senior SAP Business One Integration Engineer, SQL Developer and FastAPI Backend Architect.
+
+Project: `pos-inventory`
+
+## Problem
+
+New entries are successfully created in SAP Business One and are visible in the SAP Item Master section.
+
+However, the latest stock entries are not appearing in ATLAS → Product → Stock Configuration.
+
+The Stock Configuration page sometimes displays 0 records when the Today filter is selected, even though the SAP system contains newly created records.
+
+I am providing the existing SAP SQL query below. Treat this query as the primary business reference for the Stock Configuration data structure.
+
+## 1. Investigate the existing implementation
+
+Inspect:
+
+- Stock Configuration frontend page.
+- Stock Configuration API endpoint.
+- SAP Business One Service Layer adapter.
+- Stock Configuration service and repository.
+- Existing SQL/query implementation.
+- Date filtering and branch filtering.
+- SAP pagination and caching.
+
+Identify exactly why the latest SAP records are missing.
+
+Do not change code before identifying the root cause.
+
+## 2. Understand the provided SQL query
+
+The query uses:
+
+- OITM – Item Master.
+- OPOR / POR1 – Purchase Orders.
+- OPDN / PDN1 – Goods Receipt PO.
+- ORDR / RDR1 – Sales Orders.
+- OCRD – Business Partners.
+- OITW – Warehouse stock.
+
+It calculates or retrieves:
+
+- SAP Code.
+- Description.
+- SO Quantity.
+- Stock Quantity.
+- Vendor Name.
+- GRPO Number.
+- Received Quantity.
+- Net Weight.
+- QC.
+- Drawing.
+- V Check.
+- OK Quantity.
+- Rejected Quantity.
+- LM.
+- OLNG.
+- I PK.
+- LBL.
+- MC or PT.
+
+Preserve the original business meaning and joins.
+
+Important: The existing query uses INNER JOINs. Therefore, items without a matching Purchase Order and Goods Receipt PO are excluded. Verify whether this is intended.
+
+Do not silently change this business rule.
+
+## 3. Fix missing latest records
+
+Investigate these cases separately:
+
+A. New Item Master item with no Purchase Order.
+
+B. Item with a Purchase Order but no Goods Receipt PO.
+
+C. Item with a completed Goods Receipt PO.
+
+D. Item connected to a Sales Order through OPOR.ImportEnt.
+
+E. Item with a Purchase Order where OPOR.ImportEnt is NULL.
+
+Determine which cases should appear in Stock Configuration according to the existing business requirement.
+
+If item master-only records must also appear, implement that as a separate, clearly identified data category rather than fabricating purchase or receipt information.
+
+## 4. Correct date filtering
+
+Inspect the frontend Today filter and backend date filtering.
+
+Return the actual date fields needed:
+
+- SO Date.
+- PO Date.
+- GRN Date.
+- Entry Date.
+- Last Updated.
+
+Use GRN Date as the stock receipt date when the record represents a Goods Receipt PO.
+
+Do not use Item Master creation date as the GRPO receipt date.
+
+Ensure Today, Yesterday, This Week, This Month and All Dates filters work using the correct date field and SAP company timezone.
+
+Test the Today filter with an actual newly created SAP document.
+
+## 5. Correct SAP synchronization
+
+When the user clicks Sync from SAP:
+
+1. Retrieve the relevant SAP records.
+2. Handle pagination completely.
+3. Apply the correct business filters.
+4. Map all fields accurately.
+5. Avoid duplicate entries.
+6. Preserve existing QC, Drawing, V Check, LM, OLNG, I PK, LBL, MC or PT and Remarks values.
+7. Update the total record count.
+8. Display the actual latest synchronization timestamp.
+
+Do not replace missing SAP values with invented values.
+
+## 6. Verify quantity calculations
+
+Compare the query calculations against actual SAP records:
+
+- SO Quantity.
+- PO Quantity.
+- GRPO Quantity.
+- Open Quantity.
+- Rejected Quantity.
+- Stock Quantity from OITW.
+
+Verify whether the current OpenQty calculation is actually the intended definition of OK Quantity.
+
+Do not modify quantity formulas without documenting and verifying their business meaning.
+
+## 7. Technical requirements
+
+- Use the existing SAP integration architecture.
+- Never connect React directly to SAP.
+- Keep SAP credentials on the backend.
+- Preserve MySQL database compatibility.
+- Preserve authentication and RBAC.
+- Do not introduce PostgreSQL.
+- Do not modify `pos-inventory-v2`.
+- Do not redesign the Stock Configuration UI.
+- Do not use mock data or hardcoded records.
+- Do not write changes back to SAP.
+
+Also verify whether the supplied SQL syntax is compatible with the configured SAP database. The query uses SQL Server-specific syntax such as ISNULL and CAST AS VARCHAR. If the SAP database is HANA, translate it appropriately rather than executing incompatible SQL.
+
+## 8. Final verification report
+
+Provide:
+
+1. Root cause.
+2. Files changed.
+3. API endpoints checked.
+4. SQL/query corrections.
+5. Date-filter corrections.
+6. SAP records retrieved.
+7. Before-and-after item counts.
+8. Actual latest item/document numbers used for verification.
+9. Tests passed and failed.
+10. Any remaining SAP configuration requirements.
+
+Do not report success until the latest actual SAP records have been verified in ATLAS Stock Configuration.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-11-14T15:08:07+05:30.
+
+The user's current state is as follows:
+Active Document: c:\Users\A\Documents\IB\Dashboard\atl2\Atls\pos-inventory\pos-backend\.env (LANGUAGE_UNSPECIFIED)
+Cursor is on line: 48
+Other open documents:
+- c:\Users\A\Documents\IB\Dashboard\atl2\Atls\pos-inventory\pos-backend\_stock_configuration.json (LANGUAGE_UNSPECIFIED)
+- c:\Users\A\Documents\IB\Dashboard\atl2\Atls\pos-inventory\Dashboard-Ui\src\pages\StockConfigurationPage.tsx (LANGUAGE_UNSPECIFIED)
+- c:\Users\A\Documents\IB\Dashboard\atl2\Atls\pos-inventory\pos-backend\app\services\stock_configuration_service.py (LANGUAGE_UNSPECIFIED)
+- c:\Users\A\Documents\IB\Dashboard\atl2\Atls\pos-inventory\pos-backend\README.md (LANGUAGE_UNSPECIFIED)
+- c:\Users\A\Documents\IB\Dashboard\atl2\Atls\pos-inventory\pos-backend\app\main.py (LANGUAGE_UNSPECIFIED)
+</ADDITIONAL_METADATA>

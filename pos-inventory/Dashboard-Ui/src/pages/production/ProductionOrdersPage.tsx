@@ -122,12 +122,16 @@ export const ProductionOrdersPage = () => {
     queryKey: ['production', 'summary', warehouseFilter, date_from, date_to],
     queryFn: () => getProductionSummary(queryFilters),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const { data: ordersData, isLoading: loadingOrders, isError: errorOrders, refetch: refetchOrders } = useQuery({
     queryKey: ['production', 'orders', tableFilters],
     queryFn: () => getProductionOrders(tableFilters),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const handleRefresh = () => {

@@ -17,6 +17,7 @@ import {
   MoreVertical,
   Printer,
   Package2,  
+  RefreshCw,
   Search,
   User,
   X,
@@ -63,6 +64,8 @@ export const InvoiceDetailPanel = ({ id, onClose, initialSale }: { id: number; o
     queryFn: () => salesApi.getSaleDetail(id.toString()),
     enabled: !!id,
     initialData: mappedInitialData,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const [activeTab, setActiveTab] = useState<'items' | 'payments' | 'notes' | 'history'>('items');
@@ -384,7 +387,7 @@ export const SalesList = () => {
     return () => document.removeEventListener('click', handleOutsideClick);
   }, [isDateDropdownOpen]);
 
-  const { data, isLoading } = useQuery<DashboardRecentSalesPage>({
+  const { data, isLoading, isFetching, refetch } = useQuery<DashboardRecentSalesPage>({
     queryKey: ['sales', quickFilter, dateFrom, dateTo, debouncedSearch, statusFilter, paymentMethodFilter, branchFilter, offset, limit],
     queryFn: () => salesApi.getSalesFeed({
       range: quickFilter,
@@ -396,7 +399,9 @@ export const SalesList = () => {
       branch: branchFilter || undefined,
       limit,
       offset
-    })
+    }),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const totalPages = data?.total ? Math.ceil(data.total / limit) : 1;
@@ -484,6 +489,15 @@ export const SalesList = () => {
                 </div>
               )}
             </div>
+            <button
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="flex items-center gap-1.5 px-3 py-2 text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors font-medium text-sm cursor-pointer disabled:opacity-50"
+              title="Refresh sales list"
+            >
+              <RefreshCw className={`w-4 h-4 text-slate-500 ${isFetching ? 'animate-spin text-blue-600' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
             <button 
               onClick={() => {
                 if (!data?.items || data.items.length === 0) return;

@@ -75,7 +75,8 @@ export const ProfitabilityReportsPage: React.FC = () => {
         to_date: dateTo || undefined,
       });
     },
-    staleTime: 60_000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const summary = data?.summary || data?.kpis;

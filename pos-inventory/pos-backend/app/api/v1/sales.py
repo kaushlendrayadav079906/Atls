@@ -17,6 +17,7 @@ from app.core.security import get_current_user, require_permission
 from app.core.config import settings
 from app.models.schemas import SaleCreate, SaleResponse, SaleDetail
 from app.services.sap.invoices_service import SAPInvoicesService
+from app.services.sap.finance_service import invalidate_finance_cache
 from app.services.sap.client import SAPValidationError
 
 router = APIRouter()
@@ -122,10 +123,12 @@ async def create_sale(
         logger.info(
             f"Sale {sale_id} completed: Branch={branch}, SAP DocEntry={doc_entry}, DocNum={doc_num}"
         )
-        # Invalidate dashboard and branch-specific product cache in background
+        # Invalidate dashboard, finance, and branch-specific product cache in background
         background_tasks.add_task(cache_delete, DASHBOARD_SUMMARY_KEY)
         background_tasks.add_task(cache_delete_prefix, f"{DASHBOARD_SUMMARY_KEY}:operator:{branch}")
         background_tasks.add_task(cache_delete_prefix, f"{PRODUCTS_LIST_KEY}:branch:{branch}")
+        background_tasks.add_task(cache_delete_prefix, "pos:dashboard:executive")
+        background_tasks.add_task(invalidate_finance_cache, branch)
 
         # Patch stock in the long-lived product store immediately (no SAP round-trip needed)
         sold_deltas = [

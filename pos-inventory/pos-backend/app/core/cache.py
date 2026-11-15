@@ -20,6 +20,11 @@ logger = logging.getLogger(__name__)
 _store: dict[str, tuple[float, Any]] = {}
 _store_lock = asyncio.Lock()
 
+# Metrics tracking
+_hits: int = 0
+_misses: int = 0
+_evictions: int = 0
+
 # Background eviction task handle
 _eviction_task: Optional[asyncio.Task] = None
 
@@ -50,6 +55,7 @@ async def close_cache() -> None:
 
 async def _eviction_loop() -> None:
     """Periodically remove expired entries to avoid unbounded memory growth."""
+    global _evictions
     while True:
         await asyncio.sleep(60)  # run every minute
         now = time.monotonic()
@@ -57,6 +63,8 @@ async def _eviction_loop() -> None:
             expired = [k for k, (exp, _) in _store.items() if exp <= now]
             for k in expired:
                 del _store[k]
+            if expired:
+                _evictions += len(expired)
         if expired:
             logger.debug(f"Cache eviction: removed {len(expired)} expired entries.")
 
@@ -65,17 +73,20 @@ async def _eviction_loop() -> None:
 
 async def cache_get(key: str) -> Optional[Any]:
     """Return the cached value for *key*, or None if absent / expired."""
+    global _hits, _misses
     now = time.monotonic()
     async with _store_lock:
         entry = _store.get(key)
-    if entry is None:
-        return None
-    expires_at, value = entry
-    if expires_at <= now:
-        async with _store_lock:
+        if entry is None:
+            _misses += 1
+            return None
+        expires_at, value = entry
+        if expires_at <= now:
             _store.pop(key, None)
-        return None
-    return value
+            _misses += 1
+            return None
+        _hits += 1
+        return value
 
 
 async def cache_set(key: str, value: Any, ttl: int = 300) -> None:
@@ -103,13 +114,37 @@ async def cache_delete_prefix(prefix: str) -> None:
             del _store[k]
 
 
-async def cache_stats() -> dict[str, int]:
+async def cache_stats() -> dict[str, Any]:
     """Return lightweight cache metrics for production monitoring."""
     now = time.monotonic()
     async with _store_lock:
         total = len(_store)
         valid = sum(1 for exp, _ in _store.values() if exp > now)
+        total_lookups = _hits + _misses
+        hit_ratio = round((_hits / total_lookups * 100), 1) if total_lookups > 0 else 0.0
     return {
+        "hits": _hits,
+        "misses": _misses,
+        "hit_ratio_pct": hit_ratio,
+        "evictions": _evictions,
+        "keys_total": total,
+        "keys_valid": valid,
+        "keys_expired": max(total - valid, 0),
+    }
+
+
+def get_cache_stats_sync() -> dict[str, Any]:
+    """Synchronous read of cache metrics for non-async services."""
+    now = time.monotonic()
+    total = len(_store)
+    valid = sum(1 for exp, _ in _store.values() if exp > now)
+    total_lookups = _hits + _misses
+    hit_ratio = round((_hits / total_lookups * 100), 1) if total_lookups > 0 else 0.0
+    return {
+        "hits": _hits,
+        "misses": _misses,
+        "hit_ratio_pct": hit_ratio,
+        "evictions": _evictions,
         "keys_total": total,
         "keys_valid": valid,
         "keys_expired": max(total - valid, 0),

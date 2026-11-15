@@ -18,9 +18,29 @@ logger = logging.getLogger(__name__)
 
 _executor = ThreadPoolExecutor(max_workers=min(16, (os.cpu_count() or 4) * 2))
 
-# Thread-safe cache with 5-minute TTL
+# Dedicated bounded thread pool for independent SAP requests (max 4 concurrent workers per Phase 2 requirements)
+_FINANCE_CONCURRENCY_POOL = ThreadPoolExecutor(max_workers=4)
+
+# Thread-safe cache with 5-minute TTL for finance overviews
 _FINANCE_CACHE: Dict[str, Tuple[Dict[str, Any], float]] = {}
 _CACHE_TTL_SECONDS = 300.0
+
+# 24-hour cache for completed historical calendar month metrics (past months are static closed periods)
+_HISTORICAL_TREND_CACHE: Dict[str, Tuple[Dict[str, Any], float]] = {}
+_HISTORICAL_CACHE_TTL = 86400.0  # 24 hours
+
+
+def invalidate_finance_cache(branch_id: Optional[str] = None) -> None:
+    """Evict finance cache entries when transactions occur (sales, payments, credit notes)."""
+    global _FINANCE_CACHE
+    if branch_id and str(branch_id).strip().upper() not in ("ALL", "*", ""):
+        b_target = str(branch_id).strip().upper()
+        keys_to_del = [k for k in list(_FINANCE_CACHE.keys()) if f":{b_target}:" in k or f"_{b_target}_" in k]
+        for k in keys_to_del:
+            _FINANCE_CACHE.pop(k, None)
+    else:
+        _FINANCE_CACHE.clear()
+    logger.info("Finance cache invalidated (branch=%s)", branch_id or "all")
 
 
 def _to_float(val: Any) -> float:
@@ -188,12 +208,15 @@ class SAPFinanceService:
         to_date: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Fetch and aggregate financial KPIs, trends, top customers, suppliers, and recent payments."""
-        cache_key = f"finance_overview_{range_str}_{branch_id or 'all'}_{from_date or ''}_{to_date or ''}"
+        start_perf = time.perf_counter()
+        company = getattr(settings, "SAP_COMPANY_DB", "default")
+        cache_key = f"finance_overview:{company}:{range_str}:{branch_id or 'all'}:{from_date or ''}:{to_date or ''}"
         now_ts = time.time()
         if cache_key in _FINANCE_CACHE:
             cached_data, cached_at = _FINANCE_CACHE[cache_key]
             if now_ts - cached_at < _CACHE_TTL_SECONDS:
-                logger.debug("Returning cached finance overview (%s)", cache_key)
+                elapsed_ms = (time.perf_counter() - start_perf) * 1000.0
+                logger.info("Finance overview cache HIT in %.2f ms (key=%s)", elapsed_ms, cache_key)
                 return cached_data
 
         d_from, d_to = self._resolve_date_range(range_str, from_date, to_date)
@@ -206,22 +229,36 @@ class SAPFinanceService:
         except Exception:
             pass
 
-        # 1. Fetch Sales Invoices (Current & Previous period)
-        sales_data = self._get_sales_metrics(d_from, d_to, prev_from, prev_to, branch_id, is_all_time=is_all_time)
+        # Concurrently execute independent SAP requests using bounded thread pool (max 4 workers)
+        # Group 1 & 2: Sales, Purchases, Incoming payments, Outgoing payments, AR/AP balances,
+        # Recent payments, and Trend calculations run via bounded concurrency pool.
+        fut_sales = _FINANCE_CONCURRENCY_POOL.submit(
+            self._get_sales_metrics, d_from, d_to, prev_from, prev_to, branch_id, is_all_time
+        )
+        fut_purch = _FINANCE_CONCURRENCY_POOL.submit(
+            self._get_purchases_metrics, d_from, d_to, prev_from, prev_to, branch_id, is_all_time
+        )
+        fut_incoming = _FINANCE_CONCURRENCY_POOL.submit(
+            self._get_incoming_payments_metrics, d_from, d_to, prev_from, prev_to, branch_id, is_all_time
+        )
+        fut_outgoing = _FINANCE_CONCURRENCY_POOL.submit(
+            self._get_outgoing_payments_metrics, d_from, d_to, prev_from, prev_to, branch_id, is_all_time
+        )
+        fut_balances = _FINANCE_CONCURRENCY_POOL.submit(self._get_ar_ap_balances)
+        fut_recent = _FINANCE_CONCURRENCY_POOL.submit(self._get_recent_payments, branch_id)
+        fut_sp_trend = _FINANCE_CONCURRENCY_POOL.submit(self._get_sales_vs_purchases_trend, range_str, branch_id)
+        fut_pmt_trend = _FINANCE_CONCURRENCY_POOL.submit(self._get_payments_trend, range_str, branch_id)
 
-        # 2. Fetch Purchase Invoices (Current & Previous period)
-        purchases_data = self._get_purchases_metrics(d_from, d_to, prev_from, prev_to, branch_id, is_all_time=is_all_time)
+        sales_data = fut_sales.result()
+        purchases_data = fut_purch.result()
+        incoming_data = fut_incoming.result()
+        outgoing_data = fut_outgoing.result()
+        balances_data = fut_balances.result()
+        recent_payments = fut_recent.result()
+        sales_purchases_trend = fut_sp_trend.result()
+        payments_trend = fut_pmt_trend.result()
 
-        # 3. Fetch Incoming Payments
-        incoming_data = self._get_incoming_payments_metrics(d_from, d_to, prev_from, prev_to, branch_id, is_all_time=is_all_time)
-
-        # 4. Fetch Outgoing Payments
-        outgoing_data = self._get_outgoing_payments_metrics(d_from, d_to, prev_from, prev_to, branch_id, is_all_time=is_all_time)
-
-        # 5. Fetch Accounts Receivable & Payable balances from Business Partners
-        balances_data = self._get_ar_ap_balances()
-
-        # 6. Compute Gross Profit & Margin
+        # Compute Gross Profit & Margin
         total_sales = sales_data["total_sales"]
         total_purchases = purchases_data["total_purchases"]
         prev_sales = sales_data["prev_sales"]
@@ -235,22 +272,15 @@ class SAPFinanceService:
         prev_gross_margin = round((prev_gross_profit / prev_sales * 100), 1) if prev_sales > 0 else 0.0
         gross_margin_growth = round(gross_margin - prev_gross_margin, 1)
 
-        # 7. Generate Trends Data (Past 6 months by default for the charts)
-        sales_purchases_trend = self._get_sales_vs_purchases_trend(range_str, branch_id)
-        payments_trend = self._get_payments_trend(range_str, branch_id)
-
-        # 8. Top 5 Customers by Sales (reuses already-fetched sales invoices)
+        # Top 5 Customers by Sales (reuses already-fetched sales invoices)
         top_customers = self._get_top_customers(
             d_from, d_to, branch_id, is_all_time=is_all_time, existing_invoices=sales_data.get("current_invoices")
         )
 
-        # 9. Top 5 Suppliers by Purchase (reuses already-fetched purchase invoices)
+        # Top 5 Suppliers by Purchase (reuses already-fetched purchase invoices)
         top_suppliers = self._get_top_suppliers(
             d_from, d_to, branch_id, is_all_time=is_all_time, existing_pinvs=purchases_data.get("current_pinvs")
         )
-
-        # 10. Recent Payments (Incoming and Outgoing)
-        recent_payments = self._get_recent_payments(branch_id)
 
         kpis_obj = {
             "total_sales": {
@@ -335,6 +365,15 @@ class SAPFinanceService:
         if len(_FINANCE_CACHE) > 50:
             oldest_key = min(_FINANCE_CACHE.keys(), key=lambda k: _FINANCE_CACHE[k][1])
             _FINANCE_CACHE.pop(oldest_key, None)
+
+        elapsed_ms = (time.perf_counter() - start_perf) * 1000.0
+        logger.info(
+            "Finance overview completed in %.2f ms (range=%s, branch=%s, cache=MISS, key=%s)",
+            elapsed_ms,
+            range_str,
+            branch_id or "all",
+            cache_key,
+        )
 
         return result
 
@@ -545,7 +584,7 @@ class SAPFinanceService:
         return res
 
     def _get_sales_vs_purchases_trend(self, range_str: str, branch_id: Optional[str]) -> List[Dict[str, Any]]:
-        """Generate monthly trend data for the last 6 months using a single 1-shot date range query."""
+        """Generate monthly trend data for the last 6 months using bounded historical caching."""
         today = date.today()
         m_year = today.year
         m_month = today.month - 5
@@ -554,14 +593,39 @@ class SAPFinanceService:
             m_year -= 1
         start_6m = date(m_year, m_month, 1)
 
+        company = getattr(settings, "SAP_COMPANY_DB", "default")
+        b_key = str(branch_id or "all").strip().upper()
+        now_ts = time.time()
+
+        # Check which past completed months (months 5 to 1 ago) are already cached
+        past_months_cached = True
+        cached_month_data: Dict[str, Dict[str, Any]] = {}
+        for i in range(5, 0, -1):
+            my = today.year
+            mm = today.month - i
+            while mm <= 0:
+                mm += 12
+                my -= 1
+            m_key = f"sp_trend:{company}:{b_key}:{my}-{mm:02d}"
+            if m_key in _HISTORICAL_TREND_CACHE and (now_ts - _HISTORICAL_TREND_CACHE[m_key][1] < _HISTORICAL_CACHE_TTL):
+                cached_month_data[f"{my}-{mm:02d}"] = _HISTORICAL_TREND_CACHE[m_key][0]
+            else:
+                past_months_cached = False
+
+        # If all 5 past historical months are cached, query SAP only for the active in-progress month
+        if past_months_cached:
+            query_start = date(today.year, today.month, 1)
+        else:
+            query_start = start_6m
+
         try:
-            all_inv = self.invoices_service.get_invoices_by_date(start_6m, today)
+            all_inv = self.invoices_service.get_invoices_by_date(query_start, today)
         except Exception as e:
             logger.warning("Error fetching trend sales: %s", e)
             all_inv = []
 
         try:
-            f_str = f"DocDate ge '{start_6m.isoformat()}' and DocDate le '{today.isoformat()}' and Cancelled ne 'tYES'"
+            f_str = f"DocDate ge '{query_start.isoformat()}' and DocDate le '{today.isoformat()}' and Cancelled ne 'tYES'"
             all_po = self._fetch_all_sap_records(
                 "PurchaseInvoices",
                 {"$filter": f_str, "$select": "DocTotal,DocDate,Cancelled,BPL_IDAssignedToInvoice,BPLName"}
@@ -586,6 +650,11 @@ class SAPFinanceService:
             if end_m > today:
                 end_m = today
 
+            month_str = f"{my}-{mm:02d}"
+            if i > 0 and month_str in cached_month_data:
+                trend.append(cached_month_data[month_str])
+                continue
+
             sm_str = start_m.isoformat()
             em_str = end_m.isoformat()
             label = start_m.strftime("%b")
@@ -598,7 +667,7 @@ class SAPFinanceService:
             gp = round(s_total - p_total, 2)
             gm = round((gp / s_total * 100), 1) if s_total > 0 else 0.0
 
-            trend.append({
+            row = {
                 "period": label,
                 "month": start_m.strftime("%Y-%m"),
                 "sales": round(s_total, 2),
@@ -608,12 +677,18 @@ class SAPFinanceService:
                 "gross_profit": gp,
                 "gross_margin": gm,
                 "margin_pct": gm,
-            })
+            }
+            trend.append(row)
+
+            # Completed past months are cached for 24 hours
+            if i > 0:
+                m_key = f"sp_trend:{company}:{b_key}:{month_str}"
+                _HISTORICAL_TREND_CACHE[m_key] = (row, now_ts)
 
         return trend
 
     def _get_payments_trend(self, range_str: str, branch_id: Optional[str]) -> List[Dict[str, Any]]:
-        """Generate incoming vs outgoing payments monthly trend using a single 1-shot date range query."""
+        """Generate incoming vs outgoing payments monthly trend using bounded historical caching."""
         today = date.today()
         m_year = today.year
         m_month = today.month - 5
@@ -622,8 +697,31 @@ class SAPFinanceService:
             m_year -= 1
         start_6m = date(m_year, m_month, 1)
 
+        company = getattr(settings, "SAP_COMPANY_DB", "default")
+        b_key = str(branch_id or "all").strip().upper()
+        now_ts = time.time()
+
+        past_months_cached = True
+        cached_month_data: Dict[str, Dict[str, Any]] = {}
+        for i in range(5, 0, -1):
+            my = today.year
+            mm = today.month - i
+            while mm <= 0:
+                mm += 12
+                my -= 1
+            m_key = f"pmt_trend:{company}:{b_key}:{my}-{mm:02d}"
+            if m_key in _HISTORICAL_TREND_CACHE and (now_ts - _HISTORICAL_TREND_CACHE[m_key][1] < _HISTORICAL_CACHE_TTL):
+                cached_month_data[f"{my}-{mm:02d}"] = _HISTORICAL_TREND_CACHE[m_key][0]
+            else:
+                past_months_cached = False
+
+        if past_months_cached:
+            query_start = date(today.year, today.month, 1)
+        else:
+            query_start = start_6m
+
         try:
-            f_inc = f"DocDate ge '{start_6m.isoformat()}' and DocDate le '{today.isoformat()}' and Cancelled ne 'tYES'"
+            f_inc = f"DocDate ge '{query_start.isoformat()}' and DocDate le '{today.isoformat()}' and Cancelled ne 'tYES'"
             all_inc = self._fetch_all_sap_records(
                 "IncomingPayments",
                 {"$filter": f_inc, "$select": "DocDate,CashSum,TransferSum,Cancelled,BPLID,BPLName"}
@@ -633,7 +731,7 @@ class SAPFinanceService:
             all_inc = []
 
         try:
-            f_out = f"DocDate ge '{start_6m.isoformat()}' and DocDate le '{today.isoformat()}' and Cancelled ne 'tYES'"
+            f_out = f"DocDate ge '{query_start.isoformat()}' and DocDate le '{today.isoformat()}' and Cancelled ne 'tYES'"
             all_out = self._fetch_all_sap_records(
                 "VendorPayments",
                 {"$filter": f_out, "$select": "DocDate,CashSum,TransferSum,Cancelled,BPLID,BPLName"}
@@ -658,6 +756,11 @@ class SAPFinanceService:
             if end_m > today:
                 end_m = today
 
+            month_str = f"{my}-{mm:02d}"
+            if i > 0 and month_str in cached_month_data:
+                trend.append(cached_month_data[month_str])
+                continue
+
             sm_str = start_m.isoformat()
             em_str = end_m.isoformat()
             label = start_m.strftime("%b")
@@ -668,12 +771,17 @@ class SAPFinanceService:
             inc_total = sum(_to_float(x.get("CashSum")) + _to_float(x.get("TransferSum")) for x in m_inc)
             out_total = sum(_to_float(x.get("CashSum")) + _to_float(x.get("TransferSum")) for x in m_out)
 
-            trend.append({
+            row = {
                 "period": label,
                 "month": start_m.strftime("%Y-%m"),
                 "incoming": round(inc_total, 2),
                 "outgoing": round(out_total, 2),
-            })
+            }
+            trend.append(row)
+
+            if i > 0:
+                m_key = f"pmt_trend:{company}:{b_key}:{month_str}"
+                _HISTORICAL_TREND_CACHE[m_key] = (row, now_ts)
 
         return trend
 

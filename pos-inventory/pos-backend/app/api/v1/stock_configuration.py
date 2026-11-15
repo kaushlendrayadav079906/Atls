@@ -30,6 +30,18 @@ async def get_stock_configuration(
     current_user: dict = Depends(require_permission("products.view")),
 ) -> Dict[str, Any]:
     """Retrieve paginated stock configuration items, KPI statistics, filter options, and SAP connection state."""
+    role = str(current_user.get("role") or "").strip().lower()
+    is_admin = role in ("admin", "administrator")
+    if not is_admin:
+        user_branch = str(current_user.get("branch_id") or "").strip()
+        if user_branch:
+            if branch and branch != user_branch and branch.lower() not in ("all", "all branches"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Forbidden: You can only view items for your assigned branch ({user_branch}).",
+                )
+            branch = user_branch
+
     try:
         return _service.get_items(
             page=page,
@@ -57,8 +69,21 @@ async def bulk_update_stock_items(
     items = payload.get("items")
     if not isinstance(items, list):
         raise HTTPException(status_code=400, detail="'items' must be a list of item objects.")
+
+    role = str(current_user.get("role") or "").strip().lower()
+    is_admin = role in ("admin", "administrator")
+
+    # Permission check: Only Admin users can add or modify remarks
+    for item in items:
+        if "remark" in item and not is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Only authorized Admin users can add or modify remarks.",
+            )
+
+    admin_user_id = str(current_user.get("username") or current_user.get("sub") or current_user.get("id") or "admin")
     try:
-        return _service.bulk_update_items(items)
+        return _service.bulk_update_items(items, admin_user_id=admin_user_id)
     except Exception as e:
         logger.error(f"Error during bulk update: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to execute bulk update: {str(e)}")
@@ -71,11 +96,35 @@ async def update_stock_item(
     current_user: dict = Depends(require_permission("products.view")),
 ) -> Dict[str, Any]:
     """Update user-editable stock configuration fields for a row and automatically sync to SAP."""
+    role = str(current_user.get("role") or "").strip().lower()
+    is_admin = role in ("admin", "administrator")
+    user_branch = str(current_user.get("branch_id") or "").strip()
+
+    # Company / Branch access restriction for non-admins
+    if not is_admin and user_branch:
+        existing_item = _service.get_item(item_code)
+        if existing_item and existing_item.get("warehouse_code") and existing_item.get("warehouse_code") != user_branch:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Forbidden: You can only modify stock items assigned to your branch ({user_branch}).",
+            )
+
+    # Permission check: Only Admin users can add or modify remarks
+    if "remark" in data:
+        if not is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: Only authorized Admin users can add or modify remarks.",
+            )
+
+    admin_user_id = str(current_user.get("username") or current_user.get("sub") or current_user.get("id") or "admin")
     try:
-        updated = _service.update_item(item_code, data)
+        updated = _service.update_item(item_code, data, admin_user_id=admin_user_id)
         return {
             "success": True,
             "item": updated,
+            "remark": updated.get("remark", ""),
+            "last_submitted_at": updated.get("last_submitted_at"),
             "sap_synced": updated.get("sap_synced", False),
             "sap_message": updated.get("sap_message", ""),
         }
@@ -84,6 +133,20 @@ async def update_stock_item(
     except Exception as e:
         logger.error(f"Error updating stock item {item_code}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update stock item: {str(e)}")
+
+
+@router.get("/items/{item_code}/remarks-history")
+async def get_item_remarks_history(
+    item_code: str,
+    current_user: dict = Depends(require_permission("products.view")),
+) -> Dict[str, Any]:
+    """Retrieve audit history of remarks for a stock configuration item."""
+    try:
+        history = _service.get_remark_history(item_code)
+        return {"item_code": item_code, "history": history}
+    except Exception as e:
+        logger.error(f"Error retrieving remark history for {item_code}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve remark history: {str(e)}")
 
 
 @router.post("/items")

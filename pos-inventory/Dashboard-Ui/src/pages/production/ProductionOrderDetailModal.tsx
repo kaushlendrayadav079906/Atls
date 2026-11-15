@@ -24,6 +24,8 @@ export const ProductionOrderDetailModal: React.FC<ModalProps> = ({ productionOrd
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['production', 'orderDetail', productionOrderNo],
     queryFn: () => getProductionOrderDetail(productionOrderNo),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   return (

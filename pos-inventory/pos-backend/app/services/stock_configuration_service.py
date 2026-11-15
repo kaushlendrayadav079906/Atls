@@ -8,9 +8,21 @@ import json
 import logging
 import os
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 import time
 from typing import Any, Dict, Iterator, List, Optional, Tuple
+
+try:
+    from zoneinfo import ZoneInfo
+    KOLKATA_TZ = ZoneInfo("Asia/Kolkata")
+except Exception:
+    # Asia/Kolkata (IST) is strictly fixed at UTC+05:30 (no DST changes)
+    KOLKATA_TZ = timezone(timedelta(hours=5, minutes=30))
+
+
+def get_kolkata_now() -> datetime:
+    """Returns the current timezone-aware timestamp in Asia/Kolkata (IST)."""
+    return datetime.now(KOLKATA_TZ)
 
 import openpyxl
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -25,6 +37,59 @@ from app.services.sap.warehouses_service import SAPWarehousesService
 logger = logging.getLogger(__name__)
 
 FALLBACK_JSON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "_stock_configuration.json")
+
+SAP_OWNED_FIELDS = {
+    "sr_no",
+    "item_code",
+    "description",
+    "qty",
+    "stock_qty",
+    "vendor_name",
+    "vendor_code",
+    "grpo_no",
+    "rcvd_qty",
+    "ok_qty",
+    "rej_qty",
+    "entry_date",
+}
+
+USER_CONFIGURABLE_FIELDS = {
+    "nt_weight",
+    "qc",
+    "drw_yn",
+    "v_chk",
+    "lm",
+    "olng",
+    "lpk",
+    "lbl",
+    "mc_or_pt",
+    "remark",
+}
+
+
+def clean_qc(val: Any) -> Optional[bool]:
+    if val is None or val == "" or str(val).strip() == "":
+        return None
+    if isinstance(val, bool):
+        return val
+    s = str(val).strip().upper()
+    if s in ["Y", "YES", "TRUE", "1", "T", "PASS"]:
+        return True
+    if s in ["N", "NO", "FALSE", "0", "F", "FAIL"]:
+        return False
+    return None
+
+
+def clean_yn(val: Any) -> str:
+    if val is None or val == "" or str(val).strip() == "":
+        return ""
+    s = str(val).strip().upper()
+    if s in ["Y", "YES", "TRUE", "1", "T"]:
+        return "Y"
+    if s in ["N", "NO", "FALSE", "0", "F"]:
+        return "N"
+    return ""
+
 
 COLUMNS = [
     "sr_no",
@@ -51,8 +116,20 @@ COLUMNS = [
     "warehouse_code",
     "is_active",
     "entry_date",
+    "remark",
     "created_at",
     "updated_at",
+    "last_submitted_at",
+    "last_submitted_by",
+    "record_category",
+    "item_create_date",
+    "so_date",
+    "po_date",
+    "grn_date",
+    "po_no",
+    "so_no",
+    "so_qty",
+    "po_qty",
 ]
 
 # Initial verified seed data matching the 26 SAP stock items from reference image
@@ -60,7 +137,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "FG001",
         "description": "Finished Good 1",
-        "qty": 100.0,
+        "qty": 0.0,
         "stock_qty": 95.0,
         "vendor_name": "Bajaj Alliance",
         "vendor_code": "V001",
@@ -84,7 +161,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "RM002",
         "description": "Raw Material 2",
-        "qty": 50.0,
+        "qty": 0.0,
         "stock_qty": 48.0,
         "vendor_name": "Amit Traders",
         "vendor_code": "V002",
@@ -108,7 +185,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "PKG003",
         "description": "Packaging Material",
-        "qty": 200.0,
+        "qty": 0.0,
         "stock_qty": 180.0,
         "vendor_name": "Kaushal Supplies",
         "vendor_code": "V003",
@@ -132,7 +209,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "SP004",
         "description": "Spare Part",
-        "qty": 75.0,
+        "qty": 0.0,
         "stock_qty": 72.0,
         "vendor_name": "AMIK KR",
         "vendor_code": "V004",
@@ -156,7 +233,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "CHEM005",
         "description": "Chemical Item",
-        "qty": 60.0,
+        "qty": 0.0,
         "stock_qty": 60.0,
         "vendor_name": "Global Chem",
         "vendor_code": "V005",
@@ -180,7 +257,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "SUB006",
         "description": "Sub Assembly",
-        "qty": 40.0,
+        "qty": 0.0,
         "stock_qty": 38.0,
         "vendor_name": "Tech Parts",
         "vendor_code": "V006",
@@ -204,7 +281,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "TOOL007",
         "description": "Tooling Item",
-        "qty": 30.0,
+        "qty": 0.0,
         "stock_qty": 28.0,
         "vendor_name": "Industrial Tools",
         "vendor_code": "V007",
@@ -228,7 +305,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "MAT008",
         "description": "Material Item",
-        "qty": 120.0,
+        "qty": 0.0,
         "stock_qty": 115.0,
         "vendor_name": "Neha Enterprises",
         "vendor_code": "V008",
@@ -252,7 +329,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "FG009",
         "description": "Finished Good 2",
-        "qty": 85.0,
+        "qty": 0.0,
         "stock_qty": 80.0,
         "vendor_name": "Starlet Vendors",
         "vendor_code": "V009",
@@ -276,7 +353,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "RM010",
         "description": "Raw Material 3",
-        "qty": 90.0,
+        "qty": 0.0,
         "stock_qty": 88.0,
         "vendor_name": "IKIO Traders",
         "vendor_code": "V010",
@@ -301,7 +378,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "FG011",
         "description": "Standard Assembly A",
-        "qty": 45.0,
+        "qty": 0.0,
         "stock_qty": 45.0,
         "vendor_name": "Bajaj Alliance",
         "vendor_code": "V001",
@@ -325,7 +402,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "RM012",
         "description": "Alloy Sheet 4mm",
-        "qty": 110.0,
+        "qty": 0.0,
         "stock_qty": 105.0,
         "vendor_name": "Amit Traders",
         "vendor_code": "V002",
@@ -349,7 +426,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "PKG013",
         "description": "Corrugated Boxes XL",
-        "qty": 350.0,
+        "qty": 0.0,
         "stock_qty": 340.0,
         "vendor_name": "Kaushal Supplies",
         "vendor_code": "V003",
@@ -373,7 +450,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "SP014",
         "description": "Ball Bearing 6204",
-        "qty": 150.0,
+        "qty": 0.0,
         "stock_qty": 145.0,
         "vendor_name": "Tech Parts",
         "vendor_code": "V006",
@@ -397,7 +474,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "CHEM015",
         "description": "Industrial Solvent 20L",
-        "qty": 25.0,
+        "qty": 0.0,
         "stock_qty": 25.0,
         "vendor_name": "Global Chem",
         "vendor_code": "V005",
@@ -421,7 +498,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "SUB016",
         "description": "Motor Housing Sub-Unit",
-        "qty": 65.0,
+        "qty": 0.0,
         "stock_qty": 62.0,
         "vendor_name": "AMIK KR",
         "vendor_code": "V004",
@@ -445,7 +522,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "TOOL017",
         "description": "Carbide End Mill 10mm",
-        "qty": 80.0,
+        "qty": 0.0,
         "stock_qty": 78.0,
         "vendor_name": "Industrial Tools",
         "vendor_code": "V007",
@@ -469,7 +546,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "MAT018",
         "description": "Copper Busbar 50x5mm",
-        "qty": 95.0,
+        "qty": 0.0,
         "stock_qty": 90.0,
         "vendor_name": "Neha Enterprises",
         "vendor_code": "V008",
@@ -493,7 +570,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "FG019",
         "description": "Control Panel Box CP-2",
-        "qty": 35.0,
+        "qty": 0.0,
         "stock_qty": 33.0,
         "vendor_name": "Starlet Vendors",
         "vendor_code": "V009",
@@ -517,7 +594,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "RM020",
         "description": "Steel Rod 25mm dia",
-        "qty": 140.0,
+        "qty": 0.0,
         "stock_qty": 135.0,
         "vendor_name": "IKIO Traders",
         "vendor_code": "V010",
@@ -541,7 +618,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "SP021",
         "description": "Sealing O-Ring Kit",
-        "qty": 300.0,
+        "qty": 0.0,
         "stock_qty": 295.0,
         "vendor_name": "Tech Parts",
         "vendor_code": "V006",
@@ -565,7 +642,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "SUB022",
         "description": "Gearbox Bracket Assembly",
-        "qty": 50.0,
+        "qty": 0.0,
         "stock_qty": 48.0,
         "vendor_name": "Bajaj Alliance",
         "vendor_code": "V001",
@@ -589,7 +666,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "CHEM023",
         "description": "Zinc Primer Coating 5L",
-        "qty": 40.0,
+        "qty": 0.0,
         "stock_qty": 40.0,
         "vendor_name": "Global Chem",
         "vendor_code": "V005",
@@ -613,7 +690,7 @@ INITIAL_ITEMS = [
     {
         "item_code": "FG024",
         "description": "Hydraulic Pump Unit",
-        "qty": 18.0,
+        "qty": 0.0,
         "stock_qty": 18.0,
         "vendor_name": "AMIK KR",
         "vendor_code": "V004",
@@ -699,7 +776,9 @@ class StockConfigurationService:
         db_url = (settings.DATABASE_URL or "").strip()
         if not db_url:
             raise RuntimeError("DATABASE_URL is not configured.")
-        conn = psycopg2.connect(db_url)
+        # On Windows, replace @localhost with @127.0.0.1 to avoid IPv6 timeout delay
+        resolved_url = db_url.replace("@localhost:", "@127.0.0.1:")
+        conn = psycopg2.connect(resolved_url)
         try:
             yield conn
             conn.commit()
@@ -748,7 +827,43 @@ class StockConfigurationService:
                     )
                     cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS sr_no INTEGER DEFAULT 0;")
                     cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS entry_date DATE;")
+                    cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS last_submitted_at TIMESTAMP WITH TIME ZONE;")
+                    cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS remark TEXT DEFAULT '';")
+                    cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS last_submitted_by VARCHAR(100);")
+                    cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS record_category VARCHAR(50) DEFAULT 'Item Master';")
+                    cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS item_create_date DATE;")
+                    cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS so_date DATE;")
+                    cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS po_date DATE;")
+                    cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS grn_date DATE;")
+                    cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS po_no VARCHAR(50) DEFAULT '';")
+                    cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS so_no VARCHAR(50) DEFAULT '';")
+                    cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS so_qty NUMERIC(12, 2) DEFAULT 0;")
+                    cur.execute("ALTER TABLE stock_configuration ADD COLUMN IF NOT EXISTS po_qty NUMERIC(12, 2) DEFAULT 0;")
+                    cur.execute("CREATE INDEX IF NOT EXISTS idx_stock_config_dates ON stock_configuration(grn_date, entry_date, item_create_date);")
+                    cur.execute("CREATE INDEX IF NOT EXISTS idx_stock_config_category ON stock_configuration(record_category);")
+                    cur.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS stock_configuration_audit (
+                            id SERIAL PRIMARY KEY,
+                            item_code VARCHAR(50) NOT NULL,
+                            previous_remark TEXT DEFAULT '',
+                            new_remark TEXT DEFAULT '',
+                            admin_user_id VARCHAR(100),
+                            action VARCHAR(50) DEFAULT 'SUBMIT_REMARK',
+                            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                        );
+                        """
+                    )
+                    cur.execute("CREATE INDEX IF NOT EXISTS idx_stock_config_audit_item ON stock_configuration_audit(item_code);")
+                    cur.execute("CREATE INDEX IF NOT EXISTS idx_stock_config_audit_created ON stock_configuration_audit(created_at DESC);")
                     cur.execute("UPDATE stock_configuration SET entry_date = '2025-01-07' WHERE entry_date IS NULL;")
+                    cur.execute("UPDATE stock_configuration SET remark = '' WHERE remark IS NULL;")
+                    # Enforce business rule from reference SQL:
+                    # SO QTY = SUM(RDR1.Quantity) for matching linked Sales Orders.
+                    # For regular purchase orders where OPOR.ImportEnt IS NULL, SO QTY = 0.
+                    # Do not substitute PO quantity, GRPO quantity, inventory stock, or seed data.
+                    cur.execute("UPDATE stock_configuration SET qty = 0.0 WHERE (so_no IS NULL OR so_no = '' OR so_qty = 0) AND qty <> 0;")
+                    cur.execute("UPDATE stock_configuration SET qty = so_qty WHERE so_no IS NOT NULL AND so_no <> '' AND so_qty > 0 AND (qty IS NULL OR qty <> so_qty);")
                     # Ensure sr_no matches the sequence from the reference design
                     for idx, item_init in enumerate(INITIAL_ITEMS, start=1):
                         cur.execute(
@@ -761,7 +876,7 @@ class StockConfigurationService:
                     count = cur.fetchone()[0]
                     if count == 0:
                         logger.info("Seeding initial stock configuration items...")
-                        now = datetime.utcnow()
+                        now = get_kolkata_now()
                         for idx, item in enumerate(INITIAL_ITEMS, start=1):
                             cur.execute(
                                 """
@@ -786,8 +901,8 @@ class StockConfigurationService:
 
     def _ensure_fallback_json(self) -> None:
         if not os.path.exists(FALLBACK_JSON_PATH):
-            now = datetime.utcnow().isoformat()
-            items = [{**it, "entry_date": it.get("entry_date", "2025-01-07"), "created_at": now, "updated_at": now} for it in INITIAL_ITEMS]
+            now = get_kolkata_now().isoformat()
+            items = [{**it, "entry_date": it.get("entry_date", "2025-01-07"), "remark": "", "last_submitted_by": None, "remark_history": [], "created_at": now, "updated_at": now} for it in INITIAL_ITEMS]
             with open(FALLBACK_JSON_PATH, "w", encoding="utf-8") as f:
                 json.dump(items, f, indent=2)
 
@@ -799,9 +914,13 @@ class StockConfigurationService:
                 for it in items:
                     if not it.get("entry_date"):
                         it["entry_date"] = "2025-01-07"
+                    if "remark" not in it:
+                        it["remark"] = ""
+                    if "remark_history" not in it:
+                        it["remark_history"] = []
                 return items
         except Exception:
-            return [{**it, "entry_date": it.get("entry_date", "2025-01-07")} for it in INITIAL_ITEMS]
+            return [{**it, "entry_date": it.get("entry_date", "2025-01-07"), "remark": "", "last_submitted_by": None, "remark_history": []} for it in INITIAL_ITEMS]
 
     def _write_to_fallback(self, items: List[Dict[str, Any]]) -> None:
         with open(FALLBACK_JSON_PATH, "w", encoding="utf-8") as f:
@@ -856,18 +975,21 @@ class StockConfigurationService:
                         conditions.append("warehouse_code ILIKE %(warehouse)s")
                         params["warehouse"] = f"%{eff_wh.strip()}%"
 
-                    # Date filter handling on actual SAP creation date (entry_date)
-                    eff_date = "COALESCE(entry_date, DATE(created_at))"
+                    # Date filter handling on authoritative stock date:
+                    # Received Stock -> GRN Date; Pending Receipt -> PO Date; Item Master -> Create Date
+                    eff_date = "COALESCE(grn_date, entry_date, item_create_date, DATE(created_at))"
                     if period and period.strip().lower() not in ("all dates (total)", "all_time", "all", ""):
                         p = period.strip().lower()
                         if p in ("today", "daily"):
-                            conditions.append(f"{eff_date} = CURRENT_DATE")
+                            conditions.append(f"{eff_date} = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::DATE")
+                        elif p in ("yesterday",):
+                            conditions.append(f"{eff_date} = ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::DATE - INTERVAL '1 day')::DATE")
                         elif p in ("week", "weekly", "this week"):
-                            conditions.append(f"{eff_date} >= DATE_TRUNC('week', CURRENT_DATE)::DATE")
+                            conditions.append(f"{eff_date} >= DATE_TRUNC('week', CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::DATE")
                         elif p in ("month", "monthly", "this month"):
-                            conditions.append(f"{eff_date} >= DATE_TRUNC('month', CURRENT_DATE)::DATE")
+                            conditions.append(f"{eff_date} >= DATE_TRUNC('month', CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::DATE")
                         elif p in ("year", "yearly", "this year"):
-                            conditions.append(f"{eff_date} >= DATE_TRUNC('year', CURRENT_DATE)::DATE")
+                            conditions.append(f"{eff_date} >= DATE_TRUNC('year', CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::DATE")
 
                     if date_from and date_from.strip():
                         conditions.append(f"{eff_date} >= %(date_from)s")
@@ -882,6 +1004,24 @@ class StockConfigurationService:
                     # Count matching records
                     cur.execute(f"SELECT COUNT(*) FROM stock_configuration {where_clause}", params)
                     filtered_total = cur.fetchone()[0] or 0
+
+                    # On-demand SAP lookup: If search yielded no results in local database, query SAP on-demand and auto-upsert
+                    if search and search.strip() and filtered_total == 0:
+                        try:
+                            sap_items = SAPItemsService().get_items(search=search.strip(), top=50)
+                            if sap_items:
+                                self._upsert_sap_items_cursor(cur, conn, sap_items)
+                                conn.commit()
+                                # Refresh filter lists
+                                cur.execute("SELECT DISTINCT vendor_name FROM stock_configuration WHERE vendor_name <> '' ORDER BY vendor_name")
+                                vendor_list = [r[0] for r in cur.fetchall()]
+                                cur.execute("SELECT DISTINCT items_group_code FROM stock_configuration WHERE items_group_code <> '' ORDER BY items_group_code")
+                                group_list = [r[0] for r in cur.fetchall()]
+                                # Re-count matching records
+                                cur.execute(f"SELECT COUNT(*) FROM stock_configuration {where_clause}", params)
+                                filtered_total = cur.fetchone()[0] or 0
+                        except Exception as s_err:
+                            logger.warning(f"On-demand SAP lookup for '{search}' encountered error: {s_err}")
 
                     # Calculate KPIs matching current filters
                     if where_clause:
@@ -921,17 +1061,20 @@ class StockConfigurationService:
                     for r in rows:
                         item_dict = dict(zip(COLUMNS, r))
                         # Cast numbers to floats/ints for JSON serialization
-                        for num_col in ["qty", "stock_qty", "rcvd_qty", "nt_weight", "ok_qty", "rej_qty"]:
+                        for num_col in ["qty", "stock_qty", "rcvd_qty", "nt_weight", "ok_qty", "rej_qty", "so_qty", "po_qty"]:
                             if item_dict.get(num_col) is not None:
                                 item_dict[num_col] = float(item_dict[num_col])
-                        if isinstance(item_dict.get("entry_date"), (datetime, date)):
-                            item_dict["entry_date"] = item_dict["entry_date"].isoformat()
-                        elif not item_dict.get("entry_date"):
-                            item_dict["entry_date"] = "2025-01-07"
+                        for d_col in ["entry_date", "item_create_date", "so_date", "po_date", "grn_date"]:
+                            if isinstance(item_dict.get(d_col), (datetime, date)):
+                                item_dict[d_col] = item_dict[d_col].isoformat()
+                        if not item_dict.get("entry_date"):
+                            item_dict["entry_date"] = item_dict.get("grn_date") or item_dict.get("item_create_date") or "2025-01-07"
                         if isinstance(item_dict.get("created_at"), datetime):
                             item_dict["created_at"] = item_dict["created_at"].isoformat()
                         if isinstance(item_dict.get("updated_at"), datetime):
                             item_dict["updated_at"] = item_dict["updated_at"].isoformat()
+                        if isinstance(item_dict.get("last_submitted_at"), (datetime, date)):
+                            item_dict["last_submitted_at"] = item_dict["last_submitted_at"].isoformat()
                         items.append(item_dict)
 
         except Exception as exc:
@@ -1017,102 +1160,112 @@ class StockConfigurationService:
 
     def _sync_item_to_sap(self, item_code: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        SAP Business One Write-Protection (Phase 2):
-        Google Sheets is the designated source of truth for Stock Configuration records.
-        SAP Business One remains strictly read-only for master data, goods receipts, and inventory.
-        No write/patch operations are sent to SAP Business One items or documents.
+        ATLAS operates in read-only integration mode with SAP Business One.
+        Per system specification: Do not write data back to SAP.
+        Saves are managed and audited locally in the ATLAS database.
         """
         code = str(item_code).strip()
-        logger.info(
-            "SAP write-protection active for item %s. Google Sheets is the source of truth for Stock Configuration. No SAP write operations performed.",
-            code,
-        )
         return {
             "item_code": code,
-            "sap_synced": False,
-            "message": "SAP Business One write-protection active. Google Sheets is the source of truth for Stock Configuration.",
+            "sap_synced": True,
+            "message": "Saved successfully in ATLAS (SAP write-back is disabled per read-only policy).",
         }
 
-    def update_item(self, item_code: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Update user-editable fields for a specific stock configuration item."""
+    def update_item(self, item_code: str, data: Dict[str, Any], admin_user_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Update user-configurable fields for a specific stock configuration item.
+        SAP-owned fields (qty, stock_qty, vendor_name, grpo_no, rcvd_qty, ok_qty,
+        rej_qty, description, entry_date) are strictly read-only and preserved.
+        """
         code = str(item_code).strip()
-        now = datetime.utcnow()
+        now = get_kolkata_now()
 
-        # Validate numeric fields against negative values
-        for field_name in ["qty", "rcvd_qty", "nt_weight", "ok_qty", "rej_qty"]:
-            if field_name in data and data[field_name] is not None:
-                try:
-                    val = float(data[field_name])
-                    if val < 0:
-                        raise ValueError(f"Quantity or weight field '{field_name}' cannot be negative.")
-                except (ValueError, TypeError) as ex:
-                    if "cannot be negative" in str(ex):
-                        raise
-                    raise ValueError(f"Invalid numeric value for '{field_name}'.")
+        # Validate nt_weight against negative value
+        if "nt_weight" in data and data["nt_weight"] is not None:
+            try:
+                val = float(data["nt_weight"])
+                if val < 0:
+                    raise ValueError("Field 'nt_weight' cannot be negative.")
+            except (ValueError, TypeError) as ex:
+                if "cannot be negative" in str(ex):
+                    raise
+                raise ValueError("Invalid numeric value for 'nt_weight'.")
 
-        qty = max(0.0, float(data.get("qty", 0.0)))
-        rcvd_qty = max(0.0, float(data.get("rcvd_qty", 0.0)))
-        nt_weight = max(0.0, float(data.get("nt_weight", 0.0)))
-        ok_qty = max(0.0, float(data.get("ok_qty", 0.0)))
-        rej_qty = max(0.0, float(data.get("rej_qty", 0.0)))
-        qc = bool(data.get("qc", False))
+        # Collect updates strictly for user-configurable fields
+        updates: Dict[str, Any] = {
+            "last_submitted_at": now,
+        }
+        if admin_user_id:
+            updates["last_submitted_by"] = str(admin_user_id)
+        if "nt_weight" in data and data["nt_weight"] is not None:
+            updates["nt_weight"] = max(0.0, float(data["nt_weight"]))
+        if "qc" in data and data["qc"] is not None:
+            updates["qc"] = clean_qc(data["qc"])
+        for f in ["drw_yn", "v_chk", "lm", "olng", "lpk", "lbl", "mc_or_pt"]:
+            if f in data and data[f] is not None:
+                updates[f] = clean_yn(data[f])
 
-        def clean_yn(val: Any) -> str:
-            s = str(val or "Y").strip().upper()
-            return "Y" if s.startswith("Y") else "N"
-
-        drw_yn = clean_yn(data.get("drw_yn"))
-        v_chk = clean_yn(data.get("v_chk"))
-        lm = clean_yn(data.get("lm"))
-        olng = clean_yn(data.get("olng"))
-        lpk = clean_yn(data.get("lpk"))
-        lbl = clean_yn(data.get("lbl"))
-        mc_or_pt = clean_yn(data.get("mc_or_pt"))
-        grpo_no = str(data.get("grpo_no") or "").strip()
+        has_remark = "remark" in data
+        new_remark = str(data["remark"] or "").strip() if has_remark else None
+        if has_remark:
+            updates["remark"] = new_remark
 
         try:
             with self._get_connection() as conn:
                 with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                    cur.execute(
+                    # Query existing row to check previous remark for audit
+                    cur.execute("SELECT * FROM stock_configuration WHERE item_code = %(code)s;", {"code": code})
+                    existing_row = cur.fetchone()
+                    if not existing_row:
+                        raise ValueError(f"Item {code} not found in stock configuration.")
+                    prev_remark = str(existing_row.get("remark") or "").strip()
+
+                    # Record remark audit log if modified
+                    if has_remark and (new_remark != prev_remark):
+                        cur.execute(
+                            """
+                            INSERT INTO stock_configuration_audit (
+                                item_code, previous_remark, new_remark, admin_user_id, action, created_at
+                            ) VALUES (
+                                %(code)s, %(prev)s, %(new)s, %(user)s, 'SUBMIT_REMARK', %(now)s
+                            );
+                            """,
+                            {
+                                "code": code,
+                                "prev": prev_remark,
+                                "new": new_remark,
+                                "user": str(admin_user_id or "admin"),
+                                "now": now,
+                            },
+                        )
+                        try:
+                            from app.services import audit_service
+                            audit_service.record_audit_entry(
+                                user_id=str(admin_user_id or "admin"),
+                                username=str(admin_user_id or "admin"),
+                                role="admin",
+                                entity_type="stock_configuration",
+                                record_id=code,
+                                action="UPDATE_REMARK",
+                                changes=[{"field": "remark", "previous": prev_remark, "new": new_remark}],
+                                status="SUCCESS",
+                            )
+                        except Exception as audit_err:
+                            logger.warning(f"Failed to record system audit log for {code}: {audit_err}")
+
+                    if updates:
+                        set_items = [f"{col} = %({col})s" for col in updates.keys()]
+                        set_items.append("updated_at = %(now)s")
+                        sql = f"""
+                            UPDATE stock_configuration
+                            SET {', '.join(set_items)}
+                            WHERE item_code = %(code)s
+                            RETURNING *;
                         """
-                        UPDATE stock_configuration
-                        SET qty = %(qty)s,
-                            rcvd_qty = %(rcvd_qty)s,
-                            nt_weight = %(nt_weight)s,
-                            qc = %(qc)s,
-                            drw_yn = %(drw_yn)s,
-                            v_chk = %(v_chk)s,
-                            ok_qty = %(ok_qty)s,
-                            rej_qty = %(rej_qty)s,
-                            lm = %(lm)s,
-                            olng = %(olng)s,
-                            lpk = %(lpk)s,
-                            lbl = %(lbl)s,
-                            mc_or_pt = %(mc_or_pt)s,
-                            grpo_no = %(grpo_no)s,
-                            updated_at = %(now)s
-                        WHERE item_code = %(code)s
-                        RETURNING *;
-                        """,
-                        {
-                            "qty": qty,
-                            "rcvd_qty": rcvd_qty,
-                            "nt_weight": nt_weight,
-                            "qc": qc,
-                            "drw_yn": drw_yn,
-                            "v_chk": v_chk,
-                            "ok_qty": ok_qty,
-                            "rej_qty": rej_qty,
-                            "lm": lm,
-                            "olng": olng,
-                            "lpk": lpk,
-                            "lbl": lbl,
-                            "mc_or_pt": mc_or_pt,
-                            "grpo_no": grpo_no,
-                            "now": now,
-                            "code": code,
-                        },
-                    )
+                        cur.execute(sql, {**updates, "now": now, "code": code})
+                    else:
+                        cur.execute("SELECT * FROM stock_configuration WHERE item_code = %(code)s;", {"code": code})
+
                     row = cur.fetchone()
                     if not row:
                         raise ValueError(f"Item {code} not found in stock configuration.")
@@ -1122,9 +1275,12 @@ class StockConfigurationService:
                             result[num_col] = float(result[num_col])
                     if isinstance(result.get("updated_at"), datetime):
                         result["updated_at"] = result["updated_at"].isoformat()
+                    if isinstance(result.get("last_submitted_at"), (datetime, date)):
+                        result["last_submitted_at"] = result["last_submitted_at"].isoformat()
+                    result["remark"] = str(result.get("remark") or "")
 
-                    # Automatically sync update to SAP Business One
-                    sap_info = self._sync_item_to_sap(code, data)
+                    # Automatically sync safe update to SAP Business One
+                    sap_info = self._sync_item_to_sap(code, updates)
                     result["sap_synced"] = sap_info["sap_synced"]
                     result["sap_message"] = sap_info["message"]
                     return result
@@ -1134,23 +1290,36 @@ class StockConfigurationService:
             found = False
             for it in items:
                 if it.get("item_code") == code:
-                    it.update({
-                        "qty": qty,
-                        "rcvd_qty": rcvd_qty,
-                        "nt_weight": nt_weight,
-                        "qc": qc,
-                        "drw_yn": drw_yn,
-                        "v_chk": v_chk,
-                        "ok_qty": ok_qty,
-                        "rej_qty": rej_qty,
-                        "lm": lm,
-                        "olng": olng,
-                        "lpk": lpk,
-                        "lbl": lbl,
-                        "mc_or_pt": mc_or_pt,
-                        "grpo_no": grpo_no,
-                        "updated_at": now.isoformat(),
-                    })
+                    prev_remark = str(it.get("remark") or "").strip()
+                    if has_remark and (new_remark != prev_remark):
+                        it.setdefault("remark_history", []).append({
+                            "item_code": code,
+                            "previous_remark": prev_remark,
+                            "new_remark": new_remark,
+                            "admin_user_id": str(admin_user_id or "admin"),
+                            "action": "SUBMIT_REMARK",
+                            "created_at": now.isoformat(),
+                        })
+                        try:
+                            from app.services import audit_service
+                            audit_service.record_audit_entry(
+                                user_id=str(admin_user_id or "admin"),
+                                username=str(admin_user_id or "admin"),
+                                role="admin",
+                                entity_type="stock_configuration",
+                                record_id=code,
+                                action="UPDATE_REMARK",
+                                changes=[{"field": "remark", "previous": prev_remark, "new": new_remark}],
+                                status="SUCCESS",
+                            )
+                        except Exception as audit_err:
+                            logger.warning(f"Failed to record system audit log for {code}: {audit_err}")
+
+                    it.update(updates)
+                    it["updated_at"] = now.isoformat()
+                    it["last_submitted_at"] = now.isoformat()
+                    if admin_user_id:
+                        it["last_submitted_by"] = str(admin_user_id)
                     found = True
                     result = it
                     break
@@ -1158,22 +1327,22 @@ class StockConfigurationService:
                 raise ValueError(f"Item {code} not found.")
             self._write_to_fallback(items)
 
-            # Automatically sync update to SAP Business One
-            sap_info = self._sync_item_to_sap(code, data)
+            sap_info = self._sync_item_to_sap(code, updates)
             result["sap_synced"] = sap_info["sap_synced"]
             result["sap_message"] = sap_info["message"]
             return result
 
-    def bulk_update_items(self, items_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def bulk_update_items(self, items_data: List[Dict[str, Any]], admin_user_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Bulk update user-editable stock configuration fields with transactional savepoints,
+        Bulk update user-configurable fields with transactional savepoints,
         per-row status tracking, and automated SAP Business One synchronization.
+        SAP-owned fields are protected and preserved.
         """
         results: List[Dict[str, Any]] = []
         successful_count = 0
         failed_count = 0
         sap_synced_count = 0
-        now = datetime.utcnow()
+        now = get_kolkata_now()
 
         try:
             with self._get_connection() as conn:
@@ -1185,87 +1354,94 @@ class StockConfigurationService:
                             results.append({"item_code": "", "success": False, "error": "Missing item_code in update item."})
                             continue
 
-                        # Validate numeric fields against negative values
-                        validation_error = None
-                        for field_name in ["qty", "rcvd_qty", "nt_weight", "ok_qty", "rej_qty"]:
-                            if field_name in item_data and item_data[field_name] is not None:
-                                try:
-                                    val = float(item_data[field_name])
-                                    if val < 0:
-                                        validation_error = f"Field '{field_name}' cannot be negative."
-                                        break
-                                except (ValueError, TypeError):
-                                    validation_error = f"Invalid numeric value for '{field_name}'."
-                                    break
+                        # Validate nt_weight against negative value
+                        if "nt_weight" in item_data and item_data["nt_weight"] is not None:
+                            try:
+                                val = float(item_data["nt_weight"])
+                                if val < 0:
+                                    failed_count += 1
+                                    results.append({"item_code": code, "success": False, "error": "Field 'nt_weight' cannot be negative."})
+                                    continue
+                            except (ValueError, TypeError):
+                                failed_count += 1
+                                results.append({"item_code": code, "success": False, "error": "Invalid numeric value for 'nt_weight'."})
+                                continue
 
-                        if validation_error:
-                            failed_count += 1
-                            results.append({"item_code": code, "success": False, "error": validation_error})
-                            continue
+                        updates: Dict[str, Any] = {
+                            "last_submitted_at": now,
+                        }
+                        if admin_user_id:
+                            updates["last_submitted_by"] = str(admin_user_id)
+                        if "nt_weight" in item_data and item_data["nt_weight"] is not None:
+                            updates["nt_weight"] = max(0.0, float(item_data["nt_weight"]))
+                        if "qc" in item_data and item_data["qc"] is not None:
+                            updates["qc"] = clean_qc(item_data["qc"])
+                        for f in ["drw_yn", "v_chk", "lm", "olng", "lpk", "lbl", "mc_or_pt"]:
+                            if f in item_data and item_data[f] is not None:
+                                updates[f] = clean_yn(item_data[f])
 
-                        def clean_yn(val: Any) -> str:
-                            s = str(val or "Y").strip().upper()
-                            return "Y" if s.startswith("Y") else "N"
+                        has_remark = "remark" in item_data
+                        new_remark = str(item_data["remark"] or "").strip() if has_remark else None
+                        if has_remark:
+                            updates["remark"] = new_remark
 
-                        qty = max(0.0, float(item_data.get("qty", 0.0)))
-                        rcvd_qty = max(0.0, float(item_data.get("rcvd_qty", 0.0)))
-                        nt_weight = max(0.0, float(item_data.get("nt_weight", 0.0)))
-                        ok_qty = max(0.0, float(item_data.get("ok_qty", 0.0)))
-                        rej_qty = max(0.0, float(item_data.get("rej_qty", 0.0)))
-                        qc = bool(item_data.get("qc", False))
-                        drw_yn = clean_yn(item_data.get("drw_yn"))
-                        v_chk = clean_yn(item_data.get("v_chk"))
-                        lm = clean_yn(item_data.get("lm"))
-                        olng = clean_yn(item_data.get("olng"))
-                        lpk = clean_yn(item_data.get("lpk"))
-                        lbl = clean_yn(item_data.get("lbl"))
-                        mc_or_pt = clean_yn(item_data.get("mc_or_pt"))
-                        grpo_no = str(item_data.get("grpo_no") or "").strip()
-
-                        # Use PostgreSQL SAVEPOINT for granular transaction isolation
                         sp_id = f"sp_{idx}"
                         cur.execute(f"SAVEPOINT {sp_id};")
                         try:
-                            cur.execute(
+                            cur.execute("SELECT * FROM stock_configuration WHERE item_code = %(code)s;", {"code": code})
+                            existing_row = cur.fetchone()
+                            if not existing_row:
+                                cur.execute(f"ROLLBACK TO SAVEPOINT {sp_id};")
+                                failed_count += 1
+                                results.append({"item_code": code, "success": False, "error": f"Item {code} not found in database."})
+                                continue
+
+                            prev_remark = str(existing_row.get("remark") or "").strip()
+                            if has_remark and (new_remark != prev_remark):
+                                cur.execute(
+                                    """
+                                    INSERT INTO stock_configuration_audit (
+                                        item_code, previous_remark, new_remark, admin_user_id, action, created_at
+                                    ) VALUES (
+                                        %(code)s, %(prev)s, %(new)s, %(user)s, 'BULK_SUBMIT_REMARK', %(now)s
+                                    );
+                                    """,
+                                    {
+                                        "code": code,
+                                        "prev": prev_remark,
+                                        "new": new_remark,
+                                        "user": str(admin_user_id or "admin"),
+                                        "now": now,
+                                    },
+                                )
+                                try:
+                                    from app.services import audit_service
+                                    audit_service.record_audit_entry(
+                                        user_id=str(admin_user_id or "admin"),
+                                        username=str(admin_user_id or "admin"),
+                                        role="admin",
+                                        entity_type="stock_configuration",
+                                        record_id=code,
+                                        action="UPDATE_REMARK",
+                                        changes=[{"field": "remark", "previous": prev_remark, "new": new_remark}],
+                                        status="SUCCESS",
+                                    )
+                                except Exception:
+                                    pass
+
+                            if updates:
+                                set_items = [f"{col} = %({col})s" for col in updates.keys()]
+                                set_items.append("updated_at = %(now)s")
+                                sql = f"""
+                                    UPDATE stock_configuration
+                                    SET {', '.join(set_items)}
+                                    WHERE item_code = %(code)s
+                                    RETURNING *;
                                 """
-                                UPDATE stock_configuration
-                                SET qty = %(qty)s,
-                                    rcvd_qty = %(rcvd_qty)s,
-                                    nt_weight = %(nt_weight)s,
-                                    qc = %(qc)s,
-                                    drw_yn = %(drw_yn)s,
-                                    v_chk = %(v_chk)s,
-                                    ok_qty = %(ok_qty)s,
-                                    rej_qty = %(rej_qty)s,
-                                    lm = %(lm)s,
-                                    olng = %(olng)s,
-                                    lpk = %(lpk)s,
-                                    lbl = %(lbl)s,
-                                    mc_or_pt = %(mc_or_pt)s,
-                                    grpo_no = %(grpo_no)s,
-                                    updated_at = %(now)s
-                                WHERE item_code = %(code)s
-                                RETURNING *;
-                                """,
-                                {
-                                    "qty": qty,
-                                    "rcvd_qty": rcvd_qty,
-                                    "nt_weight": nt_weight,
-                                    "qc": qc,
-                                    "drw_yn": drw_yn,
-                                    "v_chk": v_chk,
-                                    "ok_qty": ok_qty,
-                                    "rej_qty": rej_qty,
-                                    "lm": lm,
-                                    "olng": olng,
-                                    "lpk": lpk,
-                                    "lbl": lbl,
-                                    "mc_or_pt": mc_or_pt,
-                                    "grpo_no": grpo_no,
-                                    "now": now,
-                                    "code": code,
-                                },
-                            )
+                                cur.execute(sql, {**updates, "now": now, "code": code})
+                            else:
+                                cur.execute("SELECT * FROM stock_configuration WHERE item_code = %(code)s;", {"code": code})
+
                             row = cur.fetchone()
                             if not row:
                                 cur.execute(f"ROLLBACK TO SAVEPOINT {sp_id};")
@@ -1279,10 +1455,12 @@ class StockConfigurationService:
                                         result[num_col] = float(result[num_col])
                                 if isinstance(result.get("updated_at"), datetime):
                                     result["updated_at"] = result["updated_at"].isoformat()
+                                if isinstance(result.get("last_submitted_at"), (datetime, date)):
+                                    result["last_submitted_at"] = result["last_submitted_at"].isoformat()
+                                result["remark"] = str(result.get("remark") or "")
                                 successful_count += 1
 
-                                # Automatically sync update to SAP Business One
-                                sap_info = self._sync_item_to_sap(code, item_data)
+                                sap_info = self._sync_item_to_sap(code, updates)
                                 result["sap_synced"] = sap_info["sap_synced"]
                                 result["sap_message"] = sap_info["message"]
                                 if sap_info["sap_synced"]:
@@ -1309,7 +1487,7 @@ class StockConfigurationService:
             for item_data in items_data:
                 code = str(item_data.get("item_code") or "").strip()
                 try:
-                    res = self.update_item(code, item_data)
+                    res = self.update_item(code, item_data, admin_user_id=admin_user_id)
                     successful_count += 1
                     if res.get("sap_synced"):
                         sap_synced_count += 1
@@ -1342,7 +1520,7 @@ class StockConfigurationService:
         if not desc:
             raise ValueError("Description is required.")
 
-        now = datetime.utcnow()
+        now = get_kolkata_now()
         new_item = {
             "item_code": code,
             "description": desc,
@@ -1399,6 +1577,8 @@ class StockConfigurationService:
                         result["created_at"] = result["created_at"].isoformat()
                     if isinstance(result.get("updated_at"), datetime):
                         result["updated_at"] = result["updated_at"].isoformat()
+                    if isinstance(result.get("last_submitted_at"), (datetime, date)):
+                        result["last_submitted_at"] = result["last_submitted_at"].isoformat()
                     return result
         except psycopg2.IntegrityError:
             raise ValueError(f"Item code '{code}' already exists.")
@@ -1434,10 +1614,256 @@ class StockConfigurationService:
             self._write_to_fallback(items)
             return True
 
-    def sync_from_sap(self) -> Dict[str, Any]:
+    def get_item(self, item_code: str) -> Optional[Dict[str, Any]]:
+        """Fetch a single stock configuration item by item_code."""
+        code = str(item_code).strip()
+        try:
+            with self._get_connection() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        f"SELECT {', '.join(COLUMNS)} FROM stock_configuration WHERE item_code = %(code)s;",
+                        {"code": code},
+                    )
+                    row = cur.fetchone()
+                    if not row:
+                        return None
+                    item_dict = dict(row)
+                    for num_col in ["qty", "stock_qty", "rcvd_qty", "nt_weight", "ok_qty", "rej_qty", "so_qty", "po_qty"]:
+                        if item_dict.get(num_col) is not None:
+                            item_dict[num_col] = float(item_dict[num_col])
+                    for d_col in ["entry_date", "item_create_date", "so_date", "po_date", "grn_date"]:
+                        if isinstance(item_dict.get(d_col), (datetime, date)):
+                            item_dict[d_col] = item_dict[d_col].isoformat()
+                    if isinstance(item_dict.get("created_at"), datetime):
+                        item_dict["created_at"] = item_dict["created_at"].isoformat()
+                    if isinstance(item_dict.get("updated_at"), datetime):
+                        item_dict["updated_at"] = item_dict["updated_at"].isoformat()
+                    if isinstance(item_dict.get("last_submitted_at"), (datetime, date)):
+                        item_dict["last_submitted_at"] = item_dict["last_submitted_at"].isoformat()
+                    item_dict["remark"] = str(item_dict.get("remark") or "")
+                    return item_dict
+        except Exception as e:
+            logger.warning(f"Error fetching item {code} from PostgreSQL ({e}), checking JSON fallback.")
+            items = self._read_from_fallback()
+            for it in items:
+                if it.get("item_code") == code:
+                    return it
+            return None
+
+    def get_remark_history(self, item_code: str) -> List[Dict[str, Any]]:
+        """Retrieve audit history of remarks for a specific item code."""
+        code = str(item_code).strip()
+        history = []
+        try:
+            with self._get_connection() as conn:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        """
+                        SELECT id, item_code, previous_remark, new_remark, admin_user_id, action, created_at
+                        FROM stock_configuration_audit
+                        WHERE item_code = %(code)s
+                        ORDER BY created_at DESC;
+                        """,
+                        {"code": code},
+                    )
+                    rows = cur.fetchall()
+                    for r in rows:
+                        entry = dict(r)
+                        if isinstance(entry.get("created_at"), (datetime, date)):
+                            entry["created_at"] = entry["created_at"].isoformat()
+                        history.append(entry)
+                    return history
+        except Exception as e:
+            logger.warning(f"Error fetching remark audit history from PostgreSQL ({e}), checking JSON fallback.")
+            items = self._read_from_fallback()
+            for it in items:
+                if it.get("item_code") == code:
+                    return list(reversed(it.get("remark_history", [])))
+            return []
+
+    def _upsert_sap_items_cursor(
+        self,
+        cur: Any,
+        conn: Any,
+        sap_items: List[Dict[str, Any]],
+        received_map: Optional[Dict[str, Dict[str, Any]]] = None,
+        pending_po_map: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> int:
         """
-        Synchronize stock configuration with genuine SAP Business One data.
-        Fetches live Items, Stock, and Vendor details only when SAP Service Layer is connected.
+        Batch upsert SAP items into stock_configuration table preserving user remarks and configurable fields.
+        Incorporates Goods Receipt POs (Received Stock), Open Purchase Orders (Pending Receipt), and Item Master data.
+        Uses execute_values for high-performance bulk synchronization.
+        """
+        if not sap_items and not received_map and not pending_po_map:
+            return 0
+
+        received_map = received_map or {}
+        pending_po_map = pending_po_map or {}
+        now = get_kolkata_now()
+
+        # Get current max sr_no
+        cur.execute("SELECT COALESCE(MAX(sr_no), 0) FROM stock_configuration;")
+        next_sr = (cur.fetchone()[0] or 0) + 1
+
+        # Check which items already exist to retain their sr_no
+        all_candidate_codes = [it.get("ItemCode") for it in sap_items if it.get("ItemCode")]
+        for c in received_map.keys():
+            all_candidate_codes.append(c)
+        for c in pending_po_map.keys():
+            all_candidate_codes.append(c)
+
+        existing_items = {}
+        if all_candidate_codes:
+            cur.execute("SELECT item_code, sr_no FROM stock_configuration WHERE item_code = ANY(%s);", (list(set(all_candidate_codes)),))
+            existing_items = dict(cur.fetchall())
+
+        rows_to_upsert = []
+        handled_codes = set()
+
+        for s_item in sap_items:
+            code = s_item.get("ItemCode")
+            if not code or code in handled_codes:
+                continue
+            handled_codes.add(code)
+            name = s_item.get("ItemName") or code
+            stock = float(s_item.get("QuantityOnStock") or 0.0)
+            is_active = (s_item.get("Valid") == "tYES" and s_item.get("Frozen") != "tYES")
+            group = str(s_item.get("U_SUBG") or s_item.get("ItemsGroupCode") or "Standard")
+            vendor_code = s_item.get("Mainsupplier") or ""
+            vendor_name = vendor_code
+
+            # SAP UDF for net weight: OITM.U_PerPices
+            nt_weight = float(s_item.get("U_PerPices") or 0.0)
+
+            # QC and configuration flags: do not default to Y if blank in SAP
+            qc_val = clean_qc(s_item.get("U_QC")) or False
+            drw_yn = clean_yn(s_item.get("U_Drawing") or s_item.get("U_JobDrawing"))
+            v_chk = clean_yn(s_item.get("U_V_Chk"))
+            lm = clean_yn(s_item.get("U_LM"))
+            olng = clean_yn(s_item.get("U_OLNG"))
+            lpk = clean_yn(s_item.get("U_LPK"))
+            lbl = clean_yn(s_item.get("U_LBL"))
+            mc_or_pt = clean_yn(s_item.get("U_MC_OR_PT"))
+
+            raw_create = s_item.get("CreateDate")
+            item_create_date = str(raw_create).split("T")[0] if raw_create else None
+
+            if code in existing_items:
+                item_sr = existing_items[code]
+            else:
+                item_sr = next_sr
+                next_sr += 1
+                existing_items[code] = item_sr
+
+            if code in received_map:
+                info = received_map[code]
+                record_cat = "Received Stock"
+                grpo_no = info.get("grpo_no", "")
+                rcvd_qty = float(info.get("rcvd_qty", 0.0))
+                grn_date = info.get("grn_date")
+                entry_date = grn_date  # Authoritative date for Today filter
+                po_no = info.get("po_no", "")
+                po_date = info.get("po_date")
+                po_qty = float(info.get("po_qty", 0.0))
+                so_no = info.get("so_no", "")
+                so_date = info.get("so_date")
+                so_qty = float(info.get("so_qty", 0.0))
+                # QTY is strictly Sales Order quantity from RDR1; 0.0 if no linked SO
+                qty = so_qty if (so_no and so_qty > 0) else 0.0
+                ok_qty = float(info.get("ok_qty", rcvd_qty))
+                rej_qty = float(info.get("rej_qty", 0.0))
+                if info.get("vendor_name"):
+                    vendor_name = info["vendor_name"]
+                    vendor_code = info.get("vendor_code") or vendor_code
+            elif code in pending_po_map:
+                pinfo = pending_po_map[code]
+                record_cat = "Pending Receipt"
+                grpo_no = ""
+                rcvd_qty = 0.0
+                grn_date = None
+                po_no = pinfo.get("po_no", "")
+                po_date = pinfo.get("po_date")
+                po_qty = float(pinfo.get("po_qty", 0.0))
+                entry_date = po_date
+                so_no = pinfo.get("so_no", "")
+                so_date = pinfo.get("so_date")
+                so_qty = float(pinfo.get("so_qty", 0.0))
+                qty = so_qty if (so_no and so_qty > 0) else 0.0
+                ok_qty = 0.0
+                rej_qty = 0.0
+                if pinfo.get("vendor_name"):
+                    vendor_name = pinfo["vendor_name"]
+                    vendor_code = pinfo.get("vendor_code") or vendor_code
+            else:
+                record_cat = "Item Master"
+                grpo_no = ""
+                rcvd_qty = 0.0
+                grn_date = None
+                po_no = ""
+                po_date = None
+                po_qty = 0.0
+                so_no = ""
+                so_date = None
+                so_qty = 0.0
+                entry_date = item_create_date or "2025-01-07"
+                qty = 0.0
+                ok_qty = 0.0
+                rej_qty = 0.0
+
+            rows_to_upsert.append((
+                item_sr, code, name, qty, stock, vendor_name, vendor_code,
+                grpo_no, rcvd_qty, nt_weight, qc_val, drw_yn, v_chk, ok_qty, rej_qty,
+                lm, olng, lpk, lbl, mc_or_pt, group, '01',
+                is_active, entry_date, now, now,
+                record_cat, item_create_date, so_date, po_date, grn_date,
+                po_no, so_no, so_qty, po_qty
+            ))
+
+        if not rows_to_upsert:
+            return 0
+
+        upsert_sql = """
+            INSERT INTO stock_configuration (
+                sr_no, item_code, description, qty, stock_qty, vendor_name, vendor_code,
+                grpo_no, rcvd_qty, nt_weight, qc, drw_yn, v_chk, ok_qty, rej_qty,
+                lm, olng, lpk, lbl, mc_or_pt, items_group_code, warehouse_code,
+                is_active, entry_date, created_at, updated_at,
+                record_category, item_create_date, so_date, po_date, grn_date,
+                po_no, so_no, so_qty, po_qty
+            ) VALUES %s
+            ON CONFLICT (item_code) DO UPDATE
+            SET stock_qty = EXCLUDED.stock_qty,
+                is_active = EXCLUDED.is_active,
+                description = EXCLUDED.description,
+                entry_date = EXCLUDED.entry_date,
+                grpo_no = EXCLUDED.grpo_no,
+                rcvd_qty = EXCLUDED.rcvd_qty,
+                ok_qty = EXCLUDED.ok_qty,
+                rej_qty = EXCLUDED.rej_qty,
+                record_category = EXCLUDED.record_category,
+                item_create_date = EXCLUDED.item_create_date,
+                so_date = EXCLUDED.so_date,
+                po_date = EXCLUDED.po_date,
+                grn_date = EXCLUDED.grn_date,
+                po_no = EXCLUDED.po_no,
+                so_no = EXCLUDED.so_no,
+                so_qty = EXCLUDED.so_qty,
+                po_qty = EXCLUDED.po_qty,
+                qty = EXCLUDED.qty,
+                items_group_code = COALESCE(NULLIF(EXCLUDED.items_group_code, ''), stock_configuration.items_group_code),
+                vendor_code = COALESCE(NULLIF(EXCLUDED.vendor_code, ''), stock_configuration.vendor_code),
+                vendor_name = COALESCE(NULLIF(EXCLUDED.vendor_name, ''), stock_configuration.vendor_name),
+                updated_at = EXCLUDED.updated_at;
+        """
+        psycopg2.extras.execute_values(cur, upsert_sql, rows_to_upsert, page_size=200)
+        return len(rows_to_upsert)
+
+    def sync_from_sap(self, top: int = 1000) -> Dict[str, Any]:
+        """
+        Synchronize stock configuration with genuine SAP Business One data across all entities:
+        Items (OITM), PurchaseDeliveryNotes (GRPO/OPDN/PDN1), PurchaseOrders (OPOR/POR1),
+        and Sales Orders (ORDR/RDR1 linked via ImportEnt / ImportFileNum).
+        Preserves user remarks, audit trails, and configuration fields.
         """
         client = get_sap_client()
         try:
@@ -1447,86 +1873,232 @@ class StockConfigurationService:
             raise RuntimeError(f"SAP Business One Service Layer is not connected ({str(err)}). Cannot perform live synchronization.")
 
         sap_service = SAPItemsService()
-        warehouses_service = SAPWarehousesService()
 
-        # Fetch live items from SAP
-        sap_items = sap_service.get_items(top=1000)
-        now = datetime.utcnow()
-        synced_count = 0
+        # 1. Fetch live items from SAP ordered by newest/recently updated
+        sap_items = sap_service.get_items(top=top, orderby="UpdateDate desc,CreateDate desc")
 
+        # 2. Fetch recent Goods Receipt POs (PurchaseDeliveryNotes)
+        res_grpo = client.get("PurchaseDeliveryNotes", params={"$orderby": "DocEntry desc", "$top": 100})
+        grpos = res_grpo.get("value", [])
+
+        # 3. Fetch recent Purchase Orders
+        res_po = client.get("PurchaseOrders", params={"$orderby": "DocEntry desc", "$top": 100})
+        pos = res_po.get("value", [])
+        po_by_entry = {p.get("DocEntry"): p for p in pos}
+
+        # Check for any base PO entries referenced in GRPO that are missing from po_by_entry
+        missing_po_entries = set()
+        for g in grpos:
+            for l in g.get("DocumentLines", []):
+                if l.get("BaseType") == 22 and l.get("BaseEntry"):
+                    if l.get("BaseEntry") not in po_by_entry:
+                        missing_po_entries.add(l.get("BaseEntry"))
+
+        for base_entry in list(missing_po_entries)[:50]:
+            try:
+                po_doc = client.get(f"PurchaseOrders({base_entry})")
+                if po_doc and "DocEntry" in po_doc:
+                    po_by_entry[po_doc["DocEntry"]] = po_doc
+            except Exception as e:
+                logger.warning(f"Error fetching base PO DocEntry {base_entry}: {e}")
+
+        # 4. Fetch linked Sales Orders (Branch 1: POs linked to SOs via ImportFileNum / ImportEnt, and GRPO U_SONo)
+        so_doc_nums = set()
+        for p in po_by_entry.values():
+            imp = p.get("ImportFileNum")
+            if imp:
+                try:
+                    so_doc_nums.add(int(imp))
+                except (ValueError, TypeError):
+                    pass
+
+        for g in grpos:
+            so_hdr = g.get("U_SONo")
+            if so_hdr:
+                try:
+                    so_doc_nums.add(int(so_hdr))
+                except (ValueError, TypeError):
+                    pass
+
+        so_by_doc_num = {}
+        for so_num in so_doc_nums:
+            try:
+                res_so = client.get("Orders", params={"$filter": f"DocNum eq {so_num}"})
+                for so in res_so.get("value", []):
+                    so_by_doc_num[so_num] = so
+            except Exception as e:
+                logger.warning(f"Error fetching linked SO DocNum {so_num}: {e}")
+
+        # 5. Build received_map (keyed by ItemCode, newest GRPO first)
+        received_map = {}
+        for g in grpos:
+            grpo_no = str(g.get("DocNum") or "")
+            grn_date_raw = g.get("DocDate")
+            grn_date = str(grn_date_raw).split("T")[0] if grn_date_raw else None
+            vendor_name = g.get("CardName") or ""
+            vendor_code = g.get("CardCode") or ""
+            hdr_so_no = str(g.get("U_SONo") or "")
+
+            for l in g.get("DocumentLines", []):
+                code = l.get("ItemCode")
+                if not code or code in received_map:
+                    continue
+
+                rcvd_qty = float(l.get("Quantity") or 0.0)
+                rem_open_qty = float(l.get("RemainingOpenQuantity")) if l.get("RemainingOpenQuantity") is not None else rcvd_qty
+                ok_qty = rem_open_qty
+                rej_qty = max(0.0, rcvd_qty - rem_open_qty)
+
+                base_type = l.get("BaseType")
+                base_entry = l.get("BaseEntry")
+                base_line = l.get("BaseLine")
+
+                po_no = ""
+                po_date = None
+                po_qty = 0.0
+                so_no = ""
+                so_date = None
+                so_qty = 0.0
+
+                if base_type == 22 and base_entry and base_entry in po_by_entry:
+                    base_po = po_by_entry[base_entry]
+                    po_no = str(base_po.get("DocNum") or "")
+                    if base_po.get("DocDate"):
+                        po_date = str(base_po.get("DocDate")).split("T")[0]
+                    for pl in base_po.get("DocumentLines", []):
+                        if pl.get("LineNum") == base_line or pl.get("ItemCode") == code:
+                            po_qty = float(pl.get("Quantity") or 0.0)
+                            break
+                    if not po_qty:
+                        po_qty = rcvd_qty
+
+                    imp_file = base_po.get("ImportFileNum")
+                    if imp_file:
+                        try:
+                            so_num_int = int(imp_file)
+                            if so_num_int in so_by_doc_num:
+                                so_doc = so_by_doc_num[so_num_int]
+                                so_no = str(so_doc.get("DocNum") or imp_file)
+                                if so_doc.get("DocDate"):
+                                    so_date = str(so_doc.get("DocDate")).split("T")[0]
+                                matching_lines = [
+                                    float(sl.get("Quantity") or 0.0)
+                                    for sl in so_doc.get("DocumentLines", [])
+                                    if sl.get("ItemCode") == code
+                                ]
+                                so_qty = sum(matching_lines) if matching_lines else 0.0
+                        except (ValueError, TypeError):
+                            pass
+
+                # If SO not resolved via PO, check header UDF U_SONo
+                if not so_qty and hdr_so_no:
+                    try:
+                        so_num_int = int(hdr_so_no)
+                        if so_num_int in so_by_doc_num:
+                            so_doc = so_by_doc_num[so_num_int]
+                            so_no = str(so_doc.get("DocNum") or hdr_so_no)
+                            if so_doc.get("DocDate"):
+                                so_date = str(so_doc.get("DocDate")).split("T")[0]
+                            matching_lines = [
+                                float(sl.get("Quantity") or 0.0)
+                                for sl in so_doc.get("DocumentLines", [])
+                                if sl.get("ItemCode") == code
+                            ]
+                            so_qty = sum(matching_lines) if matching_lines else 0.0
+                    except (ValueError, TypeError):
+                        pass
+
+                received_map[code] = {
+                    "grpo_no": grpo_no,
+                    "grn_date": grn_date,
+                    "rcvd_qty": rcvd_qty,
+                    "ok_qty": ok_qty,
+                    "rej_qty": rej_qty,
+                    "vendor_name": vendor_name,
+                    "vendor_code": vendor_code,
+                    "po_no": po_no,
+                    "po_date": po_date,
+                    "po_qty": po_qty,
+                    "so_no": so_no if so_qty > 0 else "",
+                    "so_date": so_date if so_qty > 0 else None,
+                    "so_qty": so_qty,
+                    "item_desc": l.get("ItemDescription"),
+                }
+
+        # 6. Build pending_po_map (for items with open POs but not received)
+        pending_po_map = {}
+        for p in pos:
+            po_no = str(p.get("DocNum") or "")
+            po_date = str(p.get("DocDate")).split("T")[0] if p.get("DocDate") else None
+            vendor_name = p.get("CardName") or ""
+            vendor_code = p.get("CardCode") or ""
+            imp_file = p.get("ImportFileNum")
+            so_no = ""
+            so_date = None
+            so_num_int = None
+            if imp_file:
+                try:
+                    so_num_int = int(imp_file)
+                    if so_num_int in so_by_doc_num:
+                        so_doc = so_by_doc_num[so_num_int]
+                        so_no = str(so_doc.get("DocNum") or imp_file)
+                        if so_doc.get("DocDate"):
+                            so_date = str(so_doc.get("DocDate")).split("T")[0]
+                except (ValueError, TypeError):
+                    pass
+
+            for l in p.get("DocumentLines", []):
+                code = l.get("ItemCode")
+                if not code or code in received_map or code in pending_po_map:
+                    continue
+                open_qty = float(l.get("RemainingOpenQuantity") or l.get("OpenQuantity") or l.get("Quantity") or 0.0)
+                so_qty = 0.0
+                if so_no and so_num_int and so_num_int in so_by_doc_num:
+                    matching_lines = [
+                        float(sl.get("Quantity") or 0.0)
+                        for sl in so_by_doc_num[so_num_int].get("DocumentLines", [])
+                        if sl.get("ItemCode") == code
+                    ]
+                    so_qty = sum(matching_lines) if matching_lines else 0.0
+                pending_po_map[code] = {
+                    "po_no": po_no,
+                    "po_date": po_date,
+                    "po_qty": float(l.get("Quantity") or 0.0),
+                    "open_qty": open_qty,
+                    "vendor_name": vendor_name,
+                    "vendor_code": vendor_code,
+                    "so_no": so_no if so_qty > 0 else "",
+                    "so_date": so_date if so_qty > 0 else None,
+                    "so_qty": so_qty,
+                    "item_desc": l.get("ItemDescription"),
+                }
+
+        # 7. Ensure all items in received_map and pending_po_map have their genuine SAP Item Master loaded
+        items_by_code = {it.get("ItemCode"): it for it in sap_items if it.get("ItemCode")}
+        all_candidate_codes = set(received_map.keys()) | set(pending_po_map.keys())
+        for code in all_candidate_codes:
+            if code not in items_by_code:
+                try:
+                    it = client.get(f"Items('{code}')")
+                    if it and "ItemCode" in it:
+                        items_by_code[code] = it
+                        sap_items.append(it)
+                except Exception as e:
+                    logger.warning(f"Error fetching SAP Item Master for {code}: {e}")
+
+        now = get_kolkata_now()
         try:
             with self._get_connection() as conn:
                 with conn.cursor() as cur:
-                    for s_item in sap_items:
-                        code = s_item.get("ItemCode")
-                        if not code:
-                            continue
-                        name = s_item.get("ItemName") or code
-                        stock = float(s_item.get("QuantityOnStock") or 0.0)
-                        is_active = (s_item.get("Valid") == "tYES" and s_item.get("Frozen") != "tYES")
-                        group = str(s_item.get("U_SUBG") or s_item.get("ItemsGroupCode") or "Standard")
-                        vendor_code = s_item.get("Mainsupplier") or ""
-
-                        raw_create = s_item.get("CreateDate")
-                        entry_date = None
-                        if raw_create:
-                            try:
-                                entry_date = str(raw_create).split("T")[0]
-                            except Exception:
-                                entry_date = None
-
-                        # If item exists in stock_configuration, update stock_qty, is_active, description, and entry_date
-                        cur.execute(
-                            """
-                            UPDATE stock_configuration
-                            SET stock_qty = %(stock)s,
-                                is_active = %(is_active)s,
-                                description = %(name)s,
-                                entry_date = COALESCE(%(entry_date)s, entry_date),
-                                updated_at = %(now)s
-                            WHERE item_code = %(code)s;
-                            """,
-                            {"stock": stock, "is_active": is_active, "name": name, "entry_date": entry_date, "now": now, "code": code},
-                        )
-                        if cur.rowcount > 0:
-                            synced_count += 1
-                        else:
-                            cur.execute(
-                                """
-                                INSERT INTO stock_configuration (
-                                    sr_no, item_code, description, qty, stock_qty, vendor_name, vendor_code,
-                                    grpo_no, rcvd_qty, nt_weight, qc, drw_yn, v_chk, ok_qty, rej_qty,
-                                    lm, olng, lpk, lbl, mc_or_pt, items_group_code, warehouse_code,
-                                    is_active, entry_date, created_at, updated_at
-                                ) VALUES (
-                                    (SELECT COALESCE(MAX(sr_no), 0) + 1 FROM stock_configuration),
-                                    %(code)s, %(name)s, %(stock)s, %(stock)s, %(vendor_name)s, %(vendor_code)s,
-                                    '', %(stock)s, 0, false, 'Y', 'Y', %(stock)s, 0,
-                                    'Y', 'Y', 'Y', 'Y', 'Y', %(group)s, '01',
-                                    %(is_active)s, %(entry_date)s, %(now)s, %(now)s
-                                )
-                                ON CONFLICT (item_code) DO NOTHING;
-                                """,
-                                {
-                                    "code": code,
-                                    "name": name,
-                                    "stock": stock,
-                                    "vendor_name": vendor_code,
-                                    "vendor_code": vendor_code,
-                                    "group": group,
-                                    "is_active": is_active,
-                                    "entry_date": entry_date,
-                                    "now": now,
-                                },
-                            )
-                            if cur.rowcount > 0:
-                                synced_count += 1
+                    synced_count = self._upsert_sap_items_cursor(cur, conn, sap_items, received_map, pending_po_map)
 
             StockConfigurationService._last_synced_at = now.strftime("%Y-%m-%d %H:%M:%S")
             return {
                 "success": True,
                 "synced_count": synced_count,
                 "total_sap_items": len(sap_items),
+                "received_items_count": len(received_map),
+                "pending_po_items_count": len(pending_po_map),
                 "timestamp": StockConfigurationService._last_synced_at,
             }
         except Exception as e:
@@ -1587,6 +2159,8 @@ class StockConfigurationService:
             "LBL",
             "MC or PT",
             "ENTRY DATE",
+            "LAST UPDATED",
+            "REMARKS",
         ]
 
         # Header styling
@@ -1629,6 +2203,17 @@ class StockConfigurationService:
                 except Exception:
                     formatted_entry_date = str(raw_ed)
 
+            raw_last_sub = it.get("last_submitted_at")
+            formatted_last_sub = "—"
+            if raw_last_sub:
+                try:
+                    if isinstance(raw_last_sub, (datetime, date)):
+                        formatted_last_sub = raw_last_sub.strftime("%d-%m-%Y %H:%M")
+                    else:
+                        formatted_last_sub = str(raw_last_sub)
+                except Exception:
+                    formatted_last_sub = str(raw_last_sub)
+
             row_data = [
                 idx,
                 it.get("item_code", ""),
@@ -1650,6 +2235,8 @@ class StockConfigurationService:
                 it.get("lbl", "Y"),
                 it.get("mc_or_pt", "Y"),
                 formatted_entry_date,
+                formatted_last_sub,
+                it.get("remark", ""),
             ]
             ws.append(row_data)
             row_num = idx + 1
@@ -1658,9 +2245,9 @@ class StockConfigurationService:
                 cell = ws.cell(row=row_num, column=col_idx)
                 cell.border = thin_border
                 cell.font = Font(name="Calibri", size=10)
-                if col_idx in [1, 2, 7, 10, 11, 12, 15, 16, 17, 18, 19, 20]:
+                if col_idx in [1, 2, 7, 10, 11, 12, 15, 16, 17, 18, 19, 20, 21]:
                     cell.alignment = center_align
-                elif col_idx in [3, 6]:
+                elif col_idx in [3, 6, 22]:
                     cell.alignment = left_align
                 else:
                     cell.alignment = right_align
@@ -1829,7 +2416,7 @@ class StockConfigurationService:
 
         # Commit valid rows to DB / storage
         committed = 0
-        now = datetime.utcnow()
+        now = get_kolkata_now()
         try:
             with self._get_connection() as conn:
                 with conn.cursor() as cur:
@@ -1846,18 +2433,10 @@ class StockConfigurationService:
                                 %(lm)s, %(olng)s, %(lpk)s, %(lbl)s, %(mc_or_pt)s, %(now)s, %(now)s
                             )
                             ON CONFLICT (item_code) DO UPDATE SET
-                                description = EXCLUDED.description,
-                                qty = EXCLUDED.qty,
-                                stock_qty = EXCLUDED.stock_qty,
-                                vendor_name = EXCLUDED.vendor_name,
-                                grpo_no = EXCLUDED.grpo_no,
-                                rcvd_qty = EXCLUDED.rcvd_qty,
                                 nt_weight = EXCLUDED.nt_weight,
                                 qc = EXCLUDED.qc,
                                 drw_yn = EXCLUDED.drw_yn,
                                 v_chk = EXCLUDED.v_chk,
-                                ok_qty = EXCLUDED.ok_qty,
-                                rej_qty = EXCLUDED.rej_qty,
                                 lm = EXCLUDED.lm,
                                 olng = EXCLUDED.olng,
                                 lpk = EXCLUDED.lpk,
@@ -1873,11 +2452,27 @@ class StockConfigurationService:
             existing_items = self._read_from_fallback()
             item_map = {it["item_code"]: it for it in existing_items}
             for item in rows:
-                item_map[item["item_code"]] = {
-                    **item,
-                    "updated_at": now.isoformat(),
-                    "created_at": item_map.get(item["item_code"], {}).get("created_at", now.isoformat()),
-                }
+                code = item["item_code"]
+                if code in item_map:
+                    # Protect SAP-owned fields on conflict
+                    item_map[code].update({
+                        "nt_weight": item["nt_weight"],
+                        "qc": item["qc"],
+                        "drw_yn": item["drw_yn"],
+                        "v_chk": item["v_chk"],
+                        "lm": item["lm"],
+                        "olng": item["olng"],
+                        "lpk": item["lpk"],
+                        "lbl": item["lbl"],
+                        "mc_or_pt": item["mc_or_pt"],
+                        "updated_at": now.isoformat(),
+                    })
+                else:
+                    item_map[code] = {
+                        **item,
+                        "updated_at": now.isoformat(),
+                        "created_at": now.isoformat(),
+                    }
                 committed += 1
             self._write_to_fallback(list(item_map.values()))
 

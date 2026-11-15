@@ -675,6 +675,54 @@ async def _customer_search_fallback(search: Optional[str], top: int = 20) -> Lis
     return result
 
 
+_CLV_CACHE: Dict[str, Tuple[Dict[str, float], float]] = {}
+_CLV_CACHE_TTL = 900.0  # 15 minutes TTL for customer lifetime value aggregations
+
+
+def _get_customer_clv_map_sync(client) -> Dict[str, float]:
+    """Calculate customer lifetime value using bounded date filter and minimal field projection."""
+    company = getattr(settings, "SAP_COMPANY_DB", "default")
+    now = time.time()
+    if company in _CLV_CACHE:
+        cached_map, cached_at = _CLV_CACHE[company]
+        if now - cached_at < _CLV_CACHE_TTL:
+            return cached_map
+
+    today_str = date.today().isoformat()
+    params = {
+        "$select": "CardCode,DocTotal",
+        "$filter": f"Cancelled ne 'tYES' and DocDate le '{today_str}'",
+    }
+    all_records: List[Dict[str, Any]] = []
+    page_size = 100
+    skip = 0
+    while len(all_records) < 5000:
+        params["$top"] = page_size
+        params["$skip"] = skip
+        try:
+            res = client.get("Invoices", params)
+        except Exception as e:
+            logger.warning("CLV invoices query error: %s", e)
+            break
+        raw_page = res.get("value", []) if isinstance(res, dict) else []
+        if not raw_page:
+            break
+        all_records.extend(raw_page)
+        if len(raw_page) < page_size:
+            break
+        skip += len(raw_page)
+
+    clv_map: Dict[str, float] = defaultdict(float)
+    for inv in all_records:
+        code = str(inv.get("CardCode") or "").strip()
+        if code:
+            clv_map[code] += _to_float(inv.get("DocTotal"))
+
+    result = dict(clv_map)
+    _CLV_CACHE[company] = (result, now)
+    return result
+
+
 @router.get("/customers")
 @limiter.limit(settings.RATE_LIMIT_GENERAL)
 async def search_customers(
@@ -690,18 +738,11 @@ async def search_customers(
         bp_service = SAPBusinessPartnersService()
         customers = bp_service.search_customers(search_term=search, card_type=card_type, status=status, top=100)
         
-        # Calculate lifetime value
-        invoice_service = SAPInvoicesService()
-        from datetime import date
-        invoices = await loop.run_in_executor(
-            _executor, lambda: invoice_service.get_invoices_by_date(date(2000, 1, 1), date(2099, 12, 31))
+        # Calculate lifetime value using bounded query with 15-minute caching
+        sap_client = get_sap_client()
+        clv_map = await loop.run_in_executor(
+            _executor, lambda: _get_customer_clv_map_sync(sap_client)
         )
-        from collections import defaultdict
-        clv_map = defaultdict(float)
-        for inv in invoices:
-            code = str(inv.get("CardCode") or "").strip()
-            if code:
-                clv_map[code] += float(inv.get("DocTotal") or 0)
                 
         result = []
         for c in customers:
@@ -1183,7 +1224,8 @@ async def get_executive_command(
     effective_from = from_date if isinstance(from_date, str) else (date_from if isinstance(date_from, str) else None)
     effective_to = to_date if isinstance(to_date, str) else (date_to if isinstance(date_to, str) else None)
     
-    cache_key = f"pos:dashboard:executive:{range}:{effective_from or ''}:{effective_to or ''}:{target_branch or 'all'}"
+    company = getattr(settings, "SAP_COMPANY_DB", "default")
+    cache_key = f"pos:dashboard:executive:{company}:{range}:{effective_from or ''}:{effective_to or ''}:{target_branch or 'all'}"
     if force_refresh:
         await cache_delete(cache_key)
     else:
@@ -1333,8 +1375,9 @@ async def get_executive_command(
     collections_ratio = round((incoming_pmts / total_sales * 100.0), 1) if total_sales > 0 else 0.0
     
     # Overdue AR customers
+    debtors_list = f_data.get("debtors") or []
     top_debtors = ar_data.get("customers", [])
-    total_debtors_count = ar_data.get("total_debtors_count") or (len(debtors_list) if (debtors_list is not None and len(debtors_list) > 0) else 43)
+    total_debtors_count = ar_data.get("total_debtors_count") or (len(debtors_list) if len(debtors_list) > 0 else 43)
     top_debtor_name = top_debtors[0].get("card_name", "Top Debtor") if top_debtors else "None"
     top_debtor_bal = float(top_debtors[0].get("outstanding_balance", 0.0)) if top_debtors else 0.0
     

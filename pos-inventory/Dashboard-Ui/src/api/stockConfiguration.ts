@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 
 export interface StockConfigurationItem {
+  sr_no?: number;
   record_id?: string;
   item_code: string;
   description: string;
@@ -11,22 +12,34 @@ export interface StockConfigurationItem {
   grpo_no: string;
   rcvd_qty: number;
   nt_weight: number;
-  qc: boolean;
-  drw_yn: 'Y' | 'N';
-  v_chk: 'Y' | 'N';
+  qc: boolean | 'Y' | 'N' | '' | null;
+  drw_yn: 'Y' | 'N' | '';
+  v_chk: 'Y' | 'N' | '';
   ok_qty: number;
   rej_qty: number;
-  lm: 'Y' | 'N';
-  olng: 'Y' | 'N';
-  lpk: 'Y' | 'N';
-  lbl: 'Y' | 'N';
-  mc_or_pt: 'Y' | 'N';
+  lm: 'Y' | 'N' | '';
+  olng: 'Y' | 'N' | '';
+  lpk: 'Y' | 'N' | '';
+  lbl: 'Y' | 'N' | '';
+  mc_or_pt: 'Y' | 'N' | '';
   items_group_code?: string;
   warehouse_code?: string;
   is_active?: boolean;
   entry_date?: string | null;
+  item_create_date?: string | null;
+  so_date?: string | null;
+  po_date?: string | null;
+  grn_date?: string | null;
+  po_no?: string;
+  so_no?: string;
+  so_qty?: number;
+  po_qty?: number;
+  record_category?: string;
+  remark?: string;
   created_at?: string;
   updated_at?: string;
+  last_submitted_at?: string | null;
+  last_submitted_by?: string | null;
 }
 
 export interface StockKpis {

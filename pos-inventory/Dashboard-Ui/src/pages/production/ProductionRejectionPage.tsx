@@ -111,6 +111,8 @@ export const ProductionRejectionPage = () => {
     queryKey: ['production', 'rejection', queryFilters],
     queryFn: () => getProductionRejection(queryFilters),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const handleRefresh = () => {

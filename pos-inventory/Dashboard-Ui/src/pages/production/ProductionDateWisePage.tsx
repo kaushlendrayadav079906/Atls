@@ -98,6 +98,8 @@ export const ProductionDateWisePage = () => {
     queryKey: ['production', 'date-wise', queryFilters],
     queryFn: () => getDateWiseProduction(queryFilters),
     enabled: dateRange === 'total' || (!!date_from && !!date_to),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
   });
 
   const handleRefresh = () => {
