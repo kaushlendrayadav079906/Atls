@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",
+    "@vercel/speed-insights": "^2.1.0",
     "axios": "^1.6.0",
     "lucide-react": "^1.48.0",
     "react": "^19.2.8",

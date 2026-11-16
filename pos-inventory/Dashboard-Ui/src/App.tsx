@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Layout } from './components/Layout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Dashboard } from './pages/Dashboard';
@@ -167,6 +168,7 @@ function App() {
         </BrowserRouter>
         </ThemeProvider>
       </AuthProvider>
+      <SpeedInsights />
     </QueryClientProvider>
   );
 }
