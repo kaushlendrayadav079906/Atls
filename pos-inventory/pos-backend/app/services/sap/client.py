@@ -78,7 +78,7 @@ class SAPServiceLayerClient:
             limits=httpx.Limits(max_keepalive_connections=50, max_connections=100, keepalive_expiry=60.0),
         )
 
-    def login(self, timeout: Optional[Any] = None) -> bool:
+    def login(self, timeout: Optional[Any] = None, force: bool = False) -> bool:
         """
         Login to SAP Service Layer and obtain session cookie
 
@@ -88,7 +88,17 @@ class SAPServiceLayerClient:
         Raises:
             SAPConnectionError: If login fails
         """
-        try:
+        if not force and self.session_id and (
+            not self.session_timeout or datetime.utcnow() < self.session_timeout
+        ):
+            return True
+
+        with self._session_lock:
+            if not force and self.session_id and (
+                not self.session_timeout or datetime.utcnow() < self.session_timeout
+            ):
+                return True
+
             login_url = f"{self.base_url}/Login"
             payload = {
                 "CompanyDB": self.company_db,
@@ -96,36 +106,47 @@ class SAPServiceLayerClient:
                 "Password": self.password,
             }
 
-            logger.info(f"Logging in to SAP Service Layer: {self.company_db}")
-            post_kwargs: Dict[str, Any] = {"json": payload}
-            if timeout is not None:
-                post_kwargs["timeout"] = timeout
-            response = self.client.post(login_url, **post_kwargs)
-            response.raise_for_status()
+            post_kwargs: Dict[str, Any] = {
+                "json": payload,
+                "timeout": timeout if timeout is not None else 60.0,
+            }
 
-            # Extract session cookies
-            session_cookie = response.cookies.get("B1SESSION")
-            route_id_cookie = response.cookies.get("ROUTEID")
-            
-            if not session_cookie:
-                raise SAPConnectionError("No session cookie received from SAP")
+            for attempt in range(2):
+                try:
+                    logger.info(f"Logging in to SAP Service Layer: {self.company_db} (attempt {attempt + 1})")
+                    response = self.client.post(login_url, **post_kwargs)
+                    response.raise_for_status()
 
-            self.session_id = session_cookie
-            self.route_id = route_id_cookie
-            # SAP sessions typically last 30 minutes
-            self.session_timeout = datetime.utcnow() + timedelta(minutes=25)
+                    # Extract session cookies
+                    session_cookie = response.cookies.get("B1SESSION")
+                    route_id_cookie = response.cookies.get("ROUTEID")
 
-            logger.info("Successfully logged in to SAP Service Layer")
-            return True
+                    if not session_cookie:
+                        raise SAPConnectionError("No session cookie received from SAP")
 
-        except httpx.HTTPStatusError as e:
-            logger.error(
-                f"SAP login failed: {e.response.status_code} - {e.response.text}"
-            )
-            raise SAPConnectionError(f"SAP login failed: {e.response.text}")
-        except Exception as e:
-            logger.error(f"SAP login error: {str(e)}")
-            raise SAPConnectionError(f"SAP login error: {str(e)}")
+                    self.session_id = session_cookie
+                    self.route_id = route_id_cookie
+                    # SAP sessions typically last 30 minutes
+                    self.session_timeout = datetime.utcnow() + timedelta(minutes=25)
+
+                    logger.info("Successfully logged in to SAP Service Layer")
+                    return True
+
+                except httpx.HTTPStatusError as e:
+                    logger.error(
+                        f"SAP login failed: {e.response.status_code} - {e.response.text}"
+                    )
+                    raise SAPConnectionError(f"SAP login failed: {e.response.text}")
+                except (httpx.TimeoutException, httpx.ConnectError) as conn_err:
+                    if attempt == 0:
+                        logger.warning("SAP login attempt 1 timed out or connection reset (%s), retrying...", conn_err)
+                        time.sleep(1)
+                        continue
+                    logger.error(f"SAP login error after retry: {str(conn_err)}")
+                    raise SAPConnectionError(f"SAP login error: {str(conn_err)}")
+                except Exception as e:
+                    logger.error(f"SAP login error: {str(e)}")
+                    raise SAPConnectionError(f"SAP login error: {str(e)}")
 
     def logout(self):
         """Logout from SAP Service Layer"""

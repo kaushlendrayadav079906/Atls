@@ -99,15 +99,15 @@ export const StockConfigurationPage: React.FC = () => {
     rcvd_qty: 0,
     nt_weight: 0,
     qc: false,
-    drw_yn: 'Y' as 'Y' | 'N',
-    v_chk: 'Y' as 'Y' | 'N',
+    drw_yn: '' as 'Y' | 'N' | '',
+    v_chk: '' as 'Y' | 'N' | '',
     ok_qty: 0,
     rej_qty: 0,
-    lm: 'Y' as 'Y' | 'N',
-    olng: 'Y' as 'Y' | 'N',
-    lpk: 'Y' as 'Y' | 'N',
-    lbl: 'Y' as 'Y' | 'N',
-    mc_or_pt: 'Y' as 'Y' | 'N',
+    lm: '' as 'Y' | 'N' | '',
+    olng: '' as 'Y' | 'N' | '',
+    lpk: '' as 'Y' | 'N' | '',
+    lbl: '' as 'Y' | 'N' | '',
+    mc_or_pt: '' as 'Y' | 'N' | '',
     items_group_code: 'Finished Goods',
     warehouse_code: '01',
   });
@@ -224,7 +224,12 @@ export const StockConfigurationPage: React.FC = () => {
       }
       queryClient.invalidateQueries({ queryKey: ['stock-configuration'] });
       queryClient.invalidateQueries({ queryKey: ['products-stock'] });
-      if (res.sap_synced) {
+      if (res.partial_success) {
+        setNotification({
+          type: 'info',
+          message: `Item ${variables.itemCode} partially saved: ${res.sap_message || res.message}`,
+        });
+      } else if (res.sap_synced) {
         setNotification({
           type: 'success',
           message: `Item ${variables.itemCode} updated in database & synced to SAP Business One!`,
@@ -357,15 +362,15 @@ export const StockConfigurationPage: React.FC = () => {
         rcvd_qty: 0,
         nt_weight: 0,
         qc: false,
-        drw_yn: 'Y',
-        v_chk: 'Y',
+        drw_yn: '',
+        v_chk: '',
         ok_qty: 0,
         rej_qty: 0,
-        lm: 'Y',
-        olng: 'Y',
-        lpk: 'Y',
-        lbl: 'Y',
-        mc_or_pt: 'Y',
+        lm: '',
+        olng: '',
+        lpk: '',
+        lbl: '',
+        mc_or_pt: '',
         items_group_code: 'Finished Goods',
         warehouse_code: '01',
       });
@@ -405,14 +410,18 @@ export const StockConfigurationPage: React.FC = () => {
       // Clean up diff if restored to original
       if (field === 'qc') {
         const itemQc = (item.qc === true || item.qc === 'Y') ? 'Y' : (item.qc === false || item.qc === 'N') ? 'N' : '';
-        const newQc = value === 'Y' ? 'Y' : value === 'N' ? 'N' : '';
-        if (itemQc === newQc) {
+        const valStr = value === true || value === 'Y' ? 'Y' : value === false || value === 'N' ? 'N' : '';
+        if (itemQc === valStr) {
           delete current.qc;
         } else {
-          current.qc = newQc === 'Y' ? true : newQc === 'N' ? false : null;
+          current.qc = valStr === 'Y' ? true : valStr === 'N' ? false : null;
         }
-      } else if (value === item[field]) {
-        delete current[field as string];
+      } else {
+        const origStr = item[field] === null || item[field] === undefined ? '' : String(item[field]);
+        const valStr = value === null || value === undefined ? '' : String(value);
+        if (valStr === origStr) {
+          delete current[field as string];
+        }
       }
       if (Object.keys(current).length === 0) {
         const next = { ...prev };
@@ -430,11 +439,13 @@ export const StockConfigurationPage: React.FC = () => {
     const edit = editedRows[item.item_code];
     if (!edit || !(field in edit)) return false;
     if (field === 'qc') {
-      const itemQc = (item.qc === true || item.qc === 'Y') ? 'Y' : 'N';
-      const editQc = (edit.qc === true || edit.qc === 'Y') ? 'Y' : 'N';
+      const itemQc = (item.qc === true || item.qc === 'Y') ? 'Y' : (item.qc === false || item.qc === 'N') ? 'N' : '';
+      const editQc = (edit.qc === true || edit.qc === 'Y') ? 'Y' : (edit.qc === false || edit.qc === 'N') ? 'N' : '';
       return itemQc !== editQc;
     }
-    return edit[field] !== item[field];
+    const origStr = item[field] === null || item[field] === undefined ? '' : String(item[field]);
+    const editStr = edit[field] === null || edit[field] === undefined ? '' : String(edit[field]);
+    return origStr !== editStr;
   };
 
   // Get effective row values (buffer or original)
@@ -459,6 +470,12 @@ export const StockConfigurationPage: React.FC = () => {
     if (!rawStr) return { date: '—', time: null };
     const raw = String(rawStr).trim();
     if (!raw || raw === '—') return { date: '—', time: null };
+
+    // Pure YYYY-MM-DD date formatting without timezone distortion
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const [y, m, d] = raw.split('-');
+      return { date: `${d}-${m}-${y}`, time: null };
+    }
 
     const d = new Date(raw);
     if (isNaN(d.getTime())) return { date: raw, time: null };
@@ -494,8 +511,11 @@ export const StockConfigurationPage: React.FC = () => {
     const raw = String(rawStr).trim();
     if (!raw || raw === '—') return { date: '—', time: null };
 
-    // If string has T but no offset or Z (naive server timestamp), ensure Asia/Kolkata offset
+    // If string has space instead of T (e.g. YYYY-MM-DD HH:MM:SS), normalize to ISO
     let parseable = raw;
+    if (parseable.includes(' ') && !parseable.includes('T')) {
+      parseable = parseable.replace(' ', 'T');
+    }
     if (parseable.includes('T') && !parseable.includes('Z') && !parseable.includes('+') && !parseable.slice(10).includes('-')) {
       parseable = parseable + '+05:30';
     }
@@ -531,18 +551,48 @@ export const StockConfigurationPage: React.FC = () => {
   // Handle Save / Submit row (syncs to Database & SAP - SAP-owned fields are protected)
   const handleSaveRow = (item: StockConfigurationItem) => {
     const edits = editedRows[item.item_code] || {};
-    const effectiveUpdates: Partial<StockConfigurationItem> = {
-      nt_weight: edits.nt_weight !== undefined ? edits.nt_weight : item.nt_weight,
-      qc: edits.qc !== undefined ? edits.qc : item.qc,
-      drw_yn: edits.drw_yn !== undefined ? edits.drw_yn : item.drw_yn,
-      v_chk: edits.v_chk !== undefined ? edits.v_chk : item.v_chk,
-      lm: edits.lm !== undefined ? edits.lm : item.lm,
-      olng: edits.olng !== undefined ? edits.olng : item.olng,
-      lpk: edits.lpk !== undefined ? edits.lpk : item.lpk,
-      lbl: edits.lbl !== undefined ? edits.lbl : item.lbl,
-      mc_or_pt: edits.mc_or_pt !== undefined ? edits.mc_or_pt : item.mc_or_pt,
-      remark: edits.remark !== undefined ? edits.remark : (item.remark || ''),
+    const hasEdits = Object.keys(edits).length > 0;
+    if (!hasEdits) {
+      setNotification({ type: 'info', message: `No changes to save for item ${item.item_code}.` });
+      return;
+    }
+
+    const cleanYnField = (val: any): 'Y' | 'N' | '' => {
+      if (val === 'Y' || val === 'y' || val === true) return 'Y';
+      if (val === 'N' || val === 'n' || val === false) return 'N';
+      return '';
     };
+
+    const effectiveUpdates: Partial<StockConfigurationItem> = {
+      item_code: item.item_code,
+    };
+
+    if (edits.nt_weight !== undefined) {
+      const rawWeight = edits.nt_weight;
+      const numWeight = isNaN(Number(rawWeight)) ? 0 : Math.round(Math.max(0, Number(rawWeight)) * 100) / 100;
+      effectiveUpdates.nt_weight = numWeight;
+    }
+
+    if (edits.qc !== undefined) {
+      let cleanQc: boolean | null = null;
+      if (edits.qc === true || edits.qc === 'Y') cleanQc = true;
+      else if (edits.qc === false || edits.qc === 'N') cleanQc = false;
+      effectiveUpdates.qc = cleanQc;
+    }
+
+    if (edits.drw_yn !== undefined) effectiveUpdates.drw_yn = cleanYnField(edits.drw_yn);
+    if (edits.v_chk !== undefined) effectiveUpdates.v_chk = cleanYnField(edits.v_chk);
+    if (edits.lm !== undefined) effectiveUpdates.lm = cleanYnField(edits.lm);
+    if (edits.olng !== undefined) effectiveUpdates.olng = cleanYnField(edits.olng);
+    if (edits.lpk !== undefined) effectiveUpdates.lpk = cleanYnField(edits.lpk);
+    if (edits.lbl !== undefined) effectiveUpdates.lbl = cleanYnField(edits.lbl);
+    if (edits.mc_or_pt !== undefined) effectiveUpdates.mc_or_pt = cleanYnField(edits.mc_or_pt);
+
+    if (edits.remark !== undefined) {
+      effectiveUpdates.remark = edits.remark;
+      if (item.po_no) effectiveUpdates.po_no = item.po_no;
+      if (item.po_doc_entry) effectiveUpdates.po_doc_entry = item.po_doc_entry;
+    }
 
     const valError = validateRow(item, effectiveUpdates);
     if (valError) {
@@ -568,25 +618,37 @@ export const StockConfigurationPage: React.FC = () => {
       }
     }
 
+    const cleanYnField = (val: any): 'Y' | 'N' | '' => {
+      if (val === 'Y' || val === 'y' || val === true) return 'Y';
+      if (val === 'N' || val === 'n' || val === false) return 'N';
+      return '';
+    };
+
     const payload = codes.map((code) => {
       const edits = editedRows[code] || {};
-      const originalItem = data?.items?.find((it) => it.item_code === code);
+      const origItem = data?.items.find((it) => it.item_code === code);
       const safeUpdates: Partial<StockConfigurationItem> = {
         item_code: code,
       };
-      if (edits.nt_weight !== undefined) safeUpdates.nt_weight = edits.nt_weight;
-      if (edits.qc !== undefined) safeUpdates.qc = edits.qc;
-      if (edits.drw_yn !== undefined) safeUpdates.drw_yn = edits.drw_yn;
-      if (edits.v_chk !== undefined) safeUpdates.v_chk = edits.v_chk;
-      if (edits.lm !== undefined) safeUpdates.lm = edits.lm;
-      if (edits.olng !== undefined) safeUpdates.olng = edits.olng;
-      if (edits.lpk !== undefined) safeUpdates.lpk = edits.lpk;
-      if (edits.lbl !== undefined) safeUpdates.lbl = edits.lbl;
-      if (edits.mc_or_pt !== undefined) safeUpdates.mc_or_pt = edits.mc_or_pt;
+      if (edits.nt_weight !== undefined) {
+        safeUpdates.nt_weight = Math.round(Math.max(0, Number(edits.nt_weight)) * 100) / 100;
+      }
+      if (edits.qc !== undefined) {
+        if (edits.qc === true || edits.qc === 'Y') safeUpdates.qc = true;
+        else if (edits.qc === false || edits.qc === 'N') safeUpdates.qc = false;
+        else safeUpdates.qc = null;
+      }
+      if (edits.drw_yn !== undefined) safeUpdates.drw_yn = cleanYnField(edits.drw_yn);
+      if (edits.v_chk !== undefined) safeUpdates.v_chk = cleanYnField(edits.v_chk);
+      if (edits.lm !== undefined) safeUpdates.lm = cleanYnField(edits.lm);
+      if (edits.olng !== undefined) safeUpdates.olng = cleanYnField(edits.olng);
+      if (edits.lpk !== undefined) safeUpdates.lpk = cleanYnField(edits.lpk);
+      if (edits.lbl !== undefined) safeUpdates.lbl = cleanYnField(edits.lbl);
+      if (edits.mc_or_pt !== undefined) safeUpdates.mc_or_pt = cleanYnField(edits.mc_or_pt);
       if (edits.remark !== undefined) {
         safeUpdates.remark = edits.remark;
-      } else if (originalItem?.remark) {
-        safeUpdates.remark = originalItem.remark;
+        if (origItem?.po_no) safeUpdates.po_no = origItem.po_no;
+        if (origItem?.po_doc_entry) safeUpdates.po_doc_entry = origItem.po_doc_entry;
       }
       return safeUpdates;
     });
@@ -603,10 +665,16 @@ export const StockConfigurationPage: React.FC = () => {
         page_size: 10000,
       });
 
+      const cleanYnField = (val: any): 'Y' | 'N' | '' => {
+        if (val === 'Y' || val === 'y' || val === true) return 'Y';
+        if (val === 'N' || val === 'n' || val === false) return 'N';
+        return '';
+      };
+
       const payload: Partial<StockConfigurationItem>[] = [];
       for (const it of allRes.items) {
         const edits = editedRows[it.item_code] || {};
-        const effWeight = edits.nt_weight !== undefined ? edits.nt_weight : it.nt_weight;
+        const effWeight = edits.nt_weight !== undefined ? Number(edits.nt_weight) : Number(it.nt_weight ?? 0);
 
         if (effWeight < 0) {
           setNotification({
@@ -616,18 +684,25 @@ export const StockConfigurationPage: React.FC = () => {
           return;
         }
 
+        const rawQc = edits.qc !== undefined ? edits.qc : it.qc;
+        let cleanQc: boolean | null = null;
+        if (rawQc === true || rawQc === 'Y') cleanQc = true;
+        else if (rawQc === false || rawQc === 'N') cleanQc = false;
+
         payload.push({
           item_code: it.item_code,
-          nt_weight: effWeight,
-          qc: edits.qc !== undefined ? edits.qc : it.qc,
-          drw_yn: edits.drw_yn !== undefined ? edits.drw_yn : it.drw_yn,
-          v_chk: edits.v_chk !== undefined ? edits.v_chk : it.v_chk,
-          lm: edits.lm !== undefined ? edits.lm : it.lm,
-          olng: edits.olng !== undefined ? edits.olng : it.olng,
-          lpk: edits.lpk !== undefined ? edits.lpk : it.lpk,
-          lbl: edits.lbl !== undefined ? edits.lbl : it.lbl,
-          mc_or_pt: edits.mc_or_pt !== undefined ? edits.mc_or_pt : it.mc_or_pt,
+          nt_weight: Math.round(Math.max(0, effWeight) * 100) / 100,
+          qc: cleanQc,
+          drw_yn: cleanYnField(edits.drw_yn !== undefined ? edits.drw_yn : it.drw_yn),
+          v_chk: cleanYnField(edits.v_chk !== undefined ? edits.v_chk : it.v_chk),
+          lm: cleanYnField(edits.lm !== undefined ? edits.lm : it.lm),
+          olng: cleanYnField(edits.olng !== undefined ? edits.olng : it.olng),
+          lpk: cleanYnField(edits.lpk !== undefined ? edits.lpk : it.lpk),
+          lbl: cleanYnField(edits.lbl !== undefined ? edits.lbl : it.lbl),
+          mc_or_pt: cleanYnField(edits.mc_or_pt !== undefined ? edits.mc_or_pt : it.mc_or_pt),
           remark: edits.remark !== undefined ? edits.remark : (it.remark || ''),
+          po_no: it.po_no,
+          po_doc_entry: it.po_doc_entry,
         });
       }
 
@@ -738,18 +813,16 @@ export const StockConfigurationPage: React.FC = () => {
   };
 
   return (
-    <div className={`w-full max-w-full space-y-3.5 sm:space-y-4 transition-colors duration-200 ${
-      isDark ? 'text-slate-100' : 'text-slate-900'
-    }`}>
+    <div className={`w-full max-w-full space-y-3.5 sm:space-y-4 transition-colors duration-200 ${isDark ? 'text-slate-100' : 'text-slate-900'
+      }`}>
       {/* ── Notification Toast ── */}
       {notification && (
-        <div className={`fixed top-20 right-8 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold transition-all duration-200 animate-in slide-in-from-top-4 ${
-          notification.type === 'success'
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-            : notification.type === 'error'
+        <div className={`fixed top-20 right-8 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold transition-all duration-200 animate-in slide-in-from-top-4 ${notification.type === 'success'
+          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+          : notification.type === 'error'
             ? 'bg-rose-50 border-rose-200 text-rose-800'
             : 'bg-blue-50 border-blue-200 text-blue-800'
-        }`}>
+          }`}>
           {notification.type === 'success' && <Check className="w-5 h-5 text-emerald-600 shrink-0" />}
           {notification.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />}
           {notification.type === 'info' && <AlertCircle className="w-5 h-5 text-blue-600 shrink-0" />}
@@ -777,11 +850,10 @@ export const StockConfigurationPage: React.FC = () => {
           <button
             onClick={() => syncMutation.mutate()}
             disabled={syncMutation.isPending}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
-              isDark
-                ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700'
-                : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300'
-            }`}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${isDark
+              ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700'
+              : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300'
+              }`}
             title="Fetch live updates from SAP Service Layer"
           >
             <RotateCw size={15} className={`text-blue-600 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
@@ -791,11 +863,10 @@ export const StockConfigurationPage: React.FC = () => {
           {/* Import Excel */}
           <button
             onClick={() => setImportModalOpen(true)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
-              isDark
-                ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700'
-                : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300'
-            }`}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${isDark
+              ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700'
+              : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300'
+              }`}
           >
             <Upload size={15} className="text-blue-600" />
             <span>Import Excel</span>
@@ -804,11 +875,10 @@ export const StockConfigurationPage: React.FC = () => {
           {/* Export Excel */}
           <button
             onClick={handleExport}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${
-              isDark
-                ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700'
-                : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300'
-            }`}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border text-[13.5px] font-semibold transition-all cursor-pointer shadow-2xs ${isDark
+              ? 'bg-slate-800 border-slate-700 text-blue-400 hover:bg-slate-700'
+              : 'bg-white border-blue-200 text-[#155EEF] hover:bg-blue-50/70 hover:border-blue-300'
+              }`}
           >
             <Download size={15} className="text-blue-600" />
             <span>Export Excel</span>
@@ -834,11 +904,10 @@ export const StockConfigurationPage: React.FC = () => {
             setBranchId(e.target.value);
             setPage(1);
           }}
-          className={`rounded-xl border px-3.5 py-2 text-[13px] sm:text-[13.5px] font-medium outline-none shadow-2xs transition cursor-pointer ${
-            isDark
-              ? 'border-slate-700 bg-[#141f32] text-slate-200 hover:border-slate-600'
-              : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
-          }`}
+          className={`rounded-xl border px-3.5 py-2 text-[13px] sm:text-[13.5px] font-medium outline-none shadow-2xs transition cursor-pointer ${isDark
+            ? 'border-slate-700 bg-[#141f32] text-slate-200 hover:border-slate-600'
+            : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
+            }`}
         >
           <option value="">All Branches</option>
           {user?.branch_id && (
@@ -856,11 +925,10 @@ export const StockConfigurationPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-colors font-medium text-[13px] sm:text-[13.5px] shadow-2xs cursor-pointer border ${
-              isDark
-                ? 'border-slate-700 bg-[#141f32] text-slate-200 hover:bg-slate-800'
-                : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'
-            }`}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-colors font-medium text-[13px] sm:text-[13.5px] shadow-2xs cursor-pointer border ${isDark
+              ? 'border-slate-700 bg-[#141f32] text-slate-200 hover:bg-slate-800'
+              : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'
+              }`}
           >
             <Calendar className="w-3.5 h-3.5 text-slate-500" />
             <span>
@@ -870,23 +938,20 @@ export const StockConfigurationPage: React.FC = () => {
           </button>
 
           {isDateDropdownOpen && (
-            <div className={`absolute left-0 mt-2 w-64 border shadow-xl rounded-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${
-              isDark ? 'bg-[#1e293b] border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-700'
-            }`}>
+            <div className={`absolute left-0 mt-2 w-64 border shadow-xl rounded-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-100 ${isDark ? 'bg-[#1e293b] border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-700'
+              }`}>
               <button
                 type="button"
                 onClick={() => applyQuickFilter('')}
-                className={`w-full text-left px-4 py-2 text-[13.5px] transition-colors cursor-pointer ${
-                  quickFilter === ''
-                    ? (isDark ? 'bg-blue-600/20 text-blue-400 font-semibold' : 'bg-blue-50 text-blue-700 font-semibold')
-                    : (isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50 font-normal')
-                }`}
+                className={`w-full text-left px-4 py-2 text-[13.5px] transition-colors cursor-pointer ${quickFilter === ''
+                  ? (isDark ? 'bg-blue-600/20 text-blue-400 font-semibold' : 'bg-blue-50 text-blue-700 font-semibold')
+                  : (isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50 font-normal')
+                  }`}
               >
                 All Dates (Total)
               </button>
-              <div className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-y ${
-                isDark ? 'text-slate-300 border-slate-700 bg-[#141f32]' : 'text-slate-700 border-slate-200 bg-slate-50'
-              }`}>
+              <div className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-y ${isDark ? 'text-slate-300 border-slate-700 bg-[#141f32]' : 'text-slate-700 border-slate-200 bg-slate-50'
+                }`}>
                 Quick Filters
               </div>
               {(['today', 'week', 'month', 'year'] as const).map((f) => {
@@ -896,19 +961,17 @@ export const StockConfigurationPage: React.FC = () => {
                     key={f}
                     type="button"
                     onClick={() => applyQuickFilter(f)}
-                    className={`w-full text-left px-4 py-2 text-[13.5px] transition-colors cursor-pointer ${
-                      quickFilter === f
-                        ? (isDark ? 'bg-blue-600/20 text-blue-400 font-semibold' : 'bg-blue-50 text-blue-700 font-semibold')
-                        : (isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50 font-normal')
-                    }`}
+                    className={`w-full text-left px-4 py-2 text-[13.5px] transition-colors cursor-pointer ${quickFilter === f
+                      ? (isDark ? 'bg-blue-600/20 text-blue-400 font-semibold' : 'bg-blue-50 text-blue-700 font-semibold')
+                      : (isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-700 hover:bg-slate-50 font-normal')
+                      }`}
                   >
                     {label}
                   </button>
                 );
               })}
-              <div className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-y mt-1 ${
-                isDark ? 'text-slate-300 border-slate-700 bg-[#141f32]' : 'text-slate-700 border-slate-200 bg-slate-50'
-              }`}>
+              <div className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-wider border-y mt-1 ${isDark ? 'text-slate-300 border-slate-700 bg-[#141f32]' : 'text-slate-700 border-slate-200 bg-slate-50'
+                }`}>
                 Custom Range
               </div>
               <div className="p-3 flex flex-col gap-2">
@@ -916,9 +979,8 @@ export const StockConfigurationPage: React.FC = () => {
                   <label className={`text-xs font-semibold mb-1 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>From</label>
                   <input
                     type="date"
-                    className={`w-full text-sm border rounded px-2 py-1 outline-none font-medium ${
-                      isDark ? 'border-slate-700 bg-[#141f32] text-slate-200' : 'border-slate-300 bg-white text-slate-800'
-                    }`}
+                    className={`w-full text-sm border rounded px-2 py-1 outline-none font-medium ${isDark ? 'border-slate-700 bg-[#141f32] text-slate-200' : 'border-slate-300 bg-white text-slate-800'
+                      }`}
                     value={customFrom}
                     onChange={(e) => {
                       setCustomFrom(e.target.value);
@@ -930,9 +992,8 @@ export const StockConfigurationPage: React.FC = () => {
                   <label className={`text-xs font-semibold mb-1 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>To</label>
                   <input
                     type="date"
-                    className={`w-full text-sm border rounded px-2 py-1 outline-none font-medium ${
-                      isDark ? 'border-slate-700 bg-[#141f32] text-slate-200' : 'border-slate-300 bg-white text-slate-800'
-                    }`}
+                    className={`w-full text-sm border rounded px-2 py-1 outline-none font-medium ${isDark ? 'border-slate-700 bg-[#141f32] text-slate-200' : 'border-slate-300 bg-white text-slate-800'
+                      }`}
                     value={customTo}
                     onChange={(e) => {
                       setCustomTo(e.target.value);
@@ -960,9 +1021,8 @@ export const StockConfigurationPage: React.FC = () => {
       {/* ── KPI Summary Cards (4 Cards in a Row) ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-3.5">
         {/* Total Items */}
-        <div className={`p-3.5 sm:p-4 rounded-xl border transition-all duration-200 shadow-xs flex items-center gap-3.5 ${
-          isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
-        }`}>
+        <div className={`p-3.5 sm:p-4 rounded-xl border transition-all duration-200 shadow-xs flex items-center gap-3.5 ${isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
+          }`}>
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
             <Box size={22} className="text-blue-600" />
           </div>
@@ -980,9 +1040,8 @@ export const StockConfigurationPage: React.FC = () => {
         </div>
 
         {/* Active Items */}
-        <div className={`p-3.5 sm:p-4 rounded-xl border transition-all duration-200 shadow-xs flex items-center gap-3.5 ${
-          isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
-        }`}>
+        <div className={`p-3.5 sm:p-4 rounded-xl border transition-all duration-200 shadow-xs flex items-center gap-3.5 ${isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
+          }`}>
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
             <CheckCircle2 size={22} className="text-emerald-600" />
           </div>
@@ -1000,9 +1059,8 @@ export const StockConfigurationPage: React.FC = () => {
         </div>
 
         {/* Inactive Items */}
-        <div className={`p-3.5 sm:p-4 rounded-xl border transition-all duration-200 shadow-xs flex items-center gap-3.5 ${
-          isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
-        }`}>
+        <div className={`p-3.5 sm:p-4 rounded-xl border transition-all duration-200 shadow-xs flex items-center gap-3.5 ${isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
+          }`}>
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center shrink-0">
             <XCircle size={22} className="text-rose-500" />
           </div>
@@ -1020,9 +1078,8 @@ export const StockConfigurationPage: React.FC = () => {
         </div>
 
         {/* Warehouses */}
-        <div className={`p-3.5 sm:p-4 rounded-xl border transition-all duration-200 shadow-xs flex items-center gap-3.5 ${
-          isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
-        }`}>
+        <div className={`p-3.5 sm:p-4 rounded-xl border transition-all duration-200 shadow-xs flex items-center gap-3.5 ${isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
+          }`}>
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center shrink-0">
             <Warehouse size={22} className="text-purple-600" />
           </div>
@@ -1041,9 +1098,8 @@ export const StockConfigurationPage: React.FC = () => {
       </div>
 
       {/* ── Search and Filters Card ── */}
-      <div className={`p-3 sm:p-3.5 rounded-xl border transition-all duration-200 shadow-xs flex flex-wrap items-center gap-2.5 ${
-        isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
-      }`}>
+      <div className={`p-3 sm:p-3.5 rounded-xl border transition-all duration-200 shadow-xs flex flex-wrap items-center gap-2.5 ${isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
+        }`}>
         {/* Search input */}
         <div className="relative flex-1 min-w-[220px]">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -1053,11 +1109,10 @@ export const StockConfigurationPage: React.FC = () => {
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
             placeholder="Search by SAP code, description, or vendor name..."
-            className={`w-full h-9 pl-9 pr-3.5 text-[13.5px] rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition ${
-              isDark
-                ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
-                : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
-            }`}
+            className={`w-full h-9 pl-9 pr-3.5 text-[13.5px] rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition ${isDark
+              ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
+              : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+              }`}
           />
         </div>
 
@@ -1066,11 +1121,10 @@ export const StockConfigurationPage: React.FC = () => {
           <select
             value={selectedVendor}
             onChange={(e) => setSelectedVendor(e.target.value)}
-            className={`w-full h-9 px-3 pr-8 appearance-none text-[13px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${
-              isDark
-                ? 'bg-slate-900 border-slate-700 text-white'
-                : 'bg-white border-slate-300 text-slate-800'
-            }`}
+            className={`w-full h-9 px-3 pr-8 appearance-none text-[13px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${isDark
+              ? 'bg-slate-900 border-slate-700 text-white'
+              : 'bg-white border-slate-300 text-slate-800'
+              }`}
           >
             <option value="">All Vendors</option>
             {data?.filters?.vendors?.map((v) => (
@@ -1085,11 +1139,10 @@ export const StockConfigurationPage: React.FC = () => {
           <select
             value={selectedGroup}
             onChange={(e) => setSelectedGroup(e.target.value)}
-            className={`w-full h-9 px-3 pr-8 appearance-none text-[13px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${
-              isDark
-                ? 'bg-slate-900 border-slate-700 text-white'
-                : 'bg-white border-slate-300 text-slate-800'
-            }`}
+            className={`w-full h-9 px-3 pr-8 appearance-none text-[13px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${isDark
+              ? 'bg-slate-900 border-slate-700 text-white'
+              : 'bg-white border-slate-300 text-slate-800'
+              }`}
           >
             <option value="">All Groups</option>
             {data?.filters?.groups?.map((g) => (
@@ -1104,11 +1157,10 @@ export const StockConfigurationPage: React.FC = () => {
           <select
             value={selectedWarehouse}
             onChange={(e) => setSelectedWarehouse(e.target.value)}
-            className={`w-full h-9 px-3 pr-8 appearance-none text-[13px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${
-              isDark
-                ? 'bg-slate-900 border-slate-700 text-white'
-                : 'bg-white border-slate-300 text-slate-800'
-            }`}
+            className={`w-full h-9 px-3 pr-8 appearance-none text-[13px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${isDark
+              ? 'bg-slate-900 border-slate-700 text-white'
+              : 'bg-white border-slate-300 text-slate-800'
+              }`}
           >
             <option value="">All Warehouses</option>
             {data?.filters?.warehouses?.map((wh) => (
@@ -1130,11 +1182,10 @@ export const StockConfigurationPage: React.FC = () => {
         {/* Reset Button */}
         <button
           onClick={handleResetFilters}
-          className={`h-9 px-3 rounded-lg border text-[13.5px] font-semibold flex items-center gap-1.5 cursor-pointer transition ${
-            isDark
-              ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-              : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
-          }`}
+          className={`h-9 px-3 rounded-lg border text-[13.5px] font-semibold flex items-center gap-1.5 cursor-pointer transition ${isDark
+            ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+            : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
         >
           <RotateCcw size={14} />
           <span>Reset</span>
@@ -1142,15 +1193,14 @@ export const StockConfigurationPage: React.FC = () => {
       </div>
 
       {/* ── Bulk Action Controls Area ── */}
-      <div className={`p-3 sm:p-3.5 rounded-xl border transition-all duration-200 shadow-xs flex flex-wrap items-center justify-between gap-3 ${
-        modifiedCount > 0
-          ? isDark
-            ? 'bg-amber-950/20 border-amber-800/60'
-            : 'bg-amber-50/70 border-amber-200/90'
-          : isDark
+      <div className={`p-3 sm:p-3.5 rounded-xl border transition-all duration-200 shadow-xs flex flex-wrap items-center justify-between gap-3 ${modifiedCount > 0
+        ? isDark
+          ? 'bg-amber-950/20 border-amber-800/60'
+          : 'bg-amber-50/70 border-amber-200/90'
+        : isDark
           ? 'bg-slate-800/80 border-slate-700/80'
           : 'bg-white border-slate-200/90'
-      }`}>
+        }`}>
         {/* Status Information */}
         <div className="flex flex-wrap items-center gap-2.5 text-[13px]">
           <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
@@ -1178,11 +1228,10 @@ export const StockConfigurationPage: React.FC = () => {
           {bulkStatus && (
             <>
               <span className="text-slate-300 dark:text-slate-600">|</span>
-              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[12px] font-semibold ${
-                bulkStatus.failed === 0
-                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200'
-                  : 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-200'
-              }`}>
+              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[12px] font-semibold ${bulkStatus.failed === 0
+                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200'
+                : 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-200'
+                }`}>
                 {bulkStatus.failed === 0 ? <Check size={13} /> : <AlertCircle size={13} />}
                 Saved: {bulkStatus.successful} {bulkStatus.failed > 0 && `| Failed: ${bulkStatus.failed}`} ({bulkStatus.timestamp})
               </span>
@@ -1196,11 +1245,10 @@ export const StockConfigurationPage: React.FC = () => {
           <button
             onClick={handleSubmitModified}
             disabled={modifiedCount === 0 || bulkMutation.isPending}
-            className={`h-9 px-3.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-xs border ${
-              modifiedCount > 0 && !bulkMutation.isPending
-                ? 'bg-emerald-50 border-emerald-400 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-700 dark:text-emerald-300 cursor-pointer active:scale-98'
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
-            }`}
+            className={`h-9 px-3.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-xs border ${modifiedCount > 0 && !bulkMutation.isPending
+              ? 'bg-emerald-50 border-emerald-400 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-700 dark:text-emerald-300 cursor-pointer active:scale-98'
+              : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+              }`}
             title="Save all modified rows across the entire dataset to Database & SAP"
           >
             {bulkMutation.isPending ? (
@@ -1215,11 +1263,10 @@ export const StockConfigurationPage: React.FC = () => {
           <button
             onClick={() => setConfirmSubmitAllOpen(true)}
             disabled={bulkMutation.isPending || !data?.total}
-            className={`h-9 px-3.5 rounded-lg border text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-2xs ${
-              isDark
-                ? 'bg-slate-800 border-blue-500/40 text-blue-400 hover:bg-slate-700'
-                : 'bg-white border-blue-400 text-blue-600 hover:bg-blue-50'
-            } cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`h-9 px-3.5 rounded-lg border text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-2xs ${isDark
+              ? 'bg-slate-800 border-blue-500/40 text-blue-400 hover:bg-slate-700'
+              : 'bg-white border-blue-400 text-blue-600 hover:bg-blue-50'
+              } cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed`}
             title="Validate and submit all entries in the dataset to Database & SAP"
           >
             <Upload size={14} />
@@ -1230,13 +1277,12 @@ export const StockConfigurationPage: React.FC = () => {
           <button
             onClick={() => setConfirmDiscardOpen(true)}
             disabled={modifiedCount === 0 || bulkMutation.isPending}
-            className={`h-9 px-3 rounded-lg border text-[13px] font-semibold flex items-center gap-1.5 transition-all ${
-              modifiedCount > 0 && !bulkMutation.isPending
-                ? isDark
-                  ? 'bg-rose-950/40 border-rose-800/60 text-rose-300 hover:bg-rose-900/50 cursor-pointer'
-                  : 'bg-white border-rose-300 text-rose-600 hover:bg-rose-50 cursor-pointer'
-                : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/60 text-slate-300 dark:text-slate-600 cursor-not-allowed'
-            }`}
+            className={`h-9 px-3 rounded-lg border text-[13px] font-semibold flex items-center gap-1.5 transition-all ${modifiedCount > 0 && !bulkMutation.isPending
+              ? isDark
+                ? 'bg-rose-950/40 border-rose-800/60 text-rose-300 hover:bg-rose-900/50 cursor-pointer'
+                : 'bg-white border-rose-300 text-rose-600 hover:bg-rose-50 cursor-pointer'
+              : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/60 text-slate-300 dark:text-slate-600 cursor-not-allowed'
+              }`}
             title="Discard all unsaved edits and restore last saved state"
           >
             <RotateCcw size={14} />
@@ -1246,9 +1292,8 @@ export const StockConfigurationPage: React.FC = () => {
       </div>
 
       {/* ── Table Card: Stock Items ── */}
-      <div className={`rounded-xl border transition-all duration-200 shadow-xs overflow-hidden ${
-        isDark ? 'bg-slate-800/90 border-slate-700/80' : 'bg-white border-slate-200/90'
-      }`}>
+      <div className={`rounded-xl border transition-all duration-200 shadow-xs overflow-hidden ${isDark ? 'bg-slate-800/90 border-slate-700/80' : 'bg-white border-slate-200/90'
+        }`}>
         {/* Table Card Header (Clean title and count badge) */}
         <div className="flex items-center justify-between px-3.5 py-3 sm:px-4 sm:py-3.5 border-b border-slate-100 dark:border-slate-700/80">
           <div className="flex items-center gap-2.5">
@@ -1263,15 +1308,13 @@ export const StockConfigurationPage: React.FC = () => {
 
         {/* ── Table View with Comfortable ERP Column Geometry and Subtle Controlled Scrolling ── */}
         <div className="overflow-x-auto w-full [scrollbar-width:thin] [scrollbar-color:#CBD5E1_transparent] dark:[scrollbar-color:#475569_transparent]">
-          <table className={`w-full border-collapse text-left text-[12px] sm:text-[12.5px] min-w-[1520px] border ${
-            isDark ? 'border-slate-600' : 'border-slate-300'
-          }`}>
+          <table className={`w-full border-collapse text-left text-[12px] sm:text-[12.5px] min-w-[1520px] border ${isDark ? 'border-slate-600' : 'border-slate-300'
+            }`}>
             <thead className="sticky top-0 z-10">
-              <tr className={`text-[11px] sm:text-[11.5px] font-bold uppercase tracking-wider ${
-                isDark
-                  ? 'bg-slate-800 text-slate-300'
-                  : 'bg-[#EAF2FE] text-[#1E3A8A]'
-              }`}>
+              <tr className={`text-[11px] sm:text-[11.5px] font-bold uppercase tracking-wider ${isDark
+                ? 'bg-slate-800 text-slate-300'
+                : 'bg-[#EAF2FE] text-[#1E3A8A]'
+                }`}>
                 <th className="py-2.5 px-2 text-center whitespace-nowrap w-[50px] min-w-[50px] border border-slate-300 dark:border-slate-600">SR. NO.</th>
                 <th className="py-2.5 px-2.5 text-left whitespace-nowrap w-[95px] min-w-[95px] border border-slate-300 dark:border-slate-600">SAP CODE</th>
                 <th className="py-2.5 px-3 text-left whitespace-nowrap min-w-[170px] max-w-[220px] border border-slate-300 dark:border-slate-600">DESCRIPTION</th>
@@ -1288,12 +1331,12 @@ export const StockConfigurationPage: React.FC = () => {
                 <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[68px] min-w-[62px] border border-slate-300 dark:border-slate-600">REJ. QTY.</th>
                 <th className="py-2.5 px-1 text-center whitespace-nowrap w-[52px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Laser Marking / Line Marking">LM</th>
                 <th className="py-2.5 px-1 text-center whitespace-nowrap w-[56px] min-w-[50px] border border-slate-300 dark:border-slate-600" title="Oiling / Loading">OLNG</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[52px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Loose Packing / Line Packing">LPK</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[52px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Inner Packing / I PK">I PK</th>
                 <th className="py-2.5 px-1 text-center whitespace-nowrap w-[52px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Labeling">LBL</th>
                 <th className="py-2.5 px-1 text-center whitespace-nowrap w-[66px] min-w-[62px] border border-slate-300 dark:border-slate-600" title="Machining / Coating / Certificate">MC OR PT</th>
                 <th className="py-2.5 px-2 text-center whitespace-nowrap w-[104px] min-w-[100px] border border-slate-300 dark:border-slate-600" title="SAP Business One Item Creation Date (OITM.CreateDate)">ENTRY DATE</th>
                 <th className="py-2.5 px-2 text-center whitespace-nowrap w-[114px] min-w-[108px] border border-slate-300 dark:border-slate-600" title="Last successful individual submission date and time (Asia/Kolkata)">LAST UPDATED</th>
-                <th className="py-2.5 px-2.5 text-center whitespace-nowrap w-[155px] min-w-[145px] border border-slate-300 dark:border-slate-600" title="Admin remarks on stock configuration and submission">REMARKS</th>
+                <th className="py-2.5 px-2.5 text-center whitespace-nowrap w-[155px] min-w-[145px] border border-slate-300 dark:border-slate-600" title="Purchase Order Comments (OPOR.Comments AS [Remarks])">REMARKS</th>
                 <th className="sticky right-0 z-20 py-2.5 px-2 text-center whitespace-nowrap w-[125px] min-w-[120px] bg-[#EAF2FE] dark:bg-slate-800 text-[#1E3A8A] dark:text-slate-300 border border-slate-300 dark:border-slate-600 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]">ACTIONS</th>
               </tr>
             </thead>
@@ -1341,9 +1384,8 @@ export const StockConfigurationPage: React.FC = () => {
                   return (
                     <tr
                       key={item.item_code}
-                      className={`transition-colors duration-150 hover:bg-slate-50/80 dark:hover:bg-slate-750 ${
-                        isModified ? 'bg-amber-50/35 dark:bg-amber-950/25' : ''
-                      }`}
+                      className={`transition-colors duration-150 hover:bg-slate-50/80 dark:hover:bg-slate-750 ${isModified ? 'bg-amber-50/35 dark:bg-amber-950/25' : ''
+                        }`}
                     >
                       {/* 1. SR. NO. */}
                       <td className="py-2.5 px-2 text-center align-middle text-slate-500 dark:text-slate-400 font-semibold text-[12px] whitespace-nowrap border border-slate-300 dark:border-slate-600">
@@ -1399,15 +1441,14 @@ export const StockConfigurationPage: React.FC = () => {
                             min="0"
                             value={getEffectiveNum(item, 'nt_weight')}
                             onChange={(e) => handleCellChange(item, 'nt_weight', Number(e.target.value))}
-                            className={`w-14 h-8 text-center text-[12px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
-                              isCellModified(item, 'nt_weight')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : getEffectiveNum(item, 'nt_weight') < 0
+                            className={`w-14 h-8 text-center text-[12px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${isCellModified(item, 'nt_weight')
+                              ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
+                              : getEffectiveNum(item, 'nt_weight') < 0
                                 ? 'border-rose-500 bg-rose-50/30'
                                 : isDark
-                                ? 'bg-slate-900 border-slate-700 text-white'
-                                : 'bg-white border-slate-300 text-slate-900'
-                            }`}
+                                  ? 'bg-slate-900 border-slate-700 text-white'
+                                  : 'bg-white border-slate-300 text-slate-900'
+                              }`}
                           />
                         </div>
                       </td>
@@ -1418,14 +1459,13 @@ export const StockConfigurationPage: React.FC = () => {
                           <div className="relative inline-flex items-center">
                             <select
                               value={getEffectiveQc(item)}
-                              onChange={(e) => handleCellChange(item, 'qc', e.target.value === '' ? null : e.target.value === 'Y')}
-                              className={`w-11 h-8 pl-1.5 pr-4 text-center text-[12px] font-semibold rounded-md border appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
-                                isCellModified(item, 'qc')
-                                  ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                  : isDark
+                              onChange={(e) => handleCellChange(item, 'qc', e.target.value)}
+                              className={`w-11 h-8 pl-1.5 pr-4 text-center text-[12px] font-semibold rounded-md border appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${isCellModified(item, 'qc')
+                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
+                                : isDark
                                   ? 'bg-slate-900 border-slate-700 text-white'
                                   : 'bg-white border-slate-300 text-slate-900'
-                              }`}
+                                }`}
                             >
                               <option value="">—</option>
                               <option value="Y">Y</option>
@@ -1442,13 +1482,12 @@ export const StockConfigurationPage: React.FC = () => {
                           <select
                             value={getEffectiveStr(item, 'drw_yn')}
                             onChange={(e) => handleCellChange(item, 'drw_yn', e.target.value)}
-                            className={`w-11 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
-                              isCellModified(item, 'drw_yn')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : isDark
+                            className={`w-11 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${isCellModified(item, 'drw_yn')
+                              ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
+                              : isDark
                                 ? 'bg-slate-900 border-slate-700 text-white'
                                 : 'bg-white border-slate-300 text-slate-900'
-                            }`}
+                              }`}
                           >
                             <option value="">—</option>
                             <option value="Y">Y</option>
@@ -1463,13 +1502,12 @@ export const StockConfigurationPage: React.FC = () => {
                           <select
                             value={getEffectiveStr(item, 'v_chk')}
                             onChange={(e) => handleCellChange(item, 'v_chk', e.target.value)}
-                            className={`w-11 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
-                              isCellModified(item, 'v_chk')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : isDark
+                            className={`w-11 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${isCellModified(item, 'v_chk')
+                              ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
+                              : isDark
                                 ? 'bg-slate-900 border-slate-700 text-white'
                                 : 'bg-white border-slate-300 text-slate-900'
-                            }`}
+                              }`}
                           >
                             <option value="">—</option>
                             <option value="Y">Y</option>
@@ -1494,13 +1532,12 @@ export const StockConfigurationPage: React.FC = () => {
                           <select
                             value={getEffectiveStr(item, 'lm')}
                             onChange={(e) => handleCellChange(item, 'lm', e.target.value)}
-                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
-                              isCellModified(item, 'lm')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : isDark
+                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${isCellModified(item, 'lm')
+                              ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
+                              : isDark
                                 ? 'bg-slate-900 border-slate-700 text-white'
                                 : 'bg-white border-slate-300 text-slate-900'
-                            }`}
+                              }`}
                           >
                             <option value="">—</option>
                             <option value="Y">Y</option>
@@ -1515,13 +1552,12 @@ export const StockConfigurationPage: React.FC = () => {
                           <select
                             value={getEffectiveStr(item, 'olng')}
                             onChange={(e) => handleCellChange(item, 'olng', e.target.value)}
-                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
-                              isCellModified(item, 'olng')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : isDark
+                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${isCellModified(item, 'olng')
+                              ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
+                              : isDark
                                 ? 'bg-slate-900 border-slate-700 text-white'
                                 : 'bg-white border-slate-300 text-slate-900'
-                            }`}
+                              }`}
                           >
                             <option value="">—</option>
                             <option value="Y">Y</option>
@@ -1530,19 +1566,18 @@ export const StockConfigurationPage: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* 17. LPK (Select Y/N) */}
+                      {/* 17. I PK (Select Y/N) */}
                       <td className="py-2 px-1 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600">
                         <div className="flex items-center justify-center">
                           <select
                             value={getEffectiveStr(item, 'lpk')}
                             onChange={(e) => handleCellChange(item, 'lpk', e.target.value)}
-                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
-                              isCellModified(item, 'lpk')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : isDark
+                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${isCellModified(item, 'lpk')
+                              ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
+                              : isDark
                                 ? 'bg-slate-900 border-slate-700 text-white'
                                 : 'bg-white border-slate-300 text-slate-900'
-                            }`}
+                              }`}
                           >
                             <option value="">—</option>
                             <option value="Y">Y</option>
@@ -1557,13 +1592,12 @@ export const StockConfigurationPage: React.FC = () => {
                           <select
                             value={getEffectiveStr(item, 'lbl')}
                             onChange={(e) => handleCellChange(item, 'lbl', e.target.value)}
-                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
-                              isCellModified(item, 'lbl')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : isDark
+                            className={`w-10 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${isCellModified(item, 'lbl')
+                              ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
+                              : isDark
                                 ? 'bg-slate-900 border-slate-700 text-white'
                                 : 'bg-white border-slate-300 text-slate-900'
-                            }`}
+                              }`}
                           >
                             <option value="">—</option>
                             <option value="Y">Y</option>
@@ -1578,13 +1612,12 @@ export const StockConfigurationPage: React.FC = () => {
                           <select
                             value={getEffectiveStr(item, 'mc_or_pt')}
                             onChange={(e) => handleCellChange(item, 'mc_or_pt', e.target.value)}
-                            className={`w-11 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${
-                              isCellModified(item, 'mc_or_pt')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : isDark
+                            className={`w-11 h-8 text-center text-[12px] font-semibold rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer ${isCellModified(item, 'mc_or_pt')
+                              ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
+                              : isDark
                                 ? 'bg-slate-900 border-slate-700 text-white'
                                 : 'bg-white border-slate-300 text-slate-900'
-                            }`}
+                              }`}
                           >
                             <option value="">—</option>
                             <option value="Y">Y</option>
@@ -1610,71 +1643,66 @@ export const StockConfigurationPage: React.FC = () => {
                         })()}
                       </td>
 
-                      {/* 21. LAST UPDATED (Exact server submission timestamp, or '—' if never submitted) */}
-                      <td className="py-2 px-2 text-center align-middle whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium text-[12px] border border-slate-300 dark:border-slate-600 bg-slate-50/40 dark:bg-slate-900/20" title={item.last_submitted_at ? `Server Timestamp: ${item.last_submitted_at}` : 'Not submitted'}>
+                      {/* 21. LAST UPDATED (Exact server submission timestamp, or SAP Item Master modification time, or '—' if none) */}
+                      <td className="py-2 px-2 text-center align-middle whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium text-[12px] border border-slate-300 dark:border-slate-600 bg-slate-50/40 dark:bg-slate-900/20" title={item.last_submitted_at ? `Server Timestamp: ${item.last_submitted_at}` : (item.updated_at ? `Last Updated: ${item.updated_at}` : 'Not submitted')}>
                         {(() => {
-                          const { date, time } = formatLastUpdated(item.last_submitted_at);
-                          if (!time) {
+                          const lastVal = item.last_submitted_at || item.updated_at;
+                          const { date, time } = formatLastUpdated(lastVal);
+                          if (!date || date === '—') {
                             return <span className="text-slate-400 dark:text-slate-500 text-[12px] font-normal">—</span>;
                           }
                           return (
                             <div className="flex flex-col items-center justify-center leading-tight">
                               <span className="font-medium text-slate-800 dark:text-slate-200 text-[12px]">{date}</span>
-                              <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-normal">
-                                {time}
-                              </span>
+                              {time && (
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-normal">
+                                  {time}
+                                </span>
+                              )}
                             </div>
                           );
                         })()}
                       </td>
 
-                      {/* 22. REMARKS (Compact text input for Admin users, read-only for other users) */}
-                      <td className="py-2 px-2.5 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600">
+                      {/* 22. REMARKS (Purchase Order Comments: OPOR.Comments AS [Remarks]) */}
+                      <td className="py-2 px-1 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600">
                         <div className="flex items-center justify-center">
                           <input
                             type="text"
-                            placeholder="Enter remark..."
                             value={getEffectiveStr(item, 'remark')}
                             onChange={(e) => handleCellChange(item, 'remark', e.target.value)}
                             disabled={!isUserAdmin}
-                            title={
-                              isUserAdmin
-                                ? (getEffectiveStr(item, 'remark') || 'Enter admin remark...')
-                                : (item.remark ? `Admin Remark: ${item.remark}` : 'Only authorized Admin users can add or modify remarks')
-                            }
-                            className={`w-[145px] h-8 px-2.5 text-left text-[12px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all truncate focus:truncate-none ${
+                            placeholder="PO Comments..."
+                            className={`w-32 h-8 px-2 text-left text-[12px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
                               isCellModified(item, 'remark')
-                                ? 'border-amber-400 bg-amber-50/40 text-amber-950 dark:bg-amber-950/30 dark:text-amber-100 ring-1 ring-amber-300'
-                                : !isUserAdmin
-                                ? 'bg-slate-100/70 border-slate-200 text-slate-500 dark:bg-slate-800/40 dark:border-slate-700 dark:text-slate-400 cursor-not-allowed select-text'
+                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
                                 : isDark
-                                ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500'
-                                : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-blue-500'
-                            }`}
+                                  ? 'bg-slate-900 border-slate-700 text-white'
+                                  : 'bg-white border-slate-300 text-slate-900'
+                            } ${!isUserAdmin ? 'opacity-70 cursor-not-allowed bg-slate-100 dark:bg-slate-800' : ''}`}
+                            title={!isUserAdmin ? 'Only administrators can modify PO remarks' : item.remark ? `Purchase Order Comments: ${item.remark}` : 'Enter Purchase Order Comments'}
                           />
                         </div>
                       </td>
 
                       {/* 23. ACTIONS (Submit / Submitted + Delete) - Sticky Right Column */}
-                      <td className={`sticky right-0 z-10 py-2 px-2 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)] ${
-                        isModified
-                          ? 'bg-[#FFFBEB] dark:bg-amber-950/90'
-                          : isDark
+                      <td className={`sticky right-0 z-10 py-2 px-2 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)] ${isModified
+                        ? 'bg-[#FFFBEB] dark:bg-amber-950/90'
+                        : isDark
                           ? 'bg-slate-800'
                           : 'bg-white'
-                      }`}>
+                        }`}>
                         <div className="flex items-center justify-center gap-1.5">
                           {/* Submit / Submitted Button */}
                           <button
                             onClick={() => handleSaveRow(item)}
                             disabled={isSaving}
-                            className={`h-8 px-3 rounded-md text-[11.5px] font-semibold flex items-center justify-center gap-1.5 transition-all shadow-2xs border ${
-                              isSaving
-                                ? 'bg-blue-600 border-blue-600 text-white cursor-wait'
-                                : isSubmitted
+                            className={`h-8 px-3 rounded-md text-[11.5px] font-semibold flex items-center justify-center gap-1.5 transition-all shadow-2xs border ${isSaving
+                              ? 'bg-blue-600 border-blue-600 text-white cursor-wait'
+                              : isSubmitted
                                 ? 'bg-[#10B981] hover:bg-emerald-600 border-emerald-500 text-white cursor-pointer active:scale-95'
                                 : 'bg-[#155EEF] hover:bg-blue-700 border-blue-600 text-white cursor-pointer active:scale-95'
-                            }`}
+                              }`}
                             title={isSubmitted ? 'Entry successfully submitted to database & SAP' : 'Submit row to database and SAP'}
                           >
                             {isSaving ? (
@@ -1684,7 +1712,7 @@ export const StockConfigurationPage: React.FC = () => {
                             ) : (
                               <Save size={12} />
                             )}
-                            <span>{isSaving ? 'Submitting...' : isSubmitted ? 'Submitted' : 'Submit'}</span>
+                            <span>{isSaving ? 'Saving to SAP...' : isSubmitted ? 'Submitted' : 'Submit'}</span>
                           </button>
 
                           {/* Delete Button */}
@@ -1713,8 +1741,8 @@ export const StockConfigurationPage: React.FC = () => {
               {isLoading
                 ? 'Loading entries...'
                 : !data?.total
-                ? 'No entries'
-                : `Showing ${startRow} - ${endRow} of ${data?.total} entries`}
+                  ? 'No entries'
+                  : `Showing ${startRow} - ${endRow} of ${data?.total} entries`}
             </span>
             <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">|</span>
             <div className="flex items-center gap-1.5">
@@ -1726,11 +1754,10 @@ export const StockConfigurationPage: React.FC = () => {
                     setPageSize(Number(e.target.value));
                     setPage(1);
                   }}
-                  className={`h-7 px-2 pr-6 text-[12px] font-medium rounded-md border appearance-none cursor-pointer ${
-                    isDark
-                      ? 'bg-slate-900 border-slate-700 text-white'
-                      : 'bg-white border-slate-300 text-slate-800'
-                  }`}
+                  className={`h-7 px-2 pr-6 text-[12px] font-medium rounded-md border appearance-none cursor-pointer ${isDark
+                    ? 'bg-slate-900 border-slate-700 text-white'
+                    : 'bg-white border-slate-300 text-slate-800'
+                    }`}
                 >
                   <option value={10}>10</option>
                   <option value={25}>25</option>
@@ -1763,9 +1790,8 @@ export const StockConfigurationPage: React.FC = () => {
                     }
                   }}
                   placeholder={String(page)}
-                  className={`w-12 h-7 px-1 text-center text-[12px] font-medium rounded-md border outline-none focus:ring-1 focus:ring-blue-500 ${
-                    isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-800'
-                  }`}
+                  className={`w-12 h-7 px-1 text-center text-[12px] font-medium rounded-md border outline-none focus:ring-1 focus:ring-blue-500 ${isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-800'
+                    }`}
                 />
                 <button
                   type="button"
@@ -1790,11 +1816,10 @@ export const StockConfigurationPage: React.FC = () => {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className={`px-2.5 py-1 rounded-md text-[13px] font-medium flex items-center gap-1 transition ${
-                page <= 1
-                  ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
-                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer'
-              }`}
+              className={`px-2.5 py-1 rounded-md text-[13px] font-medium flex items-center gap-1 transition ${page <= 1
+                ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer'
+                }`}
             >
               <ChevronLeft size={15} />
               <span>Previous</span>
@@ -1813,13 +1838,12 @@ export const StockConfigurationPage: React.FC = () => {
                 <button
                   key={p}
                   onClick={() => setPage(p)}
-                  className={`w-7 h-7 rounded-md text-[12.5px] font-semibold flex items-center justify-center transition cursor-pointer ${
-                    page === p
-                      ? 'bg-[#155EEF] text-white shadow-2xs'
-                      : isDark
+                  className={`w-7 h-7 rounded-md text-[12.5px] font-semibold flex items-center justify-center transition cursor-pointer ${page === p
+                    ? 'bg-[#155EEF] text-white shadow-2xs'
+                    : isDark
                       ? 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'
                       : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   {p}
                 </button>
@@ -1830,11 +1854,10 @@ export const StockConfigurationPage: React.FC = () => {
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className={`px-2.5 py-1 rounded-md text-[13px] font-medium flex items-center gap-1 transition ${
-                page >= totalPages
-                  ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
-                  : 'text-[#155EEF] font-semibold hover:bg-blue-50 dark:hover:bg-slate-700 cursor-pointer'
-              }`}
+              className={`px-2.5 py-1 rounded-md text-[13px] font-medium flex items-center gap-1 transition ${page >= totalPages
+                ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                : 'text-[#155EEF] font-semibold hover:bg-blue-50 dark:hover:bg-slate-700 cursor-pointer'
+                }`}
             >
               <span>Next</span>
               <ChevronRight size={15} />
@@ -1846,9 +1869,8 @@ export const StockConfigurationPage: React.FC = () => {
       {/* ── Add New Item Modal ── */}
       {addItemModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className={`w-full max-w-2xl rounded-2xl border p-6 shadow-2xl transition-all max-h-[90vh] overflow-y-auto ${
-            isDark ? 'bg-slate-850 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
-          }`}>
+          <div className={`w-full max-w-2xl rounded-2xl border p-6 shadow-2xl transition-all max-h-[90vh] overflow-y-auto ${isDark ? 'bg-slate-850 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+            }`}>
             <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center gap-2">
                 <Box className="w-5 h-5 text-blue-600" />
@@ -2065,7 +2087,7 @@ export const StockConfigurationPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500">LPK:</span>
+                    <span className="text-xs text-slate-500">I PK:</span>
                     <select
                       value={newItem.lpk}
                       onChange={(e) => setNewItem({ ...newItem, lpk: e.target.value as 'Y' | 'N' })}
@@ -2126,9 +2148,8 @@ export const StockConfigurationPage: React.FC = () => {
       {/* ── Import Excel Modal with Validation & Preview ── */}
       {importModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className={`w-full max-w-3xl rounded-2xl border p-6 shadow-2xl transition-all max-h-[90vh] overflow-y-auto ${
-            isDark ? 'bg-slate-850 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
-          }`}>
+          <div className={`w-full max-w-3xl rounded-2xl border p-6 shadow-2xl transition-all max-h-[90vh] overflow-y-auto ${isDark ? 'bg-slate-850 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+            }`}>
             <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700">
               <div className="flex items-center gap-2">
                 <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
@@ -2155,11 +2176,10 @@ export const StockConfigurationPage: React.FC = () => {
               {/* Upload Dropzone */}
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition ${
-                  importFile
-                    ? 'border-emerald-400 bg-emerald-50/30'
-                    : 'border-slate-300 hover:border-blue-400 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-900/50'
-                }`}
+                className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition ${importFile
+                  ? 'border-emerald-400 bg-emerald-50/30'
+                  : 'border-slate-300 hover:border-blue-400 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-900/50'
+                  }`}
               >
                 <input
                   ref={fileInputRef}
@@ -2283,9 +2303,8 @@ export const StockConfigurationPage: React.FC = () => {
       {/* ── Delete Confirmation Dialog ── */}
       {deleteConfirmItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl transition-all ${
-            isDark ? 'bg-slate-850 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
-          }`}>
+          <div className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl transition-all ${isDark ? 'bg-slate-850 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+            }`}>
             <div className="flex items-center gap-3 text-rose-600 mb-3">
               <AlertCircle size={28} />
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">Delete Stock Configuration Item</h3>
@@ -2318,9 +2337,8 @@ export const StockConfigurationPage: React.FC = () => {
       {/* ── Submit All Entries Confirmation Modal ── */}
       {confirmSubmitAllOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl transition-all ${
-            isDark ? 'bg-slate-850 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
-          }`}>
+          <div className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl transition-all ${isDark ? 'bg-slate-850 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+            }`}>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
                 <CheckCircle2 size={22} />
@@ -2358,9 +2376,8 @@ export const StockConfigurationPage: React.FC = () => {
       {/* ── Discard Changes Confirmation Modal ── */}
       {confirmDiscardOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl transition-all ${
-            isDark ? 'bg-slate-850 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
-          }`}>
+          <div className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl transition-all ${isDark ? 'bg-slate-850 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'
+            }`}>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
                 <RotateCcw size={22} />

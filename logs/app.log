@@ -1,0 +1,2 @@
+2026-11-17 11:03:14,658 - app.main - INFO - Request: id=3f732aead8ab48d78202a18e3260a157 method=GET path=/api/v1/stock-configuration status=200 duration_ms=63.60
+2026-11-17 11:03:14,659 - httpx2 - INFO - HTTP Request: GET http://testserver/api/v1/stock-configuration?date_from=2026-11-14&date_to=2026-11-16 "HTTP/1.1 200 OK"

@@ -5,7 +5,9 @@ from __future__ import annotations
 import importlib
 import json
 import logging
+import os
 import re
+import time
 import uuid
 from contextlib import contextmanager
 from datetime import datetime
@@ -217,6 +219,10 @@ def _get_psycopg2():
         ) from exc
 
 
+_LAST_USER_DB_FAILURE: float = 0.0
+_USER_DB_BACKOFF_SECONDS: float = 15.0
+
+
 def _require_database_url() -> str:
     database_url = (settings.DATABASE_URL or "").strip()
     if not database_url:
@@ -226,8 +232,17 @@ def _require_database_url() -> str:
 
 @contextmanager
 def _get_connection() -> Iterator[Any]:
+    global _LAST_USER_DB_FAILURE
+    if time.time() - _LAST_USER_DB_FAILURE < _USER_DB_BACKOFF_SECONDS:
+        raise RuntimeError("PostgreSQL unreachable for user auth (circuit breaker active)")
     psycopg2 = _get_psycopg2()
-    conn = psycopg2.connect(_require_database_url())
+    timeout = 1 if (os.environ.get("TESTING") == "True" or "PYTEST_CURRENT_TEST" in os.environ) else int(getattr(settings, "DB_CONNECT_TIMEOUT", 2))
+    try:
+        conn = psycopg2.connect(_require_database_url(), connect_timeout=timeout)
+    except Exception as exc:
+        _LAST_USER_DB_FAILURE = time.time()
+        raise exc
+
     try:
         yield conn
         conn.commit()
@@ -671,10 +686,14 @@ def ensure_bootstrap_admin() -> Optional[Dict[str, Any]]:
 
 
 def _fetchone(query: str, params: tuple[Any, ...]) -> Optional[tuple[Any, ...]]:
-    with _get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(query, params)
-            return cur.fetchone()
+    try:
+        with _get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                return cur.fetchone()
+    except Exception as exc:
+        logger.warning("Database query failed in user_service._fetchone: %s", exc)
+        return None
 
 
 def get_all_permissions() -> List[Dict[str, str]]:

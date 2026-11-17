@@ -91,6 +91,8 @@ class Settings(BaseSettings):
     SYNC_PRODUCTS_INTERVAL: int = 900  # 15 minutes
     SYNC_RETRY_ATTEMPTS: int = 3
     SYNC_RETRY_DELAY: int = 60  # seconds
+    SAP_STOCK_SYNC_INTERVAL_SECONDS: int = 30  # Live Stock Configuration sync polling interval (seconds)
+    SAP_STOCK_SYNC_ENABLED: bool = True  # Enable background automatic live SAP stock synchronization
     
     # Timezone
     TIMEZONE: str = "Asia/Kolkata"

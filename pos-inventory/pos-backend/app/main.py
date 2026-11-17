@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import sys
 from urllib.parse import urlparse
 
 from app.core.config import settings
@@ -63,6 +64,9 @@ async def warm_products_cache():
     Background task to pre-load products into in-memory cache on startup.
     This ensures the first user request is fast.
     """
+    if os.environ.get("TESTING") == "True" or "pytest" in sys.modules:
+        logger.info("Products cache warming skipped in test environment")
+        return
     try:
         from app.services.sap.items_service import SAPItemsService
         from app.models.schemas import ProductResponse
@@ -144,23 +148,37 @@ async def lifespan(app: FastAPI):
         sap_host,
     )
 
+    is_test_env = os.environ.get("TESTING") == "True" or "PYTEST_CURRENT_TEST" in os.environ or "pytest" in sys.modules
+
     # Initialise in-memory cache
-    await init_cache()
-    asyncio.create_task(cache_metrics_loop())
+    if not is_test_env:
+        await init_cache()
+        asyncio.create_task(cache_metrics_loop())
 
     # Initialise PostgreSQL-backed user storage.
-    try:
-        user_service.init_user_storage()
-        logger.info("User storage is ready")
-        from app.services import approval_service
-        approval_service.init_approval_storage()
-        logger.info("Approval storage is ready")
-    except Exception as e:
-        logger.error(f"User storage initialization failed: {str(e)}")
-        logger.warning("Authentication endpoints will be unavailable until PostgreSQL is configured")
+    if not is_test_env:
+        try:
+            user_service.init_user_storage()
+            logger.info("User storage is ready")
+            from app.services import approval_service
+            approval_service.init_approval_storage()
+            logger.info("Approval storage is ready")
+        except Exception as e:
+            logger.error(f"User storage initialization failed: {str(e)}")
+            logger.warning("Authentication endpoints will be unavailable until PostgreSQL is configured")
+
+    # Start the automated real-time Stock Configuration synchronization worker immediately
+    if getattr(settings, "SAP_STOCK_SYNC_ENABLED", True) and not is_test_env:
+        try:
+            from app.services.stock_configuration_service import stock_sync_worker
+            await stock_sync_worker.start()
+        except Exception as sync_start_err:
+            logger.error("Failed to start stock configuration auto-sync worker: %s", sync_start_err)
 
     # Connect to SAP Service Layer in background without blocking startup
     async def _init_sap_background():
+        if is_test_env:
+            return
         try:
             sap_client = get_sap_client()
             loop = asyncio.get_running_loop()
@@ -182,7 +200,8 @@ async def lifespan(app: FastAPI):
                 e,
             )
 
-    asyncio.create_task(_init_sap_background())
+    if not is_test_env:
+        asyncio.create_task(_init_sap_background())
 
     logger.info(f"{settings.APP_NAME} v{settings.APP_VERSION} is ready!")
 
@@ -192,6 +211,13 @@ async def lifespan(app: FastAPI):
 
     # Stop the product store background refresh task
     await product_store.stop()
+
+    # Stop the stock configuration auto-sync worker
+    try:
+        from app.services.stock_configuration_service import stock_sync_worker
+        await stock_sync_worker.stop()
+    except Exception:
+        pass
 
     # Stop in-memory cache
     await close_cache()

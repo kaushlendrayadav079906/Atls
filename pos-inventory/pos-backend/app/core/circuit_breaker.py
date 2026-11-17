@@ -62,8 +62,11 @@ class CircuitBreaker:
                 )
         try:
             result = func(*args, **kwargs)
-        except self.expected_exception:
-            self._record_failure()
+        except self.expected_exception as exc:
+            # Client-level validation errors and resource-not-found (404/400) should not trip the service-level circuit breaker
+            exc_str = str(exc)
+            if "Resource not found" not in exc_str and "Validation error" not in exc_str:
+                self._record_failure()
             raise
         self._record_success()
         return result
