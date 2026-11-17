@@ -174,7 +174,8 @@ class GoogleSheetsService:
 
         elif db_type == "postgres":
             import psycopg2
-            conn = psycopg2.connect(db_url)
+            timeout = 1 if (os.environ.get("TESTING") == "True" or "PYTEST_CURRENT_TEST" in os.environ) else int(getattr(settings, "DB_CONNECT_TIMEOUT", 2))
+            conn = psycopg2.connect(db_url, connect_timeout=timeout)
             try:
                 yield conn, "postgres"
                 conn.commit()

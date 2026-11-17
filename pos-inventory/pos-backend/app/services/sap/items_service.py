@@ -75,6 +75,21 @@ class SAPItemsService:
                 "ItemWarehouseInfoCollection",
                 "CreateDate",
                 "UpdateDate",
+                "UpdateTime",
+                "Mainsupplier",
+                "InventoryWeight",
+                "PurchaseUnitWeight",
+                "SalesUnitWeight",
+                "U_PerPices",
+                "U_Drawing",
+                "User_Text",
+                "U_QC",
+                "U_V_Chk",
+                "U_LM",
+                "U_OLNG",
+                "U_LPK",
+                "U_LBL",
+                "U_MC_OR_PT",
             ]
 
             all_items: List[Dict[str, Any]] = []
@@ -336,17 +351,17 @@ class SAPItemsService:
 
     def update_item(self, item_code: str, update_data: Dict[str, Any]) -> bool:
         """
-        Update existing item in SAP
+        Update existing item in SAP Business One Service Layer with two-way persistence validation.
 
         Args:
             item_code: SAP ItemCode
-            update_data: Fields to update
+            update_data: Fields to update (including standard fields and UDFs)
 
         Returns:
-            True if successful
+            True if successful and verified
         """
         try:
-            payload = {}
+            payload: Dict[str, Any] = {}
 
             if "name" in update_data:
                 payload["ItemName"] = update_data["name"]
@@ -371,10 +386,120 @@ class SAPItemsService:
             if "brand" in update_data:
                 payload["U_Brand"] = update_data["brand"]
 
+            # Stock Configuration: NT. WEIGHT -> InventoryWeight, PurchaseUnitWeight, SalesUnitWeight, U_PerPices
+            if "nt_weight" in update_data and update_data["nt_weight"] is not None:
+                w_val = round(max(0.0, float(update_data["nt_weight"])), 2)
+                payload["InventoryWeight"] = w_val
+                payload["PurchaseUnitWeight"] = w_val
+                payload["SalesUnitWeight"] = w_val
+                payload["U_PerPices"] = int(round(w_val))
+            elif "InventoryWeight" in update_data and update_data["InventoryWeight"] is not None:
+                w_val = round(max(0.0, float(update_data["InventoryWeight"])), 2)
+                payload["InventoryWeight"] = w_val
+                payload["PurchaseUnitWeight"] = w_val
+                payload["SalesUnitWeight"] = w_val
+                payload["U_PerPices"] = int(round(w_val))
+
+            def _clean_yn_val(v: Any) -> str:
+                if v is None:
+                    return ""
+                s = str(v).strip().upper()
+                if s in ("Y", "YES", "TRUE", "1", "T"):
+                    return "Y"
+                if s in ("N", "NO", "FALSE", "0", "F"):
+                    return "N"
+                return ""
+
+            # Stock Configuration: DRW. Y/N -> U_Drawing
+            drw_val = update_data.get("drw_yn") if "drw_yn" in update_data else update_data.get("U_Drawing", update_data.get("drawing"))
+            if drw_val is not None:
+                c_drw = _clean_yn_val(drw_val)
+                if c_drw:
+                    payload["U_Drawing"] = c_drw
+
+            # Stock Configuration: REMARKS -> User_Text
+            for r_key in ("remark", "remarks", "User_Text", "UserText"):
+                if r_key in update_data and update_data[r_key] is not None:
+                    payload["User_Text"] = str(update_data[r_key]).strip()
+                    break
+
+            # Stock Configuration: QC -> U_QC
+            qc_val = update_data.get("qc") if "qc" in update_data else update_data.get("U_QC")
+            if qc_val is not None:
+                c_qc = _clean_yn_val(qc_val)
+                if c_qc:
+                    payload["U_QC"] = c_qc
+
+            # Stock Configuration: V CHK -> U_V_Chk
+            vchk_val = update_data.get("v_chk") if "v_chk" in update_data else update_data.get("U_V_Chk")
+            if vchk_val is not None:
+                c_vchk = _clean_yn_val(vchk_val)
+                if c_vchk:
+                    payload["U_V_Chk"] = c_vchk
+
+            # Stock Configuration: LM -> U_LM
+            lm_val = update_data.get("lm") if "lm" in update_data else update_data.get("U_LM")
+            if lm_val is not None:
+                c_lm = _clean_yn_val(lm_val)
+                if c_lm:
+                    payload["U_LM"] = c_lm
+
+            # Stock Configuration: OLNG -> U_OLNG
+            olng_val = update_data.get("olng") if "olng" in update_data else update_data.get("U_OLNG")
+            if olng_val is not None:
+                c_olng = _clean_yn_val(olng_val)
+                if c_olng:
+                    payload["U_OLNG"] = c_olng
+
+            # Stock Configuration: I PK / LPK -> U_LPK
+            lpk_val = update_data.get("lpk") if "lpk" in update_data else (update_data.get("i_pk") if "i_pk" in update_data else update_data.get("U_LPK"))
+            if lpk_val is not None:
+                c_lpk = _clean_yn_val(lpk_val)
+                if c_lpk:
+                    payload["U_LPK"] = c_lpk
+
+            # Stock Configuration: LBL -> U_LBL
+            lbl_val = update_data.get("lbl") if "lbl" in update_data else update_data.get("U_LBL")
+            if lbl_val is not None:
+                c_lbl = _clean_yn_val(lbl_val)
+                if c_lbl:
+                    payload["U_LBL"] = c_lbl
+
+            # Stock Configuration: MC OR PT -> U_MC_OR_PT
+            mc_val = update_data.get("mc_or_pt") if "mc_or_pt" in update_data else (update_data.get("mc_pt") if "mc_pt" in update_data else update_data.get("U_MC_OR_PT"))
+            if mc_val is not None:
+                c_mc = _clean_yn_val(mc_val)
+                if c_mc:
+                    payload["U_MC_OR_PT"] = c_mc
+
+            if not payload:
+                logger.info(f"No SAP updatable fields in payload for item {item_code}")
+                return True
+
             endpoint = f"Items('{item_code}')"
             self.client.patch(endpoint, payload)
 
-            logger.info(f"Updated item in SAP: {item_code}")
+            # Verification: Read-back from SAP Service Layer
+            select_props = list(payload.keys())
+            if "UpdateDate" not in select_props:
+                select_props.append("UpdateDate")
+            if "UpdateTime" not in select_props:
+                select_props.append("UpdateTime")
+            post_item = self.client.get(endpoint, params={"$select": ",".join(select_props)})
+
+            for key, expected in payload.items():
+                actual = post_item.get(key)
+                if isinstance(expected, float):
+                    if actual is None or abs(float(actual) - expected) > 0.01:
+                        raise RuntimeError(f"Read-back mismatch for {key}: expected {expected}, got {actual}")
+                elif isinstance(expected, int):
+                    if actual is None or int(actual) != expected:
+                        raise RuntimeError(f"Read-back mismatch for {key}: expected {expected}, got {actual}")
+                else:
+                    if str(actual or "").strip().upper() != str(expected or "").strip().upper():
+                        raise RuntimeError(f"Read-back mismatch for {key}: expected '{expected}', got '{actual}'")
+
+            logger.info(f"Updated and verified item in SAP: {item_code} ({list(payload.keys())})")
             return True
 
         except Exception as e:

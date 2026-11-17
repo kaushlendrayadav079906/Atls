@@ -31,6 +31,7 @@ export interface StockConfigurationItem {
   po_date?: string | null;
   grn_date?: string | null;
   po_no?: string;
+  po_doc_entry?: number | null;
   so_no?: string;
   so_qty?: number;
   po_qty?: number;
@@ -66,6 +67,16 @@ export interface StockConfigurationResponse {
   sap_status: 'connected' | 'disconnected';
   sap_message?: string;
   last_synced_at?: string | null;
+  sync_interval_seconds?: number;
+}
+
+export interface StockSyncStatusResponse {
+  auto_sync_active: boolean;
+  sync_interval_seconds: number;
+  last_synced_at?: string | null;
+  last_error?: string | null;
+  sap_status: 'connected' | 'disconnected';
+  sap_message?: string;
 }
 
 export interface StockQueryParams {
@@ -79,6 +90,7 @@ export interface StockQueryParams {
   period?: string;
   date_from?: string;
   date_to?: string;
+  refresh?: boolean;
 }
 
 export interface ImportPreviewResponse {
@@ -95,9 +107,13 @@ export interface ImportPreviewResponse {
 export interface BulkUpdateItemResult {
   item_code: string;
   success: boolean;
+  partial_success?: boolean;
   item?: StockConfigurationItem;
+  item_master?: any;
+  purchase_order?: any;
   sap_synced?: boolean;
   sap_message?: string;
+  message?: string;
   error?: string;
 }
 
@@ -118,7 +134,17 @@ export const stockConfigurationApi = {
   updateItem: async (
     itemCode: string,
     data: Partial<StockConfigurationItem>
-  ): Promise<{ success: boolean; item: StockConfigurationItem; sap_synced?: boolean; sap_message?: string }> => {
+  ): Promise<{
+    success: boolean;
+    partial_success?: boolean;
+    item: StockConfigurationItem;
+    item_code?: string;
+    item_master?: any;
+    purchase_order?: any;
+    sap_synced?: boolean;
+    sap_message?: string;
+    message?: string;
+  }> => {
     const res = await apiClient.put(`/stock-configuration/items/${encodeURIComponent(itemCode)}`, data);
     return res.data;
   },
@@ -140,6 +166,18 @@ export const stockConfigurationApi = {
 
   syncFromSap: async (): Promise<{ success: boolean; synced_count: number; total_sap_items: number; timestamp: string }> => {
     const res = await apiClient.post('/stock-configuration/sync');
+    return res.data;
+  },
+
+  refreshLiveStock: async (
+    itemCodes?: string[]
+  ): Promise<{ success: boolean; refreshed_count: number; total_items: number; timestamp: string }> => {
+    const res = await apiClient.post('/stock-configuration/refresh', { item_codes: itemCodes });
+    return res.data;
+  },
+
+  getSyncStatus: async (): Promise<StockSyncStatusResponse> => {
+    const res = await apiClient.get<StockSyncStatusResponse>('/stock-configuration/sync-status');
     return res.data;
   },
 

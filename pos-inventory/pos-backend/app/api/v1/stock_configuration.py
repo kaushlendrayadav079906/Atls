@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 import io
 
 from app.core.security import require_permission
+from app.services.sap.client import SAPConnectionError, SAPValidationError
 from app.services.stock_configuration_service import StockConfigurationService
 
 router = APIRouter()
@@ -17,6 +18,7 @@ _service = StockConfigurationService()
 
 @router.get("")
 async def get_stock_configuration(
+    response: Response,
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=10000, description="Items per page"),
     search: Optional[str] = Query(None, description="Search by SAP Code, Description, or Vendor Name"),
@@ -27,9 +29,13 @@ async def get_stock_configuration(
     period: Optional[str] = Query(None, description="Filter by Date Period (e.g. today, week, month, year, all)"),
     date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
+    refresh: bool = Query(False, description="Trigger on-demand live stock quantity sync from SAP"),
     current_user: dict = Depends(require_permission("products.view")),
 ) -> Dict[str, Any]:
     """Retrieve paginated stock configuration items, KPI statistics, filter options, and SAP connection state."""
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     role = str(current_user.get("role") or "").strip().lower()
     is_admin = role in ("admin", "administrator")
     if not is_admin:
@@ -54,6 +60,7 @@ async def get_stock_configuration(
             period=period,
             date_from=date_from,
             date_to=date_to,
+            refresh=refresh,
         )
     except Exception as e:
         logger.error(f"Error fetching stock configuration items: {e}")
@@ -74,12 +81,19 @@ async def bulk_update_stock_items(
     is_admin = role in ("admin", "administrator")
 
     # Permission check: Only Admin users can add or modify remarks
-    for item in items:
-        if "remark" in item and not is_admin:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied: Only authorized Admin users can add or modify remarks.",
-            )
+    if not is_admin:
+        for item in items:
+            if "remark" in item:
+                code = item.get("item_code")
+                existing_item = _service.get_item(code) if code else None
+                incoming_rem = str(item.get("remark") or "").strip()
+                existing_rem = str(existing_item.get("remark") or "").strip() if existing_item else ""
+                if incoming_rem != existing_rem:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Access denied: Only authorized Admin users can add or modify remarks.",
+                    )
+                item.pop("remark", None)
 
     admin_user_id = str(current_user.get("username") or current_user.get("sub") or current_user.get("id") or "admin")
     try:
@@ -110,26 +124,41 @@ async def update_stock_item(
             )
 
     # Permission check: Only Admin users can add or modify remarks
-    if "remark" in data:
-        if not is_admin:
+    if "remark" in data and not is_admin:
+        existing_item = _service.get_item(item_code)
+        incoming_rem = str(data.get("remark") or "").strip()
+        existing_rem = str(existing_item.get("remark") or "").strip() if existing_item else ""
+        if incoming_rem != existing_rem:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Access denied: Only authorized Admin users can add or modify remarks.",
             )
+        data.pop("remark", None)
 
     admin_user_id = str(current_user.get("username") or current_user.get("sub") or current_user.get("id") or "admin")
     try:
         updated = _service.update_item(item_code, data, admin_user_id=admin_user_id)
         return {
-            "success": True,
-            "item": updated,
+            "success": updated.get("success", True),
+            "partial_success": updated.get("partial_success", False),
+            "item": updated.get("item") or updated,
+            "item_code": item_code,
+            "item_master": updated.get("item_master"),
+            "purchase_order": updated.get("purchase_order"),
             "remark": updated.get("remark", ""),
             "last_submitted_at": updated.get("last_submitted_at"),
             "sap_synced": updated.get("sap_synced", False),
             "sap_message": updated.get("sap_message", ""),
+            "message": updated.get("message", ""),
         }
-    except ValueError as ve:
+    except (ValueError, SAPValidationError) as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except SAPConnectionError as ce:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"SAP Business One Service Layer is unreachable: {str(ce)}")
+    except RuntimeError as re:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(re))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error updating stock item {item_code}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update stock item: {str(e)}")
@@ -187,13 +216,51 @@ async def sync_stock_from_sap(
 ) -> Dict[str, Any]:
     """Trigger live SAP Business One synchronization for stock items and warehouses."""
     try:
-        result = _service.sync_from_sap()
+        import asyncio
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, _service.sync_from_sap)
         return result
     except RuntimeError as re:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(re))
     except Exception as e:
         logger.error(f"Error during SAP sync: {e}")
         raise HTTPException(status_code=500, detail=f"SAP synchronization failed: {str(e)}")
+
+
+@router.post("/refresh")
+async def refresh_stock_from_sap(
+    payload: Optional[Dict[str, Any]] = None,
+    current_user: dict = Depends(require_permission("products.view")),
+) -> Dict[str, Any]:
+    """Fast on-demand live stock quantity sync from SAP Business One without heavy full-table rebuild."""
+    try:
+        item_codes = None
+        if payload and isinstance(payload.get("item_codes"), list):
+            item_codes = payload["item_codes"]
+        import asyncio
+        import functools
+        loop = asyncio.get_running_loop()
+        func = functools.partial(_service.refresh_live_stock_from_sap, item_codes=item_codes)
+        result = await loop.run_in_executor(None, func)
+        return result
+    except Exception as e:
+        logger.error(f"Error during live SAP refresh: {e}")
+        raise HTTPException(status_code=500, detail=f"Live SAP refresh failed: {str(e)}")
+
+
+@router.get("/sync-status")
+async def get_sync_status(
+    current_user: dict = Depends(require_permission("products.view")),
+) -> Dict[str, Any]:
+    """Retrieve the real-time status of the SAP synchronization background worker."""
+    from app.services.stock_configuration_service import stock_sync_worker
+    sap_health = _service._get_sap_health_status()
+    worker_status = stock_sync_worker.get_status()
+    return {
+        **worker_status,
+        "sap_status": sap_health.get("status", "disconnected"),
+        "sap_message": sap_health.get("message", ""),
+    }
 
 
 @router.post("/import")

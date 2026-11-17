@@ -1,0 +1,445 @@
+<USER_REQUEST>
+# MASTER PROMPT: ATLAS Backend Production Readiness, Security Audit & Deployment Preparation
+
+Act as a Senior Backend Engineer, DevOps Engineer, SAP Business One Integration Specialist, and Application Security Engineer.
+
+I want to prepare my existing **ATLAS POS / Inventory / Business Management System** backend for production deployment.
+
+Your responsibility is to inspect the existing project, identify problems, correct them, implement missing deployment requirements, and prepare the backend for secure production hosting.
+
+## 1. IMPORTANT PROJECT RULES
+
+- Work ONLY inside the existing `pos-inventory` project.
+- Do NOT modify `pos-inventory-v2`.
+- Do NOT create a new backend from scratch.
+- Do NOT replace the existing architecture unnecessarily.
+- Do NOT remove existing APIs, features, modules, or business logic.
+- Do NOT change the frontend UI.
+- Preserve the existing React frontend integration.
+- Preserve the existing FastAPI backend.
+- Preserve MySQL as the database.
+- Preserve existing SAP Business One Service Layer integration.
+- Preserve existing authentication, authorization, roles, and permissions.
+- Do not introduce PostgreSQL or another database.
+- Do not insert fake SAP data or dummy production records.
+- Do not report successful deployment readiness without verification.
+
+If any existing implementation is incorrect, explain the issue and correct it safely.
+
+## 2. PHASE 1 — COMPLETE BACKEND AUDIT
+
+Inspect the entire backend before making changes.
+
+Review:
+
+- FastAPI application entry point.
+- API routers and endpoint registration.
+- Configuration and environment variables.
+- MySQL database connection.
+- SQLAlchemy models and database migrations.
+- Authentication and authorization.
+- User roles and permissions.
+- SAP Business One Service Layer integration.
+- SAP login/session handling.
+- Dashboard APIs.
+- Stock Configuration APIs.
+- Sales and Purchase APIs.
+- Inventory and warehouse APIs.
+- Reports and analytics APIs.
+- File upload and download functionality.
+- Background tasks and scheduled jobs, if present.
+- Logging and exception handling.
+- CORS configuration.
+- Existing tests.
+
+Create:
+
+`docs/PRODUCTION_BACKEND_AUDIT.md`
+
+Document:
+1. Existing architecture.
+2. Problems found.
+3. Security vulnerabilities.
+4. Deployment blockers.
+5. Required corrections.
+6. Files changed.
+7. Verification results.
+
+## 3. PHASE 2 — PRODUCTION CONFIGURATION
+
+Prepare proper environment-based configuration.
+
+Support separate environments:
+
+- Development
+- Testing
+- Production
+
+Use environment variables for:
+
+- Application environment.
+- Application secret key.
+- Database URL.
+- SAP Service Layer URL.
+- SAP company database.
+- SAP username and password.
+- SAP timeout.
+- SAP session configuration.
+- CORS allowed origins.
+- JWT configuration.
+- Logging level.
+- File storage configuration.
+- Other existing external integrations.
+
+Requirements:
+
+- Use the existing configuration architecture.
+- Validate required production environment variables during startup.
+- Never use hardcoded passwords, tokens, URLs containing credentials, or secret keys.
+- Never use development defaults in production.
+- Never commit `.env` or secret files.
+- Keep `.env.example` updated with placeholders only.
+- Generate a secure production secret key through a safe setup procedure.
+- Never expose environment variables through API responses or logs.
+
+## 4. PHASE 3 — MYSQL DATABASE PROTECTION
+
+Inspect and prepare the existing MySQL database configuration.
+
+Requirements:
+
+- Keep the existing MySQL database and schema.
+- Verify SQLAlchemy connection configuration.
+- Use connection pooling with appropriate limits.
+- Configure connection timeouts and recovery.
+- Use transactions for critical database operations.
+- Prevent SQL injection using parameterized queries and ORM practices.
+- Verify Alembic migrations.
+- Ensure production startup does not automatically destroy or recreate tables.
+- Do not drop or overwrite existing production data.
+- Add safe database health checks.
+- Prepare a database backup and restore procedure.
+- Document backup frequency and retention recommendations.
+
+Do not change existing database structure unless necessary and approved.
+
+## 5. PHASE 4 — SAP BUSINESS ONE SECURITY AND CONNECTIVITY
+
+Preserve the existing SAP Business One Service Layer integration.
+
+Verify:
+
+- SAP Service Layer connection.
+- SAP authentication.
+- Session and cookie management.
+- Session expiry and renewal.
+- SAP connection timeouts.
+- Error handling and retry behavior.
+- Connection status monitoring.
+- Concurrent request handling.
+- SAP response validation.
+- Correct company database selection.
+
+Important security requirements:
+
+- React must NEVER connect directly to SAP.
+- All SAP requests must pass through the FastAPI backend.
+- Never expose SAP credentials or session cookies to the frontend.
+- Never expose SAP Service Layer publicly without appropriate network protection.
+- Do not log SAP passwords, cookies, tokens, or confidential business information.
+- Do not disable TLS certificate verification in production.
+- Do not automatically retry financial write operations without idempotency protection.
+- Preserve the existing `FINANCE_WRITEBACK_ENABLED=False` safety lock.
+- Do not introduce SAP financial write-back functionality.
+
+The backend must distinguish:
+- SAP connected.
+- SAP disconnected.
+- SAP authentication failed.
+- SAP timeout.
+- SAP unavailable.
+- SAP data unavailable.
+
+Do not convert SAP errors into zero values or empty successful responses.
+
+## 6. PHASE 5 — API SECURITY
+
+Audit and implement appropriate API security.
+
+Requirements:
+
+1. JWT authentication with secure token validation.
+2. Proper token expiry and refresh strategy if supported by the existing architecture.
+3. Password hashing using a secure password-hashing algorithm.
+4. Role-based access control.
+5. Company-level and branch-level access restrictions.
+6. Backend validation of every protected operation.
+7. Request payload validation.
+8. Protection against SQL injection.
+9. Protection against insecure direct object references.
+10. Rate limiting on sensitive endpoints.
+11. Secure HTTP headers where applicable.
+12. Correct handling of unauthorized and forbidden requests.
+13. Safe error responses without exposing stack traces.
+14. Request size limits.
+15. Secure file upload validation, if file uploads exist.
+
+Never trust frontend permissions as the only security control.
+
+## 7. PHASE 6 — CORS AND FRONTEND CONNECTION
+
+Prepare backend CORS configuration for production.
+
+Requirements:
+
+- Allow only explicitly approved frontend domains.
+- Keep localhost origins restricted to development.
+- Do not use wildcard origins with credentials.
+- Verify OPTIONS preflight requests.
+- Verify Authorization headers.
+- Verify cookies only where the existing authentication architecture requires them.
+- Ensure production frontend can communicate with backend over HTTPS.
+
+Create clear documentation explaining how to configure the deployed frontend API URL.
+
+## 8. PHASE 7 — PRODUCTION PERFORMANCE AND RELIABILITY
+
+Improve backend performance without changing business calculations.
+
+Inspect:
+
+- Duplicate SAP requests.
+- Unnecessary database queries.
+- Slow API endpoints.
+- Blocking operations inside asynchronous routes.
+- Connection pooling.
+- SAP session reuse.
+- Cache expiration and invalidation.
+- Concurrent request handling.
+- Large response payloads.
+- Pagination and filtering.
+
+Requirements:
+
+- Use bounded concurrency for independent SAP requests.
+- Avoid unbounded thread pools and background tasks.
+- Add appropriate request timeouts.
+- Use safe caching where suitable.
+- Preserve company, branch, and date-based cache isolation.
+- Prevent duplicate requests where practical.
+- Do not serve stale data as verified live data.
+- Provide meaningful loading and failure states through API responses.
+
+Do not change SAP business calculations or quantity mappings during performance optimization.
+
+## 9. PHASE 8 — LOGGING AND MONITORING
+
+Implement production-ready monitoring.
+
+Add or verify:
+
+- Application health endpoint.
+- Database health endpoint.
+- SAP health endpoint.
+- Structured application logs.
+- Request correlation IDs.
+- Error logging.
+- Startup and shutdown logging.
+- External service timeout logging.
+
+Health endpoints must not expose credentials, database connection strings, SAP session details, or private infrastructure information.
+
+Keep liveness checks separate from SAP availability checks so temporary SAP outages do not unnecessarily restart the backend.
+
+## 10. PHASE 9 — DEPLOYMENT PREPARATION
+
+Prepare the backend for production hosting.
+
+Inspect and create or correct only the files required by the chosen hosting architecture.
+
+Required deliverables where applicable:
+
+- `requirements.txt`
+- `.env.example`
+- `.gitignore`
+- `Dockerfile`
+- `docker-compose.yml` or production deployment configuration
+- `README_DEPLOYMENT.md`
+- Production startup command.
+- Database migration instructions.
+- Health check configuration.
+- Reverse proxy and HTTPS configuration guidance.
+- Deployment and rollback instructions.
+
+Evaluate both options:
+
+### Option A: VPS / Company Server (Preferred for ATLAS SAP integration)
+
+Prepare FastAPI for a Linux VPS or company server with:
+
+- Python production environment.
+- Gunicorn/Uvicorn worker configuration appropriate for FastAPI.
+- Reverse proxy such as Nginx.
+- HTTPS.
+- Firewall configuration.
+- Secure MySQL connectivity.
+- Secure connectivity to SAP Business One.
+- Process supervision and restart policy.
+- Log rotation.
+- Backup and recovery.
+
+### Option B: Vercel Python Functions
+
+Evaluate whether the existing FastAPI application can safely run using Vercel's Python Functions.
+
+Check:
+
+- Application entrypoint compatibility.
+- Serverless execution time limits.
+- Cold starts.
+- Persistent connection assumptions.
+- SAP session handling.
+- Background jobs.
+- MySQL connectivity.
+- File storage assumptions.
+- Deployment limitations.
+
+Do not force the existing backend into Vercel if its architecture requires persistent processes or private network connectivity.
+
+If Vercel is unsuitable, clearly explain why and prepare the recommended VPS deployment instead.
+
+Do not change the frontend hosting architecture.
+
+## 11. PHASE 10 — PROTECT SENSITIVE INFORMATION
+
+Perform a complete security and secret-exposure audit.
+
+Check:
+
+- `.env` files.
+- Git history for accidentally committed secrets.
+- GitHub repository contents.
+- SAP credentials.
+- MySQL credentials.
+- JWT secret keys.
+- Google service account keys, if Google Sheets integration still exists.
+- Private certificates and keys.
+- API tokens.
+- Application logs.
+- Error messages.
+- Uploaded files.
+- Backup files.
+
+Requirements:
+
+- Add sensitive files and folders to `.gitignore`.
+- Never commit private keys or credentials.
+- Do not expose secrets in frontend builds.
+- Do not return secrets through backend endpoints.
+- Do not store credentials in plain-text application logs.
+- Restrict server file permissions.
+- Use HTTPS for all external application communication.
+- Restrict database access to trusted network sources.
+- Configure firewall rules.
+- Use least-privilege database and service accounts.
+- Prepare a secure secret rotation procedure.
+
+If any real credential is found in Git history, report it and recommend rotation. Do not print the credential in your report.
+
+## 12. PHASE 11 — TESTING AND VERIFICATION
+
+Run the available tests.
+
+Verify:
+
+- Python compilation.
+- Backend imports.
+- FastAPI startup.
+- Database connectivity.
+- Database migrations.
+- Authentication tests.
+- Authorization tests.
+- API tests.
+- SAP connectivity tests where the SAP environment is available.
+- Dashboard API tests.
+- Stock Configuration tests.
+- Sales and Purchase API tests.
+- Security-related tests.
+- CORS behavior.
+- Production configuration validation.
+
+Do not modify or delete existing tests just to make the test suite pass.
+
+Do not use fake SAP responses to claim live SAP connectivity.
+
+If a test requires unavailable infrastructure, clearly mark it as NOT VERIFIED.
+
+## 13. FINAL DELIVERABLES
+
+Create:
+
+1. `docs/PRODUCTION_BACKEND_AUDIT.md`
+2. `docs/PRODUCTION_SECURITY_CHECKLIST.md`
+3. `docs/README_DEPLOYMENT.md`
+4. `.env.example`
+5. Corrected production configuration.
+6. Required deployment files.
+7. Required security corrections.
+8. Test and verification report.
+
+At the end, provide:
+
+- Files created.
+- Files modified.
+- Problems fixed.
+- Security improvements.
+- Database readiness.
+- SAP connectivity readiness.
+- Deployment method recommended.
+- Required environment variables.
+- GitHub preparation status.
+- Test results.
+- Remaining manual deployment steps.
+
+Use these statuses honestly:
+
+- READY
+- NEEDS CONFIGURATION
+- NOT VERIFIED
+- BLOCKED
+
+## 14. STRICT EXECUTION ORDER
+
+Follow this order:
+
+1. Inspect the entire existing backend.
+2. Create the audit report.
+3. Identify risks and deployment blockers.
+4. Correct configuration and security issues.
+5. Prepare MySQL and SAP connectivity.
+6. Prepare deployment files.
+7. Run tests and verification.
+8. Update deployment and security documentation.
+9. Provide the final report.
+
+Do not skip the audit.
+
+Do not make destructive changes.
+
+Do not claim that the application is production-ready until all required checks have been verified.
+
+**Final goal:** Prepare the existing ATLAS FastAPI backend for secure production deployment while preserving all existing business functionality, SAP Business One integration, MySQL data, authentication, and frontend API compatibility.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-11-16T11:31:46+05:30.
+
+The user's current state is as follows:
+Active Document: c:\Users\A\Documents\IB\Dashboard\atl2\Atls\pos-inventory\Dashboard-Ui\src\api\stockConfiguration.ts (LANGUAGE_UNSPECIFIED)
+Cursor is on line: 12
+Other open documents:
+- c:\Users\A\Documents\IB\Dashboard\atl2\Atls\pos-inventory\Dashboard-Ui\src\components\Layout.tsx (LANGUAGE_UNSPECIFIED)
+- c:\Users\A\Documents\IB\Dashboard\atl2\Atls\pos-inventory\pos-backend\app\services\stock_configuration_service.py (LANGUAGE_UNSPECIFIED)
+- c:\Users\A\Documents\IB\Dashboard\atl2\Atls\pos-inventory\pos-backend\README.md (LANGUAGE_UNSPECIFIED)
+- c:\Users\A\Documents\IB\Dashboard\atl2\Atls\pos-inventory\pos-backend\app\main.py (LANGUAGE_UNSPECIFIED)
+- c:\Users\A\Documents\IB\Dashboard\atl2\Atls\pos-inventory\pos-backend\.env (LANGUAGE_UNSPECIFIED)
+</ADDITIONAL_METADATA>

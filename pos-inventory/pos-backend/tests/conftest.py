@@ -1,3 +1,7 @@
+import os
+os.environ["TESTING"] = "True"
+os.environ["SAP_STOCK_SYNC_ENABLED"] = "False"
+
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch
