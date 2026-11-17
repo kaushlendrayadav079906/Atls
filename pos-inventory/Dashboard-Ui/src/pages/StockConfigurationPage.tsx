@@ -39,6 +39,9 @@ import {
   type DashboardPeriod,
 } from '../utils/date';
 
+// Y/N columns written to SAP Item Master UDFs (U_Drawing, U_V_Chk, U_LM, U_OLNG, U_LPK, U_LBL, U_MC_OR_PT)
+const SAP_YN_FIELDS = ['drw_yn', 'v_chk', 'lm', 'olng', 'lpk', 'lbl', 'mc_or_pt'] as const;
+
 export const StockConfigurationPage: React.FC = () => {
   const { isDark } = useTheme();
   const { user, isAdmin } = useAuth();
@@ -573,20 +576,17 @@ export const StockConfigurationPage: React.FC = () => {
       effectiveUpdates.nt_weight = numWeight;
     }
 
-    if (edits.qc !== undefined) {
-      let cleanQc: boolean | null = null;
-      if (edits.qc === true || edits.qc === 'Y') cleanQc = true;
-      else if (edits.qc === false || edits.qc === 'N') cleanQc = false;
-      effectiveUpdates.qc = cleanQc;
-    }
+    // Always send the row's current QC / Y-N flags (edited value, else displayed value) so that
+    // values shown in the grid but never written to SAP (e.g. default 'Y') are pushed to SAP too.
+    // The backend diffs against live SAP and skips the PATCH when SAP already matches.
+    const rawQc = edits.qc !== undefined ? edits.qc : item.qc;
+    if (rawQc === true || rawQc === 'Y') effectiveUpdates.qc = true;
+    else if (rawQc === false || rawQc === 'N') effectiveUpdates.qc = false;
 
-    if (edits.drw_yn !== undefined) effectiveUpdates.drw_yn = cleanYnField(edits.drw_yn);
-    if (edits.v_chk !== undefined) effectiveUpdates.v_chk = cleanYnField(edits.v_chk);
-    if (edits.lm !== undefined) effectiveUpdates.lm = cleanYnField(edits.lm);
-    if (edits.olng !== undefined) effectiveUpdates.olng = cleanYnField(edits.olng);
-    if (edits.lpk !== undefined) effectiveUpdates.lpk = cleanYnField(edits.lpk);
-    if (edits.lbl !== undefined) effectiveUpdates.lbl = cleanYnField(edits.lbl);
-    if (edits.mc_or_pt !== undefined) effectiveUpdates.mc_or_pt = cleanYnField(edits.mc_or_pt);
+    for (const f of SAP_YN_FIELDS) {
+      const v = cleanYnField(edits[f] !== undefined ? edits[f] : item[f]);
+      if (v) effectiveUpdates[f] = v;
+    }
 
     if (edits.remark !== undefined) {
       effectiveUpdates.remark = edits.remark;
@@ -633,18 +633,13 @@ export const StockConfigurationPage: React.FC = () => {
       if (edits.nt_weight !== undefined) {
         safeUpdates.nt_weight = Math.round(Math.max(0, Number(edits.nt_weight)) * 100) / 100;
       }
-      if (edits.qc !== undefined) {
-        if (edits.qc === true || edits.qc === 'Y') safeUpdates.qc = true;
-        else if (edits.qc === false || edits.qc === 'N') safeUpdates.qc = false;
-        else safeUpdates.qc = null;
+      const rawQc = edits.qc !== undefined ? edits.qc : origItem?.qc;
+      if (rawQc === true || rawQc === 'Y') safeUpdates.qc = true;
+      else if (rawQc === false || rawQc === 'N') safeUpdates.qc = false;
+      for (const f of SAP_YN_FIELDS) {
+        const v = cleanYnField(edits[f] !== undefined ? edits[f] : origItem?.[f]);
+        if (v) safeUpdates[f] = v;
       }
-      if (edits.drw_yn !== undefined) safeUpdates.drw_yn = cleanYnField(edits.drw_yn);
-      if (edits.v_chk !== undefined) safeUpdates.v_chk = cleanYnField(edits.v_chk);
-      if (edits.lm !== undefined) safeUpdates.lm = cleanYnField(edits.lm);
-      if (edits.olng !== undefined) safeUpdates.olng = cleanYnField(edits.olng);
-      if (edits.lpk !== undefined) safeUpdates.lpk = cleanYnField(edits.lpk);
-      if (edits.lbl !== undefined) safeUpdates.lbl = cleanYnField(edits.lbl);
-      if (edits.mc_or_pt !== undefined) safeUpdates.mc_or_pt = cleanYnField(edits.mc_or_pt);
       if (edits.remark !== undefined) {
         safeUpdates.remark = edits.remark;
         if (origItem?.po_no) safeUpdates.po_no = origItem.po_no;

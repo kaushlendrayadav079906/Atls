@@ -76,6 +76,19 @@ USER_CONFIGURABLE_FIELDS = {
     "mc_or_pt",
 }
 
+# ATLAS field -> SAP Item Master (OITM) property written by _sync_item_to_sap()
+SAP_ITEM_MASTER_FIELDS = {
+    "nt_weight": "InventoryWeight",  # + PurchaseUnitWeight, SalesUnitWeight
+    "qc": "U_QC",
+    "drw_yn": "U_Drawing",
+    "v_chk": "U_V_Chk",
+    "lm": "U_LM",
+    "olng": "U_OLNG",
+    "lpk": "U_LPK",
+    "lbl": "U_LBL",
+    "mc_or_pt": "U_MC_OR_PT",
+}
+
 
 def clean_qc(val: Any) -> Optional[bool]:
     if val is None or val == "" or str(val).strip() == "":
@@ -1148,6 +1161,11 @@ class StockConfigurationService:
                 sap_payload["U_MC_OR_PT"] = mc_val
                 sap_written_fields.append("U_MC_OR_PT")
 
+        # 11. REMARKS fallback -> Item Master memo 'User_Text' (only when the row has no Purchase Order)
+        if "User_Text" in data and data["User_Text"] is not None:
+            sap_payload["User_Text"] = str(data["User_Text"]).strip()
+            sap_written_fields.append("User_Text")
+
         # If no verified SAP fields were changed, save locally and return
         if not sap_payload:
             return {
@@ -1171,7 +1189,7 @@ class StockConfigurationService:
             raise SAPConnectionError(f"SAP Service Layer authentication failed: {auth_err}")
 
         # Pre-read current SAP item to ensure existence and capture baseline values
-        select_props = "ItemCode,ItemName,InventoryWeight,PurchaseUnitWeight,SalesUnitWeight,U_Drawing,U_PerPices,U_QC,U_V_Chk,U_LM,U_OLNG,U_LPK,U_LBL,U_MC_OR_PT,UpdateDate,UpdateTime"
+        select_props = "ItemCode,ItemName,InventoryWeight,PurchaseUnitWeight,SalesUnitWeight,U_Drawing,U_PerPices,U_QC,U_V_Chk,U_LM,U_OLNG,U_LPK,U_LBL,U_MC_OR_PT,User_Text,UpdateDate,UpdateTime"
         try:
             pre_item = client.get(
                 f"Items('{code}')?$select={select_props}"
@@ -1196,6 +1214,7 @@ class StockConfigurationService:
             "U_LPK": pre_item.get("U_LPK"),
             "U_LBL": pre_item.get("U_LBL"),
             "U_MC_OR_PT": pre_item.get("U_MC_OR_PT"),
+            "User_Text": pre_item.get("User_Text"),
             "UpdateDate": pre_item.get("UpdateDate"),
             "UpdateTime": pre_item.get("UpdateTime"),
         }
@@ -1292,6 +1311,7 @@ class StockConfigurationService:
             "U_LPK": post_item.get("U_LPK"),
             "U_LBL": post_item.get("U_LBL"),
             "U_MC_OR_PT": post_item.get("U_MC_OR_PT"),
+            "User_Text": post_item.get("User_Text"),
             "UpdateDate": post_item.get("UpdateDate"),
             "UpdateTime": post_item.get("UpdateTime"),
         }
@@ -1332,7 +1352,7 @@ class StockConfigurationService:
         #     except (ValueError, TypeError):
         #         verification_mismatches.append(f"U_PerPices conversion error: expected {expected_pp}, got {actual_pp}")
 
-        for u_prop in ["U_QC", "U_V_Chk", "U_LM", "U_OLNG", "U_LPK", "U_LBL", "U_MC_OR_PT"]:
+        for u_prop in ["U_QC", "U_V_Chk", "U_LM", "U_OLNG", "U_LPK", "U_LBL", "U_MC_OR_PT", "User_Text"]:
             if u_prop in filtered_payload:
                 actual_val = str(post_item.get(u_prop) or "").strip().upper()
                 expected_val = str(filtered_payload[u_prop]).strip().upper()
@@ -1650,30 +1670,21 @@ class StockConfigurationService:
             if c_val:
                 updates["drw_yn"] = c_val
 
-        # 2. Check for actual Item Master changes
-        has_item_master_changes = False
-        for k, v in updates.items():
-            if k == "last_submitted_by":
-                continue
-            curr_v = existing_item.get(k)
-            if k == "nt_weight":
-                if curr_v is None or abs(float(curr_v) - float(v)) > 0.001:
-                    has_item_master_changes = True
-                    break
-            elif k == "qc":
-                if curr_v != v:
-                    has_item_master_changes = True
-                    break
-            else:
-                if str(curr_v or "").strip().upper() != str(v or "").strip().upper():
-                    has_item_master_changes = True
-                    break
+        # 2. Decide whether SAP Item Master must be contacted.
+        # Do NOT diff against the local ATLAS cache here: Sync-from-SAP pre-fills blank SAP UDFs
+        # (QC, DRW, V CHK, LM, OLNG, I PK, LBL, MC OR PT) with a display default of 'Y', so an
+        # unchanged 'Y' looked "already saved" locally and was never written to SAP.
+        # _sync_item_to_sap() diffs against live SAP values and skips the PATCH when SAP already matches.
+        has_item_master_changes = any(k in updates for k in SAP_ITEM_MASTER_FIELDS)
 
         # 3. Check for REMARKS (Purchase Order Comments) changes
         has_remark_in_payload = "remark" in data and data["remark"] is not None
         new_remark = str(data["remark"]).strip() if has_remark_in_payload else None
         prev_remark = str(existing_item.get("remark") or "").strip()
-        remark_changed = has_remark_in_payload and (new_remark != prev_remark)
+        # Same reasoning as above: a non-empty remark may exist locally but never have reached SAP.
+        # _sync_po_to_sap() / _sync_item_to_sap() skip redundant PATCHes against SAP.
+        remark_changed = has_remark_in_payload and (new_remark != prev_remark or bool(new_remark))
+        remark_edited = has_remark_in_payload and new_remark != prev_remark
 
         # Track results for separate Item Master and Purchase Order updates
         item_master_result: Dict[str, Any] = {"status": "unchanged", "message": "No Item Master fields modified"}
@@ -1684,6 +1695,7 @@ class StockConfigurationService:
 
         # Step A: Execute Purchase Order update if remarks changed
         resolved_doc_entry = None
+        remark_for_item_master: Optional[str] = None
         if remark_changed:
             resolved_doc_entry = self.resolve_po_doc_entry(
                 code,
@@ -1696,9 +1708,12 @@ class StockConfigurationService:
                 updates["po_doc_entry"] = resolved_doc_entry
 
             if not resolved_doc_entry:
-                po_error = f"Cannot update REMARKS in SAP for item '{code}': No associated Purchase Order found (DocEntry missing)."
-                po_result = {"status": "error", "error": po_error}
-                logger.warning(po_error)
+                # No Purchase Order behind this row (e.g. GRPO without base PO, or Item Master only):
+                # persist REMARKS on the Item Master memo (OITM.UserText -> Service Layer 'User_Text'),
+                # which is the same field the SAP -> ATLAS sync reads remarks back from.
+                remark_for_item_master = new_remark
+                po_result = {"status": "skipped", "message": "No Purchase Order; REMARKS written to Item Master User_Text."}
+                has_item_master_changes = True
             else:
                 try:
                     po_result = self._sync_po_to_sap(resolved_doc_entry, new_remark, admin_user_id=admin_user_id)
@@ -1710,7 +1725,11 @@ class StockConfigurationService:
         # Step B: Execute Item Master update if item fields changed
         if has_item_master_changes:
             try:
-                item_master_result = self._sync_item_to_sap(code, updates, admin_user_id=admin_user_id)
+                sap_item_data = dict(updates)
+                sap_item_data.pop("remark", None)
+                if remark_for_item_master is not None:
+                    sap_item_data["User_Text"] = remark_for_item_master
+                item_master_result = self._sync_item_to_sap(code, sap_item_data, admin_user_id=admin_user_id)
                 confirmed_last_updated = item_master_result.get("confirmed_last_updated")
             except Exception as im_err:
                 im_error = str(im_err)
@@ -1720,7 +1739,7 @@ class StockConfigurationService:
         # Step C: Assess combined results
         if im_error and po_error:
             raise RuntimeError(f"Both SAP updates failed for {code} - Item Master: {im_error}; Purchase Order: {po_error}")
-        elif im_error and not remark_changed:
+        elif im_error and (not remark_changed or remark_for_item_master is not None):
             raise RuntimeError(f"Item Master write-back failed for {code}: {im_error}")
 
         is_partial = bool(im_error or po_error)
@@ -1771,7 +1790,7 @@ class StockConfigurationService:
                         """
                         cur.execute(sql, {**updates, "code": code})
 
-                    if remark_changed:
+                    if remark_edited:
                         try:
                             cur.execute(
                                 """
@@ -1816,7 +1835,7 @@ class StockConfigurationService:
                                 it["last_submitted_at"] = now.isoformat()
                                 if admin_user_id:
                                     it["last_submitted_by"] = str(admin_user_id)
-                                if remark_changed:
+                                if remark_edited:
                                     if "remark_history" not in it:
                                         it["remark_history"] = []
                                     it["remark_history"].append({
@@ -1859,7 +1878,7 @@ class StockConfigurationService:
                     it["last_submitted_at"] = now.isoformat()
                     if admin_user_id:
                         it["last_submitted_by"] = str(admin_user_id)
-                    if remark_changed:
+                    if remark_edited:
                         if "remark_history" not in it:
                             it["remark_history"] = []
                         it["remark_history"].append({
