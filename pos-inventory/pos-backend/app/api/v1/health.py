@@ -21,12 +21,8 @@ async def get_sap_health() -> Dict[str, Any]:
     """
     try:
         client = get_sap_client()
-<<<<<<< HEAD
-        result = client.check_health()
-        print(f"--> [SAP HEALTH] URL: {client.base_url} | DB: {client.company_db} | Status: {result.get('status')} | Msg: {result.get('message')}")
-=======
         result = await anyio.to_thread.run_sync(client.check_health)
->>>>>>> b249092d7d86f7bee1ff38aac1b849e62efc6f94
+        print(f"--> [SAP HEALTH] URL: {client.base_url} | DB: {client.company_db} | Status: {result.get('status')} | Msg: {result.get('message')}")
         return result
     except Exception as exc:
         logger.warning(f"Error checking SAP health: {exc}")

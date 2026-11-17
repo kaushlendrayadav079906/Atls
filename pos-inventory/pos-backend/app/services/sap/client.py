@@ -97,15 +97,11 @@ class SAPServiceLayerClient:
             }
 
             logger.info(f"Logging in to SAP Service Layer: {self.company_db}")
-<<<<<<< HEAD
             print(f"--> [SAP] Connecting to: {login_url} (CompanyDB: '{self.company_db}', User: '{self.username}')...")
-            response = self.client.post(login_url, json=payload)
-=======
             post_kwargs: Dict[str, Any] = {"json": payload}
             if timeout is not None:
                 post_kwargs["timeout"] = timeout
             response = self.client.post(login_url, **post_kwargs)
->>>>>>> b249092d7d86f7bee1ff38aac1b849e62efc6f94
             response.raise_for_status()
 
             # Extract session cookies
@@ -205,21 +201,12 @@ class SAPServiceLayerClient:
                 self._last_health_time = time.monotonic()
                 return res
 
-<<<<<<< HEAD
-            # Probe active session with lightweight request (fetch single field to avoid downloading 1.8MB $metadata)
-            probe_url = f"{self.base_url}/Items?$top=1&$select=ItemCode"
-            resp = self.client.get(
-                probe_url,
-                cookies=self._get_cookies(),
-                timeout=6.0,
-=======
             # Probe active session with lightweight request
             probe_url = f"{self.base_url}/ItemGroups?$top=1&$select=Number"
             resp = self.client.get(
                 probe_url,
                 cookies=self._get_cookies(),
                 timeout=fast_timeout,
->>>>>>> b249092d7d86f7bee1ff38aac1b849e62efc6f94
             )
             if resp.status_code in (200, 204):
                 sap_breaker.record_success()
