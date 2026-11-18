@@ -74,6 +74,8 @@ export const StockConfigurationPage: React.FC = () => {
   const [editedRows, setEditedRows] = useState<Record<string, Partial<StockConfigurationItem>>>({});
   const [savingItemCode, setSavingItemCode] = useState<string | null>(null);
   const [submittedCodes, setSubmittedCodes] = useState<Set<string>>(new Set());
+  const [partialCodes, setPartialCodes] = useState<Set<string>>(new Set());
+  const [failedCodes, setFailedCodes] = useState<Set<string>>(new Set());
 
   // Modals & Banners
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -207,7 +209,46 @@ export const StockConfigurationPage: React.FC = () => {
     },
     onSuccess: (res, variables) => {
       setSavingItemCode(null);
-      setSubmittedCodes((prev) => new Set(prev).add(variables.itemCode));
+      const isConfirmed = Boolean(res.success && !res.partial_success && res.sap_synced);
+      if (isConfirmed) {
+        setSubmittedCodes((prev) => new Set(prev).add(variables.itemCode));
+        setPartialCodes((prev) => {
+          const next = new Set(prev);
+          next.delete(variables.itemCode);
+          return next;
+        });
+        setFailedCodes((prev) => {
+          const next = new Set(prev);
+          next.delete(variables.itemCode);
+          return next;
+        });
+      } else if (res.partial_success) {
+        setPartialCodes((prev) => new Set(prev).add(variables.itemCode));
+        setSubmittedCodes((prev) => {
+          const next = new Set(prev);
+          next.delete(variables.itemCode);
+          return next;
+        });
+        setFailedCodes((prev) => {
+          const next = new Set(prev);
+          next.delete(variables.itemCode);
+          return next;
+        });
+      } else {
+        // Saved locally in database without confirmed SAP sync
+        setPartialCodes((prev) => new Set(prev).add(variables.itemCode));
+        setSubmittedCodes((prev) => {
+          const next = new Set(prev);
+          next.delete(variables.itemCode);
+          return next;
+        });
+        setFailedCodes((prev) => {
+          const next = new Set(prev);
+          next.delete(variables.itemCode);
+          return next;
+        });
+      }
+
       setEditedRows((prev) => {
         const next = { ...prev };
         delete next[variables.itemCode];
@@ -239,13 +280,26 @@ export const StockConfigurationPage: React.FC = () => {
         });
       } else {
         setNotification({
-          type: 'success',
-          message: `Item ${variables.itemCode} saved to database. ${res.sap_message ? `(${res.sap_message})` : ''}`,
+          type: 'info',
+          message: `Item ${variables.itemCode} saved to database. SAP sync was not confirmed. ${res.sap_message ? `(${res.sap_message})` : ''}`,
         });
       }
     },
-    onError: (err: any) => {
+    onError: (err: any, variables: any) => {
       setSavingItemCode(null);
+      if (variables?.itemCode) {
+        setFailedCodes((prev) => new Set(prev).add(variables.itemCode));
+        setSubmittedCodes((prev) => {
+          const next = new Set(prev);
+          next.delete(variables.itemCode);
+          return next;
+        });
+        setPartialCodes((prev) => {
+          const next = new Set(prev);
+          next.delete(variables.itemCode);
+          return next;
+        });
+      }
       setNotification({ type: 'error', message: err.response?.data?.detail || 'Failed to save changes.' });
     },
   });
@@ -254,11 +308,52 @@ export const StockConfigurationPage: React.FC = () => {
   const bulkMutation = useMutation({
     mutationFn: (items: Partial<StockConfigurationItem>[]) => stockConfigurationApi.bulkUpdateItems(items),
     onSuccess: (res) => {
-      const successCodes = new Set(res.results.filter((r) => r.success).map((r) => r.item_code));
-      setSubmittedCodes((prev) => new Set([...prev, ...successCodes]));
+      const fullSuccessCodes = new Set(
+        res.results
+          .filter((r) => r.success && !r.partial_success && r.sap_synced)
+          .map((r) => r.item_code)
+      );
+      const partialSuccessCodes = new Set(
+        res.results
+          .filter((r) => r.partial_success || (r.success && !r.sap_synced))
+          .map((r) => r.item_code)
+      );
+      const failedItemCodes = new Set(
+        res.results
+          .filter((r) => !r.success)
+          .map((r) => r.item_code)
+      );
+
+      setSubmittedCodes((prev) => {
+        const next = new Set(prev);
+        for (const code of fullSuccessCodes) next.add(code);
+        for (const code of partialSuccessCodes) next.delete(code);
+        for (const code of failedItemCodes) next.delete(code);
+        return next;
+      });
+
+      setPartialCodes((prev) => {
+        const next = new Set(prev);
+        for (const code of partialSuccessCodes) next.add(code);
+        for (const code of fullSuccessCodes) next.delete(code);
+        for (const code of failedItemCodes) next.delete(code);
+        return next;
+      });
+
+      setFailedCodes((prev) => {
+        const next = new Set(prev);
+        for (const code of failedItemCodes) next.add(code);
+        for (const code of fullSuccessCodes) next.delete(code);
+        for (const code of partialSuccessCodes) next.delete(code);
+        return next;
+      });
+
       setEditedRows((prev) => {
         const next = { ...prev };
-        for (const code of successCodes) {
+        for (const code of fullSuccessCodes) {
+          delete next[code];
+        }
+        for (const code of partialSuccessCodes) {
           delete next[code];
         }
         return next;
@@ -294,10 +389,18 @@ export const StockConfigurationPage: React.FC = () => {
 
       if (res.failed === 0) {
         const sapCount = res.sap_synced_count ?? 0;
-        setNotification({
-          type: 'success',
-          message: `Bulk save successful: ${res.successful} item(s) updated in database${sapCount > 0 ? ` & ${sapCount} synchronized to SAP!` : '!'}`,
-        });
+        const totalSuccessful = res.successful;
+        if (sapCount === totalSuccessful && totalSuccessful > 0) {
+          setNotification({
+            type: 'success',
+            message: `Bulk save successful: ${totalSuccessful} item(s) updated in database & synchronized to SAP!`,
+          });
+        } else {
+          setNotification({
+            type: 'info',
+            message: `Bulk save completed: ${totalSuccessful} item(s) updated in database (${sapCount} synchronized to SAP, ${totalSuccessful - sapCount} partial/pending SAP sync).`,
+          });
+        }
       } else {
         setNotification({
           type: 'error',
@@ -401,7 +504,26 @@ export const StockConfigurationPage: React.FC = () => {
   };
 
   const handleCellChange = (item: StockConfigurationItem, field: keyof StockConfigurationItem, value: any) => {
+    if (field === 'remark' && !isUserAdmin) {
+      setNotification({
+        type: 'error',
+        message: 'Access denied: Only authorized Admin users can add or modify remarks.',
+      });
+      return;
+    }
     setSubmittedCodes((prev) => {
+      if (!prev.has(item.item_code)) return prev;
+      const next = new Set(prev);
+      next.delete(item.item_code);
+      return next;
+    });
+    setPartialCodes((prev) => {
+      if (!prev.has(item.item_code)) return prev;
+      const next = new Set(prev);
+      next.delete(item.item_code);
+      return next;
+    });
+    setFailedCodes((prev) => {
       if (!prev.has(item.item_code)) return prev;
       const next = new Set(prev);
       next.delete(item.item_code);
@@ -582,13 +704,14 @@ export const StockConfigurationPage: React.FC = () => {
     const rawQc = edits.qc !== undefined ? edits.qc : item.qc;
     if (rawQc === true || rawQc === 'Y') effectiveUpdates.qc = true;
     else if (rawQc === false || rawQc === 'N') effectiveUpdates.qc = false;
+    else if (rawQc === '' || rawQc === null) effectiveUpdates.qc = null;
 
     for (const f of SAP_YN_FIELDS) {
       const v = cleanYnField(edits[f] !== undefined ? edits[f] : item[f]);
       if (v) effectiveUpdates[f] = v;
     }
 
-    if (edits.remark !== undefined) {
+    if (edits.remark !== undefined && isUserAdmin) {
       effectiveUpdates.remark = edits.remark;
       if (item.po_no) effectiveUpdates.po_no = item.po_no;
       if (item.po_doc_entry) effectiveUpdates.po_doc_entry = item.po_doc_entry;
@@ -636,11 +759,13 @@ export const StockConfigurationPage: React.FC = () => {
       const rawQc = edits.qc !== undefined ? edits.qc : origItem?.qc;
       if (rawQc === true || rawQc === 'Y') safeUpdates.qc = true;
       else if (rawQc === false || rawQc === 'N') safeUpdates.qc = false;
+      else if (rawQc === '' || rawQc === null) safeUpdates.qc = null;
+
       for (const f of SAP_YN_FIELDS) {
         const v = cleanYnField(edits[f] !== undefined ? edits[f] : origItem?.[f]);
         if (v) safeUpdates[f] = v;
       }
-      if (edits.remark !== undefined) {
+      if (edits.remark !== undefined && isUserAdmin) {
         safeUpdates.remark = edits.remark;
         if (origItem?.po_no) safeUpdates.po_no = origItem.po_no;
         if (origItem?.po_doc_entry) safeUpdates.po_doc_entry = origItem.po_doc_entry;
@@ -684,7 +809,7 @@ export const StockConfigurationPage: React.FC = () => {
         if (rawQc === true || rawQc === 'Y') cleanQc = true;
         else if (rawQc === false || rawQc === 'N') cleanQc = false;
 
-        payload.push({
+        const rowItem: Partial<StockConfigurationItem> = {
           item_code: it.item_code,
           nt_weight: Math.round(Math.max(0, effWeight) * 100) / 100,
           qc: cleanQc,
@@ -695,10 +820,15 @@ export const StockConfigurationPage: React.FC = () => {
           lpk: cleanYnField(edits.lpk !== undefined ? edits.lpk : it.lpk),
           lbl: cleanYnField(edits.lbl !== undefined ? edits.lbl : it.lbl),
           mc_or_pt: cleanYnField(edits.mc_or_pt !== undefined ? edits.mc_or_pt : it.mc_or_pt),
-          remark: edits.remark !== undefined ? edits.remark : (it.remark || ''),
           po_no: it.po_no,
           po_doc_entry: it.po_doc_entry,
-        });
+        };
+
+        if (isUserAdmin && edits.remark !== undefined) {
+          rowItem.remark = edits.remark;
+        }
+
+        payload.push(rowItem);
       }
 
       bulkMutation.mutate(payload);
@@ -1331,7 +1461,12 @@ export const StockConfigurationPage: React.FC = () => {
                 <th className="py-2.5 px-1 text-center whitespace-nowrap w-[66px] min-w-[62px] border border-slate-300 dark:border-slate-600" title="Machining / Coating / Certificate">MC OR PT</th>
                 <th className="py-2.5 px-2 text-center whitespace-nowrap w-[104px] min-w-[100px] border border-slate-300 dark:border-slate-600" title="SAP Business One Item Creation Date (OITM.CreateDate)">ENTRY DATE</th>
                 <th className="py-2.5 px-2 text-center whitespace-nowrap w-[114px] min-w-[108px] border border-slate-300 dark:border-slate-600" title="Last successful individual submission date and time (Asia/Kolkata)">LAST UPDATED</th>
-                <th className="py-2.5 px-2.5 text-center whitespace-nowrap w-[155px] min-w-[145px] border border-slate-300 dark:border-slate-600" title="Purchase Order Comments (OPOR.Comments AS [Remarks])">REMARKS</th>
+                <th className="py-2.5 px-2.5 text-center whitespace-nowrap w-[155px] min-w-[145px] border border-slate-300 dark:border-slate-600" title={isUserAdmin ? "Purchase Order Comments (OPOR.Comments AS [Remarks])" : "Purchase Order Comments (Admin-only modification)"}>
+                  <div className="flex items-center justify-center gap-1">
+                    <span>REMARKS</span>
+                    {!isUserAdmin && <span className="text-[10px] text-amber-500 font-normal" title="Admin only">🔒</span>}
+                  </div>
+                </th>
                 <th className="sticky right-0 z-20 py-2.5 px-2 text-center whitespace-nowrap w-[125px] min-w-[120px] bg-[#EAF2FE] dark:bg-slate-800 text-[#1E3A8A] dark:text-slate-300 border border-slate-300 dark:border-slate-600 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)]">ACTIONS</th>
               </tr>
             </thead>
@@ -1373,8 +1508,10 @@ export const StockConfigurationPage: React.FC = () => {
                   const srNo = (page - 1) * (pageSize >= 10000 ? 0 : pageSize) + idx + 1;
                   const isModified = Boolean(editedRows[item.item_code]);
                   const isSaving = savingItemCode === item.item_code;
-                  // Point 2: Show Submitted in green if submitted in current session OR previously saved in backend, as long as not modified
-                  const isSubmitted = (submittedCodes.has(item.item_code) || Boolean(item.last_submitted_at)) && !isModified;
+                  const isPartial = partialCodes.has(item.item_code) && !isModified;
+                  const isFailed = failedCodes.has(item.item_code) && !isModified;
+                  // Show Submitted in green only if successfully synced to SAP without partial or failed state
+                  const isSubmitted = (submittedCodes.has(item.item_code) || (Boolean(item.last_submitted_at) && !isPartial && !isFailed)) && !isModified;
 
                   return (
                     <tr
@@ -1667,7 +1804,8 @@ export const StockConfigurationPage: React.FC = () => {
                             value={getEffectiveStr(item, 'remark')}
                             onChange={(e) => handleCellChange(item, 'remark', e.target.value)}
                             disabled={!isUserAdmin}
-                            placeholder="PO Comments..."
+                            readOnly={!isUserAdmin}
+                            placeholder={isUserAdmin ? "PO Comments..." : "Admin only"}
                             className={`w-32 h-8 px-2 text-left text-[12px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
                               isCellModified(item, 'remark')
                                 ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
@@ -1675,7 +1813,7 @@ export const StockConfigurationPage: React.FC = () => {
                                   ? 'bg-slate-900 border-slate-700 text-white'
                                   : 'bg-white border-slate-300 text-slate-900'
                             } ${!isUserAdmin ? 'opacity-70 cursor-not-allowed bg-slate-100 dark:bg-slate-800' : ''}`}
-                            title={!isUserAdmin ? 'Only administrators can modify PO remarks' : item.remark ? `Purchase Order Comments: ${item.remark}` : 'Enter Purchase Order Comments'}
+                            title={!isUserAdmin ? 'Access restricted: Only Admin users can add or modify Purchase Order remarks' : item.remark ? `Purchase Order Comments: ${item.remark}` : 'Enter Purchase Order Comments'}
                           />
                         </div>
                       </td>
@@ -1696,18 +1834,35 @@ export const StockConfigurationPage: React.FC = () => {
                               ? 'bg-blue-600 border-blue-600 text-white cursor-wait'
                               : isSubmitted
                                 ? 'bg-[#10B981] hover:bg-emerald-600 border-emerald-500 text-white cursor-pointer active:scale-95'
-                                : 'bg-[#155EEF] hover:bg-blue-700 border-blue-600 text-white cursor-pointer active:scale-95'
+                                : isPartial
+                                  ? 'bg-amber-500 hover:bg-amber-600 border-amber-600 text-white cursor-pointer active:scale-95'
+                                  : isFailed
+                                    ? 'bg-rose-600 hover:bg-rose-700 border-rose-600 text-white cursor-pointer active:scale-95'
+                                    : 'bg-[#155EEF] hover:bg-blue-700 border-blue-600 text-white cursor-pointer active:scale-95'
                               }`}
-                            title={isSubmitted ? 'Entry successfully submitted to database & SAP' : 'Submit row to database and SAP'}
+                            title={isSaving
+                              ? 'Saving to SAP...'
+                              : isSubmitted
+                                ? 'Entry successfully submitted to database & SAP'
+                                : isPartial
+                                  ? 'Partially saved (Database updated, but SAP sync incomplete)'
+                                  : isFailed
+                                    ? 'Submission failed. Click to retry.'
+                                    : 'Submit row to database and SAP'
+                            }
                           >
                             {isSaving ? (
                               <RotateCw size={12} className="animate-spin" />
                             ) : isSubmitted ? (
                               <CheckCircle2 size={13} />
+                            ) : isPartial ? (
+                              <AlertCircle size={13} />
+                            ) : isFailed ? (
+                              <XCircle size={13} />
                             ) : (
                               <Save size={12} />
                             )}
-                            <span>{isSaving ? 'Saving to SAP...' : isSubmitted ? 'Submitted' : 'Submit'}</span>
+                            <span>{isSaving ? 'Saving to SAP...' : isSubmitted ? 'Submitted' : isPartial ? 'Partial Sync' : isFailed ? 'Failed' : 'Submit'}</span>
                           </button>
 
                           {/* Delete Button */}

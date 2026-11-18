@@ -72,20 +72,54 @@ async def bulk_update_stock_items(
     payload: Dict[str, Any],
     current_user: dict = Depends(require_permission("products.view")),
 ) -> Dict[str, Any]:
-    """Bulk update stock configuration items with per-row transactional status tracking."""
+    """Bulk update user-configurable fields for multiple stock items and sync to SAP."""
+    if not isinstance(payload, dict) or "items" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid request body. Expected format: {'items': [...]}.",
+        )
+
     items = payload.get("items")
     if not isinstance(items, list):
-        raise HTTPException(status_code=400, detail="'items' must be a list of item objects.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Field 'items' must be a list.",
+        )
+
+    if not items:
+        return {
+            "total": 0,
+            "successful": 0,
+            "failed": 0,
+            "sap_synced_count": 0,
+            "results": [],
+        }
 
     role = str(current_user.get("role") or "").strip().lower()
     is_admin = role in ("admin", "administrator")
+    user_branch = str(current_user.get("branch_id") or "").strip()
 
-    # Permission check: Only Admin users can add or modify remarks
+    # Company / Branch access restriction and Remarks authorization for non-admins
     if not is_admin:
         for item in items:
+            if not isinstance(item, dict):
+                continue
+            item_code = str(item.get("item_code") or "").strip()
+            if not item_code:
+                continue
+
+            existing_item = None
+            if user_branch or "remark" in item:
+                existing_item = _service.get_item(item_code)
+
+            if user_branch and existing_item:
+                if existing_item.get("warehouse_code") and existing_item.get("warehouse_code") != user_branch:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Forbidden: You can only modify stock items assigned to your branch ({user_branch}). Item {item_code} belongs to another branch.",
+                    )
+
             if "remark" in item:
-                code = item.get("item_code")
-                existing_item = _service.get_item(code) if code else None
                 incoming_rem = str(item.get("remark") or "").strip()
                 existing_rem = str(existing_item.get("remark") or "").strip() if existing_item else ""
                 if incoming_rem != existing_rem:
@@ -100,7 +134,7 @@ async def bulk_update_stock_items(
         return _service.bulk_update_items(items, admin_user_id=admin_user_id)
     except Exception as e:
         logger.error(f"Error during bulk update: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to execute bulk update: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to perform bulk update: {str(e)}")
 
 
 @router.put("/items/{item_code}")

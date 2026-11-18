@@ -92,47 +92,65 @@ def test_update_stock_configuration_item(auth_headers):
         "lbl": "Y",
         "mc_or_pt": "Y",
     }
-    response = client.put(f"/api/v1/stock-configuration/items/{target_code}", json=update_payload, headers=auth_headers)
-    assert response.status_code == 200
-    res_data = response.json()
-    assert res_data["success"] is True
-    # SAP-owned fields must be preserved
-    assert res_data["item"]["qty"] == orig_qty
-    assert res_data["item"]["grpo_no"] == orig_grpo
-    # User-configurable fields must be updated
-    assert res_data["item"]["nt_weight"] == 14.2
-    assert res_data["item"]["qc"] is True
+    mock_item_sync = {
+        "status": "success",
+        "sap_synced": True,
+        "confirmed_last_updated": "2026-11-17 16:30:00",
+    }
+    with patch("app.services.stock_configuration_service.StockConfigurationService._sync_item_to_sap", return_value=mock_item_sync):
+        response = client.put(f"/api/v1/stock-configuration/items/{target_code}", json=update_payload, headers=auth_headers)
+        assert response.status_code == 200
+        res_data = response.json()
+        assert res_data["success"] is True
+        # SAP-owned fields must be preserved
+        assert res_data["item"]["qty"] == orig_qty
+        assert res_data["item"]["grpo_no"] == orig_grpo
+        # User-configurable fields must be updated
+        assert res_data["item"]["nt_weight"] == 14.2
+        assert res_data["item"]["qc"] is True
 
 
 def test_qc_toggle_and_persistence(auth_headers):
-    # Toggle QC to N
-    res_n = client.put("/api/v1/stock-configuration/items/CS1124", json={"qc": "N"}, headers=auth_headers)
-    assert res_n.status_code == 200
-    assert res_n.json()["item"]["qc"] is False
+    mock_item_sync = {
+        "status": "success",
+        "sap_synced": True,
+        "confirmed_last_updated": "2026-11-17 16:30:00",
+    }
+    with patch("app.services.stock_configuration_service.StockConfigurationService._sync_item_to_sap", return_value=mock_item_sync):
+        # Toggle QC to N
+        res_n = client.put("/api/v1/stock-configuration/items/CS1124", json={"qc": "N"}, headers=auth_headers)
+        assert res_n.status_code == 200
+        assert res_n.json()["item"]["qc"] is False
 
-    # Verify via GET
-    get_res = client.get("/api/v1/stock-configuration?search=CS1124", headers=auth_headers)
-    item_n = next(it for it in get_res.json()["items"] if it["item_code"] == "CS1124")
-    assert item_n["qc"] is False
+        # Verify via GET
+        get_res = client.get("/api/v1/stock-configuration?search=CS1124", headers=auth_headers)
+        item_n = next(it for it in get_res.json()["items"] if it["item_code"] == "CS1124")
+        assert item_n["qc"] is False
 
-    # Toggle QC back to Y
-    res_y = client.put("/api/v1/stock-configuration/items/CS1124", json={"qc": "Y"}, headers=auth_headers)
-    assert res_y.status_code == 200
-    assert res_y.json()["item"]["qc"] is True
+        # Toggle QC back to Y
+        res_y = client.put("/api/v1/stock-configuration/items/CS1124", json={"qc": "Y"}, headers=auth_headers)
+        assert res_y.status_code == 200
+        assert res_y.json()["item"]["qc"] is True
 
 
 def test_sap_owned_fields_bulk_and_import_protection(auth_headers):
-    # 1. Bulk update protection
-    bulk_res = client.post(
-        "/api/v1/stock-configuration/bulk-update",
-        json={"items": [{"item_code": "CS1124", "qty": 8888.0, "vendor_name": "MALICIOUS", "nt_weight": 14.2, "qc": "Y"}]},
-        headers=auth_headers,
-    )
-    assert bulk_res.status_code == 200
-    assert bulk_res.json()["successful"] >= 1
-    updated_bulk = bulk_res.json()["results"][0]["item"]
-    assert updated_bulk["qty"] != 8888.0
-    assert updated_bulk["vendor_name"] != "MALICIOUS"
+    mock_item_sync = {
+        "status": "success",
+        "sap_synced": True,
+        "confirmed_last_updated": "2026-11-17 16:30:00",
+    }
+    with patch("app.services.stock_configuration_service.StockConfigurationService._sync_item_to_sap", return_value=mock_item_sync):
+        # 1. Bulk update protection
+        bulk_res = client.post(
+            "/api/v1/stock-configuration/bulk-update",
+            json={"items": [{"item_code": "CS1124", "qty": 8888.0, "vendor_name": "MALICIOUS", "nt_weight": 14.2, "qc": "Y"}]},
+            headers=auth_headers,
+        )
+        assert bulk_res.status_code == 200
+        assert bulk_res.json()["successful"] >= 1
+        updated_bulk = bulk_res.json()["results"][0]["item"]
+        assert updated_bulk["qty"] != 8888.0
+        assert updated_bulk["vendor_name"] != "MALICIOUS"
 
     # 2. Excel import protection on existing SAP items
     wb = openpyxl.Workbook()
@@ -257,36 +275,42 @@ def test_import_stock_configuration_excel_preview_and_commit(auth_headers):
 
 
 def test_last_submitted_at_timestamp_tracking(auth_headers):
-    # 1. Update single item CS1124
-    put_res = client.put(
-        "/api/v1/stock-configuration/items/CS1124",
-        json={"nd_weight": 14.8},
-        headers=auth_headers,
-    )
-    assert put_res.status_code == 200
-    data = put_res.json()
-    assert data["success"] is True
-    assert "last_submitted_at" in data["item"]
-    assert data["item"]["last_submitted_at"] is not None
+    mock_item_sync = {
+        "status": "success",
+        "sap_synced": True,
+        "confirmed_last_updated": "2026-11-17 16:30:00",
+    }
+    with patch("app.services.stock_configuration_service.StockConfigurationService._sync_item_to_sap", return_value=mock_item_sync):
+        # 1. Update single item CS1124
+        put_res = client.put(
+            "/api/v1/stock-configuration/items/CS1124",
+            json={"nd_weight": 14.8},
+            headers=auth_headers,
+        )
+        assert put_res.status_code == 200
+        data = put_res.json()
+        assert data["success"] is True
+        assert "last_submitted_at" in data["item"]
+        assert data["item"]["last_submitted_at"] is not None
 
-    submitted_ts = data["item"]["last_submitted_at"]
+        submitted_ts = data["item"]["last_submitted_at"]
 
-    # 2. Verify persisted in GET query
-    get_res = client.get("/api/v1/stock-configuration?search=CS1124", headers=auth_headers)
-    assert get_res.status_code == 200
-    item = next(it for it in get_res.json()["items"] if it["item_code"] == "CS1124")
-    assert item["last_submitted_at"] == submitted_ts
+        # 2. Verify persisted in GET query
+        get_res = client.get("/api/v1/stock-configuration?search=CS1124", headers=auth_headers)
+        assert get_res.status_code == 200
+        item = next(it for it in get_res.json()["items"] if it["item_code"] == "CS1124")
+        assert item["last_submitted_at"] == submitted_ts
 
-    # 3. Verify bulk update also sets and returns last_submitted_at
-    bulk_res = client.post(
-        "/api/v1/stock-configuration/bulk-update",
-        json={"items": [{"item_code": "CS1124", "nt_weight": 14.9}]},
-        headers=auth_headers,
-    )
-    assert bulk_res.status_code == 200
-    bulk_item = bulk_res.json()["results"][0]["item"]
-    assert "last_submitted_at" in bulk_item
-    assert bulk_item["last_submitted_at"] is not None
+        # 3. Verify bulk update also sets and returns last_submitted_at
+        bulk_res = client.post(
+            "/api/v1/stock-configuration/bulk-update",
+            json={"items": [{"item_code": "CS1124", "nt_weight": 14.9}]},
+            headers=auth_headers,
+        )
+        assert bulk_res.status_code == 200
+        bulk_item = bulk_res.json()["results"][0]["item"]
+        assert "last_submitted_at" in bulk_item
+        assert bulk_item["last_submitted_at"] is not None
 
 
 from unittest.mock import patch
@@ -377,7 +401,13 @@ def test_bulk_update_preserves_existing_remarks(auth_headers):
         "verified": True,
         "comments": "yes",
     }
-    with patch("app.services.stock_configuration_service.StockConfigurationService._sync_po_to_sap", return_value=mock_po_sync):
+    mock_item_sync = {
+        "status": "success",
+        "sap_synced": True,
+        "confirmed_last_updated": "2026-11-17 16:30:00",
+    }
+    with patch("app.services.stock_configuration_service.StockConfigurationService._sync_po_to_sap", return_value=mock_po_sync), \
+         patch("app.services.stock_configuration_service.StockConfigurationService._sync_item_to_sap", return_value=mock_item_sync):
         # Set a remark on CS1124
         res_set = client.put(
             "/api/v1/stock-configuration/items/CS1124",
@@ -555,7 +585,13 @@ def test_sap_all_field_mappings_and_readback(auth_headers):
         "verified": True,
         "comments": "Automated Test Verified",
     }
-    with patch("app.services.stock_configuration_service.StockConfigurationService._sync_po_to_sap", return_value=mock_po_sync):
+    mock_item_sync = {
+        "status": "success",
+        "sap_synced": True,
+        "confirmed_last_updated": "2026-11-17 16:30:00",
+    }
+    with patch("app.services.stock_configuration_service.StockConfigurationService._sync_po_to_sap", return_value=mock_po_sync), \
+         patch("app.services.stock_configuration_service.StockConfigurationService._sync_item_to_sap", return_value=mock_item_sync):
         res = client.put("/api/v1/stock-configuration/items/CS1124", json=payload, headers=auth_headers)
         assert res.status_code == 200
         data = res.json()

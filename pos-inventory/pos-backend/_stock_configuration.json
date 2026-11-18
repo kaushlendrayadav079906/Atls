@@ -2377,8 +2377,8 @@
     "is_active": true,
     "entry_date": "2026-11-16",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
-    "updated_at": "2026-11-17 16:45:29",
-    "last_submitted_at": "2026-11-17T16:45:35.541076+05:30",
+    "updated_at": "2026-11-17T23:26:53.320056+05:30",
+    "last_submitted_at": "2026-11-17T23:26:53.320056+05:30",
     "remark": "Automated Test Verified",
     "last_submitted_by": "admin",
     "record_category": "Received Stock",
@@ -2822,6 +2822,87 @@
         "admin_user_id": "admin",
         "action": "UPDATE_REMARK",
         "created_at": "2026-11-17T16:45:34.466032+05:30"
+      },
+      {
+        "id": 49,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-17T23:18:36.749405+05:30"
+      },
+      {
+        "id": 50,
+        "item_code": "CS1124",
+        "previous_remark": "yes",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-17T23:19:20.552175+05:30"
+      },
+      {
+        "id": 51,
+        "item_code": "CS1124",
+        "previous_remark": "Should fail PO sync",
+        "new_remark": "Remark only pending approval",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-17T23:19:20.617071+05:30"
+      },
+      {
+        "id": 52,
+        "item_code": "CS1124",
+        "previous_remark": "Remark only pending approval",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-17T23:24:32.462731+05:30"
+      },
+      {
+        "id": 53,
+        "item_code": "CS1124",
+        "previous_remark": "yes",
+        "new_remark": "Batch inspected and approved by Admin",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-17T23:26:52.080933+05:30"
+      },
+      {
+        "id": 54,
+        "item_code": "CS1124",
+        "previous_remark": "Batch inspected and approved by Admin",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-17T23:26:52.242433+05:30"
+      },
+      {
+        "id": 55,
+        "item_code": "CS1124",
+        "previous_remark": "yes",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-17T23:26:52.344797+05:30"
+      },
+      {
+        "id": 56,
+        "item_code": "CS1124",
+        "previous_remark": "Should fail PO sync",
+        "new_remark": "Remark only pending approval",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-17T23:26:52.399319+05:30"
+      },
+      {
+        "id": 57,
+        "item_code": "CS1124",
+        "previous_remark": "Remark only pending approval",
+        "new_remark": "Automated Test Verified",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-17T23:26:53.320056+05:30"
       }
     ],
     "po_doc_entry": 871
@@ -7791,7 +7872,7 @@
     "vendor_code": "",
     "grpo_no": "9999",
     "rcvd_qty": 50.0,
-    "nt_weight": 2.5,
+    "nt_weight": 14.2,
     "qc": true,
     "drw_yn": "Y",
     "v_chk": "Y",
@@ -7806,10 +7887,12 @@
     "warehouse_code": "01",
     "is_active": true,
     "created_at": "2026-11-17T10:11:44.058620+05:30",
-    "updated_at": "2026-11-17T10:11:44.058620+05:30",
+    "updated_at": "2026-11-17T23:26:06.794783+05:30",
     "entry_date": "2025-01-07",
     "remark": "",
     "remark_history": [],
-    "po_doc_entry": null
+    "po_doc_entry": null,
+    "last_submitted_by": "admin",
+    "last_submitted_at": "2026-11-17T23:26:06.794783+05:30"
   }
 ]
