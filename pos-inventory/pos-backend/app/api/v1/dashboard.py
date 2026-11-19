@@ -1011,7 +1011,7 @@ async def get_operator_dashboard(
         performance=_compute_performance(current_user, branch_invoices),
         customerInsights=_compute_customer_insights(branch_invoices),
         quickActions=[
-            OperatorQuickAction(id="add-sale", label="Add Sale", path="/pos"),
+            OperatorQuickAction(id="sales-orders", label="Sales Orders", path="/sales-orders"),
             OperatorQuickAction(id="process-return", label="Process Return", path="/returns"),
             OperatorQuickAction(id="check-stock", label="Check Stock", path="/products"),
         ],

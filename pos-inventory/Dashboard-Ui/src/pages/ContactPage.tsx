@@ -10,7 +10,7 @@ import {
   Send,
   Layers,
   Package,
-  ShoppingCart,
+  FileText,
   ClipboardList,
   Users,
   Factory,
@@ -122,15 +122,6 @@ export const ContactPage: React.FC = () => {
       tag: 'Inventory Hub'
     },
     {
-      title: 'Point of Sale (POS)',
-      path: '/pos',
-      icon: ShoppingCart,
-      iconColor: 'text-emerald-600',
-      iconBg: 'bg-emerald-50',
-      description: 'High-speed retail checkout, barcode scanner, split tenders, and receipt generation.',
-      tag: 'Retail Terminal'
-    },
-    {
       title: 'Sales Orders & Invoices',
       path: '/sales-orders',
       icon: ClipboardList,
@@ -227,7 +218,7 @@ export const ContactPage: React.FC = () => {
 
           {/* Description */}
           <p className={`atlas-body text-base sm:text-lg max-w-3xl leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-            Unified enterprise management integrating retail Point of Sale, live inventory synchronization, sales order workflows, manufacturing production, and SAP Business One financial intelligence.
+            Unified enterprise management integrating live inventory synchronization, sales order workflows, manufacturing production, and SAP Business One financial intelligence.
           </p>
 
           {/* Action Buttons */}
@@ -307,11 +298,11 @@ export const ContactPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white rounded-2xl border border-blue-100/90 p-5 sm:p-6 shadow-xs space-y-2.5 hover:border-blue-400 hover:shadow-md transition-all">
               <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <ShoppingCart size={20} />
+                <FileText size={20} />
               </div>
-              <h3 className="atlas-card-title text-sm">Point of Sale & Checkout</h3>
+              <h3 className="atlas-card-title text-sm">Sales & Invoicing</h3>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Fast retail cashier workflow with barcode reader integration, split cash/card payments, customer selection, and tax invoice receipt generation.
+                Customer sales order fulfillment, tax invoice management, payment reconciliation, and direct integration with SAP Business One accounts receivable.
               </p>
             </div>
 
@@ -447,7 +438,7 @@ export const ContactPage: React.FC = () => {
                 </div>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed border-t border-slate-100 pt-2.5">
-                Operating enterprise application for retail POS, production workflows, and SAP Business One data orchestration.
+                Operating enterprise application for inventory, sales orders, production workflows, and SAP Business One data orchestration.
               </p>
             </div>
 
@@ -611,7 +602,7 @@ export const ContactPage: React.FC = () => {
                     className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition"
                   >
                     <option value="General Operational Inquiry">General Operational Inquiry</option>
-                    <option value="Point of Sale & Checkout Support">Point of Sale & Checkout Support</option>
+                    <option value="Sales Orders & Invoices Support">Sales Orders & Invoices Support</option>
                     <option value="Stock & Catalog Discrepancy">Stock & Catalog Discrepancy</option>
                     <option value="SAP Synchronization Status">SAP Synchronization Status</option>
                     <option value="Production Work Order Query">Production Work Order Query</option>

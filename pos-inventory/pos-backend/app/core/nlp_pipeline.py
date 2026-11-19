@@ -75,7 +75,6 @@ MODULE_NAV_MAP = {
     "dashboard": {"route": "/", "label": "Open Dashboard"},
     "products": {"route": "/products", "label": "Open Products & Stock"},
     "inventory": {"route": "/products", "label": "Open Products & Stock"},
-    "pos": {"route": "/pos", "label": "Open Point of Sale"},
     "sales": {"route": "/sales", "label": "Open Sales Invoices"},
     "invoices": {"route": "/sales", "label": "Open Sales Invoices"},
     "sales_orders": {"route": "/sales-orders", "label": "Open Sales Orders"},
@@ -324,7 +323,7 @@ class NLPIntentPipeline:
             matched_cap = find_capability_by_id("workflow.flowchart")
 
             target_mod = "sales"
-            if any(k in norm for k in ("sale", "pos", "order to cash", "checkout")):
+            if any(k in norm for k in ("sale", "order to cash", "sales invoice")):
                 target_mod = "sales"
             elif any(k in norm for k in ("inventory", "stock", "update after a sale")):
                 target_mod = "inventory"

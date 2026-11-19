@@ -49,6 +49,47 @@ def is_postgres() -> bool:
     return get_database_dialect() == "postgresql"
 
 
+def is_db_connection_error(e: Exception) -> bool:
+    """Return True if the exception represents a legitimate database connection, pool, or circuit-breaker failure."""
+    if isinstance(e, (ConnectionError, TimeoutError, OSError)):
+        return True
+
+    # PyMySQL exceptions
+    try:
+        import pymysql
+        if isinstance(e, (pymysql.MySQLError, pymysql.Error)):
+            return True
+    except ImportError:
+        pass
+
+    # Psycopg2 exceptions
+    try:
+        import psycopg2
+        if isinstance(e, (psycopg2.Error, psycopg2.DatabaseError)):
+            return True
+    except ImportError:
+        pass
+
+    # Database circuit-breaker, connection, or pool RuntimeErrors
+    if isinstance(e, RuntimeError):
+        err_msg = str(e).lower()
+        if any(term in err_msg for term in [
+            "circuit breaker",
+            "service unreachable",
+            "database_url is not configured",
+            "timed out waiting for an available",
+            "cannot connect to database",
+            "failed to create new mysql connection",
+            "connection pool",
+            "connection to server",
+            "permission denied",
+            "connect to mysql server",
+        ]):
+            return True
+
+    return False
+
+
 class MySQLConnectionPool:
     """Thread-safe connection pool for PyMySQL."""
 

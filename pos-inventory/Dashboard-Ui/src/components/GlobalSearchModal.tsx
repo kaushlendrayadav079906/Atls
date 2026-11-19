@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, X, Package, Users, FileText, LayoutDashboard,
   Sparkles, ArrowRight, CornerDownLeft, RotateCcw,
-  BarChart3, Factory, Settings, ShoppingCart, Mail
+  BarChart3, Factory, Settings, Mail
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 
@@ -24,10 +24,9 @@ interface NavDestination {
 
 const STATIC_DESTINATIONS: NavDestination[] = [
   { id: 'nav-dash', title: 'Dashboard', category: 'Navigation', path: '/', icon: LayoutDashboard, keywords: ['home', 'overview', 'kpi', 'metrics'] },
-  { id: 'nav-product-hub', title: 'Product & Operations Hub', category: 'Navigation', path: '/product', icon: Package, keywords: ['product', 'products', 'inventory', 'stock', 'pos', 'sales', 'orders', 'customers'] },
+  { id: 'nav-product-hub', title: 'Product & Operations Hub', category: 'Navigation', path: '/product', icon: Package, keywords: ['product', 'products', 'inventory', 'stock', 'sales', 'orders', 'customers'] },
   { id: 'nav-solutions-hub', title: 'Solutions Hub (Production & Finance)', category: 'Navigation', path: '/solutions', icon: Factory, keywords: ['solutions', 'production', 'manufacturing', 'finance', 'accounting', 'payments'] },
   { id: 'nav-reports-hub', title: 'Reports Hub & Analytics', category: 'Navigation', path: '/reports', icon: FileText, keywords: ['reports', 'reporting', 'analytics', 'bi', 'sales report', 'invoices', 'inventory report'] },
-  { id: 'nav-pos', title: 'Point of Sale (POS)', category: 'Operations', path: '/pos', icon: ShoppingCart, keywords: ['checkout', 'billing', 'cashier', 'new sale'] },
   { id: 'nav-products', title: 'Products & Inventory', category: 'Operations', path: '/products', icon: Package, keywords: ['items', 'catalog', 'stock', 'pricing'] },
   { id: 'nav-sales', title: 'Sales & Invoices', category: 'Operations', path: '/sales', icon: FileText, keywords: ['invoices', 'bills', 'orders', 'transactions'] },
   { id: 'nav-sales-orders', title: 'Sales Orders', category: 'Operations', path: '/sales-orders', icon: FileText, keywords: ['so', 'pending orders'] },

@@ -13,7 +13,6 @@ import { PaymentReportPage } from './pages/reports/PaymentReportPage';
 import { AtlasAnalyticsPage } from './pages/AtlasAnalyticsPage';
 import { CustomersPage } from './pages/CustomersPage';
 import { InventoryReportPage } from './pages/InventoryReportPage';
-import { PosCheckoutPage } from './pages/pos/PosCheckoutPage';
 import { ProductsStockPage } from './pages/ProductsStockPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ReturnsApprovalsPage } from './pages/returns/ReturnsApprovalsPage';
@@ -104,7 +103,6 @@ function App() {
                 <Route path="products" element={<RequirePermission permission="products.view"><ProductsStockPage /></RequirePermission>} />
                 <Route path="products/:id" element={<RequirePermission permission="products.view"><ProductsStockPage /></RequirePermission>} />
                 <Route path="customers" element={<RequirePermission permission="customers.view"><CustomersPage /></RequirePermission>} />
-                <Route path="pos" element={<RequirePermission permission="pos.access"><PosCheckoutPage /></RequirePermission>} />
                 <Route path="sales" element={<RequirePermission permission="invoices.view"><SalesList /></RequirePermission>} />
                 <Route path="sales-orders" element={<RequirePermission permission="sales_orders.view"><SalesOrdersPage /></RequirePermission>} />
                 <Route path="purchase-orders" element={<RequirePermission permission="purchase_orders.view"><PurchaseOrdersPage /></RequirePermission>} />

@@ -7,20 +7,20 @@ import type { FlowchartData, StructuredTableResponse } from '../types/ai';
 
 describe('BusinessFlowchartRenderer Component', () => {
   const sampleFlowchart: FlowchartData = {
-    id: 'sales_pos_flow',
+    id: 'sales_invoices_flow',
     title: 'Order-to-Cash & Real-Time Invoicing Workflow',
-    module: 'Sales & POS',
-    description: 'Verified lifecycle of a retail sale from basket checkout to SAP AR Invoice creation and inventory deduction.',
+    module: 'Sales & Invoices',
+    description: 'Verified lifecycle of a retail sale from order creation to SAP AR Invoice creation and inventory deduction.',
     nodes: [
       {
         id: 'node_1',
         stepNumber: 1,
-        title: 'Customer Cart Creation',
+        title: 'Customer Sales Order Creation',
         type: 'start',
-        badge: 'POS Terminal',
-        description: 'Cashier scans barcodes or searches catalog items at active branch.',
-        route: '/pos',
-        routeLabel: 'Open POS'
+        badge: 'Sales Terminal',
+        description: 'User enters sales orders or searches catalog items at active branch.',
+        route: '/sales-orders',
+        routeLabel: 'Open Orders'
       },
       {
         id: 'node_2',
@@ -39,7 +39,7 @@ describe('BusinessFlowchartRenderer Component', () => {
         type: 'process',
         badge: 'Cash / Card / UPI',
         description: 'Tender entered and verified across authorized payment methods.',
-        route: '/pos',
+        route: '/sales',
         routeLabel: 'Collect Payment'
       },
       {
@@ -68,18 +68,18 @@ describe('BusinessFlowchartRenderer Component', () => {
     );
 
     // Module & title
-    expect(html).toContain('Sales &amp; POS');
+    expect(html).toContain('Sales &amp; Invoices');
     expect(html).toContain('Order-to-Cash &amp; Real-Time Invoicing Workflow');
     expect(html).toContain('4 Steps');
 
     // Steps content
-    expect(html).toContain('Customer Cart Creation');
+    expect(html).toContain('Customer Sales Order Creation');
     expect(html).toContain('Stock Availability Validation');
     expect(html).toContain('Payment Settlement');
     expect(html).toContain('AR Invoice &amp; Journal Entry');
 
     // Badges & types
-    expect(html).toContain('POS Terminal');
+    expect(html).toContain('Sales Terminal');
     expect(html).toContain('SAP OITW');
     expect(html).toContain('SAP OINV');
     expect(html).toContain('decision');
@@ -87,7 +87,7 @@ describe('BusinessFlowchartRenderer Component', () => {
     expect(html).toContain('end');
 
     // Deep-links
-    expect(html).toContain('Open POS');
+    expect(html).toContain('Open Orders');
     expect(html).toContain('Check Stock');
     expect(html).toContain('View Invoices');
 

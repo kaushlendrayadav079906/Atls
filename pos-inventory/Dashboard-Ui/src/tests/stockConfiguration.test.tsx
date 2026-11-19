@@ -148,7 +148,6 @@ describe('StockConfigurationPage SAP Read-Only Fields & QC Dropdown', () => {
     const html = renderComponent();
 
     // SAP-owned fields for FG001
-    expect(html).toContain('title="SAP Qty: 115"');
     expect(html).toContain('title="SAP GRPO: 5099"');
     expect(html).toContain('title="SAP Received Qty: 115"');
     expect(html).toContain('title="SAP OK Qty: 110"');
@@ -180,29 +179,32 @@ describe('StockConfigurationPage SAP Read-Only Fields & QC Dropdown', () => {
     expect(html).toContain('step="0.1"');
     expect(html).toContain('value="14.2"');
 
-    // DRW. Y/N, V CHK, LM, OLNG, LPK, LBL, MC OR PT remain dropdowns
-    expect(html).toContain('title="Laser Marking / Line Marking"');
-    expect(html).toContain('title="Oiling / Loading"');
-    expect(html).toContain('title="Loose Packing / Line Packing"');
+    // DRW. Y/N, V CHK, LM, OLNG, I PK, LBL, MC or PT remain dropdowns
+    expect(html).toContain('title="Laser Marking / Line Marking (PDN1.U_LM)"');
+    expect(html).toContain('title="Oiling / Loading (PDN1.U_OLNG)"');
+    expect(html).toContain('title="Inner Packing (PDN1.U_IPK)"');
   });
 
-  it('renders ENTRY DATE column with date on first line and time directly underneath, without inventing time for pure dates', () => {
+  it('renders exact 22 columns according to the updated SQL query', () => {
     const html = renderComponent();
 
-    // FG001 has both date and time in source (2024-08-12T10:35:00)
-    expect(html).toContain('2024-08-12T10:35:00'); // title attribute
-    expect(html).toContain('12-08-2024');
-    expect(html).toContain('10:35 AM');
-
-    // PKG003 has pure date (2023-03-05) without time, so time must not be invented
-    expect(html).toContain('05-03-2023');
+    // 22 exact headers
+    const expectedHeaders = [
+      'SO NO', 'SAP CODE', 'Desc.', 'Qty.', 'Stock Qty.', 'VENDOR NAME',
+      'GRPO No.', 'RCVD. Qty.', 'NT. WEIGHT', 'QC', 'DRW. Y/N', 'V CHK',
+      'OK Qty.', 'Rej. Qty.', 'LM', 'OLNG', 'I PK', 'LBL', 'MC or PT',
+      'Last Updated', 'Remarks', 'ACTIONS'
+    ];
+    for (const h of expectedHeaders) {
+      expect(html).toContain(h);
+    }
   });
 
-  it('renders LAST UPDATED column with date and time in Asia/Kolkata, or dash when not submitted', () => {
+  it('renders Last Updated column with date and time in Asia/Kolkata, or dash when not submitted', () => {
     const html = renderComponent();
 
     // Column header exists
-    expect(html).toContain('LAST UPDATED');
+    expect(html).toContain('Last Updated');
 
     // Not Submitted row (PKG003) shows empty dash with 'Not submitted' title
     expect(html).toContain('title="Not submitted"');
@@ -221,18 +223,18 @@ describe('StockConfigurationPage SAP Read-Only Fields & QC Dropdown', () => {
     expect(html).toContain('<span>Submit</span>');
   });
 
-  it('renders REMARKS column between LAST UPDATED and ACTIONS with placeholder "Enter remark..."', () => {
+  it('renders Remarks column between Last Updated and ACTIONS with GRPO placeholder', () => {
     const html = renderComponent();
 
-    // Verify header exists with correct tooltip
-    expect(html).toContain('REMARKS');
-    expect(html).toContain('title="Admin remarks on stock configuration and submission"');
+    // Verify header exists with correct OPDN tooltip
+    expect(html).toContain('Remarks');
+    expect(html).toContain('Goods Receipt PO Remarks (OPDN.U_Remark)');
 
     // Verify compact text input placeholder
-    expect(html).toContain('placeholder="Enter remark..."');
+    expect(html).toContain('placeholder="GRPO Remarks..."');
 
-    // Admin user should have enabled input (title says "Enter admin remark...")
-    expect(html).toContain('title="Enter admin remark..."');
+    // Admin user should have enabled input
+    expect(html).toContain('title="Enter GRPO Remark"');
   });
 
   it('renders REMARKS input as disabled with explanatory tooltip for non-admin users', () => {
@@ -259,7 +261,7 @@ describe('StockConfigurationPage SAP Read-Only Fields & QC Dropdown', () => {
 
     const html = renderComponent();
     expect(html).toContain('disabled=""');
-    expect(html).toContain('Only authorized Admin users can add or modify remarks');
+    expect(html).toContain('Access restricted: Only Admin users can add or modify GRPO remarks');
     expect(html).toContain('cursor-not-allowed');
   });
 });

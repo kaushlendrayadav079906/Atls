@@ -59,14 +59,6 @@ const PERMISSION_GROUPS: PermissionGroupConfig[] = [
     ],
   },
   {
-    title: 'Point of Sale',
-    iconName: 'ShoppingCart',
-    permissions: [
-      { id: 'pos.access', label: 'Access POS Terminal', action: 'View' },
-      { id: 'pos.checkout', label: 'Execute Checkout & Payments', action: 'Create' },
-    ],
-  },
-  {
     title: 'Sales & Invoices',
     iconName: 'FileText',
     permissions: [
@@ -157,7 +149,6 @@ const DEFAULT_ROLE_PRESETS: Record<string, string[]> = {
   manager: [
     'dashboard.view',
     'products.view', 'products.create', 'products.edit', 'products.export',
-    'pos.access', 'pos.checkout',
     'sales_orders.view', 'sales_orders.create', 'sales_orders.edit', 'sales_orders.export',
     'invoices.view', 'invoices.create', 'invoices.edit', 'invoices.export',
     'purchase_orders.view', 'purchase_orders.create', 'purchase_orders.edit', 'purchase_orders.export',
@@ -169,7 +160,6 @@ const DEFAULT_ROLE_PRESETS: Record<string, string[]> = {
   ],
   operator: [
     'dashboard.view',
-    'pos.access', 'pos.checkout',
     'products.view', 'products.export',
     'sales_orders.view', 'sales_orders.create',
     'invoices.view', 'invoices.create',
@@ -178,7 +168,6 @@ const DEFAULT_ROLE_PRESETS: Record<string, string[]> = {
   ],
   user: [
     'dashboard.view',
-    'pos.access', 'pos.checkout',
     'products.view',
     'sales_orders.view', 'sales_orders.create',
     'invoices.view', 'invoices.create',

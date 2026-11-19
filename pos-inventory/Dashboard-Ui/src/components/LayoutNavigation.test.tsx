@@ -86,7 +86,7 @@ describe('Layout Top Navigation and Sidebar RBAC Verification', () => {
         role: 'user',
         is_active: true,
         token_version: 1,
-        permissions: ['products.view', 'pos.access', 'invoices.view', 'customers.view', 'returns.view'],
+        permissions: ['products.view', 'invoices.view', 'customers.view', 'returns.view'],
       },
       isAuthenticated: true,
       isLoading: false,
@@ -95,10 +95,10 @@ describe('Layout Top Navigation and Sidebar RBAC Verification', () => {
       logout: vi.fn(),
       refreshUser: vi.fn(),
       hasPermission: vi.fn((p) =>
-        ['products.view', 'pos.access', 'invoices.view', 'customers.view', 'returns.view'].includes(p)
+        ['products.view', 'invoices.view', 'customers.view', 'returns.view'].includes(p)
       ),
       canAccess: vi.fn((m) =>
-        ['products', 'pos', 'sales', 'customers', 'returns'].includes(m.toLowerCase())
+        ['products', 'sales', 'customers', 'returns'].includes(m.toLowerCase())
       ),
     });
 

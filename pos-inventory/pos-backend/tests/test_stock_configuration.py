@@ -74,7 +74,7 @@ def test_update_stock_configuration_item(auth_headers):
     # Fetch original item first to verify SAP fields remain unchanged
     orig_res = client.get("/api/v1/stock-configuration?page=1&page_size=10", headers=auth_headers)
     assert orig_res.status_code == 200
-    target_item = orig_res.json()["items"][0]
+    target_item = next((it for it in orig_res.json()["items"] if it.get("item_code") == "CS1124"), orig_res.json()["items"][0])
     target_code = target_item["item_code"]
     orig_qty = target_item["qty"]
     orig_grpo = target_item["grpo_no"]
@@ -406,8 +406,16 @@ def test_bulk_update_preserves_existing_remarks(auth_headers):
         "sap_synced": True,
         "confirmed_last_updated": "2026-11-17 16:30:00",
     }
+    mock_por1_sync = {
+        "doc_entry": 871,
+        "line_num": 0,
+        "status": "success",
+        "verified": True,
+        "sap_synced": True,
+    }
     with patch("app.services.stock_configuration_service.StockConfigurationService._sync_po_to_sap", return_value=mock_po_sync), \
-         patch("app.services.stock_configuration_service.StockConfigurationService._sync_item_to_sap", return_value=mock_item_sync):
+         patch("app.services.stock_configuration_service.StockConfigurationService._sync_item_to_sap", return_value=mock_item_sync), \
+         patch("app.services.stock_configuration_service.StockConfigurationService._sync_por1_to_sap", return_value=mock_por1_sync):
         # Set a remark on CS1124
         res_set = client.put(
             "/api/v1/stock-configuration/items/CS1124",
@@ -590,8 +598,16 @@ def test_sap_all_field_mappings_and_readback(auth_headers):
         "sap_synced": True,
         "confirmed_last_updated": "2026-11-17 16:30:00",
     }
+    mock_por1_sync = {
+        "doc_entry": 871,
+        "line_num": 0,
+        "status": "success",
+        "verified": True,
+        "sap_synced": True,
+    }
     with patch("app.services.stock_configuration_service.StockConfigurationService._sync_po_to_sap", return_value=mock_po_sync), \
-         patch("app.services.stock_configuration_service.StockConfigurationService._sync_item_to_sap", return_value=mock_item_sync):
+         patch("app.services.stock_configuration_service.StockConfigurationService._sync_item_to_sap", return_value=mock_item_sync), \
+         patch("app.services.stock_configuration_service.StockConfigurationService._sync_por1_to_sap", return_value=mock_por1_sync):
         res = client.put("/api/v1/stock-configuration/items/CS1124", json=payload, headers=auth_headers)
         assert res.status_code == 200
         data = res.json()
@@ -783,6 +799,187 @@ def test_single_row_partial_update_sends_only_modified_fields(auth_headers):
     )
     assert res2.status_code == 200
     assert res2.json()["item"]["qc"] is True
+
+
+def test_sync_item_to_sap_u_perpices_mapping_and_readback():
+    """
+    Verify that _sync_item_to_sap:
+    1. Formulates PATCH payload with U_PerPices as an integer, plus standard weights.
+    2. Detects diff between before_values and new U_PerPices.
+    3. Asserts readback match on U_PerPices.
+    """
+    service = StockConfigurationService()
+    mock_sap = unittest.mock.MagicMock()
+    mock_sap.session_id = "test-session"
+    mock_sap.session_timeout = None
+
+    pre_read_response = {
+        "ItemCode": "CS1124",
+        "ItemName": "SS Allen Grub Screw",
+        "InventoryWeight": 70.0,
+        "PurchaseUnitWeight": 70.0,
+        "SalesUnitWeight": 70.0,
+        "U_PerPices": 92,
+        "U_Drawing": "Y",
+        "U_QC": "Y",
+        "U_V_Chk": "Y",
+        "U_LM": "Y",
+        "U_OLNG": "Y",
+        "U_LPK": "Y",
+        "U_LBL": "Y",
+        "U_MC_OR_PT": "Y",
+        "UpdateDate": "2026-11-18",
+        "UpdateTime": "120000",
+    }
+    post_read_response = dict(pre_read_response)
+    post_read_response["InventoryWeight"] = 95.0
+    post_read_response["PurchaseUnitWeight"] = 95.0
+    post_read_response["SalesUnitWeight"] = 95.0
+    post_read_response["U_PerPices"] = 95
+
+    mock_sap.get.side_effect = [pre_read_response, post_read_response]
+
+    with patch("app.services.stock_configuration_service.get_sap_client", return_value=mock_sap):
+        res = service._sync_item_to_sap("CS1124", {"nt_weight": 95.0})
+
+        assert res["status"] == "success"
+        assert res["sap_written"] is True
+        assert "U_PerPices" in res["sap_fields"]
+        assert res["after_values"]["U_PerPices"] == 95
+
+        # Verify PATCH called with correct U_PerPices
+        mock_sap.patch.assert_called_once()
+        patch_payload = mock_sap.patch.call_args[1]["data"]
+        assert patch_payload["U_PerPices"] == 95
+        assert patch_payload["InventoryWeight"] == 95.0
+
+
+def test_sync_po_to_sap_u_remark_payload_and_readback():
+    service = StockConfigurationService()
+    mock_sap = unittest.mock.MagicMock()
+    mock_sap.session_id = "test-session"
+    mock_sap.session_timeout = None
+
+    pre_read_response = {
+        "DocEntry": 871,
+        "DocNum": 1378,
+        "DocDate": "2026-11-14",
+        "CardCode": "V00020",
+        "CardName": "Aditya Engineering Services",
+        "U_Remark": "Old Remark",
+        "Comments": "Old Comment",
+        "UpdateDate": "2026-11-14",
+        "UpdateTime": "100000",
+    }
+    post_read_response = dict(pre_read_response)
+    post_read_response["U_Remark"] = "Batch QC Approved"
+
+    mock_sap.get.side_effect = [pre_read_response, post_read_response]
+
+    with unittest.mock.patch("app.services.stock_configuration_service.get_sap_client", return_value=mock_sap):
+        res = service._sync_po_to_sap(871, "Batch QC Approved")
+
+        assert res["status"] == "success"
+        assert res["verified"] is True
+        assert res["doc_entry"] == 871
+        assert res["doc_num"] == 1378
+        assert res["u_remark"] == "Batch QC Approved"
+
+        # Verify PATCH called strictly on PurchaseOrders(871)
+        mock_sap.patch.assert_called_once()
+        patch_call_path = mock_sap.patch.call_args[0][0]
+        assert patch_call_path == "PurchaseOrders(871)"
+
+        # Verify PATCH payload strictly uses U_Remark
+        patch_payload = mock_sap.patch.call_args[1]["data"]
+        assert "U_Remark" in patch_payload
+        assert patch_payload["U_Remark"] == "Batch QC Approved"
+        assert "Comments" not in patch_payload
+
+
+def test_sync_po_to_sap_clear_empty_remark():
+    service = StockConfigurationService()
+    mock_sap = unittest.mock.MagicMock()
+    mock_sap.session_id = "test-session"
+    mock_sap.session_timeout = None
+
+    pre_read_response = {
+        "DocEntry": 871,
+        "DocNum": 1378,
+        "U_Remark": "Existing Remark to Clear",
+        "Comments": None,
+        "UpdateDate": "2026-11-14",
+        "UpdateTime": "100000",
+    }
+    post_read_response = dict(pre_read_response)
+    post_read_response["U_Remark"] = ""
+
+    mock_sap.get.side_effect = [pre_read_response, post_read_response]
+
+    with unittest.mock.patch("app.services.stock_configuration_service.get_sap_client", return_value=mock_sap):
+        res = service._sync_po_to_sap(871, "")
+
+        assert res["status"] == "success"
+        assert res["verified"] is True
+        assert res["u_remark"] == ""
+
+        # Verify empty string payload sent to SAP to clear UDF
+        mock_sap.patch.assert_called_once()
+        patch_payload = mock_sap.patch.call_args[1]["data"]
+        assert patch_payload["U_Remark"] == ""
+
+
+def test_sync_po_to_sap_invalid_doc_entry():
+    service = StockConfigurationService()
+    with pytest.raises(ValueError, match="Invalid Purchase Order DocEntry"):
+        service._sync_po_to_sap(0, "Invalid")
+    with pytest.raises(ValueError, match="Invalid Purchase Order DocEntry"):
+        service._sync_po_to_sap(-5, "Invalid")
+
+
+def test_get_items_filter_by_so_no_exact_and_partial():
+    service = StockConfigurationService()
+    # Test with known SO No. '26271140' from fallback/DB
+    res_exact = service.get_items(so_no="26271140")
+    assert res_exact["total"] >= 1
+    assert all("26271140" in it.get("so_no", "") for it in res_exact["items"])
+    assert any(it.get("item_code") == "CS0227" for it in res_exact["items"])
+
+    # Test partial match (e.g. '1140') with surrounding whitespace
+    res_partial = service.get_items(so_no="  1140  ")
+    assert res_partial["total"] >= 1
+    assert any("26271140" in it.get("so_no", "") for it in res_partial["items"])
+
+
+def test_get_items_filter_by_so_no_nonexistent():
+    service = StockConfigurationService()
+    res = service.get_items(so_no="NON_EXISTENT_SO_9999999")
+    assert res["total"] == 0
+    assert len(res["items"]) == 0
+
+
+def test_get_items_filter_by_so_no_combined_with_search_and_vendor():
+    service = StockConfigurationService()
+    # Matching both SO and item_code search
+    res_match = service.get_items(so_no="26271140", search="CS0227")
+    assert res_match["total"] >= 1
+    assert all(it.get("item_code") == "CS0227" for it in res_match["items"])
+
+    # SO matches, but search does not match this SO item
+    res_mismatch = service.get_items(so_no="26271140", search="DOES_NOT_EXIST_XYZ")
+    assert res_mismatch["total"] == 0
+    assert len(res_mismatch["items"]) == 0
+
+
+def test_export_excel_with_so_no():
+    service = StockConfigurationService()
+    excel_bytes = service.export_excel(so_no="26271140")
+    assert len(excel_bytes) > 0
+    # Also verify empty result export
+    empty_bytes = service.export_excel(so_no="NON_EXISTENT_SO_9999999")
+    assert len(empty_bytes) > 0
+
+
 
 
 

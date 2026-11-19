@@ -90,9 +90,6 @@ STANDARD_PERMISSIONS: List[Dict[str, str]] = [
     {"id": "products.edit", "module": "Products", "action": "edit", "description": "Edit existing products and prices"},
     {"id": "products.delete", "module": "Products", "action": "delete", "description": "Delete or archive products"},
     {"id": "products.export", "module": "Products", "action": "export", "description": "Export product and stock reports"},
-    # Point of Sale
-    {"id": "pos.access", "module": "POS", "action": "access", "description": "Access POS checkout terminal"},
-    {"id": "pos.checkout", "module": "POS", "action": "checkout", "description": "Process sales orders and payments at POS"},
     # Sales Orders
     {"id": "sales_orders.view", "module": "Sales Orders", "action": "view", "description": "View sales orders"},
     {"id": "sales_orders.create", "module": "Sales Orders", "action": "create", "description": "Create customer sales orders"},
@@ -141,8 +138,6 @@ STANDARD_PERMISSIONS: List[Dict[str, str]] = [
 DEFAULT_ROLE_PERMISSIONS: Dict[str, List[str]] = {
     "user": [
         "dashboard.view",
-        "pos.access",
-        "pos.checkout",
         "products.view",
         "sales_orders.view",
         "sales_orders.create",
@@ -155,8 +150,6 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, List[str]] = {
     ],
     "operator": [
         "dashboard.view",
-        "pos.access",
-        "pos.checkout",
         "products.view",
         "products.export",
         "sales_orders.view",
@@ -174,8 +167,6 @@ DEFAULT_ROLE_PERMISSIONS: Dict[str, List[str]] = {
         "products.create",
         "products.edit",
         "products.export",
-        "pos.access",
-        "pos.checkout",
         "sales_orders.view",
         "sales_orders.create",
         "sales_orders.edit",

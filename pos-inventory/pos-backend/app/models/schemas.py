@@ -217,32 +217,6 @@ class CustomerDetails(BaseModel):
     address: Optional[str] = None          # → U_Address on A/R Invoice
 
 
-class PaymentMethod(BaseModel):
-    """Payment method details"""
-    type: str = Field(..., pattern="^(cash|card|upi|wallet)$")
-    amount: float = Field(..., gt=0)
-
-
-class SaleCreate(BaseModel):
-    """Sale creation request"""
-    items: List[CartItem] = Field(..., min_length=1)
-    total: float = Field(..., gt=0)
-    subtotal: Optional[float] = None
-    discount: Optional[float] = 0
-    gst: Optional[float] = 0
-    gstPercentage: Optional[float] = None
-    customer: CustomerDetails
-    paymentMethods: Optional[List[PaymentMethod]] = None
-
-
-class SaleResponse(BaseModel):
-    """Sale creation response"""
-    saleId: str
-    total: float
-    sapDocEntry: Optional[int] = None
-    sapDocNum: Optional[int] = None
-
-
 class SaleDetail(BaseModel):
     """Detailed sale information (SAP AR Invoice)"""
     id: Optional[int] = None       # SAP DocEntry

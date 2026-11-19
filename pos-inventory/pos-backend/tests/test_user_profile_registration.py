@@ -320,7 +320,7 @@ def test_saving_permissions_does_not_modify_profile_info(client, admin_headers):
     put_resp = client.put(
         f"/api/v1/admin/users/{target_user['id']}/permissions",
         headers=headers,
-        json={"permissions": ["products.view", "pos.access", "sales_orders.view"]},
+        json={"permissions": ["products.view", "invoices.view", "sales_orders.view"]},
     )
     assert put_resp.status_code == 200
 

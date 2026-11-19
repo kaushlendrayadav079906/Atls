@@ -42,6 +42,21 @@ import {
 // Y/N columns written to SAP Item Master UDFs (U_Drawing, U_V_Chk, U_LM, U_OLNG, U_LPK, U_LBL, U_MC_OR_PT)
 const SAP_YN_FIELDS = ['drw_yn', 'v_chk', 'lm', 'olng', 'lpk', 'lbl', 'mc_or_pt'] as const;
 
+// Helper to compute a unique, stable row key across multiple GRPO lines or item codes
+const getRowKey = (item: {
+  row_id?: string;
+  item_code?: string;
+  grpo_doc_entry?: number | null;
+  grpo_line_num?: number | null;
+}): string => {
+  if (item.row_id) return item.row_id;
+  const code = item.item_code || '';
+  if (item.grpo_doc_entry !== undefined && item.grpo_doc_entry !== null) {
+    return `${code}_${item.grpo_doc_entry}_${item.grpo_line_num ?? 0}`;
+  }
+  return code;
+};
+
 export const StockConfigurationPage: React.FC = () => {
   const { isDark } = useTheme();
   const { user, isAdmin } = useAuth();
@@ -63,6 +78,8 @@ export const StockConfigurationPage: React.FC = () => {
   // Filter & Pagination States
   const [searchInput, setSearchInput] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
+  const [soNoInput, setSoNoInput] = useState('');
+  const [appliedSoNo, setAppliedSoNo] = useState('');
   const [selectedVendor, setSelectedVendor] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('');
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
@@ -70,9 +87,9 @@ export const StockConfigurationPage: React.FC = () => {
   const [pageSize, setPageSize] = useState(10);
   const [pageJumpInput, setPageJumpInput] = useState('');
 
-  // Row Edit Buffers (stores modified values keyed by item_code)
+  // Row Edit Buffers (stores modified values keyed by unique row key)
   const [editedRows, setEditedRows] = useState<Record<string, Partial<StockConfigurationItem>>>({});
-  const [savingItemCode, setSavingItemCode] = useState<string | null>(null);
+  const [savingRowKey, setSavingRowKey] = useState<string | null>(null);
   const [submittedCodes, setSubmittedCodes] = useState<Set<string>>(new Set());
   const [partialCodes, setPartialCodes] = useState<Set<string>>(new Set());
   const [failedCodes, setFailedCodes] = useState<Set<string>>(new Set());
@@ -184,6 +201,7 @@ export const StockConfigurationPage: React.FC = () => {
     page,
     page_size: pageSize,
     search: appliedSearch || undefined,
+    so_no: appliedSoNo || undefined,
     vendor: selectedVendor && selectedVendor !== 'All Vendors' ? selectedVendor : undefined,
     group: selectedGroup && selectedGroup !== 'All Groups' ? selectedGroup : undefined,
     warehouse: selectedWarehouse && selectedWarehouse !== 'All Warehouses' ? selectedWarehouse : undefined,
@@ -191,7 +209,7 @@ export const StockConfigurationPage: React.FC = () => {
     period: period && period !== 'all_time' ? period : undefined,
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
-  }), [page, pageSize, appliedSearch, selectedVendor, selectedGroup, selectedWarehouse, branchId, period, dateFrom, dateTo]);
+  }), [page, pageSize, appliedSearch, appliedSoNo, selectedVendor, selectedGroup, selectedWarehouse, branchId, period, dateFrom, dateTo]);
 
   // Fetch Data
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -203,55 +221,56 @@ export const StockConfigurationPage: React.FC = () => {
 
   // Mutate Row Save
   const saveMutation = useMutation({
-    mutationFn: async ({ itemCode, updates }: { itemCode: string; updates: Partial<StockConfigurationItem> }) => {
-      setSavingItemCode(itemCode);
+    mutationFn: async ({ itemCode, rowKey, updates }: { itemCode: string; rowKey: string; updates: Partial<StockConfigurationItem> }) => {
+      setSavingRowKey(rowKey);
       return stockConfigurationApi.updateItem(itemCode, updates);
     },
     onSuccess: (res, variables) => {
-      setSavingItemCode(null);
+      setSavingRowKey(null);
+      const targetKey = variables.rowKey || variables.itemCode;
       const isConfirmed = Boolean(res.success && !res.partial_success && res.sap_synced);
       if (isConfirmed) {
-        setSubmittedCodes((prev) => new Set(prev).add(variables.itemCode));
+        setSubmittedCodes((prev) => new Set(prev).add(targetKey));
         setPartialCodes((prev) => {
           const next = new Set(prev);
-          next.delete(variables.itemCode);
+          next.delete(targetKey);
           return next;
         });
         setFailedCodes((prev) => {
           const next = new Set(prev);
-          next.delete(variables.itemCode);
+          next.delete(targetKey);
           return next;
         });
       } else if (res.partial_success) {
-        setPartialCodes((prev) => new Set(prev).add(variables.itemCode));
+        setPartialCodes((prev) => new Set(prev).add(targetKey));
         setSubmittedCodes((prev) => {
           const next = new Set(prev);
-          next.delete(variables.itemCode);
+          next.delete(targetKey);
           return next;
         });
         setFailedCodes((prev) => {
           const next = new Set(prev);
-          next.delete(variables.itemCode);
+          next.delete(targetKey);
           return next;
         });
       } else {
         // Saved locally in database without confirmed SAP sync
-        setPartialCodes((prev) => new Set(prev).add(variables.itemCode));
+        setPartialCodes((prev) => new Set(prev).add(targetKey));
         setSubmittedCodes((prev) => {
           const next = new Set(prev);
-          next.delete(variables.itemCode);
+          next.delete(targetKey);
           return next;
         });
         setFailedCodes((prev) => {
           const next = new Set(prev);
-          next.delete(variables.itemCode);
+          next.delete(targetKey);
           return next;
         });
       }
 
       setEditedRows((prev) => {
         const next = { ...prev };
-        delete next[variables.itemCode];
+        delete next[targetKey];
         return next;
       });
       // Immediately update query cache with newly saved item so last_submitted_at and remark update instantly on screen
@@ -261,7 +280,7 @@ export const StockConfigurationPage: React.FC = () => {
           return {
             ...oldData,
             items: oldData.items.map((it: StockConfigurationItem) =>
-              it.item_code === variables.itemCode ? { ...it, ...res.item } : it
+              getRowKey(it) === targetKey ? { ...it, ...res.item } : it
             ),
           };
         });
@@ -286,17 +305,18 @@ export const StockConfigurationPage: React.FC = () => {
       }
     },
     onError: (err: any, variables: any) => {
-      setSavingItemCode(null);
-      if (variables?.itemCode) {
-        setFailedCodes((prev) => new Set(prev).add(variables.itemCode));
+      setSavingRowKey(null);
+      const targetKey = variables?.rowKey || variables?.itemCode;
+      if (targetKey) {
+        setFailedCodes((prev) => new Set(prev).add(targetKey));
         setSubmittedCodes((prev) => {
           const next = new Set(prev);
-          next.delete(variables.itemCode);
+          next.delete(targetKey);
           return next;
         });
         setPartialCodes((prev) => {
           const next = new Set(prev);
-          next.delete(variables.itemCode);
+          next.delete(targetKey);
           return next;
         });
       }
@@ -311,17 +331,17 @@ export const StockConfigurationPage: React.FC = () => {
       const fullSuccessCodes = new Set(
         res.results
           .filter((r) => r.success && !r.partial_success && r.sap_synced)
-          .map((r) => r.item_code)
+          .map((r) => r.row_id || r.item_code)
       );
       const partialSuccessCodes = new Set(
         res.results
           .filter((r) => r.partial_success || (r.success && !r.sap_synced))
-          .map((r) => r.item_code)
+          .map((r) => r.row_id || r.item_code)
       );
       const failedItemCodes = new Set(
         res.results
           .filter((r) => !r.success)
-          .map((r) => r.item_code)
+          .map((r) => r.row_id || r.item_code)
       );
 
       setSubmittedCodes((prev) => {
@@ -361,7 +381,7 @@ export const StockConfigurationPage: React.FC = () => {
 
       // Immediately update query cache with all successfully updated items
       const updatedMap = new Map(
-        (res.results || []).filter((r: any) => r.success && r.item).map((r: any) => [r.item_code, r.item])
+        (res.results || []).filter((r: any) => r.success && r.item).map((r: any) => [r.row_id || r.item_code, r.item])
       );
       if (updatedMap.size > 0) {
         queryClient.setQueriesData({ queryKey: ['stock-configuration'] }, (oldData: any) => {
@@ -369,7 +389,7 @@ export const StockConfigurationPage: React.FC = () => {
           return {
             ...oldData,
             items: oldData.items.map((it: StockConfigurationItem) => {
-              const updated = updatedMap.get(it.item_code);
+              const updated = updatedMap.get(getRowKey(it)) || updatedMap.get(it.item_code);
               return updated ? { ...it, ...updated } : it;
             }),
           };
@@ -490,7 +510,8 @@ export const StockConfigurationPage: React.FC = () => {
   const modifiedCount = Object.keys(editedRows).length;
 
   const getEffectiveQc = (item: StockConfigurationItem): string => {
-    const edit = editedRows[item.item_code];
+    const rowKey = getRowKey(item);
+    const edit = editedRows[rowKey];
     if (edit && 'qc' in edit) {
       const val = edit.qc;
       if (val === null || val === undefined || val === '') return '';
@@ -511,26 +532,27 @@ export const StockConfigurationPage: React.FC = () => {
       });
       return;
     }
+    const rowKey = getRowKey(item);
     setSubmittedCodes((prev) => {
-      if (!prev.has(item.item_code)) return prev;
+      if (!prev.has(rowKey)) return prev;
       const next = new Set(prev);
-      next.delete(item.item_code);
+      next.delete(rowKey);
       return next;
     });
     setPartialCodes((prev) => {
-      if (!prev.has(item.item_code)) return prev;
+      if (!prev.has(rowKey)) return prev;
       const next = new Set(prev);
-      next.delete(item.item_code);
+      next.delete(rowKey);
       return next;
     });
     setFailedCodes((prev) => {
-      if (!prev.has(item.item_code)) return prev;
+      if (!prev.has(rowKey)) return prev;
       const next = new Set(prev);
-      next.delete(item.item_code);
+      next.delete(rowKey);
       return next;
     });
     setEditedRows((prev) => {
-      const current: Record<string, any> = { ...(prev[item.item_code] || {}) };
+      const current: Record<string, any> = { ...(prev[rowKey] || {}) };
       current[field as string] = value;
       // Clean up diff if restored to original
       if (field === 'qc') {
@@ -550,18 +572,19 @@ export const StockConfigurationPage: React.FC = () => {
       }
       if (Object.keys(current).length === 0) {
         const next = { ...prev };
-        delete next[item.item_code];
+        delete next[rowKey];
         return next;
       }
       return {
         ...prev,
-        [item.item_code]: current as Partial<StockConfigurationItem>,
+        [rowKey]: current as Partial<StockConfigurationItem>,
       };
     });
   };
 
   const isCellModified = (item: StockConfigurationItem, field: keyof StockConfigurationItem): boolean => {
-    const edit = editedRows[item.item_code];
+    const rowKey = getRowKey(item);
+    const edit = editedRows[rowKey];
     if (!edit || !(field in edit)) return false;
     if (field === 'qc') {
       const itemQc = (item.qc === true || item.qc === 'Y') ? 'Y' : (item.qc === false || item.qc === 'N') ? 'N' : '';
@@ -575,7 +598,8 @@ export const StockConfigurationPage: React.FC = () => {
 
   // Get effective row values (buffer or original)
   const getEffectiveNum = (item: StockConfigurationItem, field: keyof StockConfigurationItem): number => {
-    const edit = editedRows[item.item_code];
+    const rowKey = getRowKey(item);
+    const edit = editedRows[rowKey];
     if (edit && field in edit) {
       return Number(edit[field] ?? 0);
     }
@@ -583,51 +607,12 @@ export const StockConfigurationPage: React.FC = () => {
   };
 
   const getEffectiveStr = (item: StockConfigurationItem, field: keyof StockConfigurationItem): string => {
-    const edit = editedRows[item.item_code];
+    const rowKey = getRowKey(item);
+    const edit = editedRows[rowKey];
     if (edit && field in edit) {
       return String(edit[field] ?? '');
     }
     return String(item[field] ?? '');
-  };
-
-  // Format Entry Date & Time (Date on line 1, Time on line 2 if present in source)
-  const formatEntryDateTime = (rawStr?: string | null): { date: string; time: string | null } => {
-    if (!rawStr) return { date: '—', time: null };
-    const raw = String(rawStr).trim();
-    if (!raw || raw === '—') return { date: '—', time: null };
-
-    // Pure YYYY-MM-DD date formatting without timezone distortion
-    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-      const [y, m, d] = raw.split('-');
-      return { date: `${d}-${m}-${y}`, time: null };
-    }
-
-    const d = new Date(raw);
-    if (isNaN(d.getTime())) return { date: raw, time: null };
-
-    const hasTime = raw.includes(':') && (raw.includes('T') || raw.includes(' '));
-    const isPureMidnight = (raw.endsWith('T00:00:00') || raw.endsWith('T00:00:00Z') || raw.endsWith(' 00:00:00')) && !raw.includes('+');
-
-    const parts = new Intl.DateTimeFormat('en-IN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kolkata',
-    }).formatToParts(d);
-
-    const getPart = (t: string) => parts.find((p) => p.type === t)?.value || '';
-    const dateFormatted = `${getPart('day')}-${getPart('month')}-${getPart('year')}`;
-    const timeFormatted = `${getPart('hour')}:${getPart('minute')} ${(getPart('dayPeriod') || '')}`.trim().toUpperCase();
-
-    // Do not generate or invent an entry time if the source does not contain one
-    if (!hasTime || isPureMidnight) {
-      return { date: dateFormatted, time: null };
-    }
-
-    return { date: dateFormatted, time: timeFormatted };
   };
 
   // Format Last Updated Timestamp (Asia/Kolkata timezone: DD-MM-YYYY on line 1, hh:mm A on line 2)
@@ -675,7 +660,8 @@ export const StockConfigurationPage: React.FC = () => {
 
   // Handle Save / Submit row (syncs to Database & SAP - SAP-owned fields are protected)
   const handleSaveRow = (item: StockConfigurationItem) => {
-    const edits = editedRows[item.item_code] || {};
+    const rowKey = getRowKey(item);
+    const edits = editedRows[rowKey] || {};
     const hasEdits = Object.keys(edits).length > 0;
     if (!hasEdits) {
       setNotification({ type: 'info', message: `No changes to save for item ${item.item_code}.` });
@@ -689,6 +675,7 @@ export const StockConfigurationPage: React.FC = () => {
     };
 
     const effectiveUpdates: Partial<StockConfigurationItem> = {
+      row_id: rowKey,
       item_code: item.item_code,
     };
 
@@ -711,10 +698,14 @@ export const StockConfigurationPage: React.FC = () => {
       if (v) effectiveUpdates[f] = v;
     }
 
+    if (item.po_no) effectiveUpdates.po_no = item.po_no;
+    if (item.po_doc_entry) effectiveUpdates.po_doc_entry = item.po_doc_entry;
+    if (item.po_line_num !== undefined && item.po_line_num !== null) effectiveUpdates.po_line_num = item.po_line_num;
+    if (item.grpo_no) effectiveUpdates.grpo_no = item.grpo_no;
+    if (item.grpo_doc_entry !== undefined && item.grpo_doc_entry !== null) effectiveUpdates.grpo_doc_entry = item.grpo_doc_entry;
+    if (item.grpo_line_num !== undefined && item.grpo_line_num !== null) effectiveUpdates.grpo_line_num = item.grpo_line_num;
     if (edits.remark !== undefined && isUserAdmin) {
       effectiveUpdates.remark = edits.remark;
-      if (item.po_no) effectiveUpdates.po_no = item.po_no;
-      if (item.po_doc_entry) effectiveUpdates.po_doc_entry = item.po_doc_entry;
     }
 
     const valError = validateRow(item, effectiveUpdates);
@@ -722,21 +713,21 @@ export const StockConfigurationPage: React.FC = () => {
       setNotification({ type: 'error', message: valError });
       return;
     }
-    saveMutation.mutate({ itemCode: item.item_code, updates: effectiveUpdates });
+    saveMutation.mutate({ itemCode: item.item_code, rowKey, updates: effectiveUpdates });
   };
 
   // Bulk Actions
   const handleSubmitModified = () => {
-    const codes = Object.keys(editedRows);
-    if (codes.length === 0) {
+    const rowKeys = Object.keys(editedRows);
+    if (rowKeys.length === 0) {
       setNotification({ type: 'info', message: 'No modified entries to submit.' });
       return;
     }
 
-    for (const code of codes) {
-      const edits = editedRows[code] || {};
+    for (const key of rowKeys) {
+      const edits = editedRows[key] || {};
       if (edits.nt_weight !== undefined && Number(edits.nt_weight) < 0) {
-        setNotification({ type: 'error', message: `Validation error in item ${code}: Net weight cannot be negative.` });
+        setNotification({ type: 'error', message: `Validation error in row ${key}: Net weight cannot be negative.` });
         return;
       }
     }
@@ -747,11 +738,13 @@ export const StockConfigurationPage: React.FC = () => {
       return '';
     };
 
-    const payload = codes.map((code) => {
-      const edits = editedRows[code] || {};
-      const origItem = data?.items.find((it) => it.item_code === code);
+    const payload = rowKeys.map((key) => {
+      const edits = editedRows[key] || {};
+      const origItem = data?.items.find((it) => getRowKey(it) === key);
+      const effCode = origItem?.item_code || edits.item_code || key.split('_')[0];
       const safeUpdates: Partial<StockConfigurationItem> = {
-        item_code: code,
+        row_id: key,
+        item_code: effCode,
       };
       if (edits.nt_weight !== undefined) {
         safeUpdates.nt_weight = Math.round(Math.max(0, Number(edits.nt_weight)) * 100) / 100;
@@ -765,10 +758,14 @@ export const StockConfigurationPage: React.FC = () => {
         const v = cleanYnField(edits[f] !== undefined ? edits[f] : origItem?.[f]);
         if (v) safeUpdates[f] = v;
       }
+      if (origItem?.po_no) safeUpdates.po_no = origItem.po_no;
+      if (origItem?.po_doc_entry) safeUpdates.po_doc_entry = origItem.po_doc_entry;
+      if (origItem?.po_line_num !== undefined && origItem?.po_line_num !== null) safeUpdates.po_line_num = origItem.po_line_num;
+      if (origItem?.grpo_no) safeUpdates.grpo_no = origItem.grpo_no;
+      if (origItem?.grpo_doc_entry !== undefined && origItem?.grpo_doc_entry !== null) safeUpdates.grpo_doc_entry = origItem.grpo_doc_entry;
+      if (origItem?.grpo_line_num !== undefined && origItem?.grpo_line_num !== null) safeUpdates.grpo_line_num = origItem.grpo_line_num;
       if (edits.remark !== undefined && isUserAdmin) {
         safeUpdates.remark = edits.remark;
-        if (origItem?.po_no) safeUpdates.po_no = origItem.po_no;
-        if (origItem?.po_doc_entry) safeUpdates.po_doc_entry = origItem.po_doc_entry;
       }
       return safeUpdates;
     });
@@ -793,7 +790,8 @@ export const StockConfigurationPage: React.FC = () => {
 
       const payload: Partial<StockConfigurationItem>[] = [];
       for (const it of allRes.items) {
-        const edits = editedRows[it.item_code] || {};
+        const rowKey = getRowKey(it);
+        const edits = editedRows[rowKey] || {};
         const effWeight = edits.nt_weight !== undefined ? Number(edits.nt_weight) : Number(it.nt_weight ?? 0);
 
         if (effWeight < 0) {
@@ -810,6 +808,7 @@ export const StockConfigurationPage: React.FC = () => {
         else if (rawQc === false || rawQc === 'N') cleanQc = false;
 
         const rowItem: Partial<StockConfigurationItem> = {
+          row_id: rowKey,
           item_code: it.item_code,
           nt_weight: Math.round(Math.max(0, effWeight) * 100) / 100,
           qc: cleanQc,
@@ -822,6 +821,10 @@ export const StockConfigurationPage: React.FC = () => {
           mc_or_pt: cleanYnField(edits.mc_or_pt !== undefined ? edits.mc_or_pt : it.mc_or_pt),
           po_no: it.po_no,
           po_doc_entry: it.po_doc_entry,
+          po_line_num: it.po_line_num,
+          grpo_no: it.grpo_no,
+          grpo_doc_entry: it.grpo_doc_entry,
+          grpo_line_num: it.grpo_line_num,
         };
 
         if (isUserAdmin && edits.remark !== undefined) {
@@ -848,13 +851,16 @@ export const StockConfigurationPage: React.FC = () => {
 
   // Handle Filter Actions
   const handleApplyFilters = () => {
-    setAppliedSearch(searchInput);
+    setAppliedSearch(searchInput.trim());
+    setAppliedSoNo(soNoInput.trim());
     setPage(1);
   };
 
   const handleResetFilters = () => {
     setSearchInput('');
     setAppliedSearch('');
+    setSoNoInput('');
+    setAppliedSoNo('');
     setSelectedVendor('');
     setSelectedGroup('');
     setSelectedWarehouse('');
@@ -876,7 +882,7 @@ export const StockConfigurationPage: React.FC = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       setNotification({ type: 'success', message: 'Excel exported successfully.' });
-    } catch (e) {
+    } catch (_err) {
       setNotification({ type: 'error', message: 'Failed to export Excel file.' });
     }
   };
@@ -1277,6 +1283,24 @@ export const StockConfigurationPage: React.FC = () => {
           <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
         </div>
 
+        {/* SO No. Search Field */}
+        <div className="relative min-w-[130px] sm:w-44 flex-1 sm:flex-none">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={soNoInput}
+            onChange={(e) => setSoNoInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
+            placeholder="Search SO No."
+            title="Search by Sales Order Number"
+            aria-label="Search SO No."
+            className={`w-full h-9 pl-8.5 pr-3 text-[13px] rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition ${isDark
+              ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
+              : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+              }`}
+          />
+        </div>
+
         {/* Warehouse Dropdown */}
         <div className="relative min-w-[130px] flex-1 sm:flex-none">
           <select
@@ -1440,30 +1464,29 @@ export const StockConfigurationPage: React.FC = () => {
                 ? 'bg-slate-800 text-slate-300'
                 : 'bg-[#EAF2FE] text-[#1E3A8A]'
                 }`}>
-                <th className="py-2.5 px-2 text-center whitespace-nowrap w-[50px] min-w-[50px] border border-slate-300 dark:border-slate-600">SR. NO.</th>
+                <th className="py-2.5 px-2 text-center whitespace-nowrap w-[75px] min-w-[70px] border border-slate-300 dark:border-slate-600">SO NO</th>
                 <th className="py-2.5 px-2.5 text-left whitespace-nowrap w-[95px] min-w-[95px] border border-slate-300 dark:border-slate-600">SAP CODE</th>
-                <th className="py-2.5 px-3 text-left whitespace-nowrap min-w-[170px] max-w-[220px] border border-slate-300 dark:border-slate-600">DESCRIPTION</th>
-                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[60px] min-w-[58px] border border-slate-300 dark:border-slate-600">QTY.</th>
-                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[80px] min-w-[75px] border border-slate-300 dark:border-slate-600">STOCK QTY.</th>
+                <th className="py-2.5 px-3 text-left whitespace-nowrap min-w-[170px] max-w-[220px] border border-slate-300 dark:border-slate-600">Desc.</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[60px] min-w-[58px] border border-slate-300 dark:border-slate-600">Qty.</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[80px] min-w-[75px] border border-slate-300 dark:border-slate-600">Stock Qty.</th>
                 <th className="py-2.5 px-3 text-left whitespace-nowrap min-w-[140px] max-w-[180px] border border-slate-300 dark:border-slate-600">VENDOR NAME</th>
-                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[72px] min-w-[68px] border border-slate-300 dark:border-slate-600">GRPO NO.</th>
-                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[75px] min-w-[70px] border border-slate-300 dark:border-slate-600">RCVD. QTY.</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[72px] min-w-[68px] border border-slate-300 dark:border-slate-600">GRPO No.</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[75px] min-w-[70px] border border-slate-300 dark:border-slate-600">RCVD. Qty.</th>
                 <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[78px] min-w-[72px] border border-slate-300 dark:border-slate-600">NT. WEIGHT</th>
                 <th className="py-2.5 px-1 text-center whitespace-nowrap w-[58px] min-w-[54px] border border-slate-300 dark:border-slate-600">QC</th>
                 <th className="py-2.5 px-1 text-center whitespace-nowrap w-[60px] min-w-[56px] border border-slate-300 dark:border-slate-600">DRW. Y/N</th>
                 <th className="py-2.5 px-1 text-center whitespace-nowrap w-[58px] min-w-[54px] border border-slate-300 dark:border-slate-600">V CHK</th>
-                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[68px] min-w-[62px] border border-slate-300 dark:border-slate-600">OK QTY.</th>
-                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[68px] min-w-[62px] border border-slate-300 dark:border-slate-600">REJ. QTY.</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[52px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Laser Marking / Line Marking">LM</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[56px] min-w-[50px] border border-slate-300 dark:border-slate-600" title="Oiling / Loading">OLNG</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[52px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Inner Packing / I PK">I PK</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[52px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Labeling">LBL</th>
-                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[66px] min-w-[62px] border border-slate-300 dark:border-slate-600" title="Machining / Coating / Certificate">MC OR PT</th>
-                <th className="py-2.5 px-2 text-center whitespace-nowrap w-[104px] min-w-[100px] border border-slate-300 dark:border-slate-600" title="SAP Business One Item Creation Date (OITM.CreateDate)">ENTRY DATE</th>
-                <th className="py-2.5 px-2 text-center whitespace-nowrap w-[114px] min-w-[108px] border border-slate-300 dark:border-slate-600" title="Last successful individual submission date and time (Asia/Kolkata)">LAST UPDATED</th>
-                <th className="py-2.5 px-2.5 text-center whitespace-nowrap w-[155px] min-w-[145px] border border-slate-300 dark:border-slate-600" title={isUserAdmin ? "Purchase Order Comments (OPOR.Comments AS [Remarks])" : "Purchase Order Comments (Admin-only modification)"}>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[68px] min-w-[62px] border border-slate-300 dark:border-slate-600">OK Qty.</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[68px] min-w-[62px] border border-slate-300 dark:border-slate-600">Rej. Qty.</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[52px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Laser Marking / Line Marking (PDN1.U_LM)">LM</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[56px] min-w-[50px] border border-slate-300 dark:border-slate-600" title="Oiling / Loading (PDN1.U_OLNG)">OLNG</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[52px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Inner Packing (PDN1.U_IPK)">I PK</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[52px] min-w-[48px] border border-slate-300 dark:border-slate-600" title="Labeling (PDN1.U_LBL)">LBL</th>
+                <th className="py-2.5 px-1 text-center whitespace-nowrap w-[66px] min-w-[62px] border border-slate-300 dark:border-slate-600" title="Machining / Coating / Certificate (PDN1.U_MCorPT)">MC or PT</th>
+                <th className="py-2.5 px-2 text-center whitespace-nowrap w-[114px] min-w-[108px] border border-slate-300 dark:border-slate-600" title="Last Updated Timestamp (PDN1.U_LUpdated / Server Submission Time)">Last Updated</th>
+                <th className="py-2.5 px-2.5 text-center whitespace-nowrap w-[155px] min-w-[145px] border border-slate-300 dark:border-slate-600" title={isUserAdmin ? "Goods Receipt PO Remarks (OPDN.U_Remark)" : "Goods Receipt PO Remarks (Admin-only modification)"}>
                   <div className="flex items-center justify-center gap-1">
-                    <span>REMARKS</span>
+                    <span>Remarks</span>
                     {!isUserAdmin && <span className="text-[10px] text-amber-500 font-normal" title="Admin only">🔒</span>}
                   </div>
                 </th>
@@ -1473,7 +1496,7 @@ export const StockConfigurationPage: React.FC = () => {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={23} className="py-14 text-center border border-slate-300 dark:border-slate-600">
+                  <td colSpan={22} className="py-14 text-center border border-slate-300 dark:border-slate-600">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <div className="w-8 h-8 rounded-full border-3 border-blue-600 border-t-transparent animate-spin" />
                       <span className="text-[14.5px] font-medium text-slate-500">Loading stock configuration from backend...</span>
@@ -1482,7 +1505,7 @@ export const StockConfigurationPage: React.FC = () => {
                 </tr>
               ) : isError ? (
                 <tr>
-                  <td colSpan={23} className="py-12 text-center border border-slate-300 dark:border-slate-600">
+                  <td colSpan={22} className="py-12 text-center border border-slate-300 dark:border-slate-600">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <AlertCircle className="w-8 h-8 text-rose-500" />
                       <span className="text-slate-600 font-medium">
@@ -1499,30 +1522,30 @@ export const StockConfigurationPage: React.FC = () => {
                 </tr>
               ) : data?.items?.length === 0 ? (
                 <tr>
-                  <td colSpan={23} className="py-12 text-center text-slate-500 border border-slate-300 dark:border-slate-600">
+                  <td colSpan={22} className="py-12 text-center text-slate-500 border border-slate-300 dark:border-slate-600">
                     No items found matching the selected filters.
                   </td>
                 </tr>
               ) : (
-                data?.items?.map((item, idx) => {
-                  const srNo = (page - 1) * (pageSize >= 10000 ? 0 : pageSize) + idx + 1;
-                  const isModified = Boolean(editedRows[item.item_code]);
-                  const isSaving = savingItemCode === item.item_code;
-                  const isPartial = partialCodes.has(item.item_code) && !isModified;
-                  const isFailed = failedCodes.has(item.item_code) && !isModified;
+                data?.items?.map((item) => {
+                  const rowKey = getRowKey(item);
+                  const isModified = Boolean(editedRows[rowKey]);
+                  const isSaving = savingRowKey === rowKey;
+                  const isPartial = partialCodes.has(rowKey) && !isModified;
+                  const isFailed = failedCodes.has(rowKey) && !isModified;
                   // Show Submitted in green only if successfully synced to SAP without partial or failed state
-                  const isSubmitted = (submittedCodes.has(item.item_code) || (Boolean(item.last_submitted_at) && !isPartial && !isFailed)) && !isModified;
+                  const isSubmitted = (submittedCodes.has(rowKey) || (Boolean(item.last_submitted_at) && !isPartial && !isFailed)) && !isModified;
 
                   return (
                     <tr
-                      key={item.item_code}
+                      key={rowKey}
                       className={`transition-colors duration-150 hover:bg-slate-50/80 dark:hover:bg-slate-750 ${isModified ? 'bg-amber-50/35 dark:bg-amber-950/25' : ''
                         }`}
                     >
-                      {/* 1. SR. NO. */}
-                      <td className="py-2.5 px-2 text-center align-middle text-slate-500 dark:text-slate-400 font-semibold text-[12px] whitespace-nowrap border border-slate-300 dark:border-slate-600">
+                      {/* 1. SO NO */}
+                      <td className="py-2.5 px-2 text-center align-middle font-semibold text-slate-800 dark:text-slate-200 text-[12px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={item.so_no ? `Linked Sales Order #${item.so_no}` : 'Regular PO'}>
                         <div className="flex items-center justify-center gap-1">
-                          <span>{srNo}</span>
+                          <span>{item.so_no || '—'}</span>
                           {isModified && (
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title="Unsaved changes in this row" />
                           )}
@@ -1534,17 +1557,17 @@ export const StockConfigurationPage: React.FC = () => {
                         {item.item_code}
                       </td>
 
-                      {/* 3. DESCRIPTION (Read-only SAP field) */}
+                      {/* 3. Desc. (Read-only SAP field) */}
                       <td className="py-2.5 px-3 text-left align-middle text-slate-800 dark:text-slate-200 font-medium text-[12px] truncate max-w-[220px] border border-slate-300 dark:border-slate-600" title={item.description}>
                         {item.description}
                       </td>
 
-                      {/* 4. QTY. (Sales Order Quantity from RDR1: SUM(RDR1.Quantity); 0 for regular POs where OPOR.ImportEnt IS NULL) */}
+                      {/* 4. Qty. (Sales Order Quantity from RDR1: SUM(RDR1.Quantity); 0 for regular POs where OPOR.ImportEnt IS NULL) */}
                       <td className="py-2.5 px-1.5 text-center align-middle font-medium text-slate-800 dark:text-slate-200 text-[12.5px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={item.so_no ? `Linked Sales Order #${item.so_no}: ${item.qty ?? 0}` : 'Regular Purchase Order (SO QTY = 0)'}>
                         {item.qty !== undefined && item.qty !== null ? item.qty : 0}
                       </td>
 
-                      {/* 5. STOCK QTY. (From SAP) */}
+                      {/* 5. Stock Qty. (From SAP) */}
                       <td className="py-2.5 px-1.5 text-center align-middle font-bold text-slate-800 dark:text-slate-200 text-[12.5px] whitespace-nowrap border border-slate-300 dark:border-slate-600">
                         {item.stock_qty}
                       </td>
@@ -1554,12 +1577,12 @@ export const StockConfigurationPage: React.FC = () => {
                         {item.vendor_name || '—'}
                       </td>
 
-                      {/* 7. GRPO NO. (Read-only SAP field) */}
+                      {/* 7. GRPO No. (Read-only SAP field) */}
                       <td className="py-2.5 px-1.5 text-center align-middle font-medium text-slate-800 dark:text-slate-200 text-[12px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={item.grpo_no ? `SAP GRPO: ${item.grpo_no}` : '—'}>
                         {item.grpo_no || '—'}
                       </td>
 
-                      {/* 8. RCVD. QTY. (Read-only SAP field) */}
+                      {/* 8. RCVD. Qty. (Read-only SAP field) */}
                       <td className="py-2.5 px-1.5 text-center align-middle font-medium text-slate-800 dark:text-slate-200 text-[12.5px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={`SAP Received Qty: ${item.rcvd_qty ?? 0}`}>
                         {item.rcvd_qty ?? 0}
                       </td>
@@ -1648,12 +1671,12 @@ export const StockConfigurationPage: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* 13. OK QTY. (Read-only SAP field) */}
+                      {/* 13. OK Qty. (Read-only SAP field) */}
                       <td className="py-2.5 px-1.5 text-center align-middle font-medium text-slate-800 dark:text-slate-200 text-[12.5px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={`SAP OK Qty: ${item.ok_qty ?? 0}`}>
                         {item.ok_qty ?? 0}
                       </td>
 
-                      {/* 14. REJ. QTY. (Read-only SAP field) */}
+                      {/* 14. Rej. Qty. (Read-only SAP field) */}
                       <td className="py-2.5 px-1.5 text-center align-middle font-medium text-slate-800 dark:text-slate-200 text-[12.5px] whitespace-nowrap border border-slate-300 dark:border-slate-600" title={`SAP Rejected Qty: ${item.rej_qty ?? 0}`}>
                         {item.rej_qty ?? 0}
                       </td>
@@ -1738,7 +1761,7 @@ export const StockConfigurationPage: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* 19. MC OR PT (Select Y/N) */}
+                      {/* 19. MC or PT (Select Y/N) */}
                       <td className="py-2 px-1 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600">
                         <div className="flex items-center justify-center">
                           <select
@@ -1758,24 +1781,7 @@ export const StockConfigurationPage: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* 20. ENTRY DATE (Date on line 1, Time on line 2 if present in source) */}
-                      <td className="py-2 px-2 text-center align-middle whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium text-[12px] border border-slate-300 dark:border-slate-600 bg-slate-50/40 dark:bg-slate-900/20" title={item.grn_date ? `GRN Date: ${item.grn_date}${item.grpo_no ? ` (GRPO #${item.grpo_no})` : ''}` : item.item_create_date ? `SAP Created: ${item.item_create_date}` : item.entry_date ? `Entry Date: ${item.entry_date}` : 'Not available in SAP'}>
-                        {(() => {
-                          const { date, time } = formatEntryDateTime(item.entry_date);
-                          return (
-                            <div className="flex flex-col items-center justify-center leading-tight">
-                              <span className="font-medium text-slate-800 dark:text-slate-200 text-[12px]">{date}</span>
-                              {time && (
-                                <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-normal">
-                                  {time}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </td>
-
-                      {/* 21. LAST UPDATED (Exact server submission timestamp, or SAP Item Master modification time, or '—' if none) */}
+                      {/* 20. Last Updated (Timestamp from PDN1.U_LUpdated / server submission) */}
                       <td className="py-2 px-2 text-center align-middle whitespace-nowrap text-slate-700 dark:text-slate-300 font-medium text-[12px] border border-slate-300 dark:border-slate-600 bg-slate-50/40 dark:bg-slate-900/20" title={item.last_submitted_at ? `Server Timestamp: ${item.last_submitted_at}` : (item.updated_at ? `Last Updated: ${item.updated_at}` : 'Not submitted')}>
                         {(() => {
                           const lastVal = item.last_submitted_at || item.updated_at;
@@ -1796,7 +1802,7 @@ export const StockConfigurationPage: React.FC = () => {
                         })()}
                       </td>
 
-                      {/* 22. REMARKS (Purchase Order Comments: OPOR.Comments AS [Remarks]) */}
+                      {/* 21. Remarks (Goods Receipt PO Remarks: OPDN.U_Remark) */}
                       <td className="py-2 px-1 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600">
                         <div className="flex items-center justify-center">
                           <input
@@ -1805,7 +1811,7 @@ export const StockConfigurationPage: React.FC = () => {
                             onChange={(e) => handleCellChange(item, 'remark', e.target.value)}
                             disabled={!isUserAdmin}
                             readOnly={!isUserAdmin}
-                            placeholder={isUserAdmin ? "PO Comments..." : "Admin only"}
+                            placeholder={isUserAdmin ? "GRPO Remarks..." : "Admin only"}
                             className={`w-32 h-8 px-2 text-left text-[12px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
                               isCellModified(item, 'remark')
                                 ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
@@ -1813,12 +1819,12 @@ export const StockConfigurationPage: React.FC = () => {
                                   ? 'bg-slate-900 border-slate-700 text-white'
                                   : 'bg-white border-slate-300 text-slate-900'
                             } ${!isUserAdmin ? 'opacity-70 cursor-not-allowed bg-slate-100 dark:bg-slate-800' : ''}`}
-                            title={!isUserAdmin ? 'Access restricted: Only Admin users can add or modify Purchase Order remarks' : item.remark ? `Purchase Order Comments: ${item.remark}` : 'Enter Purchase Order Comments'}
+                            title={!isUserAdmin ? 'Access restricted: Only Admin users can add or modify GRPO remarks' : item.remark ? `GRPO Remark: ${item.remark}` : 'Enter GRPO Remark'}
                           />
                         </div>
                       </td>
 
-                      {/* 23. ACTIONS (Submit / Submitted + Delete) - Sticky Right Column */}
+                      {/* 22. ACTIONS (Submit / Submitted + Delete) - Sticky Right Column */}
                       <td className={`sticky right-0 z-10 py-2 px-2 text-center align-middle whitespace-nowrap border border-slate-300 dark:border-slate-600 shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.08)] ${isModified
                         ? 'bg-[#FFFBEB] dark:bg-amber-950/90'
                         : isDark

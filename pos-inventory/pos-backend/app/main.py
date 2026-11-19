@@ -236,7 +236,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Point of Sale Backend API with SAP Business One Integration",
+    description="ATLAS Inventory Backend API with SAP Business One Integration",
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
     lifespan=lifespan,

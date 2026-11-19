@@ -49,7 +49,6 @@ _ANALYTICS_CACHE_MAX_SIZE = 50
 # Trusted Route Registry Mapping for navigation suggestions
 INTERNAL_ROUTE_MAP = {
     "dashboard": {"name": "Dashboard", "path": "/"},
-    "pos": {"name": "Point of Sale", "path": "/pos"},
     "products": {"name": "Products & Stock", "path": "/products"},
     "sales": {"name": "Invoices", "path": "/sales"},
     "sales_orders": {"name": "Sales Orders", "path": "/sales-orders"},
@@ -191,7 +190,6 @@ TOOL_TO_WORKFLOW_MAP = {
 
 MODULE_NAV_PERMISSIONS = {
     "dashboard": "dashboard.view",
-    "pos": "pos.access",
     "products": "products.view",
     "sales": "invoices.view",
     "sales_orders": "sales_orders.view",

@@ -49,7 +49,7 @@ export const AtlasGlobalFooter: React.FC = () => {
           </div>
 
           <p className={`text-[12.5px] sm:text-[13px] max-w-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Unified Point of Sale, inventory intelligence, shop-floor production, and financial operations engine natively connected to SAP Business One.
+            Unified inventory intelligence, shop-floor production, and financial operations engine natively connected to SAP Business One.
           </p>
 
           {/* Social Icons row (LinkedIn, YouTube, X) */}
@@ -146,14 +146,6 @@ export const AtlasGlobalFooter: React.FC = () => {
                   className={`hover:text-blue-600 font-medium transition cursor-pointer text-left ${isCurrent('/products') ? 'text-blue-600 font-bold' : ''}`}
                 >
                   Products & Stock
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => navigate('/pos')}
-                  className={`hover:text-blue-600 font-medium transition cursor-pointer text-left ${isCurrent('/pos') ? 'text-blue-600 font-bold' : ''}`}
-                >
-                  Point of Sale
                 </button>
               </li>
               <li>

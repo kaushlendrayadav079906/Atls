@@ -3,7 +3,7 @@ ATLAS AI Assistant — Verified Business Workflow Flowcharts
 Provides deterministic, verified flowchart node-and-edge definitions for every ATLAS module:
 1. Dashboard (BI data pipeline)
 2. Inventory (Movement & stock levels)
-3. Sales & POS (Order-to-cash)
+3. Sales & Order-to-Cash (Order-to-cash)
 4. Invoices & Returns (Billing & approvals)
 5. Purchasing (Procure-to-pay)
 6. Customers (Receivables & credit)
@@ -24,14 +24,14 @@ WORKFLOW_FLOWCHARTS: Dict[str, Dict[str, Any]] = {
         "id": "dashboard_bi_flow",
         "title": "Executive Dashboard Business Intelligence Pipeline",
         "module": "Dashboard",
-        "description": "How live operational data is collected from POS terminals and SAP Business One, aggregated, cached, and rendered into executive KPIs.",
+        "description": "How live operational data is collected from Sales Invoices, Orders, and SAP Business One, aggregated, cached, and rendered into executive KPIs.",
         "nodes": [
             {
                 "id": "dash_1",
                 "stepNumber": 1,
                 "title": "Operational Activity Capture",
                 "type": "start",
-                "badge": "POS / SAP",
+                "badge": "Sales / SAP",
                 "description": "Sales invoices, customer orders, and warehouse movements recorded in real-time across branches.",
                 "route": "/",
                 "routeLabel": "Open Dashboard"
@@ -151,22 +151,22 @@ WORKFLOW_FLOWCHARTS: Dict[str, Dict[str, Any]] = {
         ]
     },
 
-    # ── 3. Sales & POS Order-to-Cash Workflow ─────────────────────────────────
+    # ── 3. Sales & Order-to-Cash Workflow ─────────────────────────────────
     "sales_pos": {
         "id": "sales_pos_flow",
-        "title": "Point of Sale & Order-to-Cash Workflow",
+        "title": "Sales Orders & Invoicing Workflow",
         "module": "Sales",
-        "description": "The complete sales lifecycle from item selection and POS checkout to payment settlement, AR invoice issuance, and stock deduction.",
+        "description": "The complete sales lifecycle from sales order creation to payment settlement, AR invoice issuance, and stock deduction.",
         "nodes": [
             {
                 "id": "pos_1",
                 "stepNumber": 1,
-                "title": "Customer Order / Cart Creation",
+                "title": "Sales Order / Invoice Creation",
                 "type": "start",
-                "badge": "POS Terminal",
-                "description": "Barcode scanning or manual SKU selection, customer assignment, and pricing lookup.",
-                "route": "/pos",
-                "routeLabel": "Open POS Terminal"
+                "badge": "Sales Module",
+                "description": "Sales order booking or direct tax invoice issuance with customer assignment and pricing lookup.",
+                "route": "/sales-orders",
+                "routeLabel": "Open Sales Orders"
             },
             {
                 "id": "pos_2",

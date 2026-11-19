@@ -16,7 +16,7 @@ describe('AccessDenied Component', () => {
         role: 'operator',
         is_active: true,
         token_version: 1,
-        permissions: ['pos.access'],
+        permissions: ['dashboard.view'],
       },
       isAuthenticated: true,
       isLoading: false,
@@ -24,8 +24,8 @@ describe('AccessDenied Component', () => {
       login: vi.fn(),
       logout: vi.fn(),
       refreshUser: vi.fn(),
-      hasPermission: vi.fn((p) => p === 'pos.access'),
-      canAccess: vi.fn((m) => m === 'pos'),
+      hasPermission: vi.fn((p) => p === 'dashboard.view'),
+      canAccess: vi.fn((m) => m === 'dashboard'),
     });
 
     const html = renderToStaticMarkup(

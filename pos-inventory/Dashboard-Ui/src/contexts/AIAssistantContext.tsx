@@ -17,7 +17,6 @@ export type AIAssistantPageContext =
   | 'dashboard'
   | 'products'
   | 'customers'
-  | 'pos'
   | 'analytics'
   | 'settings'
   | 'sales_orders'
@@ -50,7 +49,6 @@ export function getPageContextFromPathname(pathname: string): AIAssistantPageCon
   if (pathname === '/product' || pathname === '/products' || pathname.startsWith('/products/')) return 'products';
   if (pathname === '/solutions') return 'production';
   if (pathname === '/customers') return 'customers';
-  if (pathname === '/pos') return 'pos';
   if (pathname === '/sales-orders') return 'sales_orders';
   if (pathname === '/purchase-orders') return 'purchase_orders';
   if (pathname === '/sales' || pathname.startsWith('/sales/')) return 'invoices';

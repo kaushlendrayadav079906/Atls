@@ -8,9 +8,6 @@ from app.models.schemas import (
     ProductResponse,
     CartItem,
     CustomerDetails,
-    PaymentMethod,
-    SaleCreate,
-    SaleResponse,
     SaleDetail,
     DashboardSummary,
 )
@@ -23,9 +20,6 @@ __all__ = [
     "ProductResponse",
     "CartItem",
     "CustomerDetails",
-    "PaymentMethod",
-    "SaleCreate",
-    "SaleResponse",
     "SaleDetail",
     "DashboardSummary",
 ]

@@ -19,7 +19,7 @@ describe('PermissionMatrixModal User Profile Verification', () => {
     vi.spyOn(EndpointsModule.adminApi, 'getUserPermissions').mockResolvedValue({
       user_id: 'user-101',
       role: 'operator',
-      effective_permissions: ['products.view', 'pos.access'],
+      effective_permissions: ['products.view', 'invoices.view'],
     });
     vi.spyOn(EndpointsModule.adminApi, 'getRoles').mockResolvedValue([]);
     vi.spyOn(EndpointsModule.adminApi, 'getUser').mockResolvedValue({

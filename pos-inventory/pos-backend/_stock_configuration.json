@@ -9,7 +9,7 @@
     "vendor_code": "V00001",
     "grpo_no": "",
     "rcvd_qty": 0.0,
-    "nt_weight": 80.0,
+    "nt_weight": 800.0,
     "qc": false,
     "drw_yn": "Y",
     "v_chk": "Y",
@@ -23,23 +23,25 @@
     "items_group_code": "100",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-11-13",
+    "entry_date": "2026-11-19",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
-    "updated_at": "2026-11-17 11:21:31",
-    "last_submitted_at": "2026-11-17T11:21:32.935414+05:30",
-    "remark": "ok",
+    "updated_at": "2026-11-19 12:33:05",
+    "last_submitted_at": "2026-11-19T12:33:09.454118+05:30",
+    "remark": "Test update from website POST - PO 1377",
     "last_submitted_by": "admin",
     "record_category": "Pending Receipt",
     "item_create_date": "2026-10-31",
     "so_date": null,
-    "po_date": "2026-11-13",
+    "po_date": "2026-11-19",
     "grn_date": null,
-    "po_no": "1377",
+    "po_no": "1380",
     "so_no": "",
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 870
+    "po_doc_entry": 873,
+    "po_line_num": 0,
+    "row_id": "AMIT001"
   },
   {
     "sr_no": 2,
@@ -67,8 +69,8 @@
     "is_active": true,
     "entry_date": "2026-11-16",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
-    "updated_at": "2026-11-17 11:06:37",
-    "last_submitted_at": "2026-11-17T16:45:16.935066+05:30",
+    "updated_at": "2026-11-17 18:44:22",
+    "last_submitted_at": "2026-11-18T19:08:27.222651+05:30",
     "remark": "",
     "last_submitted_by": "admin",
     "record_category": "Item Master",
@@ -1215,7 +1217,11 @@
     "so_qty": 0.0,
     "po_qty": 40.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 4,
+    "po_line_num": 6,
+    "row_id": "CS0056_762_4"
   },
   {
     "sr_no": 30,
@@ -1257,7 +1263,11 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 12,
+    "po_line_num": 14,
+    "row_id": "CS0289_762_12"
   },
   {
     "sr_no": 31,
@@ -1299,7 +1309,11 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 865
+    "po_doc_entry": 865,
+    "grpo_doc_entry": 761,
+    "grpo_line_num": 4,
+    "po_line_num": 4,
+    "row_id": "CS0313_761_4"
   },
   {
     "sr_no": 32,
@@ -1383,7 +1397,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 17,
+    "po_line_num": 19,
+    "row_id": "CS1408_762_17"
   },
   {
     "sr_no": 34,
@@ -1425,7 +1443,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 7,
+    "po_line_num": 9,
+    "row_id": "CS1426_762_7"
   },
   {
     "sr_no": 35,
@@ -1467,7 +1489,11 @@
     "so_qty": 0.0,
     "po_qty": 4.0,
     "remark_history": [],
-    "po_doc_entry": 865
+    "po_doc_entry": 865,
+    "grpo_doc_entry": 761,
+    "grpo_line_num": 2,
+    "po_line_num": 2,
+    "row_id": "ENG0681_761_2"
   },
   {
     "sr_no": 36,
@@ -1509,7 +1535,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 865
+    "po_doc_entry": 865,
+    "grpo_doc_entry": 761,
+    "grpo_line_num": 1,
+    "po_line_num": 1,
+    "row_id": "ENG1253_761_1"
   },
   {
     "sr_no": 37,
@@ -1593,7 +1623,11 @@
     "so_qty": 0.0,
     "po_qty": 3.0,
     "remark_history": [],
-    "po_doc_entry": 865
+    "po_doc_entry": 865,
+    "grpo_doc_entry": 761,
+    "grpo_line_num": 3,
+    "po_line_num": 3,
+    "row_id": "ENG1849_761_3"
   },
   {
     "sr_no": 39,
@@ -1845,7 +1879,11 @@
     "so_qty": 0.0,
     "po_qty": 4.0,
     "remark_history": [],
-    "po_doc_entry": 867
+    "po_doc_entry": 867,
+    "grpo_doc_entry": 766,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "PS0064_766_0"
   },
   {
     "sr_no": 45,
@@ -2139,7 +2177,11 @@
     "so_qty": 0.0,
     "po_qty": 800.0,
     "remark_history": [],
-    "po_doc_entry": 860
+    "po_doc_entry": 860,
+    "po_line_num": 0,
+    "grpo_doc_entry": 759,
+    "grpo_line_num": 0,
+    "row_id": "CS0414_759_0"
   },
   {
     "sr_no": 52,
@@ -2181,7 +2223,11 @@
     "so_qty": 0.0,
     "po_qty": 200.0,
     "remark_history": [],
-    "po_doc_entry": 811
+    "po_doc_entry": 811,
+    "grpo_doc_entry": 747,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "CS0434_747_0"
   },
   {
     "sr_no": 53,
@@ -2207,13 +2253,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-16",
+    "entry_date": "2026-10-17",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
     "updated_at": "2026-10-16 14:53:04",
     "last_submitted_at": null,
     "remark": "PRNO.26271138 Dt.09.10.2026 - Ritwik Maiti\r\rFor Stock",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-16",
@@ -2223,7 +2269,10 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 854
+    "po_doc_entry": 854,
+    "grpo_doc_entry": 753,
+    "grpo_line_num": 0,
+    "po_line_num": 0
   },
   {
     "sr_no": 54,
@@ -2255,7 +2304,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -2265,7 +2314,11 @@
     "so_qty": 0.0,
     "po_qty": 4.0,
     "remark_history": [],
-    "po_doc_entry": 838
+    "po_doc_entry": 838,
+    "grpo_doc_entry": 737,
+    "grpo_line_num": 12,
+    "po_line_num": 12,
+    "row_id": "CS0539_737_12"
   },
   {
     "sr_no": 55,
@@ -2307,7 +2360,11 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 830
+    "po_doc_entry": 830,
+    "grpo_doc_entry": 738,
+    "grpo_line_num": 2,
+    "po_line_num": 2,
+    "row_id": "CS0804_738_2"
   },
   {
     "sr_no": 56,
@@ -2349,24 +2406,27 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 838
+    "po_doc_entry": 838,
+    "grpo_doc_entry": 737,
+    "grpo_line_num": 10,
+    "po_line_num": 10
   },
   {
     "sr_no": 57,
     "item_code": "CS1124",
     "description": "SS Allen Grub Screw M8 x 8 mm",
-    "qty": 0.0,
-    "stock_qty": 4964.0,
-    "vendor_name": "Aditya Engineering Services",
-    "vendor_code": "V00020",
-    "grpo_no": "474",
-    "rcvd_qty": 2.0,
-    "nt_weight": 92.5,
+    "qty": 100.0,
+    "stock_qty": 5053.0,
+    "vendor_name": "Advance Measuring Solutions",
+    "vendor_code": "V00023",
+    "grpo_no": "476",
+    "rcvd_qty": 100.0,
+    "nt_weight": 800.0,
     "qc": true,
     "drw_yn": "Y",
     "v_chk": "Y",
-    "ok_qty": 2.0,
-    "rej_qty": 0.0,
+    "ok_qty": 89.0,
+    "rej_qty": 11.0,
     "lm": "Y",
     "olng": "Y",
     "lpk": "Y",
@@ -2375,21 +2435,21 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-11-16",
+    "entry_date": "2026-11-19",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
-    "updated_at": "2026-11-17T23:26:53.320056+05:30",
-    "last_submitted_at": "2026-11-17T23:26:53.320056+05:30",
+    "updated_at": "2026-11-19 12:33:07",
+    "last_submitted_at": "2026-11-19T13:09:19.961109+05:30",
     "remark": "Automated Test Verified",
     "last_submitted_by": "admin",
     "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
-    "so_date": null,
-    "po_date": "2026-11-14",
-    "grn_date": "2026-11-16",
-    "po_no": "1378",
-    "so_no": "",
-    "so_qty": 0.0,
-    "po_qty": 0.0,
+    "so_date": "2026-11-19",
+    "po_date": "2026-11-19",
+    "grn_date": "2026-11-19",
+    "po_no": "1381",
+    "so_no": "26271142",
+    "so_qty": 100.0,
+    "po_qty": 100.0,
     "remark_history": [
       {
         "id": 1,
@@ -2903,9 +2963,598 @@
         "admin_user_id": "admin",
         "action": "UPDATE_REMARK",
         "created_at": "2026-11-17T23:26:53.320056+05:30"
+      },
+      {
+        "id": 58,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Batch inspected and approved by Admin",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T16:51:26.955407+05:30"
+      },
+      {
+        "id": 59,
+        "item_code": "CS1124",
+        "previous_remark": "Batch inspected and approved by Admin",
+        "new_remark": "Packaging QC verified; ready for dispatch",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T16:51:26.995707+05:30"
+      },
+      {
+        "id": 60,
+        "item_code": "CS1124",
+        "previous_remark": "Packaging QC verified; ready for dispatch",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T16:51:27.047440+05:30"
+      },
+      {
+        "id": 61,
+        "item_code": "CS1124",
+        "previous_remark": "yes",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T16:51:27.104913+05:30"
+      },
+      {
+        "id": 62,
+        "item_code": "CS1124",
+        "previous_remark": "Should fail PO sync",
+        "new_remark": "Remark only pending approval",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T16:51:27.132636+05:30"
+      },
+      {
+        "id": 63,
+        "item_code": "CS1124",
+        "previous_remark": "Remark only pending approval",
+        "new_remark": "Automated Test Verified",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T16:51:29.883419+05:30"
+      },
+      {
+        "id": 64,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Batch inspected and approved by Admin",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T16:58:45.940976+05:30"
+      },
+      {
+        "id": 65,
+        "item_code": "CS1124",
+        "previous_remark": "Batch inspected and approved by Admin",
+        "new_remark": "Packaging QC verified; ready for dispatch",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T16:58:45.982007+05:30"
+      },
+      {
+        "id": 66,
+        "item_code": "CS1124",
+        "previous_remark": "Packaging QC verified; ready for dispatch",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T16:58:46.036562+05:30"
+      },
+      {
+        "id": 67,
+        "item_code": "CS1124",
+        "previous_remark": "yes",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T16:58:46.095324+05:30"
+      },
+      {
+        "id": 68,
+        "item_code": "CS1124",
+        "previous_remark": "Should fail PO sync",
+        "new_remark": "Automated Test Verified",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T16:58:48.911170+05:30"
+      },
+      {
+        "id": 69,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Batch inspected and approved by Admin",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T17:02:55.299290+05:30"
+      },
+      {
+        "id": 70,
+        "item_code": "CS1124",
+        "previous_remark": "Batch inspected and approved by Admin",
+        "new_remark": "Packaging QC verified; ready for dispatch",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T17:02:55.338774+05:30"
+      },
+      {
+        "id": 71,
+        "item_code": "CS1124",
+        "previous_remark": "Packaging QC verified; ready for dispatch",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T17:02:55.387456+05:30"
+      },
+      {
+        "id": 72,
+        "item_code": "CS1124",
+        "previous_remark": "yes",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T17:02:55.447873+05:30"
+      },
+      {
+        "id": 73,
+        "item_code": "CS1124",
+        "previous_remark": "Should fail PO sync",
+        "new_remark": "Remark only pending approval",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T17:02:55.476607+05:30"
+      },
+      {
+        "id": 74,
+        "item_code": "CS1124",
+        "previous_remark": "Remark only pending approval",
+        "new_remark": "Automated Test Verified",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T17:02:58.678336+05:30"
+      },
+      {
+        "id": 75,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Batch inspected and approved by Admin",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T17:08:30.800784+05:30"
+      },
+      {
+        "id": 76,
+        "item_code": "CS1124",
+        "previous_remark": "Batch inspected and approved by Admin",
+        "new_remark": "Packaging QC verified; ready for dispatch",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T17:08:30.838530+05:30"
+      },
+      {
+        "id": 77,
+        "item_code": "CS1124",
+        "previous_remark": "Packaging QC verified; ready for dispatch",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T17:08:30.888219+05:30"
+      },
+      {
+        "id": 78,
+        "item_code": "CS1124",
+        "previous_remark": "yes",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T17:08:30.948247+05:30"
+      },
+      {
+        "id": 79,
+        "item_code": "CS1124",
+        "previous_remark": "Should fail PO sync",
+        "new_remark": "Remark only pending approval",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T17:08:30.976561+05:30"
+      },
+      {
+        "id": 80,
+        "item_code": "CS1124",
+        "previous_remark": "Remark only pending approval",
+        "new_remark": "Automated Test Verified",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T17:08:34.248625+05:30"
+      },
+      {
+        "id": 81,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Batch inspected and approved by Admin",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:22:06.480228+05:30"
+      },
+      {
+        "id": 82,
+        "item_code": "CS1124",
+        "previous_remark": "Batch inspected and approved by Admin",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:22:06.533262+05:30"
+      },
+      {
+        "id": 83,
+        "item_code": "CS1124",
+        "previous_remark": "yes",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:22:06.595232+05:30"
+      },
+      {
+        "id": 84,
+        "item_code": "CS1124",
+        "previous_remark": "Should fail PO sync",
+        "new_remark": "Remark only pending approval",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:22:06.624466+05:30"
+      },
+      {
+        "id": 85,
+        "item_code": "CS1124",
+        "previous_remark": "Remark only pending approval",
+        "new_remark": "Automated Test Verified",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:22:06.755239+05:30"
+      },
+      {
+        "id": 86,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Batch inspected and approved by Admin",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:34:50.178855+05:30"
+      },
+      {
+        "id": 87,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:34:50.374302+05:30"
+      },
+      {
+        "id": 88,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:34:50.614913+05:30"
+      },
+      {
+        "id": 89,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Batch inspected and approved by Admin",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:38:02.508754+05:30"
+      },
+      {
+        "id": 90,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:38:02.717064+05:30"
+      },
+      {
+        "id": 91,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:38:02.950124+05:30"
+      },
+      {
+        "id": 92,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Remark only pending approval",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:38:03.152240+05:30"
+      },
+      {
+        "id": 93,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Batch inspected and approved by Admin",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:39:56.827029+05:30"
+      },
+      {
+        "id": 94,
+        "item_code": "CS1124",
+        "previous_remark": "Batch inspected and approved by Admin",
+        "new_remark": "Packaging QC verified; ready for dispatch",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:39:57.015944+05:30"
+      },
+      {
+        "id": 95,
+        "item_code": "CS1124",
+        "previous_remark": "Packaging QC verified; ready for dispatch",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:39:57.207268+05:30"
+      },
+      {
+        "id": 96,
+        "item_code": "CS1124",
+        "previous_remark": "yes",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:39:57.434478+05:30"
+      },
+      {
+        "id": 97,
+        "item_code": "CS1124",
+        "previous_remark": "Should fail PO sync",
+        "new_remark": "Remark only pending approval",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:39:57.614558+05:30"
+      },
+      {
+        "id": 98,
+        "item_code": "CS1124",
+        "previous_remark": "Remark only pending approval",
+        "new_remark": "Automated Test Verified",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:40:01.549696+05:30"
+      },
+      {
+        "id": 99,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Batch inspected and approved by Admin",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:41:38.411820+05:30"
+      },
+      {
+        "id": 100,
+        "item_code": "CS1124",
+        "previous_remark": "Batch inspected and approved by Admin",
+        "new_remark": "Packaging QC verified; ready for dispatch",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:41:38.583304+05:30"
+      },
+      {
+        "id": 101,
+        "item_code": "CS1124",
+        "previous_remark": "Packaging QC verified; ready for dispatch",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:41:38.775410+05:30"
+      },
+      {
+        "id": 102,
+        "item_code": "CS1124",
+        "previous_remark": "yes",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:41:38.983893+05:30"
+      },
+      {
+        "id": 103,
+        "item_code": "CS1124",
+        "previous_remark": "Should fail PO sync",
+        "new_remark": "Remark only pending approval",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:41:39.169306+05:30"
+      },
+      {
+        "id": 104,
+        "item_code": "CS1124",
+        "previous_remark": "Remark only pending approval",
+        "new_remark": "Automated Test Verified",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:41:42.859158+05:30"
+      },
+      {
+        "id": 105,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Batch inspected and approved by Admin",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:47:03.117220+05:30"
+      },
+      {
+        "id": 106,
+        "item_code": "CS1124",
+        "previous_remark": "Batch inspected and approved by Admin",
+        "new_remark": "Packaging QC verified; ready for dispatch",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:47:03.292228+05:30"
+      },
+      {
+        "id": 107,
+        "item_code": "CS1124",
+        "previous_remark": "Packaging QC verified; ready for dispatch",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:47:03.495489+05:30"
+      },
+      {
+        "id": 108,
+        "item_code": "CS1124",
+        "previous_remark": "yes",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:47:03.701507+05:30"
+      },
+      {
+        "id": 109,
+        "item_code": "CS1124",
+        "previous_remark": "Should fail PO sync",
+        "new_remark": "Remark only pending approval",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:47:03.862694+05:30"
+      },
+      {
+        "id": 110,
+        "item_code": "CS1124",
+        "previous_remark": "Remark only pending approval",
+        "new_remark": "Automated Test Verified",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:47:07.105234+05:30"
+      },
+      {
+        "id": 111,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Batch inspected and approved by Admin",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:53:35.930148+05:30"
+      },
+      {
+        "id": 112,
+        "item_code": "CS1124",
+        "previous_remark": "Batch inspected and approved by Admin",
+        "new_remark": "Packaging QC verified; ready for dispatch",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:53:36.099924+05:30"
+      },
+      {
+        "id": 113,
+        "item_code": "CS1124",
+        "previous_remark": "Packaging QC verified; ready for dispatch",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:53:36.281433+05:30"
+      },
+      {
+        "id": 114,
+        "item_code": "CS1124",
+        "previous_remark": "yes",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:53:36.476517+05:30"
+      },
+      {
+        "id": 115,
+        "item_code": "CS1124",
+        "previous_remark": "Should fail PO sync",
+        "new_remark": "Remark only pending approval",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:53:36.646141+05:30"
+      },
+      {
+        "id": 116,
+        "item_code": "CS1124",
+        "previous_remark": "Remark only pending approval",
+        "new_remark": "Automated Test Verified",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T18:53:39.533131+05:30"
+      },
+      {
+        "id": 117,
+        "item_code": "CS1124",
+        "previous_remark": "Automated Test Verified",
+        "new_remark": "Batch inspected and approved by Admin",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T19:06:46.693868+05:30"
+      },
+      {
+        "id": 118,
+        "item_code": "CS1124",
+        "previous_remark": "Batch inspected and approved by Admin",
+        "new_remark": "Packaging QC verified; ready for dispatch",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T19:06:46.889240+05:30"
+      },
+      {
+        "id": 119,
+        "item_code": "CS1124",
+        "previous_remark": "Packaging QC verified; ready for dispatch",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T19:06:47.090726+05:30"
+      },
+      {
+        "id": 120,
+        "item_code": "CS1124",
+        "previous_remark": "yes",
+        "new_remark": "Should fail PO sync",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T19:06:47.311422+05:30"
+      },
+      {
+        "id": 121,
+        "item_code": "CS1124",
+        "previous_remark": "Should fail PO sync",
+        "new_remark": "Remark only pending approval",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T19:06:47.516399+05:30"
+      },
+      {
+        "id": 122,
+        "item_code": "CS1124",
+        "previous_remark": "Remark only pending approval",
+        "new_remark": "Automated Test Verified",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T19:06:50.728077+05:30"
       }
     ],
-    "po_doc_entry": 871
+    "po_doc_entry": 874,
+    "po_line_num": 0,
+    "grpo_doc_entry": 773,
+    "grpo_line_num": 0,
+    "row_id": "CS1124_773_0"
   },
   {
     "sr_no": 58,
@@ -2931,13 +3580,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-19",
+    "entry_date": "2026-10-20",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
     "updated_at": "2025-09-17 14:49:30",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -2947,7 +3596,11 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 14,
+    "po_line_num": 16,
+    "row_id": "CS1282_762_14"
   },
   {
     "sr_no": 59,
@@ -2989,7 +3642,11 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 821
+    "po_doc_entry": 821,
+    "grpo_doc_entry": 735,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "ENG0073_735_0"
   },
   {
     "sr_no": 60,
@@ -3031,7 +3688,11 @@
     "so_qty": 0.0,
     "po_qty": 40.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 6,
+    "po_line_num": 8,
+    "row_id": "ENG1749_762_6"
   },
   {
     "sr_no": 61,
@@ -3073,7 +3734,11 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 820
+    "po_doc_entry": 820,
+    "grpo_doc_entry": 743,
+    "grpo_line_num": 0,
+    "po_line_num": 1,
+    "row_id": "ENG1834_743_0"
   },
   {
     "sr_no": 62,
@@ -3115,7 +3780,9 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 863
+    "po_doc_entry": 863,
+    "po_line_num": 0,
+    "row_id": "ENG1847"
   },
   {
     "sr_no": 63,
@@ -3157,7 +3824,8 @@
     "so_qty": 0.0,
     "po_qty": 37.0,
     "remark_history": [],
-    "po_doc_entry": 825
+    "po_doc_entry": 825,
+    "po_line_num": 0
   },
   {
     "sr_no": 64,
@@ -3189,7 +3857,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -3199,7 +3867,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 838
+    "po_doc_entry": 838,
+    "grpo_doc_entry": 737,
+    "grpo_line_num": 3,
+    "po_line_num": 3,
+    "row_id": "PKG0023_737_3"
   },
   {
     "sr_no": 65,
@@ -3231,7 +3903,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -3241,7 +3913,11 @@
     "so_qty": 0.0,
     "po_qty": 3.13,
     "remark_history": [],
-    "po_doc_entry": 838
+    "po_doc_entry": 838,
+    "grpo_doc_entry": 737,
+    "grpo_line_num": 11,
+    "po_line_num": 11,
+    "row_id": "PKG0045_737_11"
   },
   {
     "sr_no": 66,
@@ -3283,7 +3959,11 @@
     "so_qty": 0.0,
     "po_qty": 1.16,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 19,
+    "po_line_num": 19,
+    "row_id": "RM1147_740_19"
   },
   {
     "sr_no": 67,
@@ -3325,7 +4005,11 @@
     "so_qty": 0.0,
     "po_qty": 3.5,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 16,
+    "po_line_num": 16,
+    "row_id": "RM1150_740_16"
   },
   {
     "sr_no": 68,
@@ -3367,7 +4051,11 @@
     "so_qty": 0.0,
     "po_qty": 6.2,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 9,
+    "po_line_num": 9,
+    "row_id": "RM1151_740_9"
   },
   {
     "sr_no": 69,
@@ -3393,13 +4081,13 @@
     "items_group_code": "131",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-15",
+    "entry_date": "2026-10-17",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
     "updated_at": "2026-09-29 15:04:15",
     "last_submitted_at": null,
     "remark": "PRNo.26271122, 1123 And 1124 Dt.29.09.2026 - Ritwik Maiti",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2026-09-29",
     "so_date": null,
     "po_date": "2026-10-15",
@@ -3409,7 +4097,11 @@
     "so_qty": 0.0,
     "po_qty": 18.7,
     "remark_history": [],
-    "po_doc_entry": 845
+    "po_doc_entry": 845,
+    "grpo_doc_entry": 751,
+    "grpo_line_num": 0,
+    "po_line_num": 4,
+    "row_id": "RM1156_751_0"
   },
   {
     "sr_no": 70,
@@ -3451,7 +4143,10 @@
     "so_qty": 0.0,
     "po_qty": 27.0,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 0,
+    "po_line_num": 0
   },
   {
     "sr_no": 71,
@@ -3493,7 +4188,9 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 848
+    "po_doc_entry": 848,
+    "po_line_num": 0,
+    "row_id": "CS0209"
   },
   {
     "sr_no": 72,
@@ -3535,7 +4232,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 838
+    "po_doc_entry": 838,
+    "grpo_doc_entry": 737,
+    "grpo_line_num": 2,
+    "po_line_num": 2,
+    "row_id": "CS0516_737_2"
   },
   {
     "sr_no": 73,
@@ -3577,7 +4278,11 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 15,
+    "po_line_num": 17,
+    "row_id": "CS0529_762_15"
   },
   {
     "sr_no": 74,
@@ -3603,13 +4308,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-07",
+    "entry_date": "2026-10-12",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
     "updated_at": "2025-10-01 14:50:51",
     "last_submitted_at": null,
     "remark": "PRNO.26271129 Dt.04.10.2026 - Amit Panja\r\rFor Stock",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-07",
@@ -3619,7 +4324,11 @@
     "so_qty": 0.0,
     "po_qty": 5.0,
     "remark_history": [],
-    "po_doc_entry": 830
+    "po_doc_entry": 830,
+    "grpo_doc_entry": 738,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "CS0801_738_0"
   },
   {
     "sr_no": 75,
@@ -3661,7 +4370,11 @@
     "so_qty": 0.0,
     "po_qty": 5.0,
     "remark_history": [],
-    "po_doc_entry": 830
+    "po_doc_entry": 830,
+    "grpo_doc_entry": 738,
+    "grpo_line_num": 4,
+    "po_line_num": 4,
+    "row_id": "CS0806_738_4"
   },
   {
     "sr_no": 76,
@@ -3703,7 +4416,11 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 856
+    "po_doc_entry": 856,
+    "grpo_doc_entry": 754,
+    "grpo_line_num": 2,
+    "po_line_num": 2,
+    "row_id": "CS1285_754_2"
   },
   {
     "sr_no": 77,
@@ -3745,7 +4462,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 828
+    "po_doc_entry": 828,
+    "grpo_doc_entry": 765,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "CS1341_765_0"
   },
   {
     "sr_no": 78,
@@ -3771,13 +4492,13 @@
     "items_group_code": "112",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-07",
+    "entry_date": "2026-10-08",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
     "updated_at": "2026-04-23 15:55:14",
     "last_submitted_at": null,
     "remark": "PRNo.26271133 Dt.06.10.2026 - Amit Panja\r\rFor CNCX014 And CNCX015",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-07",
@@ -3787,7 +4508,11 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 826
+    "po_doc_entry": 826,
+    "grpo_doc_entry": 733,
+    "grpo_line_num": 1,
+    "po_line_num": 1,
+    "row_id": "ENG0104_733_1"
   },
   {
     "sr_no": 79,
@@ -3871,7 +4596,10 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 820
+    "po_doc_entry": 820,
+    "grpo_doc_entry": 728,
+    "grpo_line_num": 0,
+    "po_line_num": 0
   },
   {
     "sr_no": 81,
@@ -3913,7 +4641,11 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 843
+    "po_doc_entry": 843,
+    "grpo_doc_entry": 742,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "ENG1840_742_0"
   },
   {
     "sr_no": 82,
@@ -3955,7 +4687,9 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 861
+    "po_doc_entry": 861,
+    "po_line_num": 0,
+    "row_id": "ENG1846"
   },
   {
     "sr_no": 83,
@@ -4039,7 +4773,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 838
+    "po_doc_entry": 838,
+    "grpo_doc_entry": 737,
+    "grpo_line_num": 8,
+    "po_line_num": 8,
+    "row_id": "PS0107_737_8"
   },
   {
     "sr_no": 85,
@@ -4081,7 +4819,11 @@
     "so_qty": 0.0,
     "po_qty": 10.5,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 11,
+    "po_line_num": 11,
+    "row_id": "RM0107_740_11"
   },
   {
     "sr_no": 86,
@@ -4123,7 +4865,11 @@
     "so_qty": 0.0,
     "po_qty": 5.5,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 7,
+    "po_line_num": 7,
+    "row_id": "RM0132_740_7"
   },
   {
     "sr_no": 87,
@@ -4165,7 +4911,11 @@
     "so_qty": 0.0,
     "po_qty": 500.0,
     "remark_history": [],
-    "po_doc_entry": 847
+    "po_doc_entry": 847,
+    "grpo_doc_entry": 767,
+    "grpo_line_num": 3,
+    "po_line_num": 3,
+    "row_id": "RM0575_767_3"
   },
   {
     "sr_no": 88,
@@ -4207,7 +4957,11 @@
     "so_qty": 0.0,
     "po_qty": 9.8,
     "remark_history": [],
-    "po_doc_entry": 669
+    "po_doc_entry": 669,
+    "grpo_doc_entry": 749,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "RM1116_749_0"
   },
   {
     "sr_no": 89,
@@ -4249,7 +5003,11 @@
     "so_qty": 0.0,
     "po_qty": 2.6,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 17,
+    "po_line_num": 17,
+    "row_id": "RM1149_740_17"
   },
   {
     "sr_no": 90,
@@ -4291,7 +5049,10 @@
     "so_qty": 0.0,
     "po_qty": 3.5,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 6,
+    "po_line_num": 6
   },
   {
     "sr_no": 91,
@@ -4333,7 +5094,8 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 838
+    "po_doc_entry": 838,
+    "po_line_num": 5
   },
   {
     "sr_no": 92,
@@ -4359,13 +5121,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-19",
+    "entry_date": "2026-10-20",
     "created_at": "2026-11-16T16:32:54.771119+05:30",
     "updated_at": "2025-08-05 12:44:22",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -4375,7 +5137,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 13,
+    "po_line_num": 15,
+    "row_id": "CS1243_762_13"
   },
   {
     "sr_no": 93,
@@ -4417,7 +5183,10 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 869
+    "po_doc_entry": 869,
+    "grpo_doc_entry": 768,
+    "grpo_line_num": 0,
+    "po_line_num": 0
   },
   {
     "sr_no": 94,
@@ -4459,7 +5228,11 @@
     "so_qty": 0.0,
     "po_qty": 50.0,
     "remark_history": [],
-    "po_doc_entry": 849
+    "po_doc_entry": 849,
+    "grpo_doc_entry": 746,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "CS0371_746_0"
   },
   {
     "sr_no": 95,
@@ -4501,7 +5274,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 817
+    "po_doc_entry": 817,
+    "grpo_doc_entry": 726,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "CS0740_726_0"
   },
   {
     "sr_no": 96,
@@ -4527,13 +5304,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-19",
+    "entry_date": "2026-10-20",
     "created_at": "2026-11-16T16:42:56.508447+05:30",
     "updated_at": "2025-10-06 10:20:20",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -4543,7 +5320,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 8,
+    "po_line_num": 10,
+    "row_id": "CS1125_762_8"
   },
   {
     "sr_no": 97,
@@ -4569,13 +5350,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-19",
+    "entry_date": "2026-10-20",
     "created_at": "2026-11-16T16:42:56.508447+05:30",
     "updated_at": "2026-01-22 16:19:30",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -4585,7 +5366,11 @@
     "so_qty": 0.0,
     "po_qty": 5.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 16,
+    "po_line_num": 18,
+    "row_id": "CS1226_762_16"
   },
   {
     "sr_no": 98,
@@ -4611,13 +5396,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-19",
+    "entry_date": "2026-10-20",
     "created_at": "2026-11-16T16:42:56.508447+05:30",
     "updated_at": "2026-10-06 11:53:31",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2026-10-06",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -4627,7 +5412,10 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 3,
+    "po_line_num": 4
   },
   {
     "sr_no": 99,
@@ -4669,7 +5457,10 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 523
+    "po_doc_entry": 523,
+    "grpo_doc_entry": 724,
+    "grpo_line_num": 0,
+    "po_line_num": 1
   },
   {
     "sr_no": 100,
@@ -4711,7 +5502,8 @@
     "so_qty": 0.0,
     "po_qty": 50.0,
     "remark_history": [],
-    "po_doc_entry": 835
+    "po_doc_entry": 835,
+    "po_line_num": 0
   },
   {
     "sr_no": 101,
@@ -4753,7 +5545,9 @@
     "so_qty": 0.0,
     "po_qty": 5.0,
     "remark_history": [],
-    "po_doc_entry": 851
+    "po_doc_entry": 851,
+    "po_line_num": 3,
+    "row_id": "ENG1842"
   },
   {
     "sr_no": 102,
@@ -4795,7 +5589,9 @@
     "so_qty": 0.0,
     "po_qty": 75.0,
     "remark_history": [],
-    "po_doc_entry": 839
+    "po_doc_entry": 839,
+    "po_line_num": 0,
+    "row_id": "RM0006"
   },
   {
     "sr_no": 103,
@@ -4837,7 +5633,11 @@
     "so_qty": 0.0,
     "po_qty": 100.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "po_line_num": 13,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 11,
+    "row_id": "RM0947_762_11"
   },
   {
     "sr_no": 104,
@@ -4879,7 +5679,9 @@
     "so_qty": 0.0,
     "po_qty": 800.0,
     "remark_history": [],
-    "po_doc_entry": 847
+    "po_doc_entry": 847,
+    "po_line_num": 1,
+    "row_id": "RM1092"
   },
   {
     "sr_no": 105,
@@ -4921,7 +5723,8 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 772
+    "po_doc_entry": 772,
+    "po_line_num": 0
   },
   {
     "sr_no": 106,
@@ -4963,7 +5766,10 @@
     "so_qty": 0.0,
     "po_qty": 2.2,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 10,
+    "po_line_num": 10
   },
   {
     "sr_no": 107,
@@ -5005,7 +5811,9 @@
     "so_qty": 0.0,
     "po_qty": 30.0,
     "remark_history": [],
-    "po_doc_entry": 842
+    "po_doc_entry": 842,
+    "po_line_num": 0,
+    "row_id": "RM1162"
   },
   {
     "sr_no": 108,
@@ -5047,7 +5855,10 @@
     "so_qty": 0.0,
     "po_qty": 30.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "po_line_num": 7,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 5
   },
   {
     "sr_no": 109,
@@ -5079,7 +5890,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -5089,7 +5900,11 @@
     "so_qty": 0.0,
     "po_qty": 4.0,
     "remark_history": [],
-    "po_doc_entry": 838
+    "po_doc_entry": 838,
+    "grpo_doc_entry": 737,
+    "grpo_line_num": 7,
+    "po_line_num": 7,
+    "row_id": "CS0207_737_7"
   },
   {
     "sr_no": 110,
@@ -5131,7 +5946,11 @@
     "so_qty": 0.0,
     "po_qty": 3.0,
     "remark_history": [],
-    "po_doc_entry": 862
+    "po_doc_entry": 862,
+    "grpo_doc_entry": 755,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "CS0357_755_0"
   },
   {
     "sr_no": 111,
@@ -5173,7 +5992,10 @@
     "so_qty": 0.0,
     "po_qty": 60.0,
     "remark_history": [],
-    "po_doc_entry": 864
+    "po_doc_entry": 864,
+    "po_line_num": 0,
+    "grpo_doc_entry": 764,
+    "grpo_line_num": 0
   },
   {
     "sr_no": 112,
@@ -5215,7 +6037,11 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 830
+    "po_doc_entry": 830,
+    "grpo_doc_entry": 738,
+    "grpo_line_num": 3,
+    "po_line_num": 3,
+    "row_id": "CS0805_738_3"
   },
   {
     "sr_no": 113,
@@ -5257,7 +6083,8 @@
     "so_qty": 0.0,
     "po_qty": 50.0,
     "remark_history": [],
-    "po_doc_entry": 859
+    "po_doc_entry": 859,
+    "po_line_num": 0
   },
   {
     "sr_no": 114,
@@ -5299,7 +6126,11 @@
     "so_qty": 0.0,
     "po_qty": 100.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 10,
+    "po_line_num": 12,
+    "row_id": "CS1189_762_10"
   },
   {
     "sr_no": 115,
@@ -5341,7 +6172,10 @@
     "so_qty": 0.0,
     "po_qty": 8.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 1,
+    "po_line_num": 2
   },
   {
     "sr_no": 116,
@@ -5409,13 +6243,13 @@
     "items_group_code": "112",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-07",
+    "entry_date": "2026-10-13",
     "created_at": "2026-11-16T16:42:56.508447+05:30",
     "updated_at": "2026-10-07 17:01:44",
     "last_submitted_at": null,
     "remark": "PRNO.26271130 Dt.05.10.2026 - Ritwik Maiti\r\rFor Stock",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2026-10-05",
     "so_date": null,
     "po_date": "2026-10-07",
@@ -5425,7 +6259,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 831
+    "po_doc_entry": 831,
+    "grpo_doc_entry": 744,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "ENG1836_744_0"
   },
   {
     "sr_no": 118,
@@ -5467,7 +6305,9 @@
     "so_qty": 0.0,
     "po_qty": 5.0,
     "remark_history": [],
-    "po_doc_entry": 851
+    "po_doc_entry": 851,
+    "po_line_num": 2,
+    "row_id": "ENG1841"
   },
   {
     "sr_no": 119,
@@ -5493,13 +6333,13 @@
     "items_group_code": "138",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-15",
+    "entry_date": "2026-10-24",
     "created_at": "2026-11-16T16:42:56.508447+05:30",
     "updated_at": "2026-07-25 10:27:21",
     "last_submitted_at": null,
     "remark": "For Dodhia Industries, Surat",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2026-07-25",
     "so_date": null,
     "po_date": "2026-10-15",
@@ -5509,7 +6349,11 @@
     "so_qty": 0.0,
     "po_qty": 800.0,
     "remark_history": [],
-    "po_doc_entry": 847
+    "po_doc_entry": 847,
+    "grpo_doc_entry": 767,
+    "grpo_line_num": 2,
+    "po_line_num": 2,
+    "row_id": "RM1115_767_2"
   },
   {
     "sr_no": 120,
@@ -5551,7 +6395,10 @@
     "so_qty": 0.0,
     "po_qty": 50.0,
     "remark_history": [],
-    "po_doc_entry": 812
+    "po_doc_entry": 812,
+    "grpo_doc_entry": 729,
+    "grpo_line_num": 0,
+    "po_line_num": 0
   },
   {
     "sr_no": 121,
@@ -5593,7 +6440,9 @@
     "so_qty": 0.0,
     "po_qty": 30.0,
     "remark_history": [],
-    "po_doc_entry": 842
+    "po_doc_entry": 842,
+    "po_line_num": 1,
+    "row_id": "RM1163"
   },
   {
     "sr_no": 122,
@@ -5635,7 +6484,11 @@
     "so_qty": 0.0,
     "po_qty": 30.0,
     "remark_history": [],
-    "po_doc_entry": 856
+    "po_doc_entry": 856,
+    "grpo_doc_entry": 754,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "ENG1838_754_0"
   },
   {
     "sr_no": 123,
@@ -5677,7 +6530,9 @@
     "so_qty": 0.0,
     "po_qty": 3.0,
     "remark_history": [],
-    "po_doc_entry": 852
+    "po_doc_entry": 852,
+    "po_line_num": 1,
+    "row_id": "ENG1843"
   },
   {
     "sr_no": 124,
@@ -5719,7 +6574,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 838
+    "po_doc_entry": 838,
+    "grpo_doc_entry": 737,
+    "grpo_line_num": 6,
+    "po_line_num": 6,
+    "row_id": "PKG0025_737_6"
   },
   {
     "sr_no": 125,
@@ -5751,7 +6610,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -5761,7 +6620,11 @@
     "so_qty": 0.0,
     "po_qty": 3.0,
     "remark_history": [],
-    "po_doc_entry": 838
+    "po_doc_entry": 838,
+    "grpo_doc_entry": 737,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "PS0105_737_0"
   },
   {
     "sr_no": 126,
@@ -5803,7 +6666,11 @@
     "so_qty": 0.0,
     "po_qty": 70.0,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 12,
+    "po_line_num": 12,
+    "row_id": "RM0105_740_12"
   },
   {
     "sr_no": 127,
@@ -5845,7 +6712,9 @@
     "so_qty": 0.0,
     "po_qty": 100.0,
     "remark_history": [],
-    "po_doc_entry": 840
+    "po_doc_entry": 840,
+    "po_line_num": 0,
+    "row_id": "RM0490"
   },
   {
     "sr_no": 128,
@@ -5887,7 +6756,11 @@
     "so_qty": 0.0,
     "po_qty": 6.0,
     "remark_history": [],
-    "po_doc_entry": 790
+    "po_doc_entry": 790,
+    "grpo_doc_entry": 760,
+    "grpo_line_num": 0,
+    "po_line_num": 1,
+    "row_id": "RM1063_760_0"
   },
   {
     "sr_no": 129,
@@ -5929,7 +6802,11 @@
     "so_qty": 0.0,
     "po_qty": 100.0,
     "remark_history": [],
-    "po_doc_entry": 703
+    "po_doc_entry": 703,
+    "grpo_doc_entry": 732,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "RM1126_732_0"
   },
   {
     "sr_no": 130,
@@ -5971,7 +6848,10 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 808
+    "po_doc_entry": 808,
+    "po_line_num": 0,
+    "grpo_doc_entry": 725,
+    "grpo_line_num": 0
   },
   {
     "sr_no": 131,
@@ -6013,7 +6893,11 @@
     "so_qty": 0.0,
     "po_qty": 5.3,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 18,
+    "po_line_num": 18,
+    "row_id": "RM1153_740_18"
   },
   {
     "sr_no": 132,
@@ -6055,7 +6939,11 @@
     "so_qty": 0.0,
     "po_qty": 2.5,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 5,
+    "po_line_num": 5,
+    "row_id": "RM1158_740_5"
   },
   {
     "sr_no": 133,
@@ -6097,7 +6985,11 @@
     "so_qty": 0.0,
     "po_qty": 8.0,
     "remark_history": [],
-    "po_doc_entry": 802
+    "po_doc_entry": 802,
+    "grpo_doc_entry": 727,
+    "grpo_line_num": 1,
+    "po_line_num": 4,
+    "row_id": "RMNT0114_727_1"
   },
   {
     "sr_no": 134,
@@ -6139,7 +7031,10 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 824
+    "po_doc_entry": 824,
+    "grpo_doc_entry": 723,
+    "grpo_line_num": 4,
+    "po_line_num": 4
   },
   {
     "sr_no": 135,
@@ -6165,13 +7060,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-09",
+    "entry_date": "2026-10-10",
     "created_at": "2026-11-16T16:45:20.094333+05:30",
     "updated_at": "2025-08-11 10:26:49",
     "last_submitted_at": null,
     "remark": "PRNO.26271137 Dt.09.10.2026 - Amit Panja",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-09",
@@ -6181,7 +7076,11 @@
     "so_qty": 0.0,
     "po_qty": 1000.0,
     "remark_history": [],
-    "po_doc_entry": 832
+    "po_doc_entry": 832,
+    "grpo_doc_entry": 736,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "CS0410_736_0"
   },
   {
     "sr_no": 136,
@@ -6223,7 +7122,10 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 833
+    "po_doc_entry": 833,
+    "grpo_doc_entry": 752,
+    "grpo_line_num": 0,
+    "po_line_num": 0
   },
   {
     "sr_no": 137,
@@ -6249,13 +7151,13 @@
     "items_group_code": "112",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-19",
+    "entry_date": "2026-10-20",
     "created_at": "2026-11-16T16:45:20.094333+05:30",
     "updated_at": "2026-09-12 11:49:24",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2026-09-12",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -6265,7 +7167,11 @@
     "so_qty": 0.0,
     "po_qty": 60.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 2,
+    "po_line_num": 3,
+    "row_id": "ENG1808_762_2"
   },
   {
     "sr_no": 138,
@@ -6291,13 +7197,13 @@
     "items_group_code": "138",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-15",
+    "entry_date": "2026-10-24",
     "created_at": "2026-11-16T16:45:20.094333+05:30",
     "updated_at": "2026-05-09 12:07:54",
     "last_submitted_at": null,
     "remark": "For Dodhia Industries, Surat",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-15",
@@ -6307,7 +7213,10 @@
     "so_qty": 0.0,
     "po_qty": 300.0,
     "remark_history": [],
-    "po_doc_entry": 847
+    "po_doc_entry": 847,
+    "grpo_doc_entry": 767,
+    "grpo_line_num": 0,
+    "po_line_num": 0
   },
   {
     "sr_no": 139,
@@ -6349,7 +7258,9 @@
     "so_qty": 0.0,
     "po_qty": 50.0,
     "remark_history": [],
-    "po_doc_entry": 836
+    "po_doc_entry": 836,
+    "po_line_num": 0,
+    "row_id": "RM0560"
   },
   {
     "sr_no": 140,
@@ -6391,7 +7302,11 @@
     "so_qty": 0.0,
     "po_qty": 100.0,
     "remark_history": [],
-    "po_doc_entry": 806
+    "po_doc_entry": 806,
+    "grpo_doc_entry": 750,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "RM1145_750_0"
   },
   {
     "sr_no": 141,
@@ -6433,7 +7348,8 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 834
+    "po_doc_entry": 834,
+    "po_line_num": 0
   },
   {
     "sr_no": 142,
@@ -6475,7 +7391,10 @@
     "so_qty": 0.0,
     "po_qty": 20.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "po_line_num": 11,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 9
   },
   {
     "sr_no": 143,
@@ -6517,7 +7436,10 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 826
+    "po_doc_entry": 826,
+    "grpo_doc_entry": 733,
+    "grpo_line_num": 0,
+    "po_line_num": 0
   },
   {
     "sr_no": 144,
@@ -6549,7 +7471,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -6559,7 +7481,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 838
+    "po_doc_entry": 838,
+    "grpo_doc_entry": 737,
+    "grpo_line_num": 4,
+    "po_line_num": 4,
+    "row_id": "PKG0026_737_4"
   },
   {
     "sr_no": 145,
@@ -6601,7 +7527,11 @@
     "so_qty": 0.0,
     "po_qty": 5.0,
     "remark_history": [],
-    "po_doc_entry": 867
+    "po_doc_entry": 867,
+    "grpo_doc_entry": 766,
+    "grpo_line_num": 1,
+    "po_line_num": 1,
+    "row_id": "PS0034_766_1"
   },
   {
     "sr_no": 146,
@@ -6643,7 +7573,8 @@
     "so_qty": 0.0,
     "po_qty": 30.0,
     "remark_history": [],
-    "po_doc_entry": 842
+    "po_doc_entry": 842,
+    "po_line_num": 2
   },
   {
     "sr_no": 147,
@@ -6685,7 +7616,10 @@
     "so_qty": 0.0,
     "po_qty": 208.0,
     "remark_history": [],
-    "po_doc_entry": 807
+    "po_doc_entry": 807,
+    "grpo_doc_entry": 730,
+    "grpo_line_num": 0,
+    "po_line_num": 0
   },
   {
     "sr_no": 148,
@@ -6733,43 +7667,102 @@
     "sr_no": 149,
     "item_code": "CS0227",
     "description": "Bearing NMB 1030-ZZ",
-    "qty": 45.0,
-    "stock_qty": 879.0,
-    "vendor_name": "Aditya Engineering Services",
-    "vendor_code": "V00020",
-    "grpo_no": "473",
-    "rcvd_qty": 15.0,
-    "nt_weight": 14.5,
-    "qc": true,
-    "drw_yn": "Y",
-    "v_chk": "Y",
-    "ok_qty": 15.0,
+    "qty": 80.0,
+    "stock_qty": 959.0,
+    "vendor_name": "Advance Measuring Solutions",
+    "vendor_code": "V00023",
+    "grpo_no": "477",
+    "rcvd_qty": 80.0,
+    "nt_weight": 80001.0,
+    "qc": false,
+    "drw_yn": "N",
+    "v_chk": "N",
+    "ok_qty": 80.0,
     "rej_qty": 0.0,
-    "lm": "Y",
-    "olng": "Y",
-    "lpk": "Y",
-    "lbl": "Y",
+    "lm": "N",
+    "olng": "N",
+    "lpk": "N",
+    "lbl": "N",
     "mc_or_pt": "Y",
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-11-14",
+    "entry_date": "2026-11-19",
     "created_at": "2026-11-16T16:46:28.001387+05:30",
-    "updated_at": "2026-11-16 18:35:30",
-    "last_submitted_at": "2026-11-16T18:35:38.294465+05:30",
-    "remark": "Bearing inspection OK",
-    "last_submitted_by": "test_admin",
+    "updated_at": "2026-11-19 14:40:00",
+    "last_submitted_at": "2026-11-19T16:19:10.935494+05:30",
+    "remark": "kaushal Yadav",
+    "last_submitted_by": "admin",
     "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
-    "so_date": "2026-11-14",
-    "po_date": "2026-11-14",
-    "grn_date": "2026-11-14",
-    "po_no": "1378",
-    "so_no": "26271140",
-    "so_qty": 45.0,
-    "po_qty": 20.0,
-    "remark_history": [],
-    "po_doc_entry": 871
+    "so_date": "2026-11-19",
+    "po_date": "2026-11-19",
+    "grn_date": "2026-11-19",
+    "po_no": "1381",
+    "so_no": "26271142",
+    "so_qty": 80.0,
+    "po_qty": 80.0,
+    "remark_history": [
+      {
+        "id": 1,
+        "item_code": "CS0227",
+        "previous_remark": "Bearing inspection OK",
+        "new_remark": "Bearing inspooioection OK",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T12:35:07.072417+05:30"
+      },
+      {
+        "id": 2,
+        "item_code": "CS0227",
+        "previous_remark": "Bearing inspooioection OK",
+        "new_remark": "ok",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T13:33:24.377215+05:30"
+      },
+      {
+        "id": 3,
+        "item_code": "CS0227",
+        "previous_remark": "ok",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T13:36:39.720460+05:30"
+      },
+      {
+        "id": 4,
+        "item_code": "CS0227",
+        "previous_remark": "yes",
+        "new_remark": "amit",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-19T14:37:42.215095+05:30"
+      },
+      {
+        "id": 5,
+        "item_code": "CS0227",
+        "previous_remark": "amit",
+        "new_remark": "kaushal",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-19T14:40:05.897403+05:30"
+      },
+      {
+        "id": 6,
+        "item_code": "CS0227",
+        "previous_remark": "kaushal",
+        "new_remark": "kaushal Yadav",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-19T16:19:10.935494+05:30"
+      }
+    ],
+    "po_doc_entry": 874,
+    "grpo_doc_entry": 774,
+    "grpo_line_num": 0,
+    "po_line_num": 1,
+    "row_id": "CS0227_774_0"
   },
   {
     "sr_no": 150,
@@ -6795,13 +7788,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-07",
+    "entry_date": "2026-10-12",
     "created_at": "2026-11-16T16:46:28.001387+05:30",
     "updated_at": "2025-10-01 14:51:54",
     "last_submitted_at": null,
     "remark": "PRNO.26271129 Dt.04.10.2026 - Amit Panja\r\rFor Stock",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-07",
@@ -6811,7 +7804,10 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 830
+    "po_doc_entry": 830,
+    "grpo_doc_entry": 738,
+    "grpo_line_num": 1,
+    "po_line_num": 1
   },
   {
     "sr_no": 151,
@@ -6837,13 +7833,13 @@
     "items_group_code": "112",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-21",
+    "entry_date": "2026-10-07",
     "created_at": "2026-11-16T16:46:28.001387+05:30",
     "updated_at": "2025-08-12 11:03:19",
     "last_submitted_at": null,
     "remark": "PRNO.26271130 Dt.05.10.2026 - Ritwik Maiti\r\rFor CNCX015 - Stock",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-07",
@@ -6853,7 +7849,10 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 829
+    "po_doc_entry": 829,
+    "grpo_doc_entry": 763,
+    "grpo_line_num": 0,
+    "po_line_num": 0
   },
   {
     "sr_no": 152,
@@ -6895,7 +7894,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 823
+    "po_doc_entry": 823,
+    "grpo_doc_entry": 758,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "MSP0340_758_0"
   },
   {
     "sr_no": 153,
@@ -6937,7 +7940,11 @@
     "so_qty": 0.0,
     "po_qty": 8.0,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 14,
+    "po_line_num": 14,
+    "row_id": "RM0931_740_14"
   },
   {
     "sr_no": 154,
@@ -6979,7 +7986,11 @@
     "so_qty": 0.0,
     "po_qty": 5.32,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 15,
+    "po_line_num": 15,
+    "row_id": "RM1146_740_15"
   },
   {
     "sr_no": 155,
@@ -7021,7 +8032,10 @@
     "so_qty": 0.0,
     "po_qty": 2.5,
     "remark_history": [],
-    "po_doc_entry": 822
+    "po_doc_entry": 822,
+    "grpo_doc_entry": 740,
+    "grpo_line_num": 8,
+    "po_line_num": 8
   },
   {
     "sr_no": 156,
@@ -7063,7 +8077,11 @@
     "so_qty": 0.0,
     "po_qty": 8.0,
     "remark_history": [],
-    "po_doc_entry": 827
+    "po_doc_entry": 827,
+    "grpo_doc_entry": 731,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "RM1160_731_0"
   },
   {
     "sr_no": 157,
@@ -7105,7 +8123,10 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 802
+    "po_doc_entry": 802,
+    "grpo_doc_entry": 727,
+    "grpo_line_num": 0,
+    "po_line_num": 2
   },
   {
     "sr_no": 158,
@@ -7147,7 +8168,9 @@
     "so_qty": 0.0,
     "po_qty": 2000.0,
     "remark_history": [],
-    "po_doc_entry": 856
+    "po_doc_entry": 856,
+    "po_line_num": 1,
+    "row_id": "CS0515"
   },
   {
     "sr_no": 159,
@@ -7173,13 +8196,13 @@
     "items_group_code": "111",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-15",
+    "entry_date": "2026-10-17",
     "created_at": "2026-11-16T16:48:18.679201+05:30",
     "updated_at": "2026-10-15 18:25:49",
     "last_submitted_at": null,
     "remark": "PRNO.26271142 Dt.14.10.2026 - Pankaj\r\rFor Dynascan Profile Projector - Stock",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2026-10-15",
     "so_date": null,
     "po_date": "2026-10-15",
@@ -7189,7 +8212,11 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 853
+    "po_doc_entry": 853,
+    "grpo_doc_entry": 756,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "ENG1844_756_0"
   },
   {
     "sr_no": 160,
@@ -7231,7 +8258,11 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 867
+    "po_doc_entry": 867,
+    "grpo_doc_entry": 766,
+    "grpo_line_num": 3,
+    "po_line_num": 3,
+    "row_id": "PS0054_766_3"
   },
   {
     "sr_no": 161,
@@ -7273,7 +8304,11 @@
     "so_qty": 0.0,
     "po_qty": 25.0,
     "remark_history": [],
-    "po_doc_entry": 857
+    "po_doc_entry": 857,
+    "grpo_doc_entry": 754,
+    "grpo_line_num": 4,
+    "po_line_num": 0,
+    "row_id": "CS0128_754_4"
   },
   {
     "sr_no": 162,
@@ -7305,7 +8340,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -7315,7 +8350,10 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 838
+    "po_doc_entry": 838,
+    "grpo_doc_entry": 737,
+    "grpo_line_num": 1,
+    "po_line_num": 1
   },
   {
     "sr_no": 163,
@@ -7357,7 +8395,11 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 729
+    "po_doc_entry": 729,
+    "grpo_doc_entry": 739,
+    "grpo_line_num": 0,
+    "po_line_num": 2,
+    "row_id": "FA0087_739_0"
   },
   {
     "sr_no": 164,
@@ -7399,7 +8441,11 @@
     "so_qty": 0.0,
     "po_qty": 4.0,
     "remark_history": [],
-    "po_doc_entry": 862
+    "po_doc_entry": 862,
+    "grpo_doc_entry": 755,
+    "grpo_line_num": 1,
+    "po_line_num": 1,
+    "row_id": "HK0005_755_1"
   },
   {
     "sr_no": 165,
@@ -7441,7 +8487,10 @@
     "so_qty": 0.0,
     "po_qty": 20.0,
     "remark_history": [],
-    "po_doc_entry": 824
+    "po_doc_entry": 824,
+    "grpo_doc_entry": 723,
+    "grpo_line_num": 0,
+    "po_line_num": 0
   },
   {
     "sr_no": 166,
@@ -7483,7 +8532,10 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 867
+    "po_doc_entry": 867,
+    "grpo_doc_entry": 766,
+    "grpo_line_num": 2,
+    "po_line_num": 2
   },
   {
     "sr_no": 167,
@@ -7525,7 +8577,10 @@
     "so_qty": 0.0,
     "po_qty": 10.0,
     "remark_history": [],
-    "po_doc_entry": 818
+    "po_doc_entry": 818,
+    "grpo_doc_entry": 745,
+    "grpo_line_num": 0,
+    "po_line_num": 0
   },
   {
     "sr_no": 168,
@@ -7567,7 +8622,8 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 858
+    "po_doc_entry": 858,
+    "po_line_num": 0
   },
   {
     "sr_no": 169,
@@ -7593,13 +8649,13 @@
     "items_group_code": "111",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-12",
+    "entry_date": "2026-10-20",
     "created_at": "2026-11-16T16:55:51.460048+05:30",
     "updated_at": "2026-10-22 18:02:12",
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2026-10-22",
     "so_date": null,
     "po_date": "2026-10-12",
@@ -7609,7 +8665,11 @@
     "so_qty": 0.0,
     "po_qty": 6.0,
     "remark_history": [],
-    "po_doc_entry": 865
+    "po_doc_entry": 865,
+    "grpo_doc_entry": 761,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "ENG1848_761_0"
   },
   {
     "sr_no": 170,
@@ -7651,7 +8711,10 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 841
+    "po_doc_entry": 841,
+    "grpo_doc_entry": 741,
+    "grpo_line_num": 0,
+    "po_line_num": 0
   },
   {
     "sr_no": 171,
@@ -7693,7 +8756,8 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 844
+    "po_doc_entry": 844,
+    "po_line_num": 0
   },
   {
     "sr_no": 172,
@@ -7735,7 +8799,8 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 846
+    "po_doc_entry": 846,
+    "po_line_num": 0
   },
   {
     "sr_no": 173,
@@ -7777,7 +8842,10 @@
     "so_qty": 0.0,
     "po_qty": 1.0,
     "remark_history": [],
-    "po_doc_entry": 866
+    "po_doc_entry": 866,
+    "grpo_doc_entry": 762,
+    "grpo_line_num": 0,
+    "po_line_num": 1
   },
   {
     "sr_no": 174,
@@ -7805,10 +8873,10 @@
     "is_active": true,
     "entry_date": "2026-11-14",
     "created_at": "2026-11-16T17:10:04.231968+05:30",
-    "updated_at": "2026-11-16 18:35:32",
-    "last_submitted_at": "2026-11-16T18:35:38.874401+05:30",
+    "updated_at": "2026-11-18 14:50:14",
+    "last_submitted_at": "2026-11-18T14:50:17.638074+05:30",
     "remark": "Hex Male Part Verified",
-    "last_submitted_by": "test_admin",
+    "last_submitted_by": "admin",
     "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": "2026-11-14",
@@ -7819,7 +8887,11 @@
     "so_qty": 10.0,
     "po_qty": 0.0,
     "remark_history": [],
-    "po_doc_entry": null
+    "po_doc_entry": null,
+    "grpo_doc_entry": 769,
+    "grpo_line_num": 0,
+    "po_line_num": 0,
+    "row_id": "FG2145_769_0"
   },
   {
     "sr_no": 175,
@@ -7845,13 +8917,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-16",
+    "entry_date": "2026-10-17",
     "created_at": "2026-11-16T17:38:21.269342+05:30",
     "updated_at": "2025-08-08 15:25:10",
     "last_submitted_at": null,
     "remark": "PRNO.26271138, 1140 &  1141 Dt.09.10, 12.10 And 13.10.2026- Ritwik Maiti And Amit Panja\rSr.No.1 & 2 For Sterlite and remaining for Stock",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-16",
@@ -7861,7 +8933,11 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 856
+    "po_doc_entry": 856,
+    "grpo_doc_entry": 754,
+    "grpo_line_num": 3,
+    "po_line_num": 3,
+    "row_id": "CS0162_754_3"
   },
   {
     "item_code": "TEST999",
@@ -7893,6 +8969,312 @@
     "remark_history": [],
     "po_doc_entry": null,
     "last_submitted_by": "admin",
-    "last_submitted_at": "2026-11-17T23:26:06.794783+05:30"
+    "last_submitted_at": "2026-11-17T23:26:06.794783+05:30",
+    "record_category": "Received Stock"
+  },
+  {
+    "sr_no": 177,
+    "item_code": "CS1370",
+    "description": "Oil Mobil DTE 24 Ultra (ISO VG 32)",
+    "qty": 0.0,
+    "stock_qty": 2.0,
+    "vendor_name": "",
+    "vendor_code": "",
+    "grpo_no": "",
+    "rcvd_qty": 0.0,
+    "nt_weight": 406.0,
+    "qc": false,
+    "drw_yn": "N",
+    "v_chk": "N",
+    "ok_qty": 0.0,
+    "rej_qty": 0.0,
+    "lm": "N",
+    "olng": "N",
+    "lpk": "N",
+    "lbl": "N",
+    "mc_or_pt": "N",
+    "items_group_code": "109",
+    "warehouse_code": "01",
+    "is_active": true,
+    "entry_date": "2026-02-19",
+    "created_at": "2026-11-18T12:01:50.764660+05:30",
+    "updated_at": "2026-11-18 12:01:21",
+    "last_submitted_at": null,
+    "remark": "",
+    "last_submitted_by": null,
+    "record_category": "Item Master",
+    "item_create_date": "2026-02-19",
+    "so_date": null,
+    "po_date": null,
+    "grn_date": null,
+    "po_no": "",
+    "po_doc_entry": null,
+    "so_no": "",
+    "so_qty": 0.0,
+    "po_qty": 0.0,
+    "remark_history": []
+  },
+  {
+    "sr_no": 178,
+    "item_code": "CS0130",
+    "description": "Allen Grub Screw M3 x 4 mm",
+    "qty": 150.0,
+    "stock_qty": 2759.0,
+    "vendor_name": "AGM Balancing Services",
+    "vendor_code": "V00027",
+    "grpo_no": "475",
+    "rcvd_qty": 50.0,
+    "nt_weight": 7000.0,
+    "qc": true,
+    "drw_yn": "Y",
+    "v_chk": "N",
+    "ok_qty": 50.0,
+    "rej_qty": 0.0,
+    "lm": "Y",
+    "olng": "Y",
+    "lpk": "Y",
+    "lbl": "N",
+    "mc_or_pt": "N",
+    "items_group_code": "109",
+    "warehouse_code": "01",
+    "is_active": true,
+    "entry_date": "2026-11-18",
+    "created_at": "2026-11-18T16:16:18.972216+05:30",
+    "updated_at": "2026-11-19 11:25:40",
+    "last_submitted_at": "2026-11-19T14:36:37.882725+05:30",
+    "remark": "amit",
+    "last_submitted_by": "admin",
+    "record_category": "Received Stock",
+    "item_create_date": "2025-01-07",
+    "so_date": "2026-11-18",
+    "po_date": "2026-11-18",
+    "grn_date": "2026-11-18",
+    "po_no": "1379",
+    "po_doc_entry": 872,
+    "so_no": "26271141",
+    "so_qty": 150.0,
+    "po_qty": 100.0,
+    "remark_history": [
+      {
+        "id": 1,
+        "item_code": "CS0130",
+        "previous_remark": "",
+        "new_remark": "ok",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T16:29:14.129170+05:30"
+      },
+      {
+        "id": 2,
+        "item_code": "CS0130",
+        "previous_remark": "ok",
+        "new_remark": "yes",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-18T17:43:08.939542+05:30"
+      },
+      {
+        "id": 3,
+        "item_code": "CS0130",
+        "previous_remark": "yes",
+        "new_remark": "yess",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-19T10:47:53.113644+05:30"
+      },
+      {
+        "id": 4,
+        "item_code": "CS0130",
+        "previous_remark": "yess",
+        "new_remark": "amit",
+        "admin_user_id": "admin",
+        "action": "UPDATE_REMARK",
+        "created_at": "2026-11-19T14:36:37.882725+05:30"
+      }
+    ],
+    "po_line_num": 0,
+    "grpo_doc_entry": 772,
+    "grpo_line_num": 0,
+    "row_id": "CS0130_772_0"
+  },
+  {
+    "sr_no": 179,
+    "item_code": "PS0108",
+    "description": "Manufacturing Order Card (M.O.) 12 x 8.5 Printed",
+    "qty": 115.0,
+    "stock_qty": 904.0,
+    "vendor_name": "AGM Balancing Services",
+    "vendor_code": "V00027",
+    "grpo_no": "475",
+    "rcvd_qty": 90.0,
+    "nt_weight": 0.0,
+    "qc": true,
+    "drw_yn": "Y",
+    "v_chk": "Y",
+    "ok_qty": 89.0,
+    "rej_qty": 1.0,
+    "lm": "Y",
+    "olng": "Y",
+    "lpk": "Y",
+    "lbl": "Y",
+    "mc_or_pt": "Y",
+    "items_group_code": "130",
+    "warehouse_code": "01",
+    "is_active": true,
+    "entry_date": "2026-11-18",
+    "created_at": "2026-11-18T17:21:11.856214+05:30",
+    "updated_at": "2026-06-09 15:01:54",
+    "last_submitted_at": null,
+    "remark": "ok",
+    "last_submitted_by": null,
+    "record_category": "Received Stock",
+    "item_create_date": "2025-07-09",
+    "so_date": "2026-11-18",
+    "po_date": "2026-11-18",
+    "grn_date": "2026-11-18",
+    "po_no": "1379",
+    "po_doc_entry": 872,
+    "so_no": "26271141",
+    "so_qty": 115.0,
+    "po_qty": 100.0,
+    "remark_history": [],
+    "grpo_doc_entry": 772,
+    "grpo_line_num": 1,
+    "po_line_num": 1,
+    "row_id": "PS0108_772_1"
+  },
+  {
+    "sr_no": 180,
+    "item_code": "ITEM_POR1_TEST",
+    "description": "POR1 Verification Item",
+    "qty": 0.0,
+    "stock_qty": 100.0,
+    "vendor_name": "Vendor One",
+    "vendor_code": "V100",
+    "grpo_no": "474",
+    "grpo_doc_entry": 771,
+    "grpo_line_num": 0,
+    "rcvd_qty": 25.0,
+    "nt_weight": 15.5,
+    "qc": true,
+    "drw_yn": "Y",
+    "v_chk": "N",
+    "ok_qty": 20.0,
+    "rej_qty": 5.0,
+    "lm": "Y",
+    "olng": "N",
+    "lpk": "Y",
+    "lbl": "N",
+    "mc_or_pt": "Y",
+    "last_submitted_at": "2026-11-18",
+    "warehouse_code": "01",
+    "is_active": true,
+    "entry_date": "2026-11-19",
+    "created_at": "2026-11-19T10:58:45.974129+05:30",
+    "updated_at": "2026-11-19T14:15:05.603298+05:30",
+    "remark": "POR1 Read-Side Test Remark",
+    "last_submitted_by": null,
+    "record_category": "Received Stock",
+    "item_create_date": "2026-11-19",
+    "so_date": null,
+    "po_date": "2026-11-18",
+    "grn_date": "2026-11-19",
+    "po_no": "1378",
+    "po_doc_entry": 871,
+    "po_line_num": 1,
+    "so_no": "",
+    "so_qty": 0.0,
+    "po_qty": 50.0,
+    "remark_history": [],
+    "row_id": "ITEM_POR1_TEST_771_0"
+  },
+  {
+    "sr_no": 181,
+    "item_code": "MULTI_GRPO_ITEM",
+    "description": "Multi GRPO Item",
+    "qty": 0.0,
+    "stock_qty": 100.0,
+    "vendor_name": "Vendor Three",
+    "vendor_code": "V300",
+    "grpo_no": "502",
+    "grpo_doc_entry": 602,
+    "grpo_line_num": 0,
+    "rcvd_qty": 60.0,
+    "nt_weight": 10.0,
+    "qc": true,
+    "drw_yn": "Y",
+    "v_chk": "Y",
+    "ok_qty": 55.0,
+    "rej_qty": 5.0,
+    "lm": "Y",
+    "olng": "Y",
+    "lpk": "Y",
+    "lbl": "Y",
+    "mc_or_pt": "Y",
+    "last_submitted_at": "2026-11-10",
+    "warehouse_code": "01",
+    "is_active": true,
+    "entry_date": "2026-11-15",
+    "created_at": "2026-11-19T10:58:46.799816+05:30",
+    "updated_at": "2026-11-19T14:15:05.622425+05:30",
+    "remark": "",
+    "last_submitted_by": null,
+    "record_category": "Received Stock",
+    "item_create_date": "2026-11-19",
+    "so_date": null,
+    "po_date": "2026-11-10",
+    "grn_date": "2026-11-15",
+    "po_no": "1400",
+    "po_doc_entry": 880,
+    "po_line_num": 0,
+    "so_no": "",
+    "so_qty": 0.0,
+    "po_qty": 100.0,
+    "remark_history": [],
+    "row_id": "MULTI_GRPO_ITEM_602_0"
+  },
+  {
+    "sr_no": 182,
+    "item_code": "CS0442",
+    "description": "Ferro Process Temperature Control Ceramic Rings",
+    "qty": 0.0,
+    "stock_qty": 512.0,
+    "vendor_name": "",
+    "vendor_code": "",
+    "grpo_no": "",
+    "grpo_doc_entry": null,
+    "grpo_line_num": null,
+    "rcvd_qty": 0.0,
+    "nt_weight": 0.0,
+    "qc": true,
+    "drw_yn": "Y",
+    "v_chk": "Y",
+    "ok_qty": 0.0,
+    "rej_qty": 0.0,
+    "lm": "Y",
+    "olng": "Y",
+    "lpk": "Y",
+    "lbl": "Y",
+    "mc_or_pt": "Y",
+    "last_submitted_at": null,
+    "warehouse_code": "01",
+    "is_active": true,
+    "entry_date": "2025-01-07",
+    "created_at": "2026-11-19T11:48:18.062648+05:30",
+    "updated_at": "2026-11-19 11:47:48",
+    "remark": "",
+    "last_submitted_by": null,
+    "record_category": "Item Master",
+    "item_create_date": "2025-01-07",
+    "so_date": null,
+    "po_date": null,
+    "grn_date": null,
+    "po_no": "",
+    "po_doc_entry": null,
+    "po_line_num": null,
+    "so_no": "",
+    "so_qty": 0.0,
+    "po_qty": 0.0,
+    "remark_history": []
   }
 ]

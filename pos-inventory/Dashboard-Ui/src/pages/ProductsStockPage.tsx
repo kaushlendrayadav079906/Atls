@@ -17,11 +17,11 @@ import {
 } from 'lucide-react';
 import { useMemo, useState, useEffect, type ReactNode } from 'react';
 import { useSearchParams, useParams } from 'react-router-dom';
-import { posApi } from '../api/pos';
+import { productsApi } from '../api/products';
 import { commonApi } from '../api/common';
 import { useDebounce } from '../hooks/useDebounce';
 import { useAIAssistant } from '../contexts/AIAssistantContext';
-import type { Product } from '../types/pos';
+import type { Product } from '../types/products';
 
 const fallbackProducts: Product[] = [];
 
@@ -105,7 +105,7 @@ export const ProductsStockPage = () => {
 
   const { data: products = fallbackProducts, isLoading, isFetching, isError, error, refetch } = useQuery<Product[]>({
     queryKey: ['products-stock', debouncedSearch, warehouseFilter, stockStatus],
-    queryFn: () => posApi.searchProducts({
+    queryFn: () => productsApi.searchProducts({
       search: debouncedSearch,
       warehouse: warehouseFilter || undefined,
       stock_status: stockStatus === 'all' ? undefined : stockStatus,

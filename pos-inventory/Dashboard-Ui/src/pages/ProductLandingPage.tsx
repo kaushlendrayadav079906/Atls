@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Package,
-  ShoppingCart,
+  Boxes,
   ClipboardList,
   FileText,
   Truck,
@@ -42,17 +42,6 @@ const PRODUCT_MODULES: ProductModule[] = [
     description: 'Manage master product catalog, monitor branch stock levels in real time, configure barcode data, and track low-stock items.',
     tags: ['Catalog', 'Branch Stock', 'Low-Stock Alerts'],
     actionText: 'Open Products & Stock',
-  },
-  {
-    id: 'pos',
-    title: 'Point of Sale (POS)',
-    path: '/pos',
-    icon: ShoppingCart,
-    iconBg: 'bg-emerald-50',
-    iconColor: 'text-emerald-600',
-    description: 'Fast retail terminal with barcode scanning, instant checkout, cash/card split payments, customer selection, and receipt printing.',
-    tags: ['Quick Checkout', 'Barcode Scanner', 'Receipt Printing'],
-    actionText: 'Launch POS Terminal',
   },
   {
     id: 'sales-orders',
@@ -154,28 +143,27 @@ export const ProductLandingPage: React.FC = () => {
 
           {/* Description */}
           <p className={`atlas-body text-base sm:text-lg max-w-3xl leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-            Centralized operations for product inventory, point-of-sale checkout, customer orders, tax invoicing, procurement, customer CRM, and return workflows.
+            Centralized operations for product inventory, customer orders, tax invoicing, procurement, customer CRM, and return workflows.
           </p>
 
           {/* Action Buttons */}
           <div className="pt-2 flex flex-wrap items-center gap-3.5">
             <button
-              onClick={() => navigate('/pos')}
+              onClick={() => navigate('/products')}
               className="inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[13.5px] sm:text-[14px] font-bold shadow-sm transition-all duration-150 cursor-pointer hover:shadow-md"
             >
-              <ShoppingCart size={16} />
-              <span>Open POS Terminal</span>
+              <Package size={16} />
+              <span>Manage Products & Stock</span>
             </button>
-
             <button
-              onClick={() => navigate('/products')}
+              onClick={() => navigate('/stock-configuration')}
               className={`inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-[13.5px] sm:text-[14px] font-bold border shadow-xs transition-all duration-150 cursor-pointer ${isDark
                   ? 'bg-[#1e293b] hover:bg-slate-800 text-blue-300 border-slate-700'
                   : 'bg-white hover:bg-blue-50 text-blue-700 border-blue-300'
                 }`}
             >
-              <Package size={16} />
-              <span>Manage Products & Stock</span>
+              <Boxes size={16} />
+              <span>Stock Configuration</span>
             </button>
 
             <button

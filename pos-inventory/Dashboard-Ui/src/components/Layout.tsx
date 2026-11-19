@@ -55,7 +55,6 @@ const navItems: NavSectionItem[] = [
     icon: Package,
     subItems: [
       { name: 'Products & Stock', path: '/products', permission: 'products.view' },
-      { name: 'Point of Sale', path: '/pos', permission: 'pos.access' },
       { name: 'Sales Orders', path: '/sales-orders', permission: 'sales_orders.view' },
       { name: 'Sales Invoices', path: '/sales', permission: 'invoices.view' },
       { name: 'Purchase Orders', path: '/purchase-orders', permission: 'purchase_orders.view' },
@@ -134,7 +133,6 @@ export const Layout = () => {
     location.pathname === '/product' ||
     location.pathname === '/products' ||
     location.pathname.startsWith('/products/') ||
-    location.pathname === '/pos' ||
     location.pathname === '/sales-orders' ||
     location.pathname === '/sales' ||
     location.pathname.startsWith('/sales/') ||
@@ -214,7 +212,6 @@ export const Layout = () => {
     if (pathname === '/product' || pathname === '/products' || pathname.startsWith('/products/')) return 'products';
     if (pathname === '/solutions') return 'production';
     if (pathname === '/customers') return 'customers';
-    if (pathname === '/pos') return 'pos';
     if (pathname === '/sales-orders') return 'sales_orders';
     if (pathname === '/purchase-orders') return 'purchase_orders';
     if (pathname === '/stock-configuration') return 'products';

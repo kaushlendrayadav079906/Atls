@@ -38,6 +38,7 @@ from app.db.connection import (
     is_mysql,
     is_postgres,
     normalize_ddl_for_dialect,
+    is_db_connection_error,
 )
 from app.core.config import settings
 from app.services.sap.client import get_sap_client, SAPConnectionError, SAPValidationError
@@ -78,16 +79,23 @@ USER_CONFIGURABLE_FIELDS = {
 
 # ATLAS field -> SAP Item Master (OITM) property written by _sync_item_to_sap()
 SAP_ITEM_MASTER_FIELDS = {
-    "nt_weight": "InventoryWeight",  # + PurchaseUnitWeight, SalesUnitWeight
+    "nt_weight": "InventoryWeight",  # + PurchaseUnitWeight, SalesUnitWeight, U_PerPices
+}
+
+# ATLAS field -> SAP Goods Receipt PO Line (PDN1) property written by _sync_grpo_to_sap()
+SAP_PDN1_INSPECTION_FIELDS = {
     "qc": "U_QC",
-    "drw_yn": "U_Drawing",
-    "v_chk": "U_V_Chk",
+    "drw_yn": "U_DRW",
+    "v_chk": "U_VCHK",
     "lm": "U_LM",
     "olng": "U_OLNG",
-    "lpk": "U_LPK",
+    "lpk": "U_IPK",
     "lbl": "U_LBL",
-    "mc_or_pt": "U_MC_OR_PT",
+    "mc_or_pt": "U_MCorPT",
 }
+
+# Retained alias for backward compatibility with older tests
+SAP_POR1_INSPECTION_FIELDS = SAP_PDN1_INSPECTION_FIELDS
 
 
 def clean_qc(val: Any) -> Optional[bool]:
@@ -176,6 +184,10 @@ COLUMNS = [
     "so_qty",
     "po_qty",
     "po_doc_entry",
+    "po_line_num",
+    "grpo_doc_entry",
+    "grpo_line_num",
+    "row_id",
 ]
 
 class StockConfigurationService:
@@ -222,6 +234,15 @@ class StockConfigurationService:
                             warehouse_code VARCHAR(50) DEFAULT '01',
                             is_active BOOLEAN DEFAULT TRUE,
                             entry_date DATE,
+                            po_no VARCHAR(50) DEFAULT '',
+                            so_no VARCHAR(50) DEFAULT '',
+                            so_qty NUMERIC(12, 2) DEFAULT 0,
+                            po_qty NUMERIC(12, 2) DEFAULT 0,
+                            po_doc_entry INTEGER NULL,
+                            po_line_num INTEGER NULL,
+                            grpo_doc_entry INTEGER NULL,
+                            grpo_line_num INTEGER NULL,
+                            row_id VARCHAR(100) DEFAULT '',
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         );
@@ -244,6 +265,10 @@ class StockConfigurationService:
                         ("so_qty", "NUMERIC(12, 2) DEFAULT 0"),
                         ("po_qty", "NUMERIC(12, 2) DEFAULT 0"),
                         ("po_doc_entry", "INTEGER NULL"),
+                        ("po_line_num", "INTEGER NULL"),
+                        ("grpo_doc_entry", "INTEGER NULL"),
+                        ("grpo_line_num", "INTEGER NULL"),
+                        ("row_id", "VARCHAR(100) DEFAULT ''"),
                     ]
                     if is_mysql():
                         for col_name, col_type in cols_to_add:
@@ -362,7 +387,7 @@ class StockConfigurationService:
             res_grpo = client.get("PurchaseDeliveryNotes", params={
                 "$orderby": "UpdateDate desc, DocEntry desc",
                 "$top": 50,
-                "$select": "DocEntry,DocNum,DocDate,CardName,CardCode,UpdateDate,Cancelled,DocumentStatus,U_SONo,DocumentLines",
+                "$select": "DocEntry,DocNum,DocDate,CardName,CardCode,UpdateDate,Cancelled,DocumentStatus,U_SONo,U_Remark,DocumentLines",
             })
             grpos = [g for g in res_grpo.get("value", []) if g.get("Cancelled") != "tYES"]
         except Exception as e:
@@ -374,7 +399,7 @@ class StockConfigurationService:
             res_po = client.get("PurchaseOrders", params={
                 "$orderby": "UpdateDate desc, DocEntry desc",
                 "$top": 50,
-                "$select": "DocEntry,DocNum,DocDate,CardName,CardCode,UpdateDate,Cancelled,DocumentStatus,ImportFileNum,Comments,DocumentLines",
+                "$select": "DocEntry,DocNum,DocDate,CardName,CardCode,UpdateDate,Cancelled,DocumentStatus,ImportFileNum,U_Remark,Comments,DocumentLines",
             })
             pos = [p for p in res_po.get("value", []) if p.get("Cancelled") != "tYES"]
         except Exception as e:
@@ -394,7 +419,7 @@ class StockConfigurationService:
                 filter_po = " or ".join([f"DocEntry eq {e}" for e in list(missing_po_entries)[:20]])
                 res_missing_po = client.get("PurchaseOrders", params={
                     "$filter": filter_po,
-                    "$select": "DocEntry,DocNum,DocDate,CardName,CardCode,UpdateDate,Cancelled,DocumentStatus,ImportFileNum,Comments,DocumentLines",
+                    "$select": "DocEntry,DocNum,DocDate,CardName,CardCode,UpdateDate,Cancelled,DocumentStatus,ImportFileNum,U_Remark,Comments,DocumentLines",
                 })
                 for p in res_missing_po.get("value", []):
                     if p.get("DocEntry") and p.get("Cancelled") != "tYES":
@@ -429,7 +454,7 @@ class StockConfigurationService:
             except Exception as e:
                 logger.warning(f"Error fetching linked SO DocNum {so_num}: {e}")
 
-        # 5. Build received_map (keyed by ItemCode, newest GRPO first)
+        # 5. Build received_map (keyed by ItemCode and composite row_id, newest GRPO first)
         received_map = {}
         for g in grpos:
             grpo_no = str(g.get("DocNum") or "")
@@ -438,16 +463,31 @@ class StockConfigurationService:
             vendor_name = g.get("CardName") or ""
             vendor_code = g.get("CardCode") or ""
             hdr_so_no = str(g.get("U_SONo") or "")
+            grpo_remark = str(g.get("U_Remark") or "").strip()
+            grpo_doc_entry = int(g.get("DocEntry")) if g.get("DocEntry") else None
 
             for l in g.get("DocumentLines", []):
                 code = l.get("ItemCode")
-                if not code or code in received_map:
+                if not code:
                     continue
+                grpo_line_num = int(l.get("LineNum", 0)) if l.get("LineNum") is not None else 0
+                row_id = f"{code}_{grpo_doc_entry}_{grpo_line_num}" if grpo_doc_entry is not None else code
 
                 rcvd_qty = float(l.get("Quantity") or 0.0)
-                rem_open_qty = float(l.get("RemainingOpenQuantity")) if l.get("RemainingOpenQuantity") is not None else rcvd_qty
+                rem_open_qty = float(l.get("OpenQty") if l.get("OpenQty") is not None else (l.get("RemainingOpenQuantity") or 0.0))
                 ok_qty = rem_open_qty
                 rej_qty = max(0.0, rcvd_qty - rem_open_qty)
+
+                # Inspection fields strictly from GRPO document line (PDN1); do not fallback to POR1
+                qc_pdn1 = clean_qc(l.get("U_QC"))
+                drw_pdn1 = clean_yn(l.get("U_DRW"))
+                v_chk_pdn1 = clean_yn(l.get("U_VCHK"))
+                lm_pdn1 = clean_yn(l.get("U_LM"))
+                olng_pdn1 = clean_yn(l.get("U_OLNG"))
+                lpk_pdn1 = clean_yn(l.get("U_IPK"))
+                lbl_pdn1 = clean_yn(l.get("U_LBL"))
+                mc_or_pt_pdn1 = clean_yn(l.get("U_MCorPT"))
+                last_updated_pdn1 = str(l.get("U_LUpdated") or "").strip() or None
 
                 base_type = l.get("BaseType")
                 base_entry = l.get("BaseEntry")
@@ -460,17 +500,28 @@ class StockConfigurationService:
                 so_no = ""
                 so_date = None
                 so_qty = 0.0
+                po_line_num = 0
 
                 if base_type == 22 and base_entry and base_entry in po_by_entry:
                     base_po = po_by_entry[base_entry]
                     po_no = str(base_po.get("DocNum") or "")
-                    po_comments = str(base_po.get("Comments") or "").strip()
+                    po_comments = str(base_po.get("U_Remark") or "").strip()
                     if base_po.get("DocDate"):
                         po_date = str(base_po.get("DocDate")).split("T")[0]
-                    for pl in base_po.get("DocumentLines", []):
-                        if pl.get("LineNum") == base_line or pl.get("ItemCode") == code:
-                            po_qty = float(pl.get("Quantity") or 0.0)
-                            break
+
+                    matched_pl = None
+                    if base_line is not None:
+                        try:
+                            bl_int = int(base_line)
+                            matched_pl = next((pl for pl in base_po.get("DocumentLines", []) if pl.get("LineNum") == bl_int), None)
+                        except (ValueError, TypeError):
+                            pass
+                    if not matched_pl:
+                        matched_pl = next((pl for pl in base_po.get("DocumentLines", []) if pl.get("ItemCode") == code), None)
+
+                    if matched_pl:
+                        po_qty = float(matched_pl.get("Quantity") or 0.0)
+                        po_line_num = int(matched_pl.get("LineNum", 0))
                     if not po_qty:
                         po_qty = rcvd_qty
 
@@ -510,13 +561,14 @@ class StockConfigurationService:
                     except (ValueError, TypeError):
                         pass
 
-                # Reference SAP SQL query:
-                # Branch 1 (linked to Sales Order via OPOR.ImportEnt): QTY = SO quantity from ORDR/RDR1
-                # Branch 2 (regular PO where OPOR.ImportEnt IS NULL, or direct GRPO): QTY = 0.0
                 qty = so_qty if (so_no and so_qty > 0) else 0.0
 
-                received_map[code] = {
+                record_data = {
+                    "row_id": row_id,
+                    "item_code": code,
                     "grpo_no": grpo_no,
+                    "grpo_doc_entry": grpo_doc_entry,
+                    "grpo_line_num": grpo_line_num,
                     "grn_date": grn_date,
                     "rcvd_qty": rcvd_qty,
                     "ok_qty": ok_qty,
@@ -525,15 +577,32 @@ class StockConfigurationService:
                     "vendor_code": vendor_code,
                     "po_no": po_no,
                     "po_doc_entry": int(base_entry) if (base_type == 22 and base_entry) else (int(po_no) if po_no and str(po_no).isdigit() else None),
+                    "po_line_num": po_line_num if base_type == 22 and base_entry else 0,
                     "po_date": po_date,
                     "po_qty": po_qty,
-                    "po_comments": po_comments,
+                    "po_comments": grpo_remark or po_comments,
+                    "remark": grpo_remark,
+                    "qc": qc_pdn1,
+                    "drw_yn": drw_pdn1,
+                    "v_chk": v_chk_pdn1,
+                    "lm": lm_pdn1,
+                    "olng": olng_pdn1,
+                    "lpk": lpk_pdn1,
+                    "lbl": lbl_pdn1,
+                    "mc_or_pt": mc_or_pt_pdn1,
+                    "last_submitted_at": last_updated_pdn1,
                     "so_no": so_no if so_qty > 0 else "",
                     "so_date": so_date if so_qty > 0 else None,
                     "so_qty": so_qty,
                     "qty": qty,
                     "item_desc": l.get("ItemDescription"),
                 }
+
+                # Store by row_id (composite key) to keep receipts separate
+                received_map[row_id] = record_data
+                # Also store by item_code (first/latest seen takes precedence for code-level lookups)
+                if code not in received_map:
+                    received_map[code] = record_data
 
         # 6. Build pending_po_map (for items on POs not yet received in recent GRPOs)
         pending_po_map = {}
@@ -542,7 +611,7 @@ class StockConfigurationService:
             po_no = str(p.get("DocNum") or "")
             po_date_raw = p.get("DocDate")
             po_date = str(po_date_raw).split("T")[0] if po_date_raw else None
-            po_comments = str(p.get("Comments") or "").strip()
+            po_comments = str(p.get("U_Remark") or "").strip()
             vendor_name = p.get("CardName") or ""
             vendor_code = p.get("CardCode") or ""
             imp_file = p.get("ImportFileNum")
@@ -575,15 +644,36 @@ class StockConfigurationService:
                 qty = so_qty if (so_no and so_qty > 0) else 0.0
 
                 if open_qty > 0 or float(l.get("Quantity") or 0.0) > 0:
+                    p_line_num = int(l.get("LineNum", 0)) if l.get("LineNum") is not None else 0
+                    qc_por1 = clean_qc(l.get("U_QC"))
+                    drw_por1 = clean_yn(l.get("U_DRW"))
+                    v_chk_por1 = clean_yn(l.get("U_VCHK"))
+                    lm_por1 = clean_yn(l.get("U_LM"))
+                    olng_por1 = clean_yn(l.get("U_OLNG"))
+                    lpk_por1 = clean_yn(l.get("U_IPK"))
+                    lbl_por1 = clean_yn(l.get("U_LBL"))
+                    mc_or_pt_por1 = clean_yn(l.get("U_MCorPT"))
+                    last_updated_por1 = str(l.get("U_LUpdated") or "").strip() or None
+
                     pending_po_map[code] = {
                         "po_no": po_no,
                         "po_doc_entry": int(po_entry) if po_entry else (int(po_no) if po_no and str(po_no).isdigit() else None),
+                        "po_line_num": p_line_num,
                         "po_date": po_date,
                         "po_qty": float(l.get("Quantity") or 0.0),
                         "po_comments": po_comments,
                         "open_qty": open_qty,
                         "vendor_name": vendor_name,
                         "vendor_code": vendor_code,
+                        "qc": None,
+                        "drw_yn": None,
+                        "v_chk": None,
+                        "lm": None,
+                        "olng": None,
+                        "lpk": None,
+                        "lbl": None,
+                        "mc_or_pt": None,
+                        "last_submitted_at": None,
                         "so_no": so_no if so_qty > 0 else "",
                         "so_date": so_date if so_qty > 0 else None,
                         "so_qty": so_qty,
@@ -666,21 +756,27 @@ class StockConfigurationService:
                     fb_row["updated_at"] = sap_last_updated
                     # One-way submission protection: website-entered values remain authoritative
                     is_website_authoritative = bool(fb_row.get("last_submitted_at"))
+                    rm = received_map.get(code)
+                    pm = pending_po_map.get(code)
+                    info = rm or pm or {}
                     if not is_website_authoritative:
                         s_wt = float(s_it.get("PurchaseUnitWeight") or s_it.get("InventoryWeight") or s_it.get("SalesUnitWeight") or s_it.get("U_PerPices") or 0.0)
                         if s_wt > 0 and not fb_row.get("nt_weight"):
                             fb_row["nt_weight"] = round(s_wt, 4)
-                        s_drw = clean_yn(s_it.get("U_Drawing") or s_it.get("U_JobDrawing"))
-                        if s_drw and not fb_row.get("drw_yn"):
-                            fb_row["drw_yn"] = s_drw
-                        if s_it.get("U_QC") is not None and fb_row.get("qc") is None:
-                            fb_row["qc"] = clean_qc(s_it.get("U_QC"))
-                        for s_k, fb_k in [("U_V_Chk", "v_chk"), ("U_LM", "lm"), ("U_OLNG", "olng"), ("U_LPK", "lpk"), ("U_LBL", "lbl"), ("U_MC_OR_PT", "mc_or_pt")]:
-                            if s_it.get(s_k) is not None and not fb_row.get(fb_k):
-                                fb_row[fb_k] = clean_yn(s_it.get(s_k))
+                        # Inspection fields retrieved strictly from POR1; do not use OITM as fallback
+                        if info.get("qc") is not None:
+                            fb_row["qc"] = info["qc"]
+                        for f_k in ["drw_yn", "v_chk", "lm", "olng", "lpk", "lbl", "mc_or_pt"]:
+                            if info.get(f_k):
+                                fb_row[f_k] = info[f_k]
+                        if info.get("last_submitted_at"):
+                            fb_row["last_submitted_at"] = info["last_submitted_at"]
                     if code in received_map:
                         rm = received_map[code]
                         fb_row["grpo_no"] = rm.get("grpo_no") or fb_row.get("grpo_no", "")
+                        fb_row["grpo_doc_entry"] = rm.get("grpo_doc_entry") or fb_row.get("grpo_doc_entry")
+                        fb_row["grpo_line_num"] = rm.get("grpo_line_num") if rm.get("grpo_line_num") is not None else fb_row.get("grpo_line_num")
+                        fb_row["row_id"] = rm.get("row_id") or (f"{code}_{rm.get('grpo_doc_entry')}_{rm.get('grpo_line_num', 0)}" if rm.get("grpo_doc_entry") is not None else code)
                         fb_row["grn_date"] = rm.get("grn_date") or fb_row.get("grn_date")
                         fb_row["entry_date"] = rm.get("grn_date") or rm.get("po_date") or fb_row.get("entry_date")
                         fb_row["rcvd_qty"] = rm.get("rcvd_qty", fb_row.get("rcvd_qty", 0.0))
@@ -688,10 +784,12 @@ class StockConfigurationService:
                         fb_row["rej_qty"] = rm.get("rej_qty", fb_row.get("rej_qty", 0.0))
                         fb_row["po_no"] = rm.get("po_no") or fb_row.get("po_no", "")
                         fb_row["po_doc_entry"] = rm.get("po_doc_entry") or fb_row.get("po_doc_entry")
+                        fb_row["po_line_num"] = rm.get("po_line_num") if rm.get("po_line_num") is not None else fb_row.get("po_line_num")
                         fb_row["po_date"] = rm.get("po_date") or fb_row.get("po_date")
                         fb_row["po_qty"] = rm.get("po_qty", fb_row.get("po_qty", 0.0))
-                        if rm.get("po_comments") and not is_website_authoritative and not fb_row.get("remark"):
-                            fb_row["remark"] = rm["po_comments"]
+                        effective_remark = rm.get("remark") or rm.get("po_comments")
+                        if effective_remark and not is_website_authoritative and not fb_row.get("remark"):
+                            fb_row["remark"] = effective_remark
                         fb_row["so_no"] = rm.get("so_no", "")
                         fb_row["so_date"] = rm.get("so_date")
                         fb_row["so_qty"] = rm.get("so_qty", 0.0)
@@ -701,8 +799,10 @@ class StockConfigurationService:
                         fb_row["record_category"] = "Received Stock"
                     elif code in pending_po_map:
                         pm = pending_po_map[code]
+                        fb_row["row_id"] = pm.get("row_id") or code
                         fb_row["po_no"] = pm.get("po_no") or fb_row.get("po_no", "")
                         fb_row["po_doc_entry"] = pm.get("po_doc_entry") or fb_row.get("po_doc_entry")
+                        fb_row["po_line_num"] = pm.get("po_line_num") if pm.get("po_line_num") is not None else fb_row.get("po_line_num")
                         fb_row["po_date"] = pm.get("po_date") or fb_row.get("po_date")
                         fb_row["entry_date"] = pm.get("po_date") or fb_row.get("entry_date")
                         fb_row["po_qty"] = pm.get("po_qty", fb_row.get("po_qty", 0.0))
@@ -725,6 +825,7 @@ class StockConfigurationService:
                     item_create = str(s_it.get("CreateDate")).split("T")[0] if s_it.get("CreateDate") else now.strftime("%Y-%m-%d")
                     new_item = {
                         "sr_no": len(fallback_items) + 1,
+                        "row_id": info.get("row_id") or (f"{code}_{info.get('grpo_doc_entry')}_{info.get('grpo_line_num', 0)}" if info.get("grpo_doc_entry") is not None else code),
                         "item_code": code,
                         "description": name,
                         "qty": c_qty,
@@ -732,26 +833,28 @@ class StockConfigurationService:
                         "vendor_name": info.get("vendor_name", ""),
                         "vendor_code": info.get("vendor_code", ""),
                         "grpo_no": info.get("grpo_no", ""),
+                        "grpo_doc_entry": info.get("grpo_doc_entry"),
+                        "grpo_line_num": info.get("grpo_line_num"),
                         "rcvd_qty": r_qty,
                         "nt_weight": round(float(s_it.get("PurchaseUnitWeight") or s_it.get("InventoryWeight") or s_it.get("SalesUnitWeight") or s_it.get("U_PerPices") or 0.0), 4),
-                        "qc": clean_qc(s_it.get("U_QC")) if clean_qc(s_it.get("U_QC")) is not None else True,
-                        "drw_yn": clean_yn(s_it.get("U_Drawing") or s_it.get("U_JobDrawing")) or "Y",
-                        "v_chk": clean_yn(s_it.get("U_V_Chk")) or "Y",
+                        "qc": info.get("qc") if info.get("qc") is not None else True,
+                        "drw_yn": info.get("drw_yn") or "Y",
+                        "v_chk": info.get("v_chk") or "Y",
                         "ok_qty": float(info.get("ok_qty", 0.0)),
                         "rej_qty": float(info.get("rej_qty", 0.0)),
-                        "lm": clean_yn(s_it.get("U_LM")) or "Y",
-                        "olng": clean_yn(s_it.get("U_OLNG")) or "Y",
-                        "lpk": clean_yn(s_it.get("U_LPK")) or "Y",
-                        "lbl": clean_yn(s_it.get("U_LBL")) or "Y",
-                        "mc_or_pt": clean_yn(s_it.get("U_MC_OR_PT")) or "Y",
-                        "items_group_code": str(s_it.get("U_SUBG") or s_it.get("ItemsGroupCode") or "Standard"),
+                        "lm": info.get("lm") or "Y",
+                        "olng": info.get("olng") or "Y",
+                        "lpk": info.get("lpk") or "Y",
+                        "lbl": info.get("lbl") or "Y",
+                        "mc_or_pt": info.get("mc_or_pt") or "Y",
+                        "last_submitted_at": info.get("last_submitted_at"),
                         "warehouse_code": "01",
                         "is_active": is_active,
                         "entry_date": info.get("grn_date") or info.get("po_date") or item_create,
                         "created_at": now.isoformat(),
                         "updated_at": sap_last_updated,
-                        "last_submitted_at": None,
-                        "remark": (info.get("po_comments") or str(s_it.get("User_Text") or "")).strip(),
+                        "last_submitted_at": info.get("last_submitted_at"),
+                        "remark": (info.get("remark") or info.get("po_comments") or str(s_it.get("User_Text") or "")).strip(),
                         "last_submitted_by": None,
                         "record_category": "Received Stock" if rm else ("Pending Receipt" if pm else "Item Master"),
                         "item_create_date": item_create,
@@ -760,6 +863,7 @@ class StockConfigurationService:
                         "grn_date": info.get("grn_date"),
                         "po_no": info.get("po_no", ""),
                         "po_doc_entry": info.get("po_doc_entry"),
+                        "po_line_num": info.get("po_line_num"),
                         "so_no": info.get("so_no", ""),
                         "so_qty": float(info.get("so_qty", 0.0)),
                         "po_qty": p_qty,
@@ -786,6 +890,7 @@ class StockConfigurationService:
         page: int = 1,
         page_size: int = 10,
         search: Optional[str] = None,
+        so_no: Optional[str] = None,
         vendor: Optional[str] = None,
         group: Optional[str] = None,
         warehouse: Optional[str] = None,
@@ -829,6 +934,10 @@ class StockConfigurationService:
                         s = f"%{search.strip()}%"
                         conditions.append("(item_code LIKE %(search)s OR description LIKE %(search)s OR vendor_name LIKE %(search)s)")
                         params["search"] = s
+
+                    if so_no and so_no.strip():
+                        conditions.append("so_no LIKE %(so_no)s")
+                        params["so_no"] = f"%{so_no.strip()}%"
 
                     if vendor and vendor.strip() and vendor.strip().lower() != "all vendors":
                         conditions.append("vendor_name LIKE %(vendor)s")
@@ -937,6 +1046,12 @@ class StockConfigurationService:
                         for num_col in ["qty", "stock_qty", "rcvd_qty", "nt_weight", "ok_qty", "rej_qty", "so_qty", "po_qty"]:
                             if item_dict.get(num_col) is not None:
                                 item_dict[num_col] = float(item_dict[num_col])
+                        for int_col in ["po_doc_entry", "po_line_num", "grpo_doc_entry", "grpo_line_num"]:
+                            if item_dict.get(int_col) is not None:
+                                try:
+                                    item_dict[int_col] = int(item_dict[int_col])
+                                except (ValueError, TypeError):
+                                    pass
                         for d_col in ["entry_date", "item_create_date", "so_date", "po_date", "grn_date"]:
                             if isinstance(item_dict.get(d_col), (datetime, date)):
                                 item_dict[d_col] = item_dict[d_col].isoformat()
@@ -971,6 +1086,9 @@ class StockConfigurationService:
                     or st in str(it.get("description", "")).lower()
                     or st in str(it.get("vendor_name", "")).lower()
                 ]
+            if so_no and so_no.strip():
+                sot = so_no.strip().lower()
+                filtered = [it for it in filtered if sot in str(it.get("so_no", "")).lower()]
             if vendor and vendor.strip() and vendor.strip().lower() != "all vendors":
                 vt = vendor.strip().lower()
                 filtered = [it for it in filtered if vt in str(it.get("vendor_name", "")).lower()]
@@ -1092,76 +1210,12 @@ class StockConfigurationService:
                 sap_payload["PurchaseUnitWeight"] = w_val
                 sap_payload["SalesUnitWeight"] = w_val
                 # In RMPL_DEMO database, U_PerPices is registered with 0 decimals (integer)
-                # Commented out per requirement:
-                # sap_payload["U_PerPices"] = int(round(w_val))
-                sap_written_fields.extend(["InventoryWeight", "PurchaseUnitWeight", "SalesUnitWeight"])
+                sap_payload["U_PerPices"] = int(round(w_val))
+                sap_written_fields.extend(["InventoryWeight", "PurchaseUnitWeight", "SalesUnitWeight", "U_PerPices"])
             except (ValueError, TypeError) as ex:
                 raise ValueError(f"Invalid numeric value for 'nt_weight': {ex}")
 
-        # 2. DRW. Y/N -> Maps to U_Drawing (db_Alpha(50))
-        drw_input = data.get("drw_yn") if "drw_yn" in data else data.get("drawing", data.get("drw"))
-        if drw_input is not None:
-            drw_val = clean_yn(drw_input)
-            if drw_val in ("Y", "N"):
-                sap_payload["U_Drawing"] = drw_val
-                sap_written_fields.append("U_Drawing")
-
-        # 3. QC -> Maps to U_QC (db_Alpha(1): 'Y' / 'N')
-        if "qc" in data and data["qc"] is not None:
-            qc_bool = clean_qc(data["qc"])
-            if qc_bool is not None:
-                sap_payload["U_QC"] = "Y" if qc_bool else "N"
-                sap_written_fields.append("U_QC")
-
-        # 5. V CHK -> Maps to U_V_Chk (db_Alpha(1): 'Y' / 'N')
-        v_chk_input = data.get("v_chk") if "v_chk" in data else data.get("U_V_Chk")
-        if v_chk_input is not None:
-            v_chk_val = clean_yn(v_chk_input)
-            if v_chk_val in ("Y", "N"):
-                sap_payload["U_V_Chk"] = v_chk_val
-                sap_written_fields.append("U_V_Chk")
-
-        # 6. LM -> Maps to U_LM (db_Alpha(1): 'Y' / 'N')
-        lm_input = data.get("lm") if "lm" in data else data.get("U_LM")
-        if lm_input is not None:
-            lm_val = clean_yn(lm_input)
-            if lm_val in ("Y", "N"):
-                sap_payload["U_LM"] = lm_val
-                sap_written_fields.append("U_LM")
-
-        # 7. OLNG -> Maps to U_OLNG (db_Alpha(1): 'Y' / 'N')
-        olng_input = data.get("olng") if "olng" in data else data.get("U_OLNG")
-        if olng_input is not None:
-            olng_val = clean_yn(olng_input)
-            if olng_val in ("Y", "N"):
-                sap_payload["U_OLNG"] = olng_val
-                sap_written_fields.append("U_OLNG")
-
-        # 8. LPK / I PK -> Maps to U_LPK (db_Alpha(1): 'Y' / 'N')
-        lpk_input = data.get("lpk") if "lpk" in data else (data.get("i_pk") if "i_pk" in data else data.get("U_LPK"))
-        if lpk_input is not None:
-            lpk_val = clean_yn(lpk_input)
-            if lpk_val in ("Y", "N"):
-                sap_payload["U_LPK"] = lpk_val
-                sap_written_fields.append("U_LPK")
-
-        # 9. LBL -> Maps to U_LBL (db_Alpha(1): 'Y' / 'N')
-        lbl_input = data.get("lbl") if "lbl" in data else data.get("U_LBL")
-        if lbl_input is not None:
-            lbl_val = clean_yn(lbl_input)
-            if lbl_val in ("Y", "N"):
-                sap_payload["U_LBL"] = lbl_val
-                sap_written_fields.append("U_LBL")
-
-        # 10. MC OR PT -> Maps to U_MC_OR_PT (db_Alpha(1): 'Y' / 'N')
-        mc_input = data.get("mc_or_pt") if "mc_or_pt" in data else (data.get("mc_pt") if "mc_pt" in data else data.get("U_MC_OR_PT"))
-        if mc_input is not None:
-            mc_val = clean_yn(mc_input)
-            if mc_val in ("Y", "N"):
-                sap_payload["U_MC_OR_PT"] = mc_val
-                sap_written_fields.append("U_MC_OR_PT")
-
-        # 11. REMARKS fallback -> Item Master memo 'User_Text' (only when the row has no Purchase Order)
+        # REMARKS fallback -> Item Master memo 'User_Text' (only when the row has no Purchase Order)
         if "User_Text" in data and data["User_Text"] is not None:
             sap_payload["User_Text"] = str(data["User_Text"]).strip()
             sap_written_fields.append("User_Text")
@@ -1189,7 +1243,7 @@ class StockConfigurationService:
             raise SAPConnectionError(f"SAP Service Layer authentication failed: {auth_err}")
 
         # Pre-read current SAP item to ensure existence and capture baseline values
-        select_props = "ItemCode,ItemName,InventoryWeight,PurchaseUnitWeight,SalesUnitWeight,U_Drawing,U_PerPices,U_QC,U_V_Chk,U_LM,U_OLNG,U_LPK,U_LBL,U_MC_OR_PT,User_Text,UpdateDate,UpdateTime"
+        select_props = "ItemCode,ItemName,InventoryWeight,PurchaseUnitWeight,SalesUnitWeight,U_PerPices,User_Text,UpdateDate,UpdateTime"
         try:
             pre_item = client.get(
                 f"Items('{code}')?$select={select_props}"
@@ -1205,15 +1259,7 @@ class StockConfigurationService:
             "InventoryWeight": pre_item.get("InventoryWeight"),
             "PurchaseUnitWeight": pre_item.get("PurchaseUnitWeight"),
             "SalesUnitWeight": pre_item.get("SalesUnitWeight"),
-            "U_Drawing": pre_item.get("U_Drawing"),
             "U_PerPices": pre_item.get("U_PerPices"),
-            "U_QC": pre_item.get("U_QC"),
-            "U_V_Chk": pre_item.get("U_V_Chk"),
-            "U_LM": pre_item.get("U_LM"),
-            "U_OLNG": pre_item.get("U_OLNG"),
-            "U_LPK": pre_item.get("U_LPK"),
-            "U_LBL": pre_item.get("U_LBL"),
-            "U_MC_OR_PT": pre_item.get("U_MC_OR_PT"),
             "User_Text": pre_item.get("User_Text"),
             "UpdateDate": pre_item.get("UpdateDate"),
             "UpdateTime": pre_item.get("UpdateTime"),
@@ -1227,15 +1273,15 @@ class StockConfigurationService:
             if k in ("InventoryWeight", "PurchaseUnitWeight", "SalesUnitWeight"):
                 if pre_v is None or abs(float(pre_v) - float(v)) > 0.01:
                     is_different = True
-            # elif k == "U_PerPices":
-            #     if pre_v is None:
-            #         is_different = True
-            #     else:
-            #         try:
-            #             if int(round(float(pre_v))) != int(v):
-            #                 is_different = True
-            #         except (ValueError, TypeError):
-            #             is_different = True
+            elif k == "U_PerPices":
+                if pre_v is None:
+                    is_different = True
+                else:
+                    try:
+                        if int(round(float(pre_v))) != int(v):
+                            is_different = True
+                    except (ValueError, TypeError):
+                        is_different = True
             else:
                 str_pre = str(pre_v or "").strip().upper()
                 str_v = str(v or "").strip().upper()
@@ -1302,15 +1348,7 @@ class StockConfigurationService:
             "InventoryWeight": post_item.get("InventoryWeight"),
             "PurchaseUnitWeight": post_item.get("PurchaseUnitWeight"),
             "SalesUnitWeight": post_item.get("SalesUnitWeight"),
-            "U_Drawing": post_item.get("U_Drawing"),
             "U_PerPices": post_item.get("U_PerPices"),
-            "U_QC": post_item.get("U_QC"),
-            "U_V_Chk": post_item.get("U_V_Chk"),
-            "U_LM": post_item.get("U_LM"),
-            "U_OLNG": post_item.get("U_OLNG"),
-            "U_LPK": post_item.get("U_LPK"),
-            "U_LBL": post_item.get("U_LBL"),
-            "U_MC_OR_PT": post_item.get("U_MC_OR_PT"),
             "User_Text": post_item.get("User_Text"),
             "UpdateDate": post_item.get("UpdateDate"),
             "UpdateTime": post_item.get("UpdateTime"),
@@ -1336,28 +1374,20 @@ class StockConfigurationService:
             if actual_s_wt is None or abs(float(actual_s_wt) - float(expected_s_wt)) > 0.01:
                 verification_mismatches.append(f"SalesUnitWeight expected {expected_s_wt}, got {actual_s_wt}")
 
-        if "U_Drawing" in filtered_payload:
-            actual_drw = str(post_item.get("U_Drawing") or "").strip().upper()
-            expected_drw = str(filtered_payload["U_Drawing"]).strip().upper()
-            if actual_drw != expected_drw:
-                verification_mismatches.append(f"U_Drawing expected '{expected_drw}', got '{actual_drw}'")
+        if "U_PerPices" in filtered_payload:
+            actual_pp = post_item.get("U_PerPices")
+            expected_pp = filtered_payload["U_PerPices"]
+            try:
+                if actual_pp is None or int(round(float(actual_pp))) != int(expected_pp):
+                    verification_mismatches.append(f"U_PerPices expected {expected_pp}, got {actual_pp}")
+            except (ValueError, TypeError):
+                verification_mismatches.append(f"U_PerPices conversion error: expected {expected_pp}, got {actual_pp}")
 
-        # Note: U_PerPices verification commented out per requirement
-        # if "U_PerPices" in filtered_payload:
-        #     actual_pp = post_item.get("U_PerPices")
-        #     expected_pp = filtered_payload["U_PerPices"]
-        #     try:
-        #         if actual_pp is None or int(round(float(actual_pp))) != int(expected_pp):
-        #             verification_mismatches.append(f"U_PerPices expected {expected_pp}, got {actual_pp}")
-        #     except (ValueError, TypeError):
-        #         verification_mismatches.append(f"U_PerPices conversion error: expected {expected_pp}, got {actual_pp}")
-
-        for u_prop in ["U_QC", "U_V_Chk", "U_LM", "U_OLNG", "U_LPK", "U_LBL", "U_MC_OR_PT", "User_Text"]:
-            if u_prop in filtered_payload:
-                actual_val = str(post_item.get(u_prop) or "").strip().upper()
-                expected_val = str(filtered_payload[u_prop]).strip().upper()
-                if actual_val != expected_val:
-                    verification_mismatches.append(f"{u_prop} expected '{expected_val}', got '{actual_val}'")
+        if "User_Text" in filtered_payload:
+            actual_ut = str(post_item.get("User_Text") or "").strip()
+            expected_ut = str(filtered_payload["User_Text"]).strip()
+            if actual_ut != expected_ut:
+                verification_mismatches.append(f"User_Text expected '{expected_ut}', got '{actual_ut}'")
 
         if verification_mismatches:
             err_msg = "; ".join(verification_mismatches)
@@ -1408,6 +1438,165 @@ class StockConfigurationService:
             "message": msg,
         }
 
+    def resolve_po_doc_and_line(
+        self,
+        item_code: str,
+        po_no: Optional[str] = None,
+        po_doc_entry: Optional[int] = None,
+        po_line_num: Optional[int] = None,
+        grpo_no: Optional[str] = None,
+    ) -> Tuple[Optional[int], Optional[int], Optional[str]]:
+        """
+        Authoritatively resolve the Purchase Order DocEntry, LineNum, and DocNum for an item row.
+        Priority:
+        1. Explicit po_doc_entry and po_line_num provided in arguments.
+        2. Stored po_doc_entry and po_line_num in local database / JSON record.
+        3. Lookup via po_no in SAP PurchaseOrders ($filter=DocNum eq {po_no}).
+           - Inspect DocumentLines for matching ItemCode.
+           - If 1 line matches: return its LineNum.
+           - If multiple lines match without explicit po_line_num: reject ambiguous match.
+        4. Lookup via GRPO BaseEntry / BaseLine in SAP PurchaseDeliveryNotes.
+        """
+        code = str(item_code).strip()
+        existing = self.get_item(code) if code else None
+
+        eff_doc_entry = None
+        if po_doc_entry is not None:
+            try:
+                e = int(po_doc_entry)
+                if e > 0:
+                    eff_doc_entry = e
+            except (ValueError, TypeError):
+                pass
+        if eff_doc_entry is None and existing and existing.get("po_doc_entry"):
+            try:
+                e = int(existing["po_doc_entry"])
+                if e > 0:
+                    eff_doc_entry = e
+            except (ValueError, TypeError):
+                pass
+
+        eff_line_num = None
+        if po_line_num is not None:
+            try:
+                ln = int(po_line_num)
+                if ln >= 0:
+                    eff_line_num = ln
+            except (ValueError, TypeError):
+                pass
+        if eff_line_num is None and existing and existing.get("po_line_num") is not None:
+            try:
+                ln = int(existing["po_line_num"])
+                if ln >= 0:
+                    eff_line_num = ln
+            except (ValueError, TypeError):
+                pass
+
+        eff_po_no = str(po_no or (existing.get("po_no") if existing else "") or "").strip()
+        eff_grpo_no = str(grpo_no or (existing.get("grpo_no") if existing else "") or "").strip()
+
+        # Both identifiers explicitly known
+        if eff_doc_entry is not None and eff_line_num is not None:
+            return eff_doc_entry, eff_line_num, eff_po_no or str(eff_doc_entry)
+
+        client = get_sap_client()
+
+        # DocEntry known, need LineNum
+        if eff_doc_entry is not None and eff_line_num is None:
+            try:
+                if client.session_id:
+                    po_doc = client.get(f"PurchaseOrders({eff_doc_entry})?$select=DocEntry,DocNum,DocumentLines")
+                    if po_doc:
+                        eff_po_no = str(po_doc.get("DocNum") or eff_po_no or eff_doc_entry)
+                        lines = [l for l in po_doc.get("DocumentLines", []) if l.get("ItemCode") == code]
+                        if len(lines) == 1:
+                            return eff_doc_entry, int(lines[0]["LineNum"]), eff_po_no
+                        elif len(lines) > 1:
+                            raise ValueError(f"Ambiguous match: Item '{code}' appears on multiple lines of Purchase Order {eff_po_no}. Explicit po_line_num is required.")
+                        elif len(lines) == 0:
+                            raise ValueError(f"Item '{code}' not found in Purchase Order {eff_po_no} (DocEntry {eff_doc_entry}).")
+            except ValueError:
+                raise
+            except Exception as e:
+                logger.debug(f"SAP PO line lookup failed for DocEntry {eff_doc_entry}: {e}")
+
+        # Lookup by DocNum
+        if eff_po_no:
+            clean_po = eff_po_no.strip()
+            if clean_po.isdigit():
+                try:
+                    if client.session_id:
+                        res = client.get("PurchaseOrders", params={
+                            "$filter": f"DocNum eq {clean_po}",
+                            "$select": "DocEntry,DocNum,DocumentLines",
+                        })
+                        vals = res.get("value", []) if isinstance(res, dict) else []
+                        if len(vals) > 1:
+                            matching_docs = [
+                                v for v in vals
+                                if any(l.get("ItemCode") == code for l in v.get("DocumentLines", []))
+                            ]
+                            if len(matching_docs) > 1:
+                                raise ValueError(f"Ambiguous match: Item '{code}' found in multiple Purchase Order documents with DocNum '{clean_po}'.")
+                            elif len(matching_docs) == 1:
+                                vals = matching_docs
+                        if len(vals) == 1:
+                            po_obj = vals[0]
+                            found_doc_entry = int(po_obj["DocEntry"])
+                            matching_lines = [l for l in po_obj.get("DocumentLines", []) if l.get("ItemCode") == code]
+                            if eff_line_num is not None:
+                                target_l = next((l for l in matching_lines if l.get("LineNum") == eff_line_num), None)
+                                if target_l:
+                                    return found_doc_entry, eff_line_num, clean_po
+                                else:
+                                    raise ValueError(f"Line {eff_line_num} with item '{code}' not found in Purchase Order {clean_po}.")
+                            if len(matching_lines) == 1:
+                                return found_doc_entry, int(matching_lines[0]["LineNum"]), clean_po
+                            elif len(matching_lines) > 1:
+                                raise ValueError(f"Ambiguous match: Item '{code}' appears on multiple lines of Purchase Order {clean_po}. Explicit po_line_num is required.")
+                            elif len(matching_lines) == 0:
+                                raise ValueError(f"Item '{code}' not found in Purchase Order {clean_po}.")
+                except ValueError:
+                    raise
+                except Exception as e:
+                    logger.debug(f"SAP PO DocNum lookup failed for {clean_po}: {e}")
+
+        # Fallback to GRPO BaseEntry / BaseLine
+        if eff_grpo_no and eff_grpo_no.isdigit():
+            try:
+                if client.session_id:
+                    res = client.get("PurchaseDeliveryNotes", params={
+                        "$filter": f"DocNum eq {eff_grpo_no}",
+                        "$select": "DocEntry,DocNum,DocumentLines",
+                        "$top": 1,
+                    })
+                    vals = res.get("value", []) if isinstance(res, dict) else []
+                    if vals:
+                        lines = vals[0].get("DocumentLines", [])
+                        for l in lines:
+                            if l.get("ItemCode") == code and l.get("BaseType") == 22 and l.get("BaseEntry"):
+                                base_e = int(l["BaseEntry"])
+                                base_l = int(l.get("BaseLine", 0))
+                                po_num_str = eff_po_no
+                                if not po_num_str:
+                                    try:
+                                        po_doc = client.get(f"PurchaseOrders({base_e})?$select=DocNum")
+                                        if po_doc and po_doc.get("DocNum"):
+                                            po_num_str = str(po_doc["DocNum"])
+                                    except Exception:
+                                        po_num_str = str(base_e)
+                                return base_e, base_l, po_num_str or str(base_e)
+            except Exception as grpo_err:
+                logger.debug(f"SAP GRPO base PO lookup failed: {grpo_err}")
+
+        # If po_doc_entry was present but line was not found via API, fallback for test/demo mode
+        if eff_doc_entry is not None:
+            return eff_doc_entry, eff_line_num if eff_line_num is not None else 0, eff_po_no or str(eff_doc_entry)
+        if eff_po_no and eff_po_no.isdigit():
+            return int(eff_po_no), eff_line_num if eff_line_num is not None else 0, eff_po_no
+
+        raise ValueError(f"No associated Purchase Order found for item '{code}'.")
+
     def resolve_po_doc_entry(
         self,
         item_code: str,
@@ -1416,74 +1605,106 @@ class StockConfigurationService:
     ) -> Optional[int]:
         """
         Resolve the authoritative Purchase Order DocEntry for an item row.
-        Priority:
-        1. Directly provided po_doc_entry (> 0)
-        2. Stored po_doc_entry in local database / JSON record
-        3. Lookup via po_no in SAP PurchaseOrders ($filter=DocNum eq {po_no})
-        4. Lookup via GRPO BaseEntry in SAP PurchaseDeliveryNotes
         """
-        if po_doc_entry is not None:
-            try:
-                e = int(po_doc_entry)
-                if e > 0:
-                    return e
-            except (ValueError, TypeError):
-                pass
+        try:
+            doc_entry, _, _ = self.resolve_po_doc_and_line(item_code, po_no=po_no, po_doc_entry=po_doc_entry)
+            return doc_entry
+        except Exception:
+            return None
 
+    def resolve_grpo_doc_and_line(
+        self,
+        item_code: str,
+        grpo_no: Optional[str] = None,
+        grpo_doc_entry: Optional[int] = None,
+        grpo_line_num: Optional[int] = None,
+    ) -> Tuple[int, int, str]:
+        """
+        Resolve the authoritative Goods Receipt PO DocEntry and LineNum for an item row.
+        """
         code = str(item_code).strip()
         existing = self.get_item(code) if code else None
-        if existing and existing.get("po_doc_entry"):
+
+        eff_doc_entry = None
+        if grpo_doc_entry is not None:
             try:
-                e = int(existing["po_doc_entry"])
+                e = int(grpo_doc_entry)
                 if e > 0:
-                    return e
+                    eff_doc_entry = e
+            except (ValueError, TypeError):
+                pass
+        if eff_doc_entry is None and existing and existing.get("grpo_doc_entry"):
+            try:
+                e = int(existing["grpo_doc_entry"])
+                if e > 0:
+                    eff_doc_entry = e
             except (ValueError, TypeError):
                 pass
 
-        # Try to resolve from po_no
-        eff_po_no = po_no or (existing.get("po_no") if existing else None)
-        if eff_po_no:
-            eff_clean = str(eff_po_no).strip()
-            if eff_clean.isdigit():
-                try:
-                    client = get_sap_client()
-                    if client.session_id:
-                        res = client.get("PurchaseOrders", params={
-                            "$filter": f"DocNum eq {eff_clean}",
-                            "$select": "DocEntry,DocNum",
-                            "$top": 1,
-                        })
-                        vals = res.get("value", []) if isinstance(res, dict) else []
-                        if vals and vals[0].get("DocEntry"):
-                            return int(vals[0]["DocEntry"])
-                except Exception as po_lookup_err:
-                    logger.debug(f"SAP PO lookup for {eff_po_no} skipped: {po_lookup_err}")
-                # Fallback: in demo / standard SAP environments, DocNum often matches DocEntry
-                return int(eff_clean)
+        eff_line_num = None
+        if grpo_line_num is not None:
+            try:
+                ln = int(grpo_line_num)
+                if ln >= 0:
+                    eff_line_num = ln
+            except (ValueError, TypeError):
+                pass
+        if eff_line_num is None and existing and existing.get("grpo_line_num") is not None:
+            try:
+                ln = int(existing["grpo_line_num"])
+                if ln >= 0:
+                    eff_line_num = ln
+            except (ValueError, TypeError):
+                pass
 
-        # Try to resolve from GRPO base entry if available
-        eff_grpo_no = existing.get("grpo_no") if existing else None
-        if eff_grpo_no:
-            eff_grpo_clean = str(eff_grpo_no).strip()
-            if eff_grpo_clean.isdigit():
-                try:
-                    client = get_sap_client()
-                    if client.session_id:
-                        res = client.get("PurchaseDeliveryNotes", params={
-                            "$filter": f"DocNum eq {eff_grpo_clean}",
-                            "$select": "DocEntry,DocNum,DocumentLines",
-                            "$top": 1,
-                        })
-                        vals = res.get("value", []) if isinstance(res, dict) else []
-                        if vals:
-                            lines = vals[0].get("DocumentLines", [])
-                            for l in lines:
-                                if l.get("ItemCode") == code and l.get("BaseType") == 22 and l.get("BaseEntry"):
-                                    return int(l["BaseEntry"])
-                except Exception as grpo_lookup_err:
-                    logger.debug(f"SAP GRPO lookup for {eff_grpo_no} skipped: {grpo_lookup_err}")
+        eff_grpo_no = str(grpo_no if grpo_no is not None else (existing.get("grpo_no") if existing else "")).strip()
 
-        return None
+        if eff_doc_entry is not None and eff_line_num is not None:
+            return eff_doc_entry, eff_line_num, eff_grpo_no or str(eff_doc_entry)
+
+        if not eff_grpo_no:
+            raise ValueError(f"No associated GRPO Number found for item '{code}'.")
+
+        client = get_sap_client()
+        try:
+            if not client.session_id or (client.session_timeout and datetime.utcnow() >= client.session_timeout):
+                client.login()
+        except Exception:
+            pass
+
+        try:
+            res = client.get("PurchaseDeliveryNotes", params={
+                "$filter": f"DocNum eq {eff_grpo_no}",
+                "$select": "DocEntry,DocNum,DocumentLines",
+            })
+            vals = res.get("value", []) if isinstance(res, dict) else []
+        except Exception:
+            vals = []
+
+        matching_docs = [
+            v for v in vals
+            if any(l.get("ItemCode") == code for l in v.get("DocumentLines", []))
+        ]
+        if len(matching_docs) > 1:
+            raise ValueError(f"Ambiguous match: Item '{code}' found in multiple GRPO documents with DocNum '{eff_grpo_no}'.")
+
+        if len(matching_docs) == 1:
+            grpo_obj = matching_docs[0]
+            doc_entry = int(grpo_obj["DocEntry"])
+            matching_lines = [l for l in grpo_obj.get("DocumentLines", []) if l.get("ItemCode") == code]
+            if len(matching_lines) > 1 and eff_line_num is None:
+                raise ValueError(f"Ambiguous match: Item '{code}' appears on multiple lines of GRPO {eff_grpo_no}. Explicit grpo_line_num is required.")
+            if matching_lines:
+                line_entry = next((l for l in matching_lines if l.get("LineNum") == eff_line_num), matching_lines[0])
+                return doc_entry, int(line_entry["LineNum"]), eff_grpo_no
+
+        if eff_doc_entry is not None:
+            return eff_doc_entry, eff_line_num if eff_line_num is not None else 0, eff_grpo_no
+
+        if eff_grpo_no.isdigit():
+            return int(eff_grpo_no), eff_line_num if eff_line_num is not None else 0, eff_grpo_no
+
+        raise ValueError(f"Cannot resolve GRPO DocEntry for {eff_grpo_no}.")
 
     def _sync_po_to_sap(
         self,
@@ -1492,22 +1713,21 @@ class StockConfigurationService:
         admin_user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Synchronize Purchase Order comments strictly to SAP PurchaseOrders({DocEntry}).
-        
+        Synchronize Purchase Order remarks strictly to SAP PurchaseOrders({DocEntry}).
         Policy:
-        - Strictly confined to PurchaseOrders resource: PATCH PurchaseOrders({DocEntry}).
-        - Modifies only the 'Comments' field.
+        - Confined strictly to PurchaseOrders resource: PATCH PurchaseOrders({DocEntry}).
+        - Modifies OPOR.U_Remark field.
         - Verifies persistence via immediate read-back GET before confirming success.
         - Never modifies Item Master through this method.
         """
         try:
             entry = int(doc_entry)
-            if entry <= 0:
-                raise ValueError(f"Invalid Purchase Order DocEntry: {doc_entry}")
         except (ValueError, TypeError):
-            raise ValueError(f"Purchase Order DocEntry must be a positive integer, got: {doc_entry}")
+            raise ValueError(f"Invalid Purchase Order DocEntry: {doc_entry}")
+        if entry <= 0:
+            raise ValueError(f"Invalid Purchase Order DocEntry: {doc_entry}")
 
-        target_comments = str(comments or "").strip()
+        target_comments = str(comments if comments is not None else "").strip()
 
         client = get_sap_client()
         try:
@@ -1518,7 +1738,7 @@ class StockConfigurationService:
             raise SAPConnectionError(f"SAP Service Layer authentication failed: {auth_err}")
 
         # Step 1: Pre-read Purchase Order from SAP
-        select_props = "DocEntry,DocNum,DocDate,CardCode,CardName,Comments,UpdateDate,UpdateTime"
+        select_props = "DocEntry,DocNum,DocDate,CardCode,CardName,U_Remark,Comments,UpdateDate,UpdateTime"
         try:
             pre_po = client.get(f"PurchaseOrders({entry})?$select={select_props}")
         except Exception as pre_err:
@@ -1528,27 +1748,28 @@ class StockConfigurationService:
         if not pre_po or "DocEntry" not in pre_po:
             raise ValueError(f"Purchase Order with DocEntry {entry} does not exist in SAP Business One.")
 
-        before_comments = str(pre_po.get("Comments") or "").strip()
+        before_comments = str(pre_po.get("U_Remark") or "").strip()
         doc_num = pre_po.get("DocNum")
 
-        # Step 2: Skip redundant PATCH if comments are already identical in SAP
+        # Step 2: Skip redundant PATCH if U_Remark is already identical in SAP
         if before_comments == target_comments:
-            logger.info(f"Purchase Order {doc_num} (DocEntry {entry}) comments already match target; skipping redundant PATCH.")
+            logger.info(f"Purchase Order {doc_num} (DocEntry {entry}) U_Remark already matches target; skipping redundant PATCH.")
             return {
                 "doc_entry": entry,
                 "doc_num": doc_num,
                 "status": "success",
                 "verified": True,
+                "u_remark": before_comments,
                 "comments": before_comments,
                 "before_comments": before_comments,
                 "after_comments": before_comments,
                 "update_date": pre_po.get("UpdateDate"),
                 "update_time": pre_po.get("UpdateTime"),
-                "message": f"Purchase Order {doc_num or entry} comments verified in SAP (already identical).",
+                "message": f"Purchase Order {doc_num or entry} remarks verified in SAP (already identical).",
             }
 
         # Step 3: Execute SAP Service Layer PATCH
-        patch_payload = {"Comments": target_comments}
+        patch_payload = {"U_Remark": target_comments}
         try:
             client.patch(f"PurchaseOrders({entry})", data=patch_payload)
             logger.info(f"SAP PATCH successful for PurchaseOrders({entry}): {patch_payload}")
@@ -1563,7 +1784,7 @@ class StockConfigurationService:
                     entity_type="purchase_order",
                     record_id=str(entry),
                     action="SAP_PO_WRITE_BACK_FAILED",
-                    changes=[{"field": "Comments", "previous": before_comments, "new": target_comments}],
+                    changes=[{"field": "U_Remark", "previous": before_comments, "new": target_comments}],
                     status="FAILED",
                     error_message=str(patch_err),
                 )
@@ -1578,7 +1799,7 @@ class StockConfigurationService:
             logger.error(f"SAP read-back failed for PurchaseOrders({entry}): {readback_err}")
             raise RuntimeError(f"SAP read-back verification failed for PurchaseOrders({entry}): {readback_err}")
 
-        after_comments = str(post_po.get("Comments") or "").strip()
+        after_comments = str(post_po.get("U_Remark") or "").strip()
         if after_comments != target_comments:
             raise RuntimeError(
                 f"Purchase Order read-back verification mismatch for DocEntry {entry}: "
@@ -1595,9 +1816,9 @@ class StockConfigurationService:
                 entity_type="purchase_order",
                 record_id=str(entry),
                 action="SAP_PO_WRITE_BACK_SUCCESS",
-                changes=[{"field": "Comments", "previous": before_comments, "new": after_comments}],
+                changes=[{"field": "U_Remark", "previous": before_comments, "new": after_comments}],
                 status="SUCCESS",
-                sap_response={"Comments": after_comments},
+                sap_response={"U_Remark": after_comments},
             )
         except Exception as audit_err:
             logger.warning(f"Failed to record audit entry for PO {entry}: {audit_err}")
@@ -1607,12 +1828,690 @@ class StockConfigurationService:
             "doc_num": doc_num,
             "status": "success",
             "verified": True,
+            "u_remark": after_comments,
             "comments": after_comments,
             "before_comments": before_comments,
             "after_comments": after_comments,
             "update_date": post_po.get("UpdateDate"),
             "update_time": post_po.get("UpdateTime"),
-            "message": f"Purchase Order {doc_num or entry} comments updated in SAP & verified via read-back.",
+            "message": f"Purchase Order {doc_num or entry} remarks updated in SAP & verified via read-back.",
+        }
+
+    def _sync_por1_to_sap(
+        self,
+        doc_entry: int,
+        line_num: int,
+        data: Dict[str, Any],
+        admin_user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Synchronize inspection user-defined fields strictly to SAP Purchase Order Lines (POR1).
+        Target: PATCH PurchaseOrders({doc_entry})
+        Body:
+        {
+            "DocumentLines": [
+                {
+                    "LineNum": line_num,
+                    "U_QC": "Y" / "N",
+                    "U_DRW": "Y" / "N",
+                    "U_VCHK": "Y" / "N",
+                    "U_LM": "Y" / "N",
+                    "U_OLNG": "Y" / "N",
+                    "U_IPK": "Y" / "N",
+                    "U_LBL": "Y" / "N",
+                    "U_MCorPT": "Y" / "N",
+                    "U_LUpdated": "YYYY-MM-DD",
+                }
+            ]
+        }
+        """
+        try:
+            entry = int(doc_entry)
+            if entry <= 0:
+                raise ValueError(f"Invalid Purchase Order DocEntry: {doc_entry}")
+            line = int(line_num)
+            if line < 0:
+                raise ValueError(f"Invalid Purchase Order LineNum: {line_num}")
+        except (ValueError, TypeError):
+            raise ValueError(f"Purchase Order DocEntry and LineNum must be valid non-negative integers.")
+
+        # Build POR1 UDF payload
+        line_payload: Dict[str, Any] = {"LineNum": line}
+        mapped_fields: List[str] = []
+
+        # 1. QC -> U_QC
+        if "qc" in data and data["qc"] is not None:
+            qc_bool = clean_qc(data["qc"])
+            if qc_bool is not None:
+                line_payload["U_QC"] = "Y" if qc_bool else "N"
+                mapped_fields.append("U_QC")
+
+        # 2. DRW. Y/N -> U_DRW
+        drw = data.get("drw_yn") if "drw_yn" in data else data.get("drawing", data.get("drw"))
+        if drw is not None:
+            c = clean_yn(drw)
+            if c:
+                line_payload["U_DRW"] = c
+                mapped_fields.append("U_DRW")
+
+        # 3. V CHK -> U_VCHK
+        v_chk = data.get("v_chk") if "v_chk" in data else data.get("U_VCHK", data.get("U_V_Chk"))
+        if v_chk is not None:
+            c = clean_yn(v_chk)
+            if c:
+                line_payload["U_VCHK"] = c
+                mapped_fields.append("U_VCHK")
+
+        # 4. LM -> U_LM
+        lm = data.get("lm") if "lm" in data else data.get("U_LM")
+        if lm is not None:
+            c = clean_yn(lm)
+            if c:
+                line_payload["U_LM"] = c
+                mapped_fields.append("U_LM")
+
+        # 5. OLNG -> U_OLNG
+        olng = data.get("olng") if "olng" in data else data.get("U_OLNG")
+        if olng is not None:
+            c = clean_yn(olng)
+            if c:
+                line_payload["U_OLNG"] = c
+                mapped_fields.append("U_OLNG")
+
+        # 6. I PK -> U_IPK
+        lpk = data.get("lpk") if "lpk" in data else (data.get("i_pk") if "i_pk" in data else data.get("U_IPK", data.get("U_LPK")))
+        if lpk is not None:
+            c = clean_yn(lpk)
+            if c:
+                line_payload["U_IPK"] = c
+                mapped_fields.append("U_IPK")
+
+        # 7. LBL -> U_LBL
+        lbl = data.get("lbl") if "lbl" in data else data.get("U_LBL")
+        if lbl is not None:
+            c = clean_yn(lbl)
+            if c:
+                line_payload["U_LBL"] = c
+                mapped_fields.append("U_LBL")
+
+        # 8. MC or PT -> U_MCorPT
+        mc = data.get("mc_or_pt") if "mc_or_pt" in data else (data.get("mc_pt") if "mc_pt" in data else data.get("U_MCorPT", data.get("U_MC_OR_PT")))
+        if mc is not None:
+            c = clean_yn(mc)
+            if c:
+                line_payload["U_MCorPT"] = c
+                mapped_fields.append("U_MCorPT")
+
+        # 9. Last Updated -> U_LUpdated (Date YYYY-MM-DD)
+        raw_dt = data.get("last_submitted_at") or data.get("last_updated") or data.get("U_LUpdated")
+        target_date_str = get_kolkata_now().strftime("%Y-%m-%d")
+        if raw_dt:
+            try:
+                if isinstance(raw_dt, (datetime, date)):
+                    target_date_str = raw_dt.strftime("%Y-%m-%d")
+                else:
+                    s_dt = str(raw_dt).strip().split("T")[0].split(" ")[0]
+                    datetime.strptime(s_dt, "%Y-%m-%d")
+                    target_date_str = s_dt
+            except Exception:
+                pass
+        line_payload["U_LUpdated"] = target_date_str
+        mapped_fields.append("U_LUpdated")
+
+        client = get_sap_client()
+        try:
+            if not client.session_id or (client.session_timeout and datetime.utcnow() >= client.session_timeout):
+                client.login()
+        except Exception as auth_err:
+            logger.error(f"Failed to authenticate with SAP Service Layer for POR1 update: {auth_err}")
+            raise SAPConnectionError(f"SAP Service Layer authentication failed: {auth_err}")
+
+        # Pre-read Purchase Order from SAP
+        select_props = "DocEntry,DocNum,DocumentLines"
+        try:
+            pre_po = client.get(f"PurchaseOrders({entry})?$select={select_props}")
+        except Exception as pre_err:
+            logger.error(f"Failed to pre-read Purchase Order DocEntry {entry} from SAP: {pre_err}")
+            raise RuntimeError(f"Cannot verify Purchase Order DocEntry {entry} in SAP: {pre_err}")
+
+        if not pre_po or "DocEntry" not in pre_po:
+            raise ValueError(f"Purchase Order with DocEntry {entry} does not exist in SAP Business One.")
+
+        doc_num = pre_po.get("DocNum") or entry
+        lines = pre_po.get("DocumentLines", [])
+        target_line = next((l for l in lines if l.get("LineNum") == line), None)
+        if not target_line and lines:
+            target_line = lines[0]
+
+        before_values = {}
+        if target_line:
+            for k in mapped_fields:
+                val = target_line.get(k)
+                if k == "U_LUpdated" and val:
+                    val = str(val).split("T")[0]
+                before_values[k] = val
+
+        # Check for differences
+        diff_payload: Dict[str, Any] = {"LineNum": line}
+        for k in mapped_fields:
+            if k == "U_LUpdated":
+                diff_payload[k] = line_payload[k]
+            else:
+                prev_v = str(before_values.get(k) or "").strip().upper()
+                new_v = str(line_payload.get(k) or "").strip().upper()
+                if prev_v != new_v:
+                    diff_payload[k] = line_payload[k]
+
+        has_changes = any(k != "LineNum" and str(diff_payload.get(k) or "").strip().upper() != str(before_values.get(k) or "").strip().upper() for k in mapped_fields)
+        if not has_changes and target_line:
+            logger.info(f"Purchase Order {doc_num} line {line} values already match target payload; skipping redundant PATCH.")
+            return {
+                "doc_entry": entry,
+                "doc_num": doc_num,
+                "line_num": line,
+                "status": "success",
+                "verified": True,
+                "sap_written": False,
+                "sap_synced": True,
+                "por1_fields": mapped_fields,
+                "before_values": before_values,
+                "after_values": before_values,
+                "message": f"Purchase Order {doc_num} line {line} inspection values verified in SAP (already identical).",
+            }
+
+        # Execute PATCH
+        patch_body = {"DocumentLines": [line_payload]}
+        try:
+            client.patch(f"PurchaseOrders({entry})", data=patch_body)
+            logger.info(f"SAP PATCH successful for PurchaseOrders({entry}) DocumentLines: {line_payload}")
+        except Exception as patch_err:
+            err_str = str(patch_err)
+            logger.error(f"SAP PATCH failed for PurchaseOrders({entry}) line {line}: {patch_err}")
+            try:
+                from app.services import audit_service
+                audit_service.record_audit_entry(
+                    user_id=str(admin_user_id or "admin"),
+                    username=str(admin_user_id or "admin"),
+                    role="admin",
+                    entity_type="purchase_order_line",
+                    record_id=f"{entry}:{line}",
+                    action="SAP_POR1_WRITE_BACK_FAILED",
+                    changes=[{"field": k, "previous": before_values.get(k), "new": line_payload.get(k)} for k in mapped_fields],
+                    status="FAILED",
+                    error_message=err_str,
+                )
+            except Exception:
+                pass
+            if "234000128" in err_str or "awaiting approval" in err_str.lower():
+                raise RuntimeError(f"Purchase Order {doc_num} (DocEntry {entry}) cannot be updated: awaiting approval in SAP Business One.")
+            if "ODBC -1029" in err_str or "-1029" in err_str:
+                raise RuntimeError(f"SAP document rows are non-editable (ODBC -1029). Enable 'Allow Update of User-Defined Fields When Document Rows Are Not Editable' in SAP B1 for Purchase Order.")
+            raise RuntimeError(f"SAP write-back rejected by SAP Service Layer for PurchaseOrders({entry}) line {line}: {patch_err}")
+
+        # Read-back verification
+        try:
+            post_po = client.get(f"PurchaseOrders({entry})?$select={select_props}")
+        except Exception as readback_err:
+            logger.error(f"SAP read-back failed for PurchaseOrders({entry}): {readback_err}")
+            raise RuntimeError(f"SAP read-back verification failed for PurchaseOrders({entry}) line {line}: {readback_err}")
+
+        post_lines = post_po.get("DocumentLines", []) if post_po else []
+        post_target = next((l for l in post_lines if l.get("LineNum") == line), None)
+        if not post_target and post_lines:
+            post_target = post_lines[0]
+
+        after_values = {}
+        verification_mismatches = []
+        if post_target:
+            for k in mapped_fields:
+                act = post_target.get(k)
+                if k == "U_LUpdated" and act:
+                    act = str(act).split("T")[0]
+                after_values[k] = act
+                exp = line_payload.get(k)
+                if exp is not None:
+                    str_act = str(act or "").strip().upper()
+                    str_exp = str(exp).strip().upper()
+                    if str_act != str_exp:
+                        verification_mismatches.append(f"{k} expected '{str_exp}', got '{str_act}'")
+        else:
+            after_values = line_payload
+
+        if verification_mismatches:
+            err_msg = "; ".join(verification_mismatches)
+            logger.error(f"SAP POR1 read-back mismatch for PO {entry} line {line}: {err_msg}")
+            raise RuntimeError(f"SAP persistence verification failed for PurchaseOrders({entry}) line {line}: {err_msg}")
+
+        # Audit log
+        try:
+            from app.services import audit_service
+            audit_service.record_audit_entry(
+                user_id=str(admin_user_id or "admin"),
+                username=str(admin_user_id or "admin"),
+                role="admin",
+                entity_type="purchase_order_line",
+                record_id=f"{entry}:{line}",
+                action="SAP_POR1_WRITE_BACK_SUCCESS",
+                changes=[{"field": k, "previous": before_values.get(k), "new": after_values.get(k)} for k in mapped_fields],
+                status="SUCCESS",
+                sap_response=after_values,
+            )
+        except Exception as audit_err:
+            logger.warning(f"Failed to record audit entry for POR1 {entry}:{line}: {audit_err}")
+
+        return {
+            "doc_entry": entry,
+            "doc_num": doc_num,
+            "line_num": line,
+            "status": "success",
+            "verified": True,
+            "sap_written": True,
+            "sap_synced": True,
+            "por1_fields": mapped_fields,
+            "before_values": before_values,
+            "after_values": after_values,
+            "message": f"Purchase Order {doc_num or entry} line {line} inspection fields updated and verified in SAP Business One.",
+        }
+
+    def _sync_grpo_to_sap(
+        self,
+        doc_entry: int,
+        line_num: int,
+        data: Dict[str, Any],
+        admin_user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Synchronize inspection user-defined fields strictly to SAP Goods Receipt PO Lines (PDN1).
+        Target: PATCH PurchaseDeliveryNotes({doc_entry})
+        Body:
+        {
+            "DocumentLines": [
+                {
+                    "LineNum": line_num,
+                    "U_QC": "Y" / "N",
+                    "U_DRW": "Y" / "N",
+                    "U_VCHK": "Y" / "N",
+                    "U_LM": "Y" / "N",
+                    "U_OLNG": "Y" / "N",
+                    "U_IPK": "Y" / "N",
+                    "U_LBL": "Y" / "N",
+                    "U_MCorPT": "Y" / "N",
+                    "U_LUpdated": "YYYY-MM-DD",
+                }
+            ]
+        }
+        """
+        try:
+            entry = int(doc_entry)
+            if entry <= 0:
+                raise ValueError(f"Invalid Goods Receipt PO DocEntry: {doc_entry}")
+            line = int(line_num)
+            if line < 0:
+                raise ValueError(f"Invalid Goods Receipt PO LineNum: {line_num}")
+        except (ValueError, TypeError):
+            raise ValueError("Goods Receipt PO DocEntry and LineNum must be valid non-negative integers.")
+
+        # Build PDN1 UDF payload
+        line_payload: Dict[str, Any] = {"LineNum": line}
+        mapped_fields: List[str] = []
+
+        # 1. QC -> U_QC
+        if "qc" in data and data["qc"] is not None:
+            qc_bool = clean_qc(data["qc"])
+            if qc_bool is not None:
+                line_payload["U_QC"] = "Y" if qc_bool else "N"
+                mapped_fields.append("U_QC")
+
+        # 2. DRW. Y/N -> U_DRW
+        drw = data.get("drw_yn") if "drw_yn" in data else data.get("drawing", data.get("drw"))
+        if drw is not None:
+            c = clean_yn(drw)
+            if c:
+                line_payload["U_DRW"] = c
+                mapped_fields.append("U_DRW")
+
+        # 3. V CHK -> U_VCHK
+        v_chk = data.get("v_chk") if "v_chk" in data else data.get("U_VCHK", data.get("U_V_Chk"))
+        if v_chk is not None:
+            c = clean_yn(v_chk)
+            if c:
+                line_payload["U_VCHK"] = c
+                mapped_fields.append("U_VCHK")
+
+        # 4. LM -> U_LM
+        lm = data.get("lm") if "lm" in data else data.get("U_LM")
+        if lm is not None:
+            c = clean_yn(lm)
+            if c:
+                line_payload["U_LM"] = c
+                mapped_fields.append("U_LM")
+
+        # 5. OLNG -> U_OLNG
+        olng = data.get("olng") if "olng" in data else data.get("U_OLNG")
+        if olng is not None:
+            c = clean_yn(olng)
+            if c:
+                line_payload["U_OLNG"] = c
+                mapped_fields.append("U_OLNG")
+
+        # 6. I PK -> U_IPK
+        lpk = data.get("lpk") if "lpk" in data else (data.get("i_pk") if "i_pk" in data else data.get("U_IPK", data.get("U_LPK")))
+        if lpk is not None:
+            c = clean_yn(lpk)
+            if c:
+                line_payload["U_IPK"] = c
+                mapped_fields.append("U_IPK")
+
+        # 7. LBL -> U_LBL
+        lbl = data.get("lbl") if "lbl" in data else data.get("U_LBL")
+        if lbl is not None:
+            c = clean_yn(lbl)
+            if c:
+                line_payload["U_LBL"] = c
+                mapped_fields.append("U_LBL")
+
+        # 8. MC or PT -> U_MCorPT
+        mc = data.get("mc_or_pt") if "mc_or_pt" in data else (data.get("mc_pt") if "mc_pt" in data else data.get("U_MCorPT", data.get("U_MC_OR_PT")))
+        if mc is not None:
+            c = clean_yn(mc)
+            if c:
+                line_payload["U_MCorPT"] = c
+                mapped_fields.append("U_MCorPT")
+
+        # 9. Last Updated -> U_LUpdated (Date YYYY-MM-DD)
+        raw_dt = data.get("last_submitted_at") or data.get("last_updated") or data.get("U_LUpdated")
+        target_date_str = get_kolkata_now().strftime("%Y-%m-%d")
+        if raw_dt:
+            try:
+                if isinstance(raw_dt, (datetime, date)):
+                    target_date_str = raw_dt.strftime("%Y-%m-%d")
+                else:
+                    s_dt = str(raw_dt).strip().split("T")[0].split(" ")[0]
+                    datetime.strptime(s_dt, "%Y-%m-%d")
+                    target_date_str = s_dt
+            except Exception:
+                pass
+        line_payload["U_LUpdated"] = target_date_str
+        mapped_fields.append("U_LUpdated")
+
+        client = get_sap_client()
+        try:
+            if not client.session_id or (client.session_timeout and datetime.utcnow() >= client.session_timeout):
+                client.login()
+        except Exception as auth_err:
+            logger.error(f"Failed to authenticate with SAP Service Layer for PDN1 update: {auth_err}")
+            raise SAPConnectionError(f"SAP Service Layer authentication failed: {auth_err}")
+
+        # Pre-read Goods Receipt PO from SAP
+        select_props = "DocEntry,DocNum,DocumentLines"
+        try:
+            pre_grpo = client.get(f"PurchaseDeliveryNotes({entry})?$select={select_props}")
+        except Exception as pre_err:
+            logger.error(f"Failed to pre-read Goods Receipt PO DocEntry {entry} from SAP: {pre_err}")
+            raise RuntimeError(f"Cannot verify Goods Receipt PO DocEntry {entry} in SAP: {pre_err}")
+
+        if not pre_grpo or "DocEntry" not in pre_grpo:
+            raise ValueError(f"Goods Receipt PO with DocEntry {entry} does not exist in SAP Business One.")
+
+        doc_num = pre_grpo.get("DocNum") or entry
+        lines = pre_grpo.get("DocumentLines", [])
+        target_line = next((l for l in lines if l.get("LineNum") == line), None)
+        if not target_line and lines:
+            target_line = lines[0]
+
+        before_values = {}
+        if target_line:
+            for k in mapped_fields:
+                val = target_line.get(k)
+                if k == "U_LUpdated" and val:
+                    val = str(val).split("T")[0]
+                before_values[k] = val
+
+        # Check for differences
+        diff_payload: Dict[str, Any] = {"LineNum": line}
+        for k in mapped_fields:
+            if k == "U_LUpdated":
+                diff_payload[k] = line_payload[k]
+            else:
+                prev_v = str(before_values.get(k) or "").strip().upper()
+                new_v = str(line_payload.get(k) or "").strip().upper()
+                if prev_v != new_v:
+                    diff_payload[k] = line_payload[k]
+
+        has_changes = any(k != "LineNum" and str(diff_payload.get(k) or "").strip().upper() != str(before_values.get(k) or "").strip().upper() for k in mapped_fields)
+        if not has_changes and target_line:
+            logger.info(f"Goods Receipt PO {doc_num} line {line} values already match target payload; skipping redundant PATCH.")
+            return {
+                "doc_entry": entry,
+                "doc_num": doc_num,
+                "line_num": line,
+                "status": "success",
+                "verified": True,
+                "sap_written": False,
+                "sap_synced": True,
+                "pdn1_fields": mapped_fields,
+                "before_values": before_values,
+                "after_values": before_values,
+                "message": f"Goods Receipt PO {doc_num} line {line} inspection values verified in SAP (already identical).",
+            }
+
+        # Execute PATCH
+        patch_body = {"DocumentLines": [line_payload]}
+        try:
+            client.patch(f"PurchaseDeliveryNotes({entry})", data=patch_body)
+            logger.info(f"SAP PATCH successful for PurchaseDeliveryNotes({entry}) DocumentLines: {line_payload}")
+        except Exception as patch_err:
+            err_str = str(patch_err)
+            logger.error(f"SAP PATCH failed for PurchaseDeliveryNotes({entry}) line {line}: {patch_err}")
+            try:
+                from app.services import audit_service
+                audit_service.record_audit_entry(
+                    user_id=str(admin_user_id or "admin"),
+                    username=str(admin_user_id or "admin"),
+                    role="admin",
+                    entity_type="goods_receipt_po_line",
+                    record_id=f"{entry}:{line}",
+                    action="SAP_PDN1_WRITE_BACK_FAILED",
+                    changes=[{"field": k, "previous": before_values.get(k), "new": line_payload.get(k)} for k in mapped_fields],
+                    status="FAILED",
+                    error_message=err_str,
+                )
+            except Exception:
+                pass
+            if "ODBC -1029" in err_str or "-1029" in err_str:
+                raise RuntimeError("SAP document rows are non-editable (ODBC -1029). Enable 'Allow Update of User-Defined Fields When Document Rows Are Not Editable' in SAP B1 for Goods Receipt PO.")
+            raise RuntimeError(f"SAP write-back rejected by SAP Service Layer for PurchaseDeliveryNotes({entry}) line {line}: {patch_err}")
+
+        # Read-back verification
+        try:
+            post_grpo = client.get(f"PurchaseDeliveryNotes({entry})?$select={select_props}")
+        except Exception as readback_err:
+            logger.error(f"SAP read-back failed for PurchaseDeliveryNotes({entry}): {readback_err}")
+            raise RuntimeError(f"SAP read-back verification failed for PurchaseDeliveryNotes({entry}) line {line}: {readback_err}")
+
+        post_lines = post_grpo.get("DocumentLines", []) if post_grpo else []
+        post_target = next((l for l in post_lines if l.get("LineNum") == line), None)
+        if not post_target and post_lines:
+            post_target = post_lines[0]
+
+        after_values = {}
+        verification_mismatches = []
+        if post_target:
+            for k in mapped_fields:
+                act = post_target.get(k)
+                if k == "U_LUpdated" and act:
+                    act = str(act).split("T")[0]
+                after_values[k] = act
+                exp = line_payload.get(k)
+                if exp is not None:
+                    str_act = str(act or "").strip().upper()
+                    str_exp = str(exp).strip().upper()
+                    if str_act != str_exp:
+                        verification_mismatches.append(f"{k} expected '{str_exp}', got '{str_act}'")
+        else:
+            after_values = line_payload
+
+        if verification_mismatches:
+            err_msg = "; ".join(verification_mismatches)
+            logger.error(f"SAP PDN1 read-back mismatch for GRPO {entry} line {line}: {err_msg}")
+            raise RuntimeError(f"SAP persistence verification failed for PurchaseDeliveryNotes({entry}) line {line}: {err_msg}")
+
+        # Audit log
+        try:
+            from app.services import audit_service
+            audit_service.record_audit_entry(
+                user_id=str(admin_user_id or "admin"),
+                username=str(admin_user_id or "admin"),
+                role="admin",
+                entity_type="goods_receipt_po_line",
+                record_id=f"{entry}:{line}",
+                action="SAP_PDN1_WRITE_BACK_SUCCESS",
+                changes=[{"field": k, "previous": before_values.get(k), "new": after_values.get(k)} for k in mapped_fields],
+                status="SUCCESS",
+                sap_response=after_values,
+            )
+        except Exception as audit_err:
+            logger.warning(f"Failed to record audit entry for PDN1 {entry}:{line}: {audit_err}")
+
+        return {
+            "doc_entry": entry,
+            "doc_num": doc_num,
+            "line_num": line,
+            "status": "success",
+            "verified": True,
+            "sap_written": True,
+            "sap_synced": True,
+            "pdn1_fields": mapped_fields,
+            "before_values": before_values,
+            "after_values": after_values,
+            "message": f"Goods Receipt PO {doc_num or entry} line {line} inspection fields updated and verified in SAP Business One.",
+        }
+
+    def _sync_grpo_remark_to_sap(
+        self,
+        doc_entry: int,
+        remark: str,
+        admin_user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Synchronize Goods Receipt PO remarks strictly to SAP PurchaseDeliveryNotes({DocEntry}).
+        Policy:
+        - Confined strictly to PurchaseDeliveryNotes resource: PATCH PurchaseDeliveryNotes({DocEntry}).
+        - Modifies OPDN.U_Remark field.
+        - Verifies persistence via immediate read-back GET before confirming success.
+        - Never modifies Item Master through this method.
+        """
+        try:
+            entry = int(doc_entry)
+        except (ValueError, TypeError):
+            raise ValueError(f"Invalid GRPO DocEntry: {doc_entry}")
+        if entry <= 0:
+            raise ValueError(f"Invalid GRPO DocEntry: {doc_entry}")
+
+        target_remark = str(remark if remark is not None else "").strip()
+
+        client = get_sap_client()
+        try:
+            if not client.session_id or (client.session_timeout and datetime.utcnow() >= client.session_timeout):
+                client.login()
+        except Exception as auth_err:
+            logger.error(f"Failed to authenticate with SAP Service Layer for GRPO remark update: {auth_err}")
+            raise SAPConnectionError(f"SAP Service Layer authentication failed: {auth_err}")
+
+        # Pre-read GRPO from SAP
+        select_props = "DocEntry,DocNum,DocDate,CardCode,CardName,U_Remark,Comments,UpdateDate,UpdateTime"
+        try:
+            pre_grpo = client.get(f"PurchaseDeliveryNotes({entry})?$select={select_props}")
+        except Exception as pre_err:
+            logger.error(f"Failed to pre-read GRPO DocEntry {entry} from SAP: {pre_err}")
+            raise RuntimeError(f"Cannot verify GRPO DocEntry {entry} in SAP: {pre_err}")
+
+        if not pre_grpo or "DocEntry" not in pre_grpo:
+            raise ValueError(f"Goods Receipt PO with DocEntry {entry} does not exist in SAP Business One.")
+
+        before_remark = str(pre_grpo.get("U_Remark") or "").strip()
+        doc_num = pre_grpo.get("DocNum")
+
+        # Skip redundant PATCH if U_Remark is already identical
+        if before_remark == target_remark:
+            logger.info(f"GRPO {doc_num} (DocEntry {entry}) U_Remark already matches target; skipping redundant PATCH.")
+            return {
+                "doc_entry": entry,
+                "doc_num": doc_num,
+                "status": "success",
+                "verified": True,
+                "u_remark": before_remark,
+                "before_remark": before_remark,
+                "after_remark": before_remark,
+                "message": f"Goods Receipt PO {doc_num or entry} remarks verified in SAP (already identical).",
+            }
+
+        patch_payload = {"U_Remark": target_remark}
+        try:
+            client.patch(f"PurchaseDeliveryNotes({entry})", data=patch_payload)
+            logger.info(f"SAP PATCH successful for PurchaseDeliveryNotes({entry}): {patch_payload}")
+        except Exception as patch_err:
+            err_str = str(patch_err)
+            logger.error(f"SAP PATCH failed for PurchaseDeliveryNotes({entry}): {patch_err}")
+            try:
+                from app.services import audit_service
+                audit_service.record_audit_entry(
+                    user_id=str(admin_user_id or "admin"),
+                    username=str(admin_user_id or "admin"),
+                    role="admin",
+                    entity_type="goods_receipt_po",
+                    record_id=str(entry),
+                    action="SAP_GRPO_REMARK_WRITE_BACK_FAILED",
+                    changes=[{"field": "U_Remark", "previous": before_remark, "new": target_remark}],
+                    status="FAILED",
+                    error_message=err_str,
+                )
+            except Exception:
+                pass
+            if "ODBC -1029" in err_str or "-1029" in err_str:
+                raise RuntimeError("SAP document rows are non-editable (ODBC -1029). Enable 'Allow Update of User-Defined Fields When Document Rows Are Not Editable' in SAP B1 for Goods Receipt PO.")
+            raise RuntimeError(f"Goods Receipt PO write-back rejected by SAP Service Layer: {patch_err}")
+
+        # Read-back verification
+        try:
+            post_grpo = client.get(f"PurchaseDeliveryNotes({entry})?$select={select_props}")
+        except Exception as readback_err:
+            logger.error(f"SAP read-back failed for PurchaseDeliveryNotes({entry}): {readback_err}")
+            raise RuntimeError(f"SAP read-back verification failed for PurchaseDeliveryNotes({entry}): {readback_err}")
+
+        after_remark = str(post_grpo.get("U_Remark") or "").strip()
+        if after_remark != target_remark:
+            raise RuntimeError(
+                f"Goods Receipt PO read-back verification mismatch for DocEntry {entry}: "
+                f"expected '{target_remark}', got '{after_remark}'"
+            )
+
+        # Audit log
+        try:
+            from app.services import audit_service
+            audit_service.record_audit_entry(
+                user_id=str(admin_user_id or "admin"),
+                username=str(admin_user_id or "admin"),
+                role="admin",
+                entity_type="goods_receipt_po",
+                record_id=str(entry),
+                action="SAP_GRPO_REMARK_WRITE_BACK_SUCCESS",
+                changes=[{"field": "U_Remark", "previous": before_remark, "new": after_remark}],
+                status="SUCCESS",
+                sap_response={"U_Remark": after_remark},
+            )
+        except Exception as audit_err:
+            logger.warning(f"Failed to record audit entry for GRPO {entry}: {audit_err}")
+
+        return {
+            "doc_entry": entry,
+            "doc_num": doc_num,
+            "status": "success",
+            "verified": True,
+            "u_remark": after_remark,
+            "before_remark": before_remark,
+            "after_remark": after_remark,
+            "message": f"Goods Receipt PO {doc_num or entry} remarks updated and verified in SAP Business One.",
         }
 
     def update_item(self, item_code: str, data: Dict[str, Any], admin_user_id: Optional[str] = None) -> Dict[str, Any]:
@@ -1670,59 +2569,95 @@ class StockConfigurationService:
             if c_val:
                 updates["drw_yn"] = c_val
 
-        # 2. Decide whether SAP Item Master must be contacted.
-        # Do NOT diff against the local ATLAS cache here: Sync-from-SAP pre-fills blank SAP UDFs
-        # (QC, DRW, V CHK, LM, OLNG, I PK, LBL, MC OR PT) with a display default of 'Y', so an
-        # unchanged 'Y' looked "already saved" locally and was never written to SAP.
-        # _sync_item_to_sap() diffs against live SAP values and skips the PATCH when SAP already matches.
+        # 2. Check for Item Master changes (weight)
         has_item_master_changes = any(k in updates for k in SAP_ITEM_MASTER_FIELDS)
 
-        # 3. Check for REMARKS (Purchase Order Comments) changes
+        # 3. Check for PDN1 inspection changes
+        has_inspection_changes = any(k in updates for k in SAP_PDN1_INSPECTION_FIELDS)
+
+        # 4. Check for REMARKS (OPDN.U_Remark) changes
         has_remark_in_payload = "remark" in data and data["remark"] is not None
         new_remark = str(data["remark"]).strip() if has_remark_in_payload else None
         prev_remark = str(existing_item.get("remark") or "").strip()
-        # Same reasoning as above: a non-empty remark may exist locally but never have reached SAP.
-        # _sync_po_to_sap() / _sync_item_to_sap() skip redundant PATCHes against SAP.
         remark_changed = has_remark_in_payload and (new_remark != prev_remark or bool(new_remark))
         remark_edited = has_remark_in_payload and new_remark != prev_remark
 
-        # Track results for separate Item Master and Purchase Order updates
+        # Track results for separate Item Master, Goods Receipt PO header, and Goods Receipt PO line updates
         item_master_result: Dict[str, Any] = {"status": "unchanged", "message": "No Item Master fields modified"}
-        po_result: Dict[str, Any] = {"status": "unchanged", "message": "No PO comments modified"}
+        po_result: Dict[str, Any] = {"status": "unchanged", "message": "No PO remarks modified"}
+        grpo_remark_result: Dict[str, Any] = {"status": "unchanged", "message": "No GRPO remarks modified"}
+        pdn1_result: Dict[str, Any] = {"status": "unchanged", "message": "No PDN1 inspection fields modified"}
         im_error: Optional[str] = None
         po_error: Optional[str] = None
+        pdn1_error: Optional[str] = None
         confirmed_last_updated = None
 
-        # Step A: Execute Purchase Order update if remarks changed
+        # Resolve Goods Receipt PO doc entry and line num for PDN1 inspection fields and OPDN remarks
+        resolved_grpo_doc_entry = None
+        resolved_grpo_line_num = None
+        resolved_grpo_no = None
+        if remark_changed or has_inspection_changes or data.get("grpo_no") or data.get("grpo_doc_entry"):
+            try:
+                resolved_grpo_doc_entry, resolved_grpo_line_num, resolved_grpo_no = self.resolve_grpo_doc_and_line(
+                    code,
+                    grpo_no=data.get("grpo_no"),
+                    grpo_doc_entry=data.get("grpo_doc_entry"),
+                    grpo_line_num=data.get("grpo_line_num"),
+                )
+            except Exception as g_res_err:
+                logger.debug(f"Could not resolve GRPO doc/line for {code}: {g_res_err}")
+                resolved_grpo_doc_entry = None
+                resolved_grpo_line_num = None
+
+            if resolved_grpo_doc_entry:
+                updates["grpo_doc_entry"] = resolved_grpo_doc_entry
+            if resolved_grpo_line_num is not None:
+                updates["grpo_line_num"] = resolved_grpo_line_num
+
+        # Resolve Purchase Order doc entry and line num as reference
         resolved_doc_entry = None
-        remark_for_item_master: Optional[str] = None
-        if remark_changed:
-            resolved_doc_entry = self.resolve_po_doc_entry(
+        resolved_line_num = None
+        resolved_po_no = None
+        try:
+            resolved_doc_entry, resolved_line_num, resolved_po_no = self.resolve_po_doc_and_line(
                 code,
                 po_no=data.get("po_no"),
                 po_doc_entry=data.get("po_doc_entry"),
+                po_line_num=data.get("po_line_num"),
             )
-            # Website is authoritative: always ensure user-entered remark is saved locally
-            updates["remark"] = new_remark
-            if resolved_doc_entry:
-                updates["po_doc_entry"] = resolved_doc_entry
+        except Exception:
+            resolved_doc_entry = None
+            resolved_line_num = None
 
-            if not resolved_doc_entry:
-                # No Purchase Order behind this row (e.g. GRPO without base PO, or Item Master only):
-                # persist REMARKS on the Item Master memo (OITM.UserText -> Service Layer 'User_Text'),
-                # which is the same field the SAP -> ATLAS sync reads remarks back from.
-                remark_for_item_master = new_remark
-                po_result = {"status": "skipped", "message": "No Purchase Order; REMARKS written to Item Master User_Text."}
-                has_item_master_changes = True
-            else:
+        if resolved_doc_entry:
+            updates["po_doc_entry"] = resolved_doc_entry
+        if resolved_line_num is not None:
+            updates["po_line_num"] = resolved_line_num
+
+        # Step A: Execute Goods Receipt PO header (OPDN.U_Remark) update if remarks changed
+        remark_for_item_master: Optional[str] = None
+        if remark_changed:
+            updates["remark"] = new_remark
+            if resolved_grpo_doc_entry:
+                try:
+                    grpo_remark_result = self._sync_grpo_remark_to_sap(resolved_grpo_doc_entry, new_remark, admin_user_id=admin_user_id)
+                except Exception as g_rem_err:
+                    po_error = str(g_rem_err)
+                    grpo_remark_result = {"status": "error", "doc_entry": resolved_grpo_doc_entry, "error": po_error}
+                    logger.warning(f"GRPO remark update failed for {code} (DocEntry {resolved_grpo_doc_entry}): {g_rem_err}")
+            elif resolved_doc_entry:
                 try:
                     po_result = self._sync_po_to_sap(resolved_doc_entry, new_remark, admin_user_id=admin_user_id)
                 except Exception as p_err:
                     po_error = str(p_err)
                     po_result = {"status": "error", "doc_entry": resolved_doc_entry, "error": po_error}
                     logger.warning(f"Purchase Order update failed for {code} (DocEntry {resolved_doc_entry}): {p_err}")
+            else:
+                remark_for_item_master = new_remark
+                po_result = {"status": "skipped", "message": "No GRPO/PO; REMARKS written to Item Master User_Text."}
+                has_item_master_changes = True
 
-        # Step B: Execute Item Master update if item fields changed
+        # Step B: Execute Item Master update if item weight fields changed (or memo fallback)
         if has_item_master_changes:
             try:
                 sap_item_data = dict(updates)
@@ -1736,13 +2671,28 @@ class StockConfigurationService:
                 item_master_result = {"status": "error", "error": im_error}
                 logger.error(f"Item Master update failed for {code}: {im_err}")
 
-        # Step C: Assess combined results
-        if im_error and po_error:
-            raise RuntimeError(f"Both SAP updates failed for {code} - Item Master: {im_error}; Purchase Order: {po_error}")
-        elif im_error and (not remark_changed or remark_for_item_master is not None):
+        # Step C: Execute Goods Receipt PO line (PDN1) update if inspection fields changed
+        if has_inspection_changes:
+            if resolved_grpo_doc_entry is not None and resolved_grpo_line_num is not None:
+                try:
+                    pdn1_result = self._sync_grpo_to_sap(
+                        resolved_grpo_doc_entry,
+                        resolved_grpo_line_num,
+                        data=updates,
+                        admin_user_id=admin_user_id,
+                    )
+                except Exception as p1_err:
+                    pdn1_error = str(p1_err)
+                    pdn1_result = {"status": "error", "doc_entry": resolved_grpo_doc_entry, "line_num": resolved_grpo_line_num, "error": pdn1_error}
+                    logger.warning(f"PDN1 update failed for {code} (DocEntry {resolved_grpo_doc_entry} line {resolved_grpo_line_num}): {p1_err}")
+            else:
+                pdn1_result = {"status": "saved_locally", "message": "Saved in ATLAS database (no Goods Receipt PO line found)."}
+
+        # Step D: Assess combined results
+        if im_error and (not remark_changed or remark_for_item_master is not None) and not has_inspection_changes:
             raise RuntimeError(f"Item Master write-back failed for {code}: {im_error}")
 
-        is_partial = bool(im_error or po_error)
+        is_partial = bool(im_error or po_error or pdn1_error)
         overall_success = not is_partial
 
         # Construct user-facing status message
@@ -1752,11 +2702,20 @@ class StockConfigurationService:
         elif im_error:
             messages.append(f"Item Master update failed ({im_error})")
 
-        if po_result.get("status") == "success":
+        if grpo_remark_result.get("status") == "success":
+            g_id_str = str(grpo_remark_result.get("doc_num") or resolved_grpo_doc_entry)
+            messages.append(f"Goods Receipt PO {g_id_str} remarks updated in SAP")
+        elif po_result.get("status") == "success":
             po_id_str = str(po_result.get("doc_num") or resolved_doc_entry)
-            messages.append(f"Purchase Order {po_id_str} comments updated in SAP")
+            messages.append(f"Purchase Order {po_id_str} remarks updated in SAP")
         elif po_error:
-            messages.append(f"Purchase Order update failed ({po_error})")
+            messages.append(f"Remarks update failed ({po_error})")
+
+        if pdn1_result.get("status") == "success":
+            g_id_str = str(pdn1_result.get("doc_num") or resolved_grpo_doc_entry)
+            messages.append(f"GRPO {g_id_str} line {resolved_grpo_line_num} inspection fields updated in SAP")
+        elif pdn1_error:
+            messages.append(f"GRPO line inspection update failed ({pdn1_error})")
 
         if not messages:
             final_message = f"Item {code} verified (no values modified)."
@@ -1781,14 +2740,15 @@ class StockConfigurationService:
         try:
             with self._get_connection() as conn:
                 with get_db_cursor(conn, dict_cursor=True) as cur:
-                    if updates:
-                        set_items = [f"{col} = %({col})s" for col in updates.keys()]
+                    db_updates = {k: v for k, v in updates.items() if k not in ("po_doc_entry", "po_line_num", "grpo_doc_entry", "grpo_line_num")}
+                    if db_updates:
+                        set_items = [f"{col} = %({col})s" for col in db_updates.keys()]
                         sql = f"""
                             UPDATE stock_configuration
                             SET {', '.join(set_items)}
                             WHERE item_code = %(code)s;
                         """
-                        cur.execute(sql, {**updates, "code": code})
+                        cur.execute(sql, {**db_updates, "code": code})
 
                     if remark_edited:
                         try:
@@ -1829,7 +2789,13 @@ class StockConfigurationService:
                     try:
                         f_items = self._read_from_fallback()
                         for it in f_items:
-                            if it.get("item_code") == code:
+                            matches_code = it.get("item_code") == code
+                            matches_grpo = (
+                                resolved_grpo_doc_entry is None
+                                or it.get("grpo_doc_entry") == resolved_grpo_doc_entry
+                                or not it.get("grpo_doc_entry")
+                            )
+                            if matches_code and matches_grpo:
                                 it.update(updates)
                                 it["updated_at"] = now.isoformat()
                                 it["last_submitted_at"] = now.isoformat()
@@ -1852,27 +2818,47 @@ class StockConfigurationService:
                     except Exception:
                         pass
 
+                    eff_row_id = str(data.get("row_id") or "").strip()
+                    if not eff_row_id and resolved_grpo_doc_entry is not None:
+                        eff_row_id = f"{code}_{resolved_grpo_doc_entry}_{resolved_grpo_line_num or 0}"
+                    elif not eff_row_id:
+                        eff_row_id = code
+
                     return {
                         "item_code": code,
+                        "row_id": eff_row_id,
                         "success": overall_success,
                         "partial_success": is_partial,
                         "item": result,
                         "item_master": item_master_result,
                         "purchase_order": po_result,
+                        "grpo_remark": grpo_remark_result,
+                        "grpo": pdn1_result,
+                        "pdn1": pdn1_result,
+                        "po_line": pdn1_result,
+                        "por1": pdn1_result,
                         "message": final_message,
                         "sap_message": final_message,
-                        "sap_synced": overall_success or item_master_result.get("status") == "success" or po_result.get("status") == "success",
+                        "sap_synced": overall_success or any(r.get("status") == "success" for r in [item_master_result, po_result, grpo_remark_result, pdn1_result]),
                         "last_submitted_at": result.get("last_submitted_at"),
                         "remark": result.get("remark", ""),
                     }
-        except (ValueError, RuntimeError, SAPValidationError, SAPConnectionError):
+        except (ValueError, SAPValidationError, SAPConnectionError):
             raise
         except Exception as e:
-            logger.warning(f"Error updating item in PostgreSQL ({e}), falling back to JSON.")
+            if not is_db_connection_error(e):
+                raise
+            logger.warning(f"Database connection or circuit-breaker failure ({e}), falling back to offline JSON.")
             items = self._read_from_fallback()
             found = False
             for it in items:
-                if it.get("item_code") == code:
+                matches_code = it.get("item_code") == code
+                matches_grpo = (
+                    resolved_grpo_doc_entry is None
+                    or it.get("grpo_doc_entry") == resolved_grpo_doc_entry
+                    or not it.get("grpo_doc_entry")
+                )
+                if matches_code and matches_grpo:
                     it.update(updates)
                     it["updated_at"] = now.isoformat()
                     it["last_submitted_at"] = now.isoformat()
@@ -1897,16 +2883,28 @@ class StockConfigurationService:
                 raise ValueError(f"Item {code} not found.")
             self._write_to_fallback(items)
 
+            eff_row_id = str(data.get("row_id") or "").strip()
+            if not eff_row_id and resolved_grpo_doc_entry is not None:
+                eff_row_id = f"{code}_{resolved_grpo_doc_entry}_{resolved_grpo_line_num or 0}"
+            elif not eff_row_id:
+                eff_row_id = code
+
             return {
                 "item_code": code,
+                "row_id": eff_row_id,
                 "success": overall_success,
                 "partial_success": is_partial,
                 "item": result,
                 "item_master": item_master_result,
                 "purchase_order": po_result,
+                "grpo_remark": grpo_remark_result,
+                "grpo": pdn1_result,
+                "pdn1": pdn1_result,
+                "po_line": pdn1_result,
+                "por1": pdn1_result,
                 "message": final_message,
                 "sap_message": final_message,
-                "sap_synced": overall_success or item_master_result.get("status") == "success" or po_result.get("status") == "success",
+                "sap_synced": overall_success or any(r.get("status") == "success" for r in [item_master_result, po_result, grpo_remark_result, pdn1_result]),
                 "last_submitted_at": result.get("last_submitted_at"),
                 "remark": result.get("remark", ""),
             }
@@ -1924,9 +2922,15 @@ class StockConfigurationService:
 
         for item_data in items_data:
             code = str(item_data.get("item_code") or "").strip()
+            item_row_id = str(item_data.get("row_id") or "").strip()
+            if not item_row_id and item_data.get("grpo_doc_entry") is not None:
+                item_row_id = f"{code}_{item_data.get('grpo_doc_entry')}_{item_data.get('grpo_line_num', 0)}"
+            elif not item_row_id:
+                item_row_id = code
+
             if not code:
                 failed_count += 1
-                results.append({"item_code": "", "success": False, "error": "Missing item_code in update item."})
+                results.append({"item_code": "", "row_id": item_row_id, "success": False, "error": "Missing item_code in update item."})
                 continue
 
             # Validate nt_weight against negative value
@@ -1935,11 +2939,11 @@ class StockConfigurationService:
                     val = float(item_data["nt_weight"])
                     if val < 0:
                         failed_count += 1
-                        results.append({"item_code": code, "success": False, "error": "Field 'nt_weight' cannot be negative."})
+                        results.append({"item_code": code, "row_id": item_row_id, "success": False, "error": "Field 'nt_weight' cannot be negative."})
                         continue
                 except (ValueError, TypeError):
                     failed_count += 1
-                    results.append({"item_code": code, "success": False, "error": "Invalid numeric value for 'nt_weight'."})
+                    results.append({"item_code": code, "row_id": item_row_id, "success": False, "error": "Invalid numeric value for 'nt_weight'."})
                     continue
 
             try:
@@ -1956,6 +2960,7 @@ class StockConfigurationService:
 
                 results.append({
                     "item_code": code,
+                    "row_id": res.get("row_id") or item_row_id,
                     "success": is_success,
                     "partial_success": is_partial,
                     "item": res.get("item") or res,
@@ -1967,7 +2972,7 @@ class StockConfigurationService:
                 })
             except Exception as ex:
                 failed_count += 1
-                results.append({"item_code": code, "success": False, "error": str(ex)})
+                results.append({"item_code": code, "row_id": item_row_id, "success": False, "error": str(ex)})
 
         return {
             "total": len(items_data),
@@ -2078,23 +3083,49 @@ class StockConfigurationService:
             self._write_to_fallback(items)
             return True
 
-    def get_item(self, item_code: str) -> Optional[Dict[str, Any]]:
-        """Fetch a single stock configuration item by item_code."""
+    def get_item(
+        self,
+        item_code: str,
+        grpo_doc_entry: Optional[int] = None,
+        grpo_line_num: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Fetch a single stock configuration item by item_code and optional GRPO composite identifiers."""
         code = str(item_code).strip()
         try:
             with self._get_connection() as conn:
                 with get_db_cursor(conn, dict_cursor=True) as cur:
-                    cur.execute(
-                        f"SELECT {', '.join(COLUMNS)} FROM stock_configuration WHERE item_code = %(code)s;",
-                        {"code": code},
-                    )
-                    row = cur.fetchone()
+                    row = None
+                    if grpo_doc_entry is not None:
+                        if grpo_line_num is not None:
+                            cur.execute(
+                                f"SELECT {', '.join(COLUMNS)} FROM stock_configuration WHERE item_code = %(code)s AND grpo_doc_entry = %(grpo)s AND grpo_line_num = %(line)s;",
+                                {"code": code, "grpo": int(grpo_doc_entry), "line": int(grpo_line_num)},
+                            )
+                        else:
+                            cur.execute(
+                                f"SELECT {', '.join(COLUMNS)} FROM stock_configuration WHERE item_code = %(code)s AND grpo_doc_entry = %(grpo)s;",
+                                {"code": code, "grpo": int(grpo_doc_entry)},
+                            )
+                        row = cur.fetchone()
+
+                    if not row:
+                        cur.execute(
+                            f"SELECT {', '.join(COLUMNS)} FROM stock_configuration WHERE item_code = %(code)s;",
+                            {"code": code},
+                        )
+                        row = cur.fetchone()
                     if not row:
                         return None
                     item_dict = dict(row)
                     for num_col in ["qty", "stock_qty", "rcvd_qty", "nt_weight", "ok_qty", "rej_qty", "so_qty", "po_qty"]:
                         if item_dict.get(num_col) is not None:
                             item_dict[num_col] = float(item_dict[num_col])
+                    for int_col in ["po_doc_entry", "po_line_num", "grpo_doc_entry", "grpo_line_num"]:
+                        if item_dict.get(int_col) is not None:
+                            try:
+                                item_dict[int_col] = int(item_dict[int_col])
+                            except (ValueError, TypeError):
+                                pass
                     for d_col in ["entry_date", "item_create_date", "so_date", "po_date", "grn_date"]:
                         if isinstance(item_dict.get(d_col), (datetime, date)):
                             item_dict[d_col] = item_dict[d_col].isoformat()
@@ -2109,6 +3140,15 @@ class StockConfigurationService:
         except Exception as e:
             logger.warning(f"Error fetching item {code} from PostgreSQL ({e}), checking JSON fallback.")
             items = self._read_from_fallback()
+            for it in items:
+                if it.get("item_code") == code:
+                    if grpo_doc_entry is not None:
+                        if it.get("grpo_doc_entry") == grpo_doc_entry:
+                            if grpo_line_num is not None and it.get("grpo_line_num") != grpo_line_num:
+                                continue
+                            return it
+                    else:
+                        return it
             for it in items:
                 if it.get("item_code") == code:
                     return it
@@ -2210,15 +3250,16 @@ class StockConfigurationService:
                 or 0.0
             ), 4)
 
-            # QC and configuration flags: preserve user/DB values if blank in SAP; default to Y/True for new rows
-            qc_val = clean_qc(s_item.get("U_QC"))
-            drw_yn = clean_yn(s_item.get("U_Drawing") or s_item.get("U_JobDrawing"))
-            v_chk = clean_yn(s_item.get("U_V_Chk"))
-            lm = clean_yn(s_item.get("U_LM"))
-            olng = clean_yn(s_item.get("U_OLNG"))
-            lpk = clean_yn(s_item.get("U_LPK"))
-            lbl = clean_yn(s_item.get("U_LBL"))
-            mc_or_pt = clean_yn(s_item.get("U_MC_OR_PT"))
+            # QC and configuration flags: strictly from PDN1 (from received_map); do NOT use OITM as fallback
+            info_pdn1 = received_map.get(code) or {}
+            qc_val = info_pdn1.get("qc")
+            drw_yn = info_pdn1.get("drw_yn")
+            v_chk = info_pdn1.get("v_chk")
+            lm = info_pdn1.get("lm")
+            olng = info_pdn1.get("olng")
+            lpk = info_pdn1.get("lpk")
+            lbl = info_pdn1.get("lbl")
+            mc_or_pt = info_pdn1.get("mc_or_pt")
 
             if code not in existing_items:
                 if qc_val is None:
@@ -2233,7 +3274,7 @@ class StockConfigurationService:
 
             po_comment = ""
             if code in received_map:
-                po_comment = received_map[code].get("po_comments", "")
+                po_comment = received_map[code].get("remark") or received_map[code].get("po_comments", "")
             elif code in pending_po_map:
                 po_comment = pending_po_map[code].get("po_comments", "")
             sap_remark = po_comment or str(s_item.get("User_Text") or "").strip()
@@ -2249,13 +3290,22 @@ class StockConfigurationService:
                 next_sr += 1
                 existing_items[code] = item_sr
 
+            po_doc_entry = None
+            po_line_num = None
+            grpo_doc_entry = None
+            grpo_line_num = None
+
             if code in received_map:
                 info = received_map[code]
                 record_cat = "Received Stock"
                 grpo_no = info.get("grpo_no", "")
+                grpo_doc_entry = info.get("grpo_doc_entry")
+                grpo_line_num = info.get("grpo_line_num")
                 rcvd_qty = float(info.get("rcvd_qty", 0.0))
                 grn_date = info.get("grn_date")
                 po_no = info.get("po_no", "")
+                po_doc_entry = info.get("po_doc_entry")
+                po_line_num = info.get("po_line_num")
                 po_date = info.get("po_date")
                 po_qty = float(info.get("po_qty", 0.0))
                 entry_date = grn_date or po_date or item_create_date or now.strftime("%Y-%m-%d")
@@ -2273,9 +3323,13 @@ class StockConfigurationService:
                 pinfo = pending_po_map[code]
                 record_cat = "Pending Receipt"
                 grpo_no = ""
+                grpo_doc_entry = None
+                grpo_line_num = None
                 rcvd_qty = 0.0
                 grn_date = None
                 po_no = pinfo.get("po_no", "")
+                po_doc_entry = pinfo.get("po_doc_entry")
+                po_line_num = pinfo.get("po_line_num")
                 po_date = pinfo.get("po_date")
                 po_qty = float(pinfo.get("po_qty", 0.0))
                 entry_date = po_date or item_create_date or now.strftime("%Y-%m-%d")
@@ -2292,9 +3346,13 @@ class StockConfigurationService:
             else:
                 record_cat = "Item Master"
                 grpo_no = ""
+                grpo_doc_entry = None
+                grpo_line_num = None
                 rcvd_qty = 0.0
                 grn_date = None
                 po_no = ""
+                po_doc_entry = None
+                po_line_num = None
                 po_date = None
                 po_qty = 0.0
                 so_no = ""
@@ -2311,7 +3369,8 @@ class StockConfigurationService:
                 lm, olng, lpk, lbl, mc_or_pt, group, '01',
                 is_active, entry_date, sap_remark, now, sap_last_updated,
                 record_cat, item_create_date, so_date, po_date, grn_date,
-                po_no, so_no, so_qty, po_qty
+                po_no, so_no, so_qty, po_qty,
+                po_doc_entry, po_line_num, grpo_doc_entry, grpo_line_num
             ))
 
         if not rows_to_upsert:
@@ -2325,11 +3384,12 @@ class StockConfigurationService:
                     lm, olng, lpk, lbl, mc_or_pt, items_group_code, warehouse_code,
                     is_active, entry_date, remark, created_at, updated_at,
                     record_category, item_create_date, so_date, po_date, grn_date,
-                    po_no, so_no, so_qty, po_qty
+                    po_no, so_no, so_qty, po_qty,
+                    po_doc_entry, po_line_num, grpo_doc_entry, grpo_line_num
                 ) VALUES (
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 )
                 ON DUPLICATE KEY UPDATE
                     stock_qty = VALUES(stock_qty),
@@ -2363,6 +3423,10 @@ class StockConfigurationService:
                     items_group_code = COALESCE(NULLIF(VALUES(items_group_code), ''), stock_configuration.items_group_code),
                     vendor_code = COALESCE(NULLIF(VALUES(vendor_code), ''), stock_configuration.vendor_code),
                     vendor_name = COALESCE(NULLIF(VALUES(vendor_name), ''), stock_configuration.vendor_name),
+                    po_doc_entry = COALESCE(VALUES(po_doc_entry), stock_configuration.po_doc_entry),
+                    po_line_num = COALESCE(VALUES(po_line_num), stock_configuration.po_line_num),
+                    grpo_doc_entry = COALESCE(VALUES(grpo_doc_entry), stock_configuration.grpo_doc_entry),
+                    grpo_line_num = COALESCE(VALUES(grpo_line_num), stock_configuration.grpo_line_num),
                     updated_at = VALUES(updated_at);
             """
             cur.executemany(upsert_sql, rows_to_upsert)
@@ -2374,7 +3438,8 @@ class StockConfigurationService:
                     lm, olng, lpk, lbl, mc_or_pt, items_group_code, warehouse_code,
                     is_active, entry_date, remark, created_at, updated_at,
                     record_category, item_create_date, so_date, po_date, grn_date,
-                    po_no, so_no, so_qty, po_qty
+                    po_no, so_no, so_qty, po_qty,
+                    po_doc_entry, po_line_num, grpo_doc_entry, grpo_line_num
                 ) VALUES %s
                 ON CONFLICT (item_code) DO UPDATE
                 SET stock_qty = EXCLUDED.stock_qty,
@@ -2408,13 +3473,17 @@ class StockConfigurationService:
                     items_group_code = COALESCE(NULLIF(EXCLUDED.items_group_code, ''), stock_configuration.items_group_code),
                     vendor_code = COALESCE(NULLIF(EXCLUDED.vendor_code, ''), stock_configuration.vendor_code),
                     vendor_name = COALESCE(NULLIF(EXCLUDED.vendor_name, ''), stock_configuration.vendor_name),
+                    po_doc_entry = COALESCE(EXCLUDED.po_doc_entry, stock_configuration.po_doc_entry),
+                    po_line_num = COALESCE(EXCLUDED.po_line_num, stock_configuration.po_line_num),
+                    grpo_doc_entry = COALESCE(EXCLUDED.grpo_doc_entry, stock_configuration.grpo_doc_entry),
+                    grpo_line_num = COALESCE(EXCLUDED.grpo_line_num, stock_configuration.grpo_line_num),
                     updated_at = EXCLUDED.updated_at;
             """
             try:
                 import psycopg2.extras
                 psycopg2.extras.execute_values(cur, pg_values_sql, rows_to_upsert, page_size=200)
             except Exception:
-                placeholders = "(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+                placeholders = "(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
                 pg_exec_sql = pg_values_sql.replace("VALUES %s", f"VALUES {placeholders}")
                 cur.executemany(pg_exec_sql, rows_to_upsert)
         return len(rows_to_upsert)
@@ -2491,7 +3560,7 @@ class StockConfigurationService:
             except Exception as e:
                 logger.warning(f"Error fetching linked SO DocNum {so_num}: {e}")
 
-        # 5. Build received_map (keyed by ItemCode, newest GRPO first)
+        # 5. Build received_map (keyed by ItemCode and composite row_id, newest GRPO first)
         received_map = {}
         for g in grpos:
             grpo_no = str(g.get("DocNum") or "")
@@ -2500,16 +3569,31 @@ class StockConfigurationService:
             vendor_name = g.get("CardName") or ""
             vendor_code = g.get("CardCode") or ""
             hdr_so_no = str(g.get("U_SONo") or "")
+            grpo_remark = str(g.get("U_Remark") or "").strip()
+            grpo_doc_entry = int(g.get("DocEntry")) if g.get("DocEntry") else None
 
             for l in g.get("DocumentLines", []):
                 code = l.get("ItemCode")
-                if not code or code in received_map:
+                if not code:
                     continue
+                grpo_line_num = int(l.get("LineNum", 0)) if l.get("LineNum") is not None else 0
+                row_id = f"{code}_{grpo_doc_entry}_{grpo_line_num}" if grpo_doc_entry is not None else code
 
                 rcvd_qty = float(l.get("Quantity") or 0.0)
-                rem_open_qty = float(l.get("RemainingOpenQuantity")) if l.get("RemainingOpenQuantity") is not None else rcvd_qty
+                rem_open_qty = float(l.get("OpenQty") if l.get("OpenQty") is not None else (l.get("RemainingOpenQuantity") or 0.0))
                 ok_qty = rem_open_qty
                 rej_qty = max(0.0, rcvd_qty - rem_open_qty)
+
+                # Inspection fields strictly from GRPO document line (PDN1); do not fallback to POR1
+                qc_pdn1 = clean_qc(l.get("U_QC"))
+                drw_pdn1 = clean_yn(l.get("U_DRW"))
+                v_chk_pdn1 = clean_yn(l.get("U_VCHK"))
+                lm_pdn1 = clean_yn(l.get("U_LM"))
+                olng_pdn1 = clean_yn(l.get("U_OLNG"))
+                lpk_pdn1 = clean_yn(l.get("U_IPK"))
+                lbl_pdn1 = clean_yn(l.get("U_LBL"))
+                mc_or_pt_pdn1 = clean_yn(l.get("U_MCorPT"))
+                last_updated_pdn1 = str(l.get("U_LUpdated") or "").strip() or None
 
                 base_type = l.get("BaseType")
                 base_entry = l.get("BaseEntry")
@@ -2522,17 +3606,28 @@ class StockConfigurationService:
                 so_no = ""
                 so_date = None
                 so_qty = 0.0
+                po_line_num = 0
 
                 if base_type == 22 and base_entry and base_entry in po_by_entry:
                     base_po = po_by_entry[base_entry]
                     po_no = str(base_po.get("DocNum") or "")
-                    po_comments = str(base_po.get("Comments") or "").strip()
+                    po_comments = str(base_po.get("U_Remark") or "").strip()
                     if base_po.get("DocDate"):
                         po_date = str(base_po.get("DocDate")).split("T")[0]
-                    for pl in base_po.get("DocumentLines", []):
-                        if pl.get("LineNum") == base_line or pl.get("ItemCode") == code:
-                            po_qty = float(pl.get("Quantity") or 0.0)
-                            break
+
+                    matched_pl = None
+                    if base_line is not None:
+                        try:
+                            bl_int = int(base_line)
+                            matched_pl = next((pl for pl in base_po.get("DocumentLines", []) if pl.get("LineNum") == bl_int), None)
+                        except (ValueError, TypeError):
+                            pass
+                    if not matched_pl:
+                        matched_pl = next((pl for pl in base_po.get("DocumentLines", []) if pl.get("ItemCode") == code), None)
+
+                    if matched_pl:
+                        po_qty = float(matched_pl.get("Quantity") or 0.0)
+                        po_line_num = int(matched_pl.get("LineNum", 0))
                     if not po_qty:
                         po_qty = rcvd_qty
 
@@ -2574,8 +3669,12 @@ class StockConfigurationService:
                     except (ValueError, TypeError):
                         pass
 
-                received_map[code] = {
+                record_data = {
+                    "row_id": row_id,
+                    "item_code": code,
                     "grpo_no": grpo_no,
+                    "grpo_doc_entry": grpo_doc_entry,
+                    "grpo_line_num": grpo_line_num,
                     "grn_date": grn_date,
                     "rcvd_qty": rcvd_qty,
                     "ok_qty": ok_qty,
@@ -2584,14 +3683,31 @@ class StockConfigurationService:
                     "vendor_code": vendor_code,
                     "po_no": po_no,
                     "po_doc_entry": int(base_entry) if (base_type == 22 and base_entry) else (int(po_no) if po_no and str(po_no).isdigit() else None),
+                    "po_line_num": po_line_num if base_type == 22 and base_entry else 0,
                     "po_date": po_date,
                     "po_qty": po_qty,
-                    "po_comments": po_comments,
+                    "po_comments": grpo_remark or po_comments,
+                    "remark": grpo_remark,
+                    "qc": qc_pdn1,
+                    "drw_yn": drw_pdn1,
+                    "v_chk": v_chk_pdn1,
+                    "lm": lm_pdn1,
+                    "olng": olng_pdn1,
+                    "lpk": lpk_pdn1,
+                    "lbl": lbl_pdn1,
+                    "mc_or_pt": mc_or_pt_pdn1,
+                    "last_submitted_at": last_updated_pdn1,
                     "so_no": so_no if so_qty > 0 else "",
                     "so_date": so_date if so_qty > 0 else None,
                     "so_qty": so_qty,
                     "item_desc": l.get("ItemDescription"),
                 }
+
+                # Store by row_id (composite key) to keep receipts separate
+                received_map[row_id] = record_data
+                # Also store by item_code (first/latest seen takes precedence for code-level lookups)
+                if code not in received_map:
+                    received_map[code] = record_data
 
         # 6. Build pending_po_map (for items with open POs but not received)
         pending_po_map = {}
@@ -2599,7 +3715,7 @@ class StockConfigurationService:
             po_entry = p.get("DocEntry")
             po_no = str(p.get("DocNum") or "")
             po_date = str(p.get("DocDate")).split("T")[0] if p.get("DocDate") else None
-            po_comments = str(p.get("Comments") or "").strip()
+            po_comments = str(p.get("U_Remark") or "").strip()
             vendor_name = p.get("CardName") or ""
             vendor_code = p.get("CardCode") or ""
             imp_file = p.get("ImportFileNum")
@@ -2622,6 +3738,17 @@ class StockConfigurationService:
                 if not code or code in received_map or code in pending_po_map:
                     continue
                 open_qty = float(l.get("RemainingOpenQuantity") or l.get("OpenQuantity") or l.get("Quantity") or 0.0)
+                p_line_num = int(l.get("LineNum", 0)) if l.get("LineNum") is not None else 0
+                qc_por1 = clean_qc(l.get("U_QC"))
+                drw_por1 = clean_yn(l.get("U_DRW"))
+                v_chk_por1 = clean_yn(l.get("U_VCHK"))
+                lm_por1 = clean_yn(l.get("U_LM"))
+                olng_por1 = clean_yn(l.get("U_OLNG"))
+                lpk_por1 = clean_yn(l.get("U_IPK"))
+                lbl_por1 = clean_yn(l.get("U_LBL"))
+                mc_or_pt_por1 = clean_yn(l.get("U_MCorPT"))
+                last_updated_por1 = str(l.get("U_LUpdated") or "").strip() or None
+
                 so_qty = 0.0
                 if so_no and so_num_int and so_num_int in so_by_doc_num:
                     so_qty_total = 0.0
@@ -2633,12 +3760,23 @@ class StockConfigurationService:
                     so_qty = so_qty_total if found_so_line else 0.0
                 pending_po_map[code] = {
                     "po_no": po_no,
+                    "po_doc_entry": int(po_entry) if po_entry else (int(po_no) if po_no and str(po_no).isdigit() else None),
+                    "po_line_num": p_line_num,
                     "po_date": po_date,
                     "po_qty": float(l.get("Quantity") or 0.0),
                     "po_comments": po_comments,
                     "open_qty": open_qty,
                     "vendor_name": vendor_name,
                     "vendor_code": vendor_code,
+                    "qc": None,
+                    "drw_yn": None,
+                    "v_chk": None,
+                    "lm": None,
+                    "olng": None,
+                    "lpk": None,
+                    "lbl": None,
+                    "mc_or_pt": None,
+                    "last_submitted_at": None,
                     "so_no": so_no if so_qty > 0 else "",
                     "so_date": so_date if so_qty > 0 else None,
                     "so_qty": so_qty,
@@ -2712,19 +3850,40 @@ class StockConfigurationService:
                         fb_it["updated_at"] = sap_last_updated
                     else:
                         fb_it["updated_at"] = now.isoformat()
-                    if s_item.get("User_Text"):
+                    if s_item.get("User_Text") and not fb_it.get("remark"):
                         fb_it["remark"] = s_item.get("User_Text")
-                    if code in received_map:
-                        rm = received_map[code]
-                        fb_it["grpo_no"] = rm.get("grpo_no") or fb_it.get("grpo_no", "")
-                        fb_it["rcvd_qty"] = rm.get("rcvd_qty", fb_it.get("rcvd_qty", 0.0))
-                        fb_it["po_qty"] = rm.get("po_qty", fb_it.get("po_qty", 0.0))
-                        fb_it["so_qty"] = rm.get("so_qty", fb_it.get("so_qty", 0.0))
-                        fb_it["so_no"] = rm.get("so_no", fb_it.get("so_no", ""))
-                        fb_it["po_no"] = rm.get("po_no", fb_it.get("po_no", ""))
-                        fb_it["qty"] = rm.get("so_qty") if (rm.get("so_no") and rm.get("so_qty", 0) > 0) else 0.0
-                        fb_it["entry_date"] = rm.get("grn_date") or fb_it.get("entry_date")
-                        fb_it["vendor_name"] = rm.get("vendor_name") or fb_it.get("vendor_name", "")
+                    info = received_map.get(code) or pending_po_map.get(code) or {}
+                    if info:
+                        if info.get("qc") is not None:
+                            fb_it["qc"] = info["qc"]
+                        for f_k in ["drw_yn", "v_chk", "lm", "olng", "lpk", "lbl", "mc_or_pt"]:
+                            if info.get(f_k):
+                                fb_it[f_k] = info[f_k]
+                        if info.get("last_submitted_at"):
+                            fb_it["last_submitted_at"] = info["last_submitted_at"]
+                        fb_it["po_no"] = info.get("po_no") or fb_it.get("po_no", "")
+                        fb_it["po_doc_entry"] = info.get("po_doc_entry") or fb_it.get("po_doc_entry")
+                        fb_it["po_line_num"] = info.get("po_line_num") if info.get("po_line_num") is not None else fb_it.get("po_line_num")
+                        fb_it["po_date"] = info.get("po_date") or fb_it.get("po_date")
+                        fb_it["po_qty"] = info.get("po_qty", fb_it.get("po_qty", 0.0))
+                        fb_it["so_no"] = info.get("so_no", fb_it.get("so_no", ""))
+                        fb_it["so_date"] = info.get("so_date") or fb_it.get("so_date")
+                        fb_it["so_qty"] = info.get("so_qty", fb_it.get("so_qty", 0.0))
+                        fb_it["qty"] = info.get("qty", 0.0)
+                        fb_it["vendor_name"] = info.get("vendor_name") or fb_it.get("vendor_name", "")
+                        fb_it["vendor_code"] = info.get("vendor_code") or fb_it.get("vendor_code", "")
+                        if code in received_map:
+                            rm = received_map[code]
+                            fb_it["grpo_no"] = rm.get("grpo_no") or fb_it.get("grpo_no", "")
+                            fb_it["grpo_doc_entry"] = rm.get("grpo_doc_entry") or fb_it.get("grpo_doc_entry")
+                            fb_it["grpo_line_num"] = rm.get("grpo_line_num") if rm.get("grpo_line_num") is not None else fb_it.get("grpo_line_num")
+                            fb_it["rcvd_qty"] = rm.get("rcvd_qty", fb_it.get("rcvd_qty", 0.0))
+                            fb_it["ok_qty"] = rm.get("ok_qty", fb_it.get("ok_qty", 0.0))
+                            fb_it["rej_qty"] = rm.get("rej_qty", fb_it.get("rej_qty", 0.0))
+                            fb_it["entry_date"] = rm.get("grn_date") or fb_it.get("entry_date")
+                            fb_it["record_category"] = "Received Stock"
+                        else:
+                            fb_it["record_category"] = "Pending Receipt"
                     synced_count += 1
             self._write_to_fallback(fallback_items)
             StockConfigurationService._last_synced_at = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -2741,6 +3900,7 @@ class StockConfigurationService:
     def export_excel(
         self,
         search: Optional[str] = None,
+        so_no: Optional[str] = None,
         vendor: Optional[str] = None,
         group: Optional[str] = None,
         warehouse: Optional[str] = None,
@@ -2758,6 +3918,7 @@ class StockConfigurationService:
             page=1,
             page_size=100000,
             search=search,
+            so_no=so_no,
             vendor=vendor,
             group=group,
             warehouse=warehouse,

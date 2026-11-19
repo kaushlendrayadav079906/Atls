@@ -22,6 +22,7 @@ async def get_stock_configuration(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=10000, description="Items per page"),
     search: Optional[str] = Query(None, description="Search by SAP Code, Description, or Vendor Name"),
+    so_no: Optional[str] = Query(None, description="Filter by Sales Order Number"),
     vendor: Optional[str] = Query(None, description="Filter by Vendor"),
     group: Optional[str] = Query(None, description="Filter by Item Group"),
     warehouse: Optional[str] = Query(None, description="Filter by Warehouse"),
@@ -53,6 +54,7 @@ async def get_stock_configuration(
             page=page,
             page_size=page_size,
             search=search,
+            so_no=so_no,
             vendor=vendor,
             group=group,
             warehouse=warehouse,
@@ -138,6 +140,7 @@ async def bulk_update_stock_items(
 
 
 @router.put("/items/{item_code}")
+@router.post("/items/{item_code}")
 async def update_stock_item(
     item_code: str,
     data: Dict[str, Any],
@@ -179,6 +182,9 @@ async def update_stock_item(
             "item_code": item_code,
             "item_master": updated.get("item_master"),
             "purchase_order": updated.get("purchase_order"),
+            "por1": updated.get("por1"),
+            "po_line": updated.get("po_line"),
+            "grpo": updated.get("grpo"),
             "remark": updated.get("remark", ""),
             "last_submitted_at": updated.get("last_submitted_at"),
             "sap_synced": updated.get("sap_synced", False),
@@ -324,6 +330,7 @@ async def import_stock_excel(
 @router.get("/export")
 async def export_stock_excel(
     search: Optional[str] = Query(None),
+    so_no: Optional[str] = Query(None),
     vendor: Optional[str] = Query(None),
     group: Optional[str] = Query(None),
     warehouse: Optional[str] = Query(None),
@@ -337,6 +344,7 @@ async def export_stock_excel(
     try:
         excel_bytes = _service.export_excel(
             search=search,
+            so_no=so_no,
             vendor=vendor,
             group=group,
             warehouse=warehouse,

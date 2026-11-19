@@ -27,8 +27,6 @@ def client():
             "permissions": [
                 "dashboard.view",
                 "products.view",
-                "pos.access",
-                "pos.checkout",
                 "invoices.view",
                 "reports.view",
                 "reports.export",

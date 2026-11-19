@@ -88,8 +88,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case 'products':
       case 'inventory':
         return hasPermission('products.view');
-      case 'pos':
-        return hasPermission('pos.access');
       case 'sales':
       case 'invoices':
         return hasPermission('invoices.view');

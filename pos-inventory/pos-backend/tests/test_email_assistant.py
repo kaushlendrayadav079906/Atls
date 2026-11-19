@@ -163,7 +163,7 @@ def test_send_email_without_explicit_confirmation_fails():
 
 def test_send_email_unauthorized_user_fails():
     # Regular 'user' role lacks email.send permission by default
-    user = {"id": "2", "username": "cashier", "role": "user", "permissions": ["pos.checkout"]}
+    user = {"id": "2", "username": "cashier", "role": "user", "permissions": ["invoices.view"]}
     req = EmailSendRequest(
         recipient_email="finance@partner.com",
         subject="Payment Reminder",

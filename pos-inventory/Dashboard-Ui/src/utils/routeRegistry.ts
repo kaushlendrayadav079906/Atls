@@ -24,14 +24,6 @@ export const INTERNAL_ROUTES: InternalRoute[] = [
     supportedFilters: ['period', 'branch_id', 'date_from', 'date_to'],
   },
   {
-    id: 'pos',
-    name: 'Point of Sale',
-    path: '/pos',
-    module: 'pos',
-    description: 'Point of Sale cash checkout, barcode scanning, customer billing',
-    supportedFilters: ['warehouse'],
-  },
-  {
     id: 'products',
     name: 'Products & Inventory',
     path: '/products',
@@ -254,7 +246,7 @@ export const INTERNAL_ROUTES: InternalRoute[] = [
     name: 'Product Overview',
     path: '/product',
     module: 'landing',
-    description: 'ATLAS Retail OS product features and POS platform architecture overview',
+    description: 'ATLAS Retail OS product features and inventory architecture overview',
     supportedFilters: [],
   },
   {

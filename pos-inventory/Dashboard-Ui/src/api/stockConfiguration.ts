@@ -2,6 +2,7 @@ import { apiClient } from './client';
 
 export interface StockConfigurationItem {
   sr_no?: number;
+  row_id?: string;
   record_id?: string;
   item_code: string;
   description: string;
@@ -32,6 +33,9 @@ export interface StockConfigurationItem {
   grn_date?: string | null;
   po_no?: string;
   po_doc_entry?: number | null;
+  po_line_num?: number | null;
+  grpo_doc_entry?: number | null;
+  grpo_line_num?: number | null;
   so_no?: string;
   so_qty?: number;
   po_qty?: number;
@@ -83,6 +87,7 @@ export interface StockQueryParams {
   page?: number;
   page_size?: number;
   search?: string;
+  so_no?: string;
   vendor?: string;
   group?: string;
   warehouse?: string;
@@ -106,6 +111,7 @@ export interface ImportPreviewResponse {
 
 export interface BulkUpdateItemResult {
   item_code: string;
+  row_id?: string;
   success: boolean;
   partial_success?: boolean;
   item?: StockConfigurationItem;
