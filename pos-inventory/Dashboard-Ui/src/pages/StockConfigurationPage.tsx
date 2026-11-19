@@ -1035,7 +1035,7 @@ export const StockConfigurationPage: React.FC = () => {
             setBranchId(e.target.value);
             setPage(1);
           }}
-          className={`rounded-xl border px-3.5 py-2 text-[13px] sm:text-[13.5px] font-medium outline-none shadow-2xs transition cursor-pointer ${isDark
+          className={`rounded-xl border px-3.5 py-2 text-[14px] sm:text-[14.5px] font-medium outline-none shadow-2xs transition cursor-pointer ${isDark
             ? 'border-slate-700 bg-[#141f32] text-slate-200 hover:border-slate-600'
             : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
             }`}
@@ -1056,7 +1056,7 @@ export const StockConfigurationPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-colors font-medium text-[13px] sm:text-[13.5px] shadow-2xs cursor-pointer border ${isDark
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-colors font-medium text-[14px] sm:text-[14.5px] shadow-2xs cursor-pointer border ${isDark
               ? 'border-slate-700 bg-[#141f32] text-slate-200 hover:bg-slate-800'
               : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'
               }`}
@@ -1158,15 +1158,15 @@ export const StockConfigurationPage: React.FC = () => {
             <Box size={22} className="text-blue-600" />
           </div>
           <div className="space-y-0.5 min-w-0">
-            <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Total Items</p>
-            <p className="text-[24px] sm:text-[26px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
+            <p className="text-[14px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Total Items</p>
+            <p className="text-[26px] sm:text-[28px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
               {isLoading ? (
                 <span className="inline-block w-8 h-6 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
               ) : (
                 data?.kpis?.total_items ?? 0
               )}
             </p>
-            <p className="text-[12px] font-medium text-slate-400 leading-tight">From SAP</p>
+            <p className="text-[13px] font-medium text-slate-400 leading-tight">From SAP</p>
           </div>
         </div>
 
@@ -1177,15 +1177,15 @@ export const StockConfigurationPage: React.FC = () => {
             <CheckCircle2 size={22} className="text-emerald-600" />
           </div>
           <div className="space-y-0.5 min-w-0">
-            <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Active Items</p>
-            <p className="text-[24px] sm:text-[26px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
+            <p className="text-[14px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Active Items</p>
+            <p className="text-[26px] sm:text-[28px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
               {isLoading ? (
                 <span className="inline-block w-8 h-6 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
               ) : (
                 data?.kpis?.active_items ?? 0
               )}
             </p>
-            <p className="text-[12px] font-medium text-slate-400 leading-tight">Available for sale</p>
+            <p className="text-[13px] font-medium text-slate-400 leading-tight">Available for sale</p>
           </div>
         </div>
 
@@ -1196,15 +1196,15 @@ export const StockConfigurationPage: React.FC = () => {
             <XCircle size={22} className="text-rose-500" />
           </div>
           <div className="space-y-0.5 min-w-0">
-            <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Inactive Items</p>
-            <p className="text-[24px] sm:text-[26px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
+            <p className="text-[14px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Inactive Items</p>
+            <p className="text-[26px] sm:text-[28px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
               {isLoading ? (
                 <span className="inline-block w-8 h-6 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
               ) : (
                 data?.kpis?.inactive_items ?? 0
               )}
             </p>
-            <p className="text-[12px] font-medium text-slate-400 leading-tight">Not available</p>
+            <p className="text-[13px] font-medium text-slate-400 leading-tight">Not available</p>
           </div>
         </div>
 
@@ -1215,15 +1215,15 @@ export const StockConfigurationPage: React.FC = () => {
             <Warehouse size={22} className="text-purple-600" />
           </div>
           <div className="space-y-0.5 min-w-0">
-            <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Warehouses</p>
-            <p className="text-[24px] sm:text-[26px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
+            <p className="text-[14px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Warehouses</p>
+            <p className="text-[26px] sm:text-[28px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
               {isLoading ? (
                 <span className="inline-block w-8 h-6 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
               ) : (
                 data?.kpis?.warehouses_count ?? 0
               )}
             </p>
-            <p className="text-[12px] font-medium text-slate-400 leading-tight">Configured in SAP</p>
+            <p className="text-[13px] font-medium text-slate-400 leading-tight">Configured in SAP</p>
           </div>
         </div>
       </div>
@@ -1240,7 +1240,7 @@ export const StockConfigurationPage: React.FC = () => {
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
             placeholder="Search by SAP code, description, or vendor name..."
-            className={`w-full h-9 pl-9 pr-3.5 text-[13.5px] rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition ${isDark
+            className={`w-full h-9 pl-9 pr-3.5 text-[14.5px] rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition ${isDark
               ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
               : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
               }`}
@@ -1252,7 +1252,7 @@ export const StockConfigurationPage: React.FC = () => {
           <select
             value={selectedVendor}
             onChange={(e) => setSelectedVendor(e.target.value)}
-            className={`w-full h-9 px-3 pr-8 appearance-none text-[13px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${isDark
+            className={`w-full h-9 px-3 pr-8 appearance-none text-[14px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${isDark
               ? 'bg-slate-900 border-slate-700 text-white'
               : 'bg-white border-slate-300 text-slate-800'
               }`}
@@ -1270,7 +1270,7 @@ export const StockConfigurationPage: React.FC = () => {
           <select
             value={selectedGroup}
             onChange={(e) => setSelectedGroup(e.target.value)}
-            className={`w-full h-9 px-3 pr-8 appearance-none text-[13px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${isDark
+            className={`w-full h-9 px-3 pr-8 appearance-none text-[14px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${isDark
               ? 'bg-slate-900 border-slate-700 text-white'
               : 'bg-white border-slate-300 text-slate-800'
               }`}
@@ -1294,7 +1294,7 @@ export const StockConfigurationPage: React.FC = () => {
             placeholder="Search SO No."
             title="Search by Sales Order Number"
             aria-label="Search SO No."
-            className={`w-full h-9 pl-8.5 pr-3 text-[13px] rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition ${isDark
+            className={`w-full h-9 pl-8.5 pr-3 text-[14px] rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition ${isDark
               ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
               : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
               }`}
@@ -1306,7 +1306,7 @@ export const StockConfigurationPage: React.FC = () => {
           <select
             value={selectedWarehouse}
             onChange={(e) => setSelectedWarehouse(e.target.value)}
-            className={`w-full h-9 px-3 pr-8 appearance-none text-[13px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${isDark
+            className={`w-full h-9 px-3 pr-8 appearance-none text-[14px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${isDark
               ? 'bg-slate-900 border-slate-700 text-white'
               : 'bg-white border-slate-300 text-slate-800'
               }`}
@@ -1322,7 +1322,7 @@ export const StockConfigurationPage: React.FC = () => {
         {/* Apply Filters Button */}
         <button
           onClick={handleApplyFilters}
-          className="h-9 px-4 rounded-lg bg-[#155EEF] hover:bg-blue-700 text-white text-[13.5px] font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs active:scale-98"
+          className="h-9 px-4 rounded-lg bg-[#155EEF] hover:bg-blue-700 text-white text-[14.5px] font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs active:scale-98"
         >
           <Filter size={15} />
           <span>Apply Filters</span>
@@ -1331,7 +1331,7 @@ export const StockConfigurationPage: React.FC = () => {
         {/* Reset Button */}
         <button
           onClick={handleResetFilters}
-          className={`h-9 px-3 rounded-lg border text-[13.5px] font-semibold flex items-center gap-1.5 cursor-pointer transition ${isDark
+          className={`h-9 px-3 rounded-lg border text-[14.5px] font-semibold flex items-center gap-1.5 cursor-pointer transition ${isDark
             ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
             : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
             }`}
@@ -1351,7 +1351,7 @@ export const StockConfigurationPage: React.FC = () => {
           : 'bg-white border-slate-200/90'
         }`}>
         {/* Status Information */}
-        <div className="flex flex-wrap items-center gap-2.5 text-[13px]">
+        <div className="flex flex-wrap items-center gap-2.5 text-[14px]">
           <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
             <Box size={16} className="text-blue-600" />
             <span>Dataset: {isLoading ? 'Loading...' : `${data?.total ?? 0} entries`}</span>
@@ -1362,12 +1362,12 @@ export const StockConfigurationPage: React.FC = () => {
           {/* Modified indicator */}
           <div className="flex items-center gap-1.5">
             {modifiedCount > 0 ? (
-              <span className="text-amber-600 dark:text-amber-400 font-semibold text-[13px] flex items-center gap-1">
+              <span className="text-amber-600 dark:text-amber-400 font-semibold text-[14px] flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
                 {modifiedCount} unsaved {modifiedCount === 1 ? 'change' : 'changes'}
               </span>
             ) : (
-              <span className="text-slate-400 dark:text-slate-500 text-[12.5px] font-medium">
+              <span className="text-slate-400 dark:text-slate-500 text-[13.5px] font-medium">
                 No unsaved changes
               </span>
             )}
@@ -1377,7 +1377,7 @@ export const StockConfigurationPage: React.FC = () => {
           {bulkStatus && (
             <>
               <span className="text-slate-300 dark:text-slate-600">|</span>
-              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[12px] font-semibold ${bulkStatus.failed === 0
+              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[13px] font-semibold ${bulkStatus.failed === 0
                 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200'
                 : 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-200'
                 }`}>
@@ -1394,7 +1394,7 @@ export const StockConfigurationPage: React.FC = () => {
           <button
             onClick={handleSubmitModified}
             disabled={modifiedCount === 0 || bulkMutation.isPending}
-            className={`h-9 px-3.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-xs border ${modifiedCount > 0 && !bulkMutation.isPending
+            className={`h-9 px-3.5 rounded-lg text-[14px] font-semibold flex items-center gap-1.5 transition-all shadow-xs border ${modifiedCount > 0 && !bulkMutation.isPending
               ? 'bg-emerald-50 border-emerald-400 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-700 dark:text-emerald-300 cursor-pointer active:scale-98'
               : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
               }`}
@@ -1412,7 +1412,7 @@ export const StockConfigurationPage: React.FC = () => {
           <button
             onClick={() => setConfirmSubmitAllOpen(true)}
             disabled={bulkMutation.isPending || !data?.total}
-            className={`h-9 px-3.5 rounded-lg border text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-2xs ${isDark
+            className={`h-9 px-3.5 rounded-lg border text-[14px] font-semibold flex items-center gap-1.5 transition-all shadow-2xs ${isDark
               ? 'bg-slate-800 border-blue-500/40 text-blue-400 hover:bg-slate-700'
               : 'bg-white border-blue-400 text-blue-600 hover:bg-blue-50'
               } cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -1426,7 +1426,7 @@ export const StockConfigurationPage: React.FC = () => {
           <button
             onClick={() => setConfirmDiscardOpen(true)}
             disabled={modifiedCount === 0 || bulkMutation.isPending}
-            className={`h-9 px-3 rounded-lg border text-[13px] font-semibold flex items-center gap-1.5 transition-all ${modifiedCount > 0 && !bulkMutation.isPending
+            className={`h-9 px-3 rounded-lg border text-[14px] font-semibold flex items-center gap-1.5 transition-all ${modifiedCount > 0 && !bulkMutation.isPending
               ? isDark
                 ? 'bg-rose-950/40 border-rose-800/60 text-rose-300 hover:bg-rose-900/50 cursor-pointer'
                 : 'bg-white border-rose-300 text-rose-600 hover:bg-rose-50 cursor-pointer'
