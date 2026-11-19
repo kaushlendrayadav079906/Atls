@@ -111,6 +111,14 @@ const TEXT_MUTED = '#7C8BA1';
 const COLOR_PRIMARY = '#155EEF';
 const COLOR_BADGE = '#EF3340';
 
+// Blue left bar shown on every active sidebar item and sub-item
+const ActiveIndicator = ({ small = false }: { small?: boolean }) => (
+  <span
+    className={`absolute left-0 top-1/2 ${small ? 'h-4' : 'h-5'} w-[3px] -translate-y-1/2 rounded-r-full`}
+    style={{ backgroundColor: COLOR_PRIMARY }}
+  />
+);
+
 export const Layout = () => {
   const { user, isAdmin, hasPermission, canAccess, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -268,6 +276,21 @@ export const Layout = () => {
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
+  // ── Shared sidebar active-state look (light-blue pill, blue text, left indicator bar) ──
+  const activeItemStyle = (active: boolean, muted = false): React.CSSProperties => ({
+    backgroundColor: active ? (isDark ? '#152547' : SIDEBAR_ACTIVE_BG) : undefined,
+    color: active ? COLOR_PRIMARY : (isDark ? (muted ? '#94a3b8' : '#cbd5e1') : TEXT_SECONDARY),
+  });
+
+  // A sub-item is active on its own path or a nested path (e.g. /sales/123),
+  // unless a sibling with a longer path is a closer match (e.g. /finance vs /finance/purchase-invoices).
+  const isSubItemActive = (sub: NavSubItem, siblings: NavSubItem[]) => {
+    const p = location.pathname;
+    const matches = (path: string) => p === path || p.startsWith(`${path}/`);
+    if (!matches(sub.path)) return false;
+    return !siblings.some((s) => s.path.length > sub.path.length && matches(s.path));
+  };
+
   return (
     <div className={`flex flex-col h-screen font-sans overflow-hidden transition-colors duration-200 ${isDark ? 'bg-[#0f172a] text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       {/* ── Full-Width Fixed Top Navbar (Spanning all the way across left & right) ── */}
@@ -290,9 +313,9 @@ export const Layout = () => {
             <img
               src={atlasLogo}
               alt="ATLAS Logo"
-              className="h-10 w-10 shrink-0 object-contain drop-shadow-md"
+              className="h-11 w-11 shrink-0 object-contain drop-shadow-md"
             />
-            <span className="text-[21px] font-black tracking-wider text-blue-600 select-none">
+            <span className="text-[23px] font-black tracking-wider text-blue-600 select-none">
               ATLAS
             </span>
           </div>
@@ -551,7 +574,7 @@ export const Layout = () => {
             borderRightColor: isDark ? '#26354a' : SIDEBAR_BORDER
           }}
           className={`fixed inset-y-0 left-0 top-[60px] z-20 flex flex-col border-r transition-all duration-300 md:static md:top-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-            } md:translate-x-0 ${sidebarCollapsed ? 'w-[72px]' : 'w-[220px]'}`}
+            } md:translate-x-0 ${sidebarCollapsed ? 'w-[72px]' : 'w-[226px]'}`}
         >
           {/* Compact Sidebar Search (Matching Reference Screenshot) */}
           {!sidebarCollapsed && (
@@ -584,7 +607,7 @@ export const Layout = () => {
           <div style={{ backgroundColor: isDark ? '#1e293b' : SIDEBAR_BORDER }} className="mx-4 h-px" />
 
           {/* Nav */}
-          <nav className={`flex-1 overflow-y-auto ${sidebarCollapsed ? 'px-2' : 'px-4'} py-3 space-y-1.5`}>
+          <nav className={`flex-1 overflow-y-auto ${sidebarCollapsed ? 'px-2' : 'px-3.5'} py-3 space-y-1.5`}>
             {visibleNavItems.map((item) => {
               const hasSubItems = !!item.subItems && item.subItems.length > 0;
               const isActiveParent = hasSubItems && (
@@ -606,10 +629,7 @@ export const Layout = () => {
                   {hasSubItems ? (
                     /* Section Parent Item (Navigates to Landing Page + Expands) */
                     <div
-                      style={{
-                        backgroundColor: isActiveParent ? (isDark ? '#152547' : SIDEBAR_ACTIVE_BG) : undefined,
-                        color: isActiveParent ? COLOR_PRIMARY : (isDark ? '#cbd5e1' : TEXT_SECONDARY),
-                      }}
+                      style={activeItemStyle(isActiveParent)}
                       onMouseEnter={(e) => {
                         if (!isActiveParent) e.currentTarget.style.backgroundColor = isDark ? '#0f1c35' : SIDEBAR_HOVER_BG;
                       }}
@@ -619,15 +639,10 @@ export const Layout = () => {
                       className={`group relative flex items-center transition-all duration-150 ${
                         sidebarCollapsed
                           ? 'h-10 w-10 justify-center rounded-xl p-0'
-                          : 'w-full justify-between rounded-lg py-[9px] px-3 text-[14.5px] font-semibold'
-                      }`}
+                          : 'w-full justify-between rounded-lg py-[9px] px-3 text-[15.5px]'
+                      } ${isActiveParent ? 'font-semibold' : 'font-medium'}`}
                     >
-                      {!sidebarCollapsed && isActiveParent && (
-                        <span
-                          className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full"
-                          style={{ backgroundColor: COLOR_PRIMARY }}
-                        />
-                      )}
+                      {!sidebarCollapsed && isActiveParent && <ActiveIndicator />}
                       <NavLink
                         to={item.path}
                         onClick={() => {
@@ -643,12 +658,12 @@ export const Layout = () => {
                         } text-inherit no-underline`}
                       >
                         <item.icon
-                          size={18}
+                          size={19}
                           style={{ color: isActiveParent ? COLOR_PRIMARY : (isDark ? '#94a3b8' : TEXT_MUTED) }}
                           className="transition-colors group-hover:text-[#155EEF] shrink-0"
                         />
                         {!sidebarCollapsed && (
-                          <span className="whitespace-nowrap font-medium text-inherit">{item.name}</span>
+                          <span className="whitespace-nowrap text-inherit">{item.name}</span>
                         )}
                       </NavLink>
 
@@ -682,19 +697,17 @@ export const Layout = () => {
                       end={item.path === '/'}
                       onClick={() => setSidebarOpen(false)}
                       title={sidebarCollapsed ? item.name : undefined}
-                      className={() =>
-                        `group relative flex items-center transition-all duration-150 ${
+                      className={({ isActive }) => {
+                        const active = isActive || (item.path === '/settings' && location.pathname.startsWith('/settings'));
+                        return `group relative flex items-center transition-all duration-150 ${
                           sidebarCollapsed
                             ? 'h-10 w-10 justify-center rounded-xl p-0'
-                            : 'w-full justify-between rounded-lg py-[9px] px-3 text-[14.5px] font-semibold'
-                        }`
-                      }
+                            : 'w-full justify-between rounded-lg py-[9px] px-3 text-[15.5px]'
+                        } ${active ? 'font-semibold' : 'font-medium'}`;
+                      }}
                       style={({ isActive }) => {
                         const active = isActive || (item.path === '/settings' && location.pathname.startsWith('/settings'));
-                        return {
-                          backgroundColor: active ? (item.path === '/' ? '#155EEF' : (isDark ? '#152547' : SIDEBAR_ACTIVE_BG)) : undefined,
-                          color: active ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : (isDark ? '#cbd5e1' : TEXT_SECONDARY),
-                        };
+                        return activeItemStyle(active);
                       }}
                       onMouseEnter={(e) => {
                         const isActive = location.pathname === item.path || (item.path === '/settings' && location.pathname.startsWith('/settings'));
@@ -713,10 +726,11 @@ export const Layout = () => {
                         const active = isActive || (item.path === '/settings' && location.pathname.startsWith('/settings'));
                         return (
                           <>
+                            {!sidebarCollapsed && active && <ActiveIndicator />}
                             <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
                               <item.icon
-                                size={18}
-                                style={{ color: active ? (item.path === '/' ? '#ffffff' : COLOR_PRIMARY) : (isDark ? '#94a3b8' : TEXT_MUTED) }}
+                                size={19}
+                                style={{ color: active ? COLOR_PRIMARY : (isDark ? '#94a3b8' : TEXT_MUTED) }}
                                 className="transition-colors"
                               />
                               {!sidebarCollapsed && <span className="whitespace-nowrap">{item.name}</span>}
@@ -744,18 +758,19 @@ export const Layout = () => {
                   {/* Sub-menu rendering */}
                   {isExpanded && !sidebarCollapsed && item.subItems && (
                     <div
-                      className="mt-1 mb-2 ml-7 flex flex-col space-y-0.5 border-l"
+                      className="mt-1 mb-2 ml-4 flex flex-col space-y-0.5 border-l pl-1"
                       style={{ borderColor: isDark ? '#26354a' : SIDEBAR_BORDER }}
                     >
                       {item.subItems.map((sub, idx) => {
                         const showCategoryHeader =
                           sub.category &&
                           (idx === 0 || item.subItems![idx - 1].category !== sub.category);
+                        const subActive = isSubItemActive(sub, item.subItems!);
 
                         return (
                           <React.Fragment key={sub.name}>
                             {showCategoryHeader && (
-                              <div className="px-3 pt-2.5 pb-1 text-[11px] font-bold tracking-wider text-slate-400 uppercase select-none">
+                              <div className="px-3 pt-2.5 pb-1 text-[11.5px] font-bold tracking-wider text-slate-400 uppercase select-none">
                                 {sub.category}
                               </div>
                             )}
@@ -763,17 +778,17 @@ export const Layout = () => {
                               key={sub.name}
                               to={sub.path}
                               onClick={() => setSidebarOpen(false)}
-                              className="group flex items-center justify-between px-3 py-1.5 text-[13.5px] sm:text-[14px] font-medium transition-colors"
-                              style={({ isActive }) => ({
-                                color: isActive ? COLOR_PRIMARY : (isDark ? '#94a3b8' : TEXT_SECONDARY),
-                                backgroundColor: isActive ? (isDark ? '#1a2c4e' : SIDEBAR_ACTIVE_BG) : 'transparent',
-                                borderRadius: '0 6px 6px 0',
-                                marginLeft: '-1px',
-                                borderLeft: isActive ? `2px solid ${COLOR_PRIMARY}` : '2px solid transparent',
-                              })}
+                              aria-current={subActive ? 'page' : undefined}
+                              className={`group relative flex items-center justify-between gap-1.5 rounded-lg pl-3 pr-2 py-1.5 text-[14.5px] transition-colors ${
+                                subActive
+                                  ? 'font-semibold'
+                                  : `font-medium ${isDark ? 'hover:bg-[#0f1c35]' : 'hover:bg-[#F0F5FF]'}`
+                              }`}
+                              style={activeItemStyle(subActive, true)}
                             >
                               {() => (
                                 <>
+                                  {subActive && <ActiveIndicator small />}
                                   <span className="whitespace-nowrap">{sub.name}</span>
                                   {sub.badge && (
                                     <span
