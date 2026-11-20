@@ -57,6 +57,216 @@ const getRowKey = (item: {
   return code;
 };
 
+interface SearchableDropdownProps {
+  id?: string;
+  defaultLabel: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  isOpen: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  searchPlaceholder: string;
+  isDark: boolean;
+  className?: string;
+  ariaLabel?: string;
+}
+
+const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
+  id,
+  defaultLabel,
+  value,
+  options,
+  onChange,
+  isOpen,
+  onToggle,
+  onClose,
+  searchPlaceholder,
+  isDark,
+  className = '',
+  ariaLabel,
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen) {
+      setSearchTerm('');
+      const t = setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen]);
+
+  // Click outside listener
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, onClose]);
+
+  // Filter options dynamically based on search term
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm.trim()) return options;
+    const q = searchTerm.trim().toLowerCase();
+    return options.filter((opt) => opt.toLowerCase().includes(q));
+  }, [options, searchTerm]);
+
+  const handleSelect = (val: string) => {
+    onChange(val);
+    onClose();
+    setSearchTerm('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose();
+    }
+  };
+
+  const currentDisplay = value || defaultLabel;
+
+  return (
+    <div ref={dropdownRef} className={`relative ${className}`} onKeyDown={handleKeyDown}>
+      {/* Trigger Button */}
+      <button
+        type="button"
+        id={id}
+        onClick={onToggle}
+        aria-label={ariaLabel || defaultLabel}
+        aria-expanded={isOpen}
+        className={`w-full h-9 px-3 pr-8 flex items-center justify-between text-left text-[14px] font-medium rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${
+          value
+            ? isDark
+              ? 'border-blue-500/60 bg-blue-950/30 text-blue-300'
+              : 'border-blue-400 bg-blue-50/60 text-blue-800'
+            : isDark
+            ? 'bg-slate-900 border-slate-700 text-slate-200 hover:border-slate-600'
+            : 'bg-white border-slate-300 text-slate-800 hover:border-slate-400'
+        }`}
+      >
+        <span className="truncate">{currentDisplay}</span>
+        {value ? (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange('');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                onChange('');
+              }
+            }}
+            className="absolute right-7 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded cursor-pointer"
+            title={`Clear ${defaultLabel}`}
+          >
+            <X size={12} />
+          </span>
+        ) : null}
+        <ChevronDown
+          size={14}
+          className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 transition-transform duration-150 pointer-events-none ${
+            isOpen ? 'rotate-180 text-blue-500' : ''
+          }`}
+        />
+      </button>
+
+      {/* Dropdown Panel */}
+      {isOpen && (
+        <div
+          className={`absolute top-full left-0 mt-1 min-w-[220px] w-full max-w-[320px] rounded-lg border shadow-xl z-50 overflow-hidden ${
+            isDark
+              ? 'bg-slate-900 border-slate-700 text-slate-200'
+              : 'bg-white border-slate-200 text-slate-800 shadow-slate-300/40'
+          }`}
+        >
+          {/* Search Input Area */}
+          <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
+            <div className="relative flex items-center">
+              <Search size={13} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder={searchPlaceholder}
+                className={`w-full h-8 pl-8 pr-7 text-[13px] rounded-md border transition focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  isDark
+                    ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500'
+                    : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500'
+                }`}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  title="Clear search"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Options List */}
+          <div className="max-h-56 overflow-y-auto py-1 text-[13.5px] divide-y divide-slate-100/50 dark:divide-slate-800/50">
+            {/* Default "All" option */}
+            <button
+              type="button"
+              onClick={() => handleSelect('')}
+              className={`w-full px-3 py-1.5 flex items-center justify-between text-left transition hover:bg-blue-50/80 dark:hover:bg-slate-800 cursor-pointer ${
+                !value
+                  ? 'bg-blue-50 dark:bg-blue-900/30 font-semibold text-blue-600 dark:text-blue-400'
+                  : 'text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              <span>{defaultLabel}</span>
+              {!value && <Check size={14} className="text-blue-600 dark:text-blue-400 ml-2 shrink-0" />}
+            </button>
+
+            {filteredOptions.length === 0 ? (
+              <div className="py-3 px-3 text-center text-[12.5px] text-slate-400 dark:text-slate-500">
+                No matching options found
+              </div>
+            ) : (
+              filteredOptions.map((opt) => {
+                const isSelected = value === opt;
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => handleSelect(opt)}
+                    className={`w-full px-3 py-1.5 flex items-center justify-between text-left transition hover:bg-blue-50/80 dark:hover:bg-slate-800 cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-50 dark:bg-blue-900/30 font-semibold text-blue-600 dark:text-blue-400'
+                        : 'text-slate-700 dark:text-slate-300'
+                    }`}
+                  >
+                    <span className="truncate">{opt}</span>
+                    {isSelected && <Check size={14} className="text-blue-600 dark:text-blue-400 ml-2 shrink-0" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const StockConfigurationPage: React.FC = () => {
   const { isDark } = useTheme();
   const { user, isAdmin } = useAuth();
@@ -86,6 +296,28 @@ export const StockConfigurationPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [pageJumpInput, setPageJumpInput] = useState('');
+
+  // Searchable filter dropdowns open state ('vendor' | 'group' | 'warehouse' | null)
+  const [openFilterDropdown, setOpenFilterDropdown] = useState<'vendor' | 'group' | 'warehouse' | null>(null);
+
+  // SO NO Column Expandable Search State
+  const [isSoSearchOpen, setIsSoSearchOpen] = useState(false);
+  const [columnSoNoSearch, setColumnSoNoSearch] = useState('');
+  const soSearchInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCloseSoSearch = () => {
+    setIsSoSearchOpen(false);
+    setColumnSoNoSearch('');
+  };
+
+  useEffect(() => {
+    if (isSoSearchOpen) {
+      const t = setTimeout(() => {
+        soSearchInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(t);
+    }
+  }, [isSoSearchOpen]);
 
   // Row Edit Buffers (stores modified values keyed by unique row key)
   const [editedRows, setEditedRows] = useState<Record<string, Partial<StockConfigurationItem>>>({});
@@ -218,6 +450,17 @@ export const StockConfigurationPage: React.FC = () => {
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
   });
+
+  // Dynamically filtered items for the table body (filters strictly on item.so_no when column search is active)
+  const displayedItems = useMemo(() => {
+    const items = data?.items || [];
+    if (!columnSoNoSearch.trim()) return items;
+    const q = columnSoNoSearch.trim().toLowerCase();
+    return items.filter((item) => {
+      const val = item.so_no !== undefined && item.so_no !== null ? String(item.so_no).toLowerCase() : '';
+      return val.includes(q);
+    });
+  }, [data?.items, columnSoNoSearch]);
 
   // Mutate Row Save
   const saveMutation = useMutation({
@@ -865,6 +1108,9 @@ export const StockConfigurationPage: React.FC = () => {
     setSelectedGroup('');
     setSelectedWarehouse('');
     setBranchId('');
+    setColumnSoNoSearch('');
+    setIsSoSearchOpen(false);
+    setOpenFilterDropdown(null);
     applyQuickFilter('');
     setPage(1);
   };
@@ -1035,7 +1281,7 @@ export const StockConfigurationPage: React.FC = () => {
             setBranchId(e.target.value);
             setPage(1);
           }}
-          className={`rounded-xl border px-3.5 py-2 text-[14px] sm:text-[14.5px] font-medium outline-none shadow-2xs transition cursor-pointer ${isDark
+          className={`rounded-xl border px-3.5 py-2 text-[13px] sm:text-[13.5px] font-medium outline-none shadow-2xs transition cursor-pointer ${isDark
             ? 'border-slate-700 bg-[#141f32] text-slate-200 hover:border-slate-600'
             : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
             }`}
@@ -1056,7 +1302,7 @@ export const StockConfigurationPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-colors font-medium text-[14px] sm:text-[14.5px] shadow-2xs cursor-pointer border ${isDark
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition-colors font-medium text-[13px] sm:text-[13.5px] shadow-2xs cursor-pointer border ${isDark
               ? 'border-slate-700 bg-[#141f32] text-slate-200 hover:bg-slate-800'
               : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'
               }`}
@@ -1158,15 +1404,15 @@ export const StockConfigurationPage: React.FC = () => {
             <Box size={22} className="text-blue-600" />
           </div>
           <div className="space-y-0.5 min-w-0">
-            <p className="text-[14px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Total Items</p>
-            <p className="text-[26px] sm:text-[28px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
+            <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Total Items</p>
+            <p className="text-[24px] sm:text-[26px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
               {isLoading ? (
                 <span className="inline-block w-8 h-6 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
               ) : (
                 data?.kpis?.total_items ?? 0
               )}
             </p>
-            <p className="text-[13px] font-medium text-slate-400 leading-tight">From SAP</p>
+            <p className="text-[12px] font-medium text-slate-400 leading-tight">From SAP</p>
           </div>
         </div>
 
@@ -1177,15 +1423,15 @@ export const StockConfigurationPage: React.FC = () => {
             <CheckCircle2 size={22} className="text-emerald-600" />
           </div>
           <div className="space-y-0.5 min-w-0">
-            <p className="text-[14px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Active Items</p>
-            <p className="text-[26px] sm:text-[28px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
+            <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Active Items</p>
+            <p className="text-[24px] sm:text-[26px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
               {isLoading ? (
                 <span className="inline-block w-8 h-6 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
               ) : (
                 data?.kpis?.active_items ?? 0
               )}
             </p>
-            <p className="text-[13px] font-medium text-slate-400 leading-tight">Available for sale</p>
+            <p className="text-[12px] font-medium text-slate-400 leading-tight">Available for sale</p>
           </div>
         </div>
 
@@ -1196,15 +1442,15 @@ export const StockConfigurationPage: React.FC = () => {
             <XCircle size={22} className="text-rose-500" />
           </div>
           <div className="space-y-0.5 min-w-0">
-            <p className="text-[14px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Inactive Items</p>
-            <p className="text-[26px] sm:text-[28px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
+            <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Inactive Items</p>
+            <p className="text-[24px] sm:text-[26px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
               {isLoading ? (
                 <span className="inline-block w-8 h-6 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
               ) : (
                 data?.kpis?.inactive_items ?? 0
               )}
             </p>
-            <p className="text-[13px] font-medium text-slate-400 leading-tight">Not available</p>
+            <p className="text-[12px] font-medium text-slate-400 leading-tight">Not available</p>
           </div>
         </div>
 
@@ -1215,21 +1461,21 @@ export const StockConfigurationPage: React.FC = () => {
             <Warehouse size={22} className="text-purple-600" />
           </div>
           <div className="space-y-0.5 min-w-0">
-            <p className="text-[14px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Warehouses</p>
-            <p className="text-[26px] sm:text-[28px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
+            <p className="text-[13px] font-medium text-slate-500 dark:text-slate-400 leading-tight">Warehouses</p>
+            <p className="text-[24px] sm:text-[26px] font-bold text-slate-900 dark:text-white leading-none tracking-tight">
               {isLoading ? (
                 <span className="inline-block w-8 h-6 bg-slate-200 dark:bg-slate-700 animate-pulse rounded" />
               ) : (
                 data?.kpis?.warehouses_count ?? 0
               )}
             </p>
-            <p className="text-[13px] font-medium text-slate-400 leading-tight">Configured in SAP</p>
+            <p className="text-[12px] font-medium text-slate-400 leading-tight">Configured in SAP</p>
           </div>
         </div>
       </div>
 
       {/* ── Search and Filters Card ── */}
-      <div className={`p-3 sm:p-3.5 rounded-xl border transition-all duration-200 shadow-xs flex flex-wrap items-center gap-2.5 ${isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
+      <div className={`p-3 sm:p-3.5 rounded-xl border transition-all duration-200 shadow-xs flex flex-wrap items-center gap-2.5 relative z-20 ${isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
         }`}>
         {/* Search input */}
         <div className="relative flex-1 min-w-[220px]">
@@ -1240,7 +1486,7 @@ export const StockConfigurationPage: React.FC = () => {
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
             placeholder="Search by SAP code, description, or vendor name..."
-            className={`w-full h-9 pl-9 pr-3.5 text-[14.5px] rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition ${isDark
+            className={`w-full h-9 pl-9 pr-3.5 text-[13.5px] rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition ${isDark
               ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
               : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
               }`}
@@ -1248,40 +1494,38 @@ export const StockConfigurationPage: React.FC = () => {
         </div>
 
         {/* Vendor Dropdown */}
-        <div className="relative min-w-[140px] flex-1 sm:flex-none">
-          <select
-            value={selectedVendor}
-            onChange={(e) => setSelectedVendor(e.target.value)}
-            className={`w-full h-9 px-3 pr-8 appearance-none text-[14px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${isDark
-              ? 'bg-slate-900 border-slate-700 text-white'
-              : 'bg-white border-slate-300 text-slate-800'
-              }`}
-          >
-            <option value="">All Vendors</option>
-            {data?.filters?.vendors?.map((v) => (
-              <option key={v} value={v}>{v}</option>
-            ))}
-          </select>
-          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        </div>
+        <SearchableDropdown
+          defaultLabel="All Vendors"
+          value={selectedVendor}
+          options={data?.filters?.vendors || []}
+          onChange={(v) => {
+            setSelectedVendor(v);
+            setPage(1);
+          }}
+          isOpen={openFilterDropdown === 'vendor'}
+          onToggle={() => setOpenFilterDropdown((prev) => (prev === 'vendor' ? null : 'vendor'))}
+          onClose={() => setOpenFilterDropdown(null)}
+          searchPlaceholder="Search vendors..."
+          isDark={isDark}
+          className="min-w-[150px] flex-1 sm:flex-none"
+        />
 
         {/* Group Dropdown */}
-        <div className="relative min-w-[130px] flex-1 sm:flex-none">
-          <select
-            value={selectedGroup}
-            onChange={(e) => setSelectedGroup(e.target.value)}
-            className={`w-full h-9 px-3 pr-8 appearance-none text-[14px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${isDark
-              ? 'bg-slate-900 border-slate-700 text-white'
-              : 'bg-white border-slate-300 text-slate-800'
-              }`}
-          >
-            <option value="">All Groups</option>
-            {data?.filters?.groups?.map((g) => (
-              <option key={g} value={g}>{g}</option>
-            ))}
-          </select>
-          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        </div>
+        <SearchableDropdown
+          defaultLabel="All Groups"
+          value={selectedGroup}
+          options={data?.filters?.groups || []}
+          onChange={(g) => {
+            setSelectedGroup(g);
+            setPage(1);
+          }}
+          isOpen={openFilterDropdown === 'group'}
+          onToggle={() => setOpenFilterDropdown((prev) => (prev === 'group' ? null : 'group'))}
+          onClose={() => setOpenFilterDropdown(null)}
+          searchPlaceholder="Search groups..."
+          isDark={isDark}
+          className="min-w-[140px] flex-1 sm:flex-none"
+        />
 
         {/* SO No. Search Field */}
         <div className="relative min-w-[130px] sm:w-44 flex-1 sm:flex-none">
@@ -1294,7 +1538,7 @@ export const StockConfigurationPage: React.FC = () => {
             placeholder="Search SO No."
             title="Search by Sales Order Number"
             aria-label="Search SO No."
-            className={`w-full h-9 pl-8.5 pr-3 text-[14px] rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition ${isDark
+            className={`w-full h-9 pl-8.5 pr-3 text-[13px] rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition ${isDark
               ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500'
               : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
               }`}
@@ -1302,27 +1546,26 @@ export const StockConfigurationPage: React.FC = () => {
         </div>
 
         {/* Warehouse Dropdown */}
-        <div className="relative min-w-[130px] flex-1 sm:flex-none">
-          <select
-            value={selectedWarehouse}
-            onChange={(e) => setSelectedWarehouse(e.target.value)}
-            className={`w-full h-9 px-3 pr-8 appearance-none text-[14px] font-medium rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${isDark
-              ? 'bg-slate-900 border-slate-700 text-white'
-              : 'bg-white border-slate-300 text-slate-800'
-              }`}
-          >
-            <option value="">All Warehouses</option>
-            {data?.filters?.warehouses?.map((wh) => (
-              <option key={wh} value={wh}>{wh}</option>
-            ))}
-          </select>
-          <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        </div>
+        <SearchableDropdown
+          defaultLabel="All Warehouses"
+          value={selectedWarehouse}
+          options={data?.filters?.warehouses || []}
+          onChange={(wh) => {
+            setSelectedWarehouse(wh);
+            setPage(1);
+          }}
+          isOpen={openFilterDropdown === 'warehouse'}
+          onToggle={() => setOpenFilterDropdown((prev) => (prev === 'warehouse' ? null : 'warehouse'))}
+          onClose={() => setOpenFilterDropdown(null)}
+          searchPlaceholder="Search warehouses..."
+          isDark={isDark}
+          className="min-w-[140px] flex-1 sm:flex-none"
+        />
 
         {/* Apply Filters Button */}
         <button
           onClick={handleApplyFilters}
-          className="h-9 px-4 rounded-lg bg-[#155EEF] hover:bg-blue-700 text-white text-[14.5px] font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs active:scale-98"
+          className="h-9 px-4 rounded-lg bg-[#155EEF] hover:bg-blue-700 text-white text-[13.5px] font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-2xs active:scale-98"
         >
           <Filter size={15} />
           <span>Apply Filters</span>
@@ -1331,7 +1574,7 @@ export const StockConfigurationPage: React.FC = () => {
         {/* Reset Button */}
         <button
           onClick={handleResetFilters}
-          className={`h-9 px-3 rounded-lg border text-[14.5px] font-semibold flex items-center gap-1.5 cursor-pointer transition ${isDark
+          className={`h-9 px-3 rounded-lg border text-[13.5px] font-semibold flex items-center gap-1.5 cursor-pointer transition ${isDark
             ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
             : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
             }`}
@@ -1351,7 +1594,7 @@ export const StockConfigurationPage: React.FC = () => {
           : 'bg-white border-slate-200/90'
         }`}>
         {/* Status Information */}
-        <div className="flex flex-wrap items-center gap-2.5 text-[14px]">
+        <div className="flex flex-wrap items-center gap-2.5 text-[13px]">
           <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
             <Box size={16} className="text-blue-600" />
             <span>Dataset: {isLoading ? 'Loading...' : `${data?.total ?? 0} entries`}</span>
@@ -1362,12 +1605,12 @@ export const StockConfigurationPage: React.FC = () => {
           {/* Modified indicator */}
           <div className="flex items-center gap-1.5">
             {modifiedCount > 0 ? (
-              <span className="text-amber-600 dark:text-amber-400 font-semibold text-[14px] flex items-center gap-1">
+              <span className="text-amber-600 dark:text-amber-400 font-semibold text-[13px] flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
                 {modifiedCount} unsaved {modifiedCount === 1 ? 'change' : 'changes'}
               </span>
             ) : (
-              <span className="text-slate-400 dark:text-slate-500 text-[13.5px] font-medium">
+              <span className="text-slate-400 dark:text-slate-500 text-[12.5px] font-medium">
                 No unsaved changes
               </span>
             )}
@@ -1377,7 +1620,7 @@ export const StockConfigurationPage: React.FC = () => {
           {bulkStatus && (
             <>
               <span className="text-slate-300 dark:text-slate-600">|</span>
-              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[13px] font-semibold ${bulkStatus.failed === 0
+              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[12px] font-semibold ${bulkStatus.failed === 0
                 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200'
                 : 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-200'
                 }`}>
@@ -1394,7 +1637,7 @@ export const StockConfigurationPage: React.FC = () => {
           <button
             onClick={handleSubmitModified}
             disabled={modifiedCount === 0 || bulkMutation.isPending}
-            className={`h-9 px-3.5 rounded-lg text-[14px] font-semibold flex items-center gap-1.5 transition-all shadow-xs border ${modifiedCount > 0 && !bulkMutation.isPending
+            className={`h-9 px-3.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-xs border ${modifiedCount > 0 && !bulkMutation.isPending
               ? 'bg-emerald-50 border-emerald-400 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-700 dark:text-emerald-300 cursor-pointer active:scale-98'
               : 'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
               }`}
@@ -1412,7 +1655,7 @@ export const StockConfigurationPage: React.FC = () => {
           <button
             onClick={() => setConfirmSubmitAllOpen(true)}
             disabled={bulkMutation.isPending || !data?.total}
-            className={`h-9 px-3.5 rounded-lg border text-[14px] font-semibold flex items-center gap-1.5 transition-all shadow-2xs ${isDark
+            className={`h-9 px-3.5 rounded-lg border text-[13px] font-semibold flex items-center gap-1.5 transition-all shadow-2xs ${isDark
               ? 'bg-slate-800 border-blue-500/40 text-blue-400 hover:bg-slate-700'
               : 'bg-white border-blue-400 text-blue-600 hover:bg-blue-50'
               } cursor-pointer active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -1426,7 +1669,7 @@ export const StockConfigurationPage: React.FC = () => {
           <button
             onClick={() => setConfirmDiscardOpen(true)}
             disabled={modifiedCount === 0 || bulkMutation.isPending}
-            className={`h-9 px-3 rounded-lg border text-[14px] font-semibold flex items-center gap-1.5 transition-all ${modifiedCount > 0 && !bulkMutation.isPending
+            className={`h-9 px-3 rounded-lg border text-[13px] font-semibold flex items-center gap-1.5 transition-all ${modifiedCount > 0 && !bulkMutation.isPending
               ? isDark
                 ? 'bg-rose-950/40 border-rose-800/60 text-rose-300 hover:bg-rose-900/50 cursor-pointer'
                 : 'bg-white border-rose-300 text-rose-600 hover:bg-rose-50 cursor-pointer'
@@ -1464,7 +1707,70 @@ export const StockConfigurationPage: React.FC = () => {
                 ? 'bg-slate-800 text-slate-300'
                 : 'bg-[#EAF2FE] text-[#1E3A8A]'
                 }`}>
-                <th className="py-2.5 px-2 text-center whitespace-nowrap w-[75px] min-w-[70px] border border-slate-300 dark:border-slate-600">SO NO</th>
+                {/* 1. SO NO Header */}
+                <th className={`py-2 px-2 text-center whitespace-nowrap border border-slate-300 dark:border-slate-600 transition-all ${
+                  isSoSearchOpen ? 'w-[145px] min-w-[135px] bg-blue-50/50 dark:bg-slate-800/90' : 'w-[95px] min-w-[85px]'
+                }`}>
+                  {isSoSearchOpen ? (
+                    <div className="flex items-center gap-1 w-full min-w-[125px] px-0.5">
+                      <div className="relative flex-1 flex items-center">
+                        <Search size={11} className="absolute left-1.5 text-slate-400 pointer-events-none" />
+                        <input
+                          ref={soSearchInputRef}
+                          type="text"
+                          value={columnSoNoSearch}
+                          onChange={(e) => setColumnSoNoSearch(e.target.value)}
+                          placeholder="SO No..."
+                          autoFocus
+                          className={`w-full h-6 pl-5 pr-5 text-[11px] font-medium rounded border focus:outline-none focus:ring-1 focus:ring-blue-500 uppercase ${
+                            isDark
+                              ? 'bg-slate-900 border-blue-500 text-white placeholder-slate-500'
+                              : 'bg-white border-blue-500 text-slate-900 placeholder-slate-400'
+                          }`}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              handleCloseSoSearch();
+                            }
+                          }}
+                        />
+                        {columnSoNoSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setColumnSoNoSearch('')}
+                            className="absolute right-1 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                            title="Clear search text"
+                          >
+                            <X size={10} />
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCloseSoSearch}
+                        className="p-0.5 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 rounded transition-colors cursor-pointer"
+                        title="Close SO NO search"
+                        aria-label="Close SO NO search"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>SO NO</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsSoSearchOpen(true)}
+                        className={`p-1 rounded hover:bg-blue-100 dark:hover:bg-slate-700 transition-colors cursor-pointer ${
+                          columnSoNoSearch ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-500 dark:text-slate-400'
+                        }`}
+                        title="Search by Sales Order Number"
+                        aria-label="Search SO NO"
+                      >
+                        <Search size={12} />
+                      </button>
+                    </div>
+                  )}
+                </th>
                 <th className="py-2.5 px-2.5 text-left whitespace-nowrap w-[95px] min-w-[95px] border border-slate-300 dark:border-slate-600">SAP CODE</th>
                 <th className="py-2.5 px-3 text-left whitespace-nowrap min-w-[170px] max-w-[220px] border border-slate-300 dark:border-slate-600">Desc.</th>
                 <th className="py-2.5 px-1.5 text-center whitespace-nowrap w-[60px] min-w-[58px] border border-slate-300 dark:border-slate-600">Qty.</th>
@@ -1520,14 +1826,16 @@ export const StockConfigurationPage: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ) : data?.items?.length === 0 ? (
+              ) : displayedItems.length === 0 ? (
                 <tr>
                   <td colSpan={22} className="py-12 text-center text-slate-500 border border-slate-300 dark:border-slate-600">
-                    No items found matching the selected filters.
+                    {columnSoNoSearch.trim()
+                      ? `No items found matching SO NO "${columnSoNoSearch.trim()}".`
+                      : 'No items found matching the selected filters.'}
                   </td>
                 </tr>
               ) : (
-                data?.items?.map((item) => {
+                displayedItems.map((item) => {
                   const rowKey = getRowKey(item);
                   const isModified = Boolean(editedRows[rowKey]);
                   const isSaving = savingRowKey === rowKey;
@@ -1812,13 +2120,12 @@ export const StockConfigurationPage: React.FC = () => {
                             disabled={!isUserAdmin}
                             readOnly={!isUserAdmin}
                             placeholder={isUserAdmin ? "GRPO Remarks..." : "Admin only"}
-                            className={`w-32 h-8 px-2 text-left text-[12px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${
-                              isCellModified(item, 'remark')
-                                ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
-                                : isDark
-                                  ? 'bg-slate-900 border-slate-700 text-white'
-                                  : 'bg-white border-slate-300 text-slate-900'
-                            } ${!isUserAdmin ? 'opacity-70 cursor-not-allowed bg-slate-100 dark:bg-slate-800' : ''}`}
+                            className={`w-32 h-8 px-2 text-left text-[12px] font-medium rounded-md border focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${isCellModified(item, 'remark')
+                              ? 'border-amber-400 bg-amber-50/30 dark:bg-amber-950/30'
+                              : isDark
+                                ? 'bg-slate-900 border-slate-700 text-white'
+                                : 'bg-white border-slate-300 text-slate-900'
+                              } ${!isUserAdmin ? 'opacity-70 cursor-not-allowed bg-slate-100 dark:bg-slate-800' : ''}`}
                             title={!isUserAdmin ? 'Access restricted: Only Admin users can add or modify GRPO remarks' : item.remark ? `GRPO Remark: ${item.remark}` : 'Enter GRPO Remark'}
                           />
                         </div>

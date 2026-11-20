@@ -2167,7 +2167,7 @@
     "last_submitted_at": null,
     "remark": "For Stock",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -2181,7 +2181,7 @@
     "po_line_num": 0,
     "grpo_doc_entry": 759,
     "grpo_line_num": 0,
-    "row_id": "CS0414_759_0"
+    "row_id": "CS0414"
   },
   {
     "sr_no": 52,
@@ -2272,7 +2272,8 @@
     "po_doc_entry": 854,
     "grpo_doc_entry": 753,
     "grpo_line_num": 0,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "CS0521_753_0"
   },
   {
     "sr_no": 54,
@@ -2304,7 +2305,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -2318,7 +2319,7 @@
     "grpo_doc_entry": 737,
     "grpo_line_num": 12,
     "po_line_num": 12,
-    "row_id": "CS0539_737_12"
+    "row_id": "CS0539"
   },
   {
     "sr_no": 55,
@@ -2409,7 +2410,8 @@
     "po_doc_entry": 838,
     "grpo_doc_entry": 737,
     "grpo_line_num": 10,
-    "po_line_num": 10
+    "po_line_num": 10,
+    "row_id": "CS0874_737_10"
   },
   {
     "sr_no": 57,
@@ -3672,13 +3674,13 @@
     "items_group_code": "112",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-20",
+    "entry_date": "2026-10-19",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
     "updated_at": "2026-07-13 15:40:40",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2026-07-13",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -3692,7 +3694,7 @@
     "grpo_doc_entry": 762,
     "grpo_line_num": 6,
     "po_line_num": 8,
-    "row_id": "ENG1749_762_6"
+    "row_id": "ENG1749"
   },
   {
     "sr_no": 61,
@@ -3857,7 +3859,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -3871,7 +3873,7 @@
     "grpo_doc_entry": 737,
     "grpo_line_num": 3,
     "po_line_num": 3,
-    "row_id": "PKG0023_737_3"
+    "row_id": "PKG0023"
   },
   {
     "sr_no": 65,
@@ -3903,7 +3905,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -3917,7 +3919,7 @@
     "grpo_doc_entry": 737,
     "grpo_line_num": 11,
     "po_line_num": 11,
-    "row_id": "PKG0045_737_11"
+    "row_id": "PKG0045"
   },
   {
     "sr_no": 66,
@@ -4146,7 +4148,8 @@
     "po_doc_entry": 822,
     "grpo_doc_entry": 740,
     "grpo_line_num": 0,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "RM1157_740_0"
   },
   {
     "sr_no": 71,
@@ -4262,13 +4265,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-20",
+    "entry_date": "2026-10-19",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
     "updated_at": "2025-09-17 14:54:49",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -4282,7 +4285,7 @@
     "grpo_doc_entry": 762,
     "grpo_line_num": 15,
     "po_line_num": 17,
-    "row_id": "CS0529_762_15"
+    "row_id": "CS0529"
   },
   {
     "sr_no": 74,
@@ -4599,7 +4602,8 @@
     "po_doc_entry": 820,
     "grpo_doc_entry": 728,
     "grpo_line_num": 0,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "ENG1833_728_0"
   },
   {
     "sr_no": 81,
@@ -4721,7 +4725,7 @@
     "last_submitted_at": null,
     "remark": "For Stock",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-17",
@@ -4731,7 +4735,11 @@
     "so_qty": 0.0,
     "po_qty": 2.0,
     "remark_history": [],
-    "po_doc_entry": 862
+    "po_doc_entry": 862,
+    "grpo_doc_entry": 755,
+    "grpo_line_num": 2,
+    "row_id": "PS0002",
+    "po_line_num": 2
   },
   {
     "sr_no": 84,
@@ -4763,7 +4771,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -4777,7 +4785,7 @@
     "grpo_doc_entry": 737,
     "grpo_line_num": 8,
     "po_line_num": 8,
-    "row_id": "PS0107_737_8"
+    "row_id": "PS0107"
   },
   {
     "sr_no": 85,
@@ -4895,13 +4903,13 @@
     "items_group_code": "138",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-24",
+    "entry_date": "2026-10-15",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
     "updated_at": "2025-11-14 14:08:02",
     "last_submitted_at": null,
     "remark": "For Dodhia Industries, Surat",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-15",
@@ -4915,7 +4923,7 @@
     "grpo_doc_entry": 767,
     "grpo_line_num": 3,
     "po_line_num": 3,
-    "row_id": "RM0575_767_3"
+    "row_id": "RM0575"
   },
   {
     "sr_no": 88,
@@ -5052,7 +5060,8 @@
     "po_doc_entry": 822,
     "grpo_doc_entry": 740,
     "grpo_line_num": 6,
-    "po_line_num": 6
+    "po_line_num": 6,
+    "row_id": "RM1155_740_6"
   },
   {
     "sr_no": 91,
@@ -5084,7 +5093,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -5095,7 +5104,10 @@
     "po_qty": 1.0,
     "remark_history": [],
     "po_doc_entry": 838,
-    "po_line_num": 5
+    "po_line_num": 5,
+    "grpo_doc_entry": 737,
+    "grpo_line_num": 5,
+    "row_id": "PKG0027_737_5"
   },
   {
     "sr_no": 92,
@@ -5121,13 +5133,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-20",
+    "entry_date": "2026-10-19",
     "created_at": "2026-11-16T16:32:54.771119+05:30",
     "updated_at": "2025-08-05 12:44:22",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -5141,7 +5153,7 @@
     "grpo_doc_entry": 762,
     "grpo_line_num": 13,
     "po_line_num": 15,
-    "row_id": "CS1243_762_13"
+    "row_id": "CS1243"
   },
   {
     "sr_no": 93,
@@ -5173,7 +5185,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-29",
@@ -5186,7 +5198,8 @@
     "po_doc_entry": 869,
     "grpo_doc_entry": 768,
     "grpo_line_num": 0,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "BAC0005"
   },
   {
     "sr_no": 94,
@@ -5218,7 +5231,7 @@
     "last_submitted_at": null,
     "remark": "For Stock",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-14",
@@ -5232,7 +5245,7 @@
     "grpo_doc_entry": 746,
     "grpo_line_num": 0,
     "po_line_num": 0,
-    "row_id": "CS0371_746_0"
+    "row_id": "CS0371"
   },
   {
     "sr_no": 95,
@@ -5350,13 +5363,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-20",
+    "entry_date": "2026-10-19",
     "created_at": "2026-11-16T16:42:56.508447+05:30",
     "updated_at": "2026-01-22 16:19:30",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -5370,7 +5383,7 @@
     "grpo_doc_entry": 762,
     "grpo_line_num": 16,
     "po_line_num": 18,
-    "row_id": "CS1226_762_16"
+    "row_id": "CS1226"
   },
   {
     "sr_no": 98,
@@ -5396,13 +5409,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-20",
+    "entry_date": "2026-10-19",
     "created_at": "2026-11-16T16:42:56.508447+05:30",
     "updated_at": "2026-10-06 11:53:31",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2026-10-06",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -5415,7 +5428,8 @@
     "po_doc_entry": 866,
     "grpo_doc_entry": 762,
     "grpo_line_num": 3,
-    "po_line_num": 4
+    "po_line_num": 4,
+    "row_id": "CS1424"
   },
   {
     "sr_no": 99,
@@ -5503,7 +5517,8 @@
     "po_qty": 50.0,
     "remark_history": [],
     "po_doc_entry": 835,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "ENG1839"
   },
   {
     "sr_no": 101,
@@ -5724,7 +5739,8 @@
     "po_qty": 10.0,
     "remark_history": [],
     "po_doc_entry": 772,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "RM1137"
   },
   {
     "sr_no": 106,
@@ -5769,7 +5785,8 @@
     "po_doc_entry": 822,
     "grpo_doc_entry": 740,
     "grpo_line_num": 10,
-    "po_line_num": 10
+    "po_line_num": 10,
+    "row_id": "RM1148_740_10"
   },
   {
     "sr_no": 107,
@@ -5839,13 +5856,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-20",
+    "entry_date": "2026-10-19",
     "created_at": "2026-11-16T16:42:56.508447+05:30",
     "updated_at": "2026-01-22 15:18:13",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -5858,7 +5875,8 @@
     "po_doc_entry": 866,
     "po_line_num": 7,
     "grpo_doc_entry": 762,
-    "grpo_line_num": 5
+    "grpo_line_num": 5,
+    "row_id": "CS0057"
   },
   {
     "sr_no": 109,
@@ -5995,7 +6013,8 @@
     "po_doc_entry": 864,
     "po_line_num": 0,
     "grpo_doc_entry": 764,
-    "grpo_line_num": 0
+    "grpo_line_num": 0,
+    "row_id": "CS0708_764_0"
   },
   {
     "sr_no": 112,
@@ -6021,13 +6040,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-12",
+    "entry_date": "2026-10-07",
     "created_at": "2026-11-16T16:42:56.508447+05:30",
     "updated_at": "2025-10-01 14:52:53",
     "last_submitted_at": null,
     "remark": "PRNO.26271129 Dt.04.10.2026 - Amit Panja\r\rFor Stock",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-07",
@@ -6041,7 +6060,7 @@
     "grpo_doc_entry": 738,
     "grpo_line_num": 3,
     "po_line_num": 3,
-    "row_id": "CS0805_738_3"
+    "row_id": "CS0805"
   },
   {
     "sr_no": 113,
@@ -6084,7 +6103,8 @@
     "po_qty": 50.0,
     "remark_history": [],
     "po_doc_entry": 859,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "CS1066"
   },
   {
     "sr_no": 114,
@@ -6175,7 +6195,8 @@
     "po_doc_entry": 866,
     "grpo_doc_entry": 762,
     "grpo_line_num": 1,
-    "po_line_num": 2
+    "po_line_num": 2,
+    "row_id": "ENG1809_762_1"
   },
   {
     "sr_no": 116,
@@ -6398,7 +6419,8 @@
     "po_doc_entry": 812,
     "grpo_doc_entry": 729,
     "grpo_line_num": 0,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "RM1136_729_0"
   },
   {
     "sr_no": 121,
@@ -6851,7 +6873,8 @@
     "po_doc_entry": 808,
     "po_line_num": 0,
     "grpo_doc_entry": 725,
-    "grpo_line_num": 0
+    "grpo_line_num": 0,
+    "row_id": "RM1139_725_0"
   },
   {
     "sr_no": 131,
@@ -7060,13 +7083,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-10",
+    "entry_date": "2026-10-09",
     "created_at": "2026-11-16T16:45:20.094333+05:30",
     "updated_at": "2025-08-11 10:26:49",
     "last_submitted_at": null,
     "remark": "PRNO.26271137 Dt.09.10.2026 - Amit Panja",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-09",
@@ -7080,7 +7103,7 @@
     "grpo_doc_entry": 736,
     "grpo_line_num": 0,
     "po_line_num": 0,
-    "row_id": "CS0410_736_0"
+    "row_id": "CS0410"
   },
   {
     "sr_no": 136,
@@ -7125,7 +7148,8 @@
     "po_doc_entry": 833,
     "grpo_doc_entry": 752,
     "grpo_line_num": 0,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "ENG0267_752_0"
   },
   {
     "sr_no": 137,
@@ -7197,13 +7221,13 @@
     "items_group_code": "138",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-24",
+    "entry_date": "2026-10-15",
     "created_at": "2026-11-16T16:45:20.094333+05:30",
     "updated_at": "2026-05-09 12:07:54",
     "last_submitted_at": null,
     "remark": "For Dodhia Industries, Surat",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-15",
@@ -7216,7 +7240,8 @@
     "po_doc_entry": 847,
     "grpo_doc_entry": 767,
     "grpo_line_num": 0,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "RM0526"
   },
   {
     "sr_no": 139,
@@ -7349,7 +7374,8 @@
     "po_qty": 1.0,
     "remark_history": [],
     "po_doc_entry": 834,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "SC0031"
   },
   {
     "sr_no": 142,
@@ -7394,7 +7420,8 @@
     "po_doc_entry": 866,
     "po_line_num": 11,
     "grpo_doc_entry": 762,
-    "grpo_line_num": 9
+    "grpo_line_num": 9,
+    "row_id": "CS1137_762_9"
   },
   {
     "sr_no": 143,
@@ -7439,7 +7466,8 @@
     "po_doc_entry": 826,
     "grpo_doc_entry": 733,
     "grpo_line_num": 0,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "ENG0303_733_0"
   },
   {
     "sr_no": 144,
@@ -7574,7 +7602,8 @@
     "po_qty": 30.0,
     "remark_history": [],
     "po_doc_entry": 842,
-    "po_line_num": 2
+    "po_line_num": 2,
+    "row_id": "RM1164"
   },
   {
     "sr_no": 147,
@@ -7807,7 +7836,8 @@
     "po_doc_entry": 830,
     "grpo_doc_entry": 738,
     "grpo_line_num": 1,
-    "po_line_num": 1
+    "po_line_num": 1,
+    "row_id": "CS0802_738_1"
   },
   {
     "sr_no": 151,
@@ -7852,7 +7882,8 @@
     "po_doc_entry": 829,
     "grpo_doc_entry": 763,
     "grpo_line_num": 0,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "ENG0384"
   },
   {
     "sr_no": 152,
@@ -8035,7 +8066,8 @@
     "po_doc_entry": 822,
     "grpo_doc_entry": 740,
     "grpo_line_num": 8,
-    "po_line_num": 8
+    "po_line_num": 8,
+    "row_id": "RM1154_740_8"
   },
   {
     "sr_no": 156,
@@ -8126,7 +8158,8 @@
     "po_doc_entry": 802,
     "grpo_doc_entry": 727,
     "grpo_line_num": 0,
-    "po_line_num": 2
+    "po_line_num": 2,
+    "row_id": "RMNT0113_727_0"
   },
   {
     "sr_no": 158,
@@ -8248,7 +8281,7 @@
     "last_submitted_at": null,
     "remark": "For Stock",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-23",
@@ -8262,7 +8295,7 @@
     "grpo_doc_entry": 766,
     "grpo_line_num": 3,
     "po_line_num": 3,
-    "row_id": "PS0054_766_3"
+    "row_id": "PS0054"
   },
   {
     "sr_no": 161,
@@ -8340,7 +8373,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -8353,7 +8386,8 @@
     "po_doc_entry": 838,
     "grpo_doc_entry": 737,
     "grpo_line_num": 1,
-    "po_line_num": 1
+    "po_line_num": 1,
+    "row_id": "CS0537_737_1"
   },
   {
     "sr_no": 163,
@@ -8431,7 +8465,7 @@
     "last_submitted_at": null,
     "remark": "For Stock",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-17",
@@ -8445,7 +8479,7 @@
     "grpo_doc_entry": 755,
     "grpo_line_num": 1,
     "po_line_num": 1,
-    "row_id": "HK0005_755_1"
+    "row_id": "HK0005"
   },
   {
     "sr_no": 165,
@@ -8535,7 +8569,8 @@
     "po_doc_entry": 867,
     "grpo_doc_entry": 766,
     "grpo_line_num": 2,
-    "po_line_num": 2
+    "po_line_num": 2,
+    "row_id": "CS1238_766_2"
   },
   {
     "sr_no": 167,
@@ -8580,7 +8615,8 @@
     "po_doc_entry": 818,
     "grpo_doc_entry": 745,
     "grpo_line_num": 0,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "ENG0274_745_0"
   },
   {
     "sr_no": 168,
@@ -8714,7 +8750,8 @@
     "po_doc_entry": 841,
     "grpo_doc_entry": 741,
     "grpo_line_num": 0,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "MSP0412_741_0"
   },
   {
     "sr_no": 171,
@@ -8800,7 +8837,8 @@
     "po_qty": 1.0,
     "remark_history": [],
     "po_doc_entry": 846,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "SP0006"
   },
   {
     "sr_no": 173,
@@ -8845,7 +8883,8 @@
     "po_doc_entry": 866,
     "grpo_doc_entry": 762,
     "grpo_line_num": 0,
-    "po_line_num": 1
+    "po_line_num": 1,
+    "row_id": "CS1404_762_0"
   },
   {
     "sr_no": 174,
@@ -8917,13 +8956,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-17",
+    "entry_date": "2026-10-16",
     "created_at": "2026-11-16T17:38:21.269342+05:30",
     "updated_at": "2025-08-08 15:25:10",
     "last_submitted_at": null,
     "remark": "PRNO.26271138, 1140 &  1141 Dt.09.10, 12.10 And 13.10.2026- Ritwik Maiti And Amit Panja\rSr.No.1 & 2 For Sterlite and remaining for Stock",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-16",
@@ -8937,7 +8976,7 @@
     "grpo_doc_entry": 754,
     "grpo_line_num": 3,
     "po_line_num": 3,
-    "row_id": "CS0162_754_3"
+    "row_id": "CS0162"
   },
   {
     "item_code": "TEST999",
@@ -9042,7 +9081,7 @@
     "created_at": "2026-11-18T16:16:18.972216+05:30",
     "updated_at": "2026-11-19 11:25:40",
     "last_submitted_at": "2026-11-19T14:36:37.882725+05:30",
-    "remark": "amit",
+    "remark": "yess",
     "last_submitted_by": "admin",
     "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
@@ -9125,7 +9164,7 @@
     "created_at": "2026-11-18T17:21:11.856214+05:30",
     "updated_at": "2026-06-09 15:01:54",
     "last_submitted_at": null,
-    "remark": "ok",
+    "remark": "yess",
     "last_submitted_by": null,
     "record_category": "Received Stock",
     "item_create_date": "2025-07-09",
