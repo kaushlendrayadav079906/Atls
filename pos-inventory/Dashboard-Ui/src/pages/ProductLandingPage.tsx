@@ -16,6 +16,7 @@ import {
 import atlasLogo from '../assets/LOGO.png';
 import { useSystemHealth } from '../hooks/useSystemHealth';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ProductModule {
   id: string;
@@ -106,6 +107,7 @@ export const ProductLandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { isSapConnected } = useSystemHealth();
   const { isDark } = useTheme();
+  const { hasPermission } = useAuth();
 
   return (
     <div className={`w-full min-h-screen flex flex-col transition-all duration-300 ${isDark ? 'bg-[#0f172a] text-white' : 'bg-[#f0f6ff] text-slate-900'
@@ -155,16 +157,18 @@ export const ProductLandingPage: React.FC = () => {
               <Package size={16} />
               <span>Manage Products & Stock</span>
             </button>
-            <button
-              onClick={() => navigate('/stock-configuration')}
-              className={`inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-[13.5px] sm:text-[14px] font-bold border shadow-xs transition-all duration-150 cursor-pointer ${isDark
-                  ? 'bg-[#1e293b] hover:bg-slate-800 text-blue-300 border-slate-700'
-                  : 'bg-white hover:bg-blue-50 text-blue-700 border-blue-300'
-                }`}
-            >
-              <Boxes size={16} />
-              <span>Stock Configuration</span>
-            </button>
+            {hasPermission('stock_configuration') && (
+              <button
+                onClick={() => navigate('/stock-configuration')}
+                className={`inline-flex items-center gap-2 px-4.5 py-2.5 rounded-xl text-[13.5px] sm:text-[14px] font-bold border shadow-xs transition-all duration-150 cursor-pointer ${isDark
+                    ? 'bg-[#1e293b] hover:bg-slate-800 text-blue-300 border-slate-700'
+                    : 'bg-white hover:bg-blue-50 text-blue-700 border-blue-300'
+                  }`}
+              >
+                <Boxes size={16} />
+                <span>Stock Configuration</span>
+              </button>
+            )}
 
             <button
               onClick={() => window.dispatchEvent(new CustomEvent('atls-toggle-ai', { detail: { open: true } }))}

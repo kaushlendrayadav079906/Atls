@@ -261,5 +261,71 @@ describe('Layout Top Navigation and Sidebar RBAC Verification', () => {
     expect(html).toContain('Logout');
     expect(html).toContain('id="user-logout-button"');
   });
+
+  it('hides Stock Configuration link in sidebar submenu when user lacks stock_configuration permission', () => {
+    vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
+      user: {
+        id: 'user-no-stock',
+        username: 'no_stock_user',
+        email: 'nostock@atlas.local',
+        name: 'Regular Cashier',
+        role: 'user',
+        is_active: true,
+        token_version: 1,
+        permissions: ['products.view', 'invoices.view'],
+      },
+      isAuthenticated: true,
+      isLoading: false,
+      isAdmin: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshUser: vi.fn(),
+      hasPermission: vi.fn((p) => ['products.view', 'invoices.view'].includes(p)),
+      canAccess: vi.fn((m) => ['products', 'sales'].includes(m.toLowerCase())),
+    });
+
+    const html = renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/products']}>
+        <Layout />
+      </MemoryRouter>
+    );
+
+    // Products & Stock is visible, but Stock Configuration is hidden
+    expect(html).toContain('Products &amp; Stock');
+    expect(html).not.toContain('Stock Configuration');
+  });
+
+  it('shows Stock Configuration link in sidebar submenu when user has stock_configuration permission', () => {
+    vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
+      user: {
+        id: 'user-with-stock',
+        username: 'stock_manager_user',
+        email: 'stockuser@atlas.local',
+        name: 'Stock Manager User',
+        role: 'user',
+        is_active: true,
+        token_version: 1,
+        permissions: ['products.view', 'stock_configuration'],
+      },
+      isAuthenticated: true,
+      isLoading: false,
+      isAdmin: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshUser: vi.fn(),
+      hasPermission: vi.fn((p) => ['products.view', 'stock_configuration'].includes(p)),
+      canAccess: vi.fn((m) => ['products', 'stock_configuration'].includes(m.toLowerCase())),
+    });
+
+    const html = renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/products']}>
+        <Layout />
+      </MemoryRouter>
+    );
+
+    // Both Products & Stock and Stock Configuration are visible
+    expect(html).toContain('Products &amp; Stock');
+    expect(html).toContain('Stock Configuration');
+  });
 });
 

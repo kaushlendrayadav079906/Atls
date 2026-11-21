@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { StockConfigurationPage } from '../pages/StockConfigurationPage';
+import { StockConfigurationPage, SearchableDropdown } from '../pages/StockConfigurationPage';
 import type { StockConfigurationResponse } from '../api/stockConfiguration';
 import * as AuthContextModule from '../contexts/AuthContext';
 import * as ThemeContextModule from '../contexts/ThemeContext';
@@ -159,6 +159,135 @@ describe('StockConfigurationPage Searchable Dropdowns and Expandable SO NO Colum
     const html = renderComponent();
     expect(html).toContain('Apply Filters');
     expect(html).toContain('Reset');
+  });
+
+  describe('SearchableDropdown UI & Alignment Verification', () => {
+    it('renders closed dropdown trigger button with proper styling, label, and chevron down icon', () => {
+      const html = renderToStaticMarkup(
+        <SearchableDropdown
+          defaultLabel="All Vendors"
+          value=""
+          options={['Aditya Engineering', 'Precision Bearings']}
+          onChange={vi.fn()}
+          isOpen={false}
+          onToggle={vi.fn()}
+          onClose={vi.fn()}
+          searchPlaceholder="Search vendors..."
+          isDark={false}
+        />
+      );
+
+      expect(html).toContain('All Vendors');
+      expect(html).toContain('lucide-chevron-down');
+      // Popup should NOT be rendered when isOpen is false
+      expect(html).not.toContain('Search vendors...');
+    });
+
+    it('renders opened dropdown popup with aligned search input, proper padding, and vertical centering', () => {
+      const html = renderToStaticMarkup(
+        <SearchableDropdown
+          defaultLabel="All Vendors"
+          value=""
+          options={['Aditya Engineering', 'Precision Bearings']}
+          onChange={vi.fn()}
+          isOpen={true}
+          onToggle={vi.fn()}
+          onClose={vi.fn()}
+          searchPlaceholder="Search vendors..."
+          isDark={false}
+        />
+      );
+
+      // Popup container classes: below trigger, width, rounded, border, shadow, z-50
+      expect(html).toContain('top-full');
+      expect(html).toContain('mt-1.5');
+      expect(html).toContain('w-64');
+      expect(html).toContain('rounded-xl');
+      expect(html).toContain('shadow-xl');
+      expect(html).toContain('z-50');
+
+      // Search box at the top with proper container padding and border
+      expect(html).toContain('p-2.5');
+      expect(html).toContain('placeholder="Search vendors..."');
+      expect(html).toContain('lucide-search');
+      expect(html).toContain('top-1/2 -translate-y-1/2'); // vertically centered icon
+    });
+
+    it('renders option list with default "All Vendors" at the top and checkmark on the right', () => {
+      const html = renderToStaticMarkup(
+        <SearchableDropdown
+          defaultLabel="All Vendors"
+          value=""
+          options={['Aditya Engineering', 'Precision Bearings']}
+          onChange={vi.fn()}
+          isOpen={true}
+          onToggle={vi.fn()}
+          onClose={vi.fn()}
+          searchPlaceholder="Search vendors..."
+          isDark={false}
+        />
+      );
+
+      // Default label at top
+      expect(html).toContain('All Vendors');
+      // Filtered options below
+      expect(html).toContain('Aditya Engineering');
+      expect(html).toContain('Precision Bearings');
+      // Checkmark icon present for selected empty value (All Vendors)
+      expect(html).toContain('lucide-check');
+      // Separate scrolling list with max height
+      expect(html).toContain('max-h-60');
+      expect(html).toContain('overflow-y-auto');
+    });
+
+    it('renders selected option with highlighted background, right-aligned checkmark, and clear button on trigger', () => {
+      const html = renderToStaticMarkup(
+        <SearchableDropdown
+          defaultLabel="All Groups"
+          value="Fasteners"
+          options={['Fasteners', 'Mechanical', 'Electrical']}
+          onChange={vi.fn()}
+          isOpen={true}
+          onToggle={vi.fn()}
+          onClose={vi.fn()}
+          searchPlaceholder="Search groups..."
+          isDark={false}
+        />
+      );
+
+      // Trigger shows selected value and clear button
+      expect(html).toContain('Fasteners');
+      expect(html).toContain('Clear All Groups');
+      expect(html).toContain('lucide-x');
+
+      // In popup: Fasteners is highlighted and has checkmark aligned to right
+      expect(html).toContain('bg-blue-50/70');
+      expect(html).toContain('ml-auto');
+      expect(html).toContain('lucide-check');
+    });
+
+    it('supports All Warehouses dropdown with dark mode theme styling', () => {
+      const html = renderToStaticMarkup(
+        <SearchableDropdown
+          defaultLabel="All Warehouses"
+          value="01"
+          options={['01', '02', 'SH']}
+          onChange={vi.fn()}
+          isOpen={true}
+          onToggle={vi.fn()}
+          onClose={vi.fn()}
+          searchPlaceholder="Search warehouses..."
+          isDark={true}
+        />
+      );
+
+      expect(html).toContain('bg-slate-900');
+      expect(html).toContain('border-slate-700');
+      expect(html).toContain('Search warehouses...');
+      expect(html).toContain('01');
+      expect(html).toContain('02');
+      expect(html).toContain('SH');
+    });
   });
 });
 

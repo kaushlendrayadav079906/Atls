@@ -90,6 +90,7 @@ STANDARD_PERMISSIONS: List[Dict[str, str]] = [
     {"id": "products.edit", "module": "Products", "action": "edit", "description": "Edit existing products and prices"},
     {"id": "products.delete", "module": "Products", "action": "delete", "description": "Delete or archive products"},
     {"id": "products.export", "module": "Products", "action": "export", "description": "Export product and stock reports"},
+    {"id": "stock_configuration", "module": "Product", "action": "manage", "description": "Access and manage stock configuration and SAP sync"},
     # Sales Orders
     {"id": "sales_orders.view", "module": "Sales Orders", "action": "view", "description": "View sales orders"},
     {"id": "sales_orders.create", "module": "Sales Orders", "action": "create", "description": "Create customer sales orders"},

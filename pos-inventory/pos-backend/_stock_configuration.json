@@ -2253,13 +2253,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-17",
+    "entry_date": "2026-10-16",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
     "updated_at": "2026-10-16 14:53:04",
     "last_submitted_at": null,
     "remark": "PRNO.26271138 Dt.09.10.2026 - Ritwik Maiti\r\rFor Stock",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-16",
@@ -2273,7 +2273,7 @@
     "grpo_doc_entry": 753,
     "grpo_line_num": 0,
     "po_line_num": 0,
-    "row_id": "CS0521_753_0"
+    "row_id": "CS0521"
   },
   {
     "sr_no": 54,
@@ -3859,7 +3859,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -3873,7 +3873,7 @@
     "grpo_doc_entry": 737,
     "grpo_line_num": 3,
     "po_line_num": 3,
-    "row_id": "PKG0023"
+    "row_id": "PKG0023_737_3"
   },
   {
     "sr_no": 65,
@@ -4403,13 +4403,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-17",
+    "entry_date": "2026-10-16",
     "created_at": "2026-11-16T15:35:50.968244+05:30",
     "updated_at": "2025-08-08 12:58:33",
     "last_submitted_at": null,
     "remark": "PRNO.26271138, 1140 &  1141 Dt.09.10, 12.10 And 13.10.2026- Ritwik Maiti And Amit Panja\rSr.No.1 & 2 For Sterlite and remaining for Stock",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-16",
@@ -4423,7 +4423,7 @@
     "grpo_doc_entry": 754,
     "grpo_line_num": 2,
     "po_line_num": 2,
-    "row_id": "CS1285_754_2"
+    "row_id": "CS1285"
   },
   {
     "sr_no": 77,
@@ -4771,7 +4771,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -4785,7 +4785,7 @@
     "grpo_doc_entry": 737,
     "grpo_line_num": 8,
     "po_line_num": 8,
-    "row_id": "PS0107"
+    "row_id": "PS0107_737_8"
   },
   {
     "sr_no": 85,
@@ -5093,7 +5093,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-10",
@@ -5107,7 +5107,7 @@
     "po_line_num": 5,
     "grpo_doc_entry": 737,
     "grpo_line_num": 5,
-    "row_id": "PKG0027_737_5"
+    "row_id": "PKG0027"
   },
   {
     "sr_no": 92,
@@ -5185,7 +5185,7 @@
     "last_submitted_at": null,
     "remark": "",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-29",
@@ -5199,7 +5199,7 @@
     "grpo_doc_entry": 768,
     "grpo_line_num": 0,
     "po_line_num": 0,
-    "row_id": "BAC0005"
+    "row_id": "BAC0005_768_0"
   },
   {
     "sr_no": 94,
@@ -5317,13 +5317,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-20",
+    "entry_date": "2026-10-19",
     "created_at": "2026-11-16T16:42:56.508447+05:30",
     "updated_at": "2025-10-06 10:20:20",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -5337,7 +5337,7 @@
     "grpo_doc_entry": 762,
     "grpo_line_num": 8,
     "po_line_num": 10,
-    "row_id": "CS1125_762_8"
+    "row_id": "CS1125"
   },
   {
     "sr_no": 97,
@@ -5632,13 +5632,13 @@
     "items_group_code": "138",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-20",
+    "entry_date": "2026-10-19",
     "created_at": "2026-11-16T16:42:56.508447+05:30",
     "updated_at": "2025-08-05 12:39:38",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -5652,7 +5652,7 @@
     "po_line_num": 13,
     "grpo_doc_entry": 762,
     "grpo_line_num": 11,
-    "row_id": "RM0947_762_11"
+    "row_id": "RM0947"
   },
   {
     "sr_no": 104,
@@ -6264,13 +6264,13 @@
     "items_group_code": "112",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-13",
+    "entry_date": "2026-10-07",
     "created_at": "2026-11-16T16:42:56.508447+05:30",
     "updated_at": "2026-10-07 17:01:44",
     "last_submitted_at": null,
     "remark": "PRNO.26271130 Dt.05.10.2026 - Ritwik Maiti\r\rFor Stock",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2026-10-05",
     "so_date": null,
     "po_date": "2026-10-07",
@@ -6284,7 +6284,7 @@
     "grpo_doc_entry": 744,
     "grpo_line_num": 0,
     "po_line_num": 0,
-    "row_id": "ENG1836_744_0"
+    "row_id": "ENG1836"
   },
   {
     "sr_no": 118,
@@ -7083,13 +7083,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-09",
+    "entry_date": "2026-10-10",
     "created_at": "2026-11-16T16:45:20.094333+05:30",
     "updated_at": "2025-08-11 10:26:49",
     "last_submitted_at": null,
     "remark": "PRNO.26271137 Dt.09.10.2026 - Amit Panja",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-09",
@@ -7103,7 +7103,7 @@
     "grpo_doc_entry": 736,
     "grpo_line_num": 0,
     "po_line_num": 0,
-    "row_id": "CS0410"
+    "row_id": "CS0410_736_0"
   },
   {
     "sr_no": 136,
@@ -7401,13 +7401,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-20",
+    "entry_date": "2026-10-19",
     "created_at": "2026-11-16T16:46:28.001387+05:30",
     "updated_at": "2026-06-15 09:53:21",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -7421,7 +7421,7 @@
     "po_line_num": 11,
     "grpo_doc_entry": 762,
     "grpo_line_num": 9,
-    "row_id": "CS1137_762_9"
+    "row_id": "CS1137"
   },
   {
     "sr_no": 143,
@@ -7447,13 +7447,13 @@
     "items_group_code": "112",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-08",
+    "entry_date": "2026-10-07",
     "created_at": "2026-11-16T16:46:28.001387+05:30",
     "updated_at": "2025-07-20 16:49:06",
     "last_submitted_at": null,
     "remark": "PRNo.26271133 Dt.06.10.2026 - Amit Panja\r\rFor CNCX014 And CNCX015",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-07",
@@ -7467,7 +7467,7 @@
     "grpo_doc_entry": 733,
     "grpo_line_num": 0,
     "po_line_num": 0,
-    "row_id": "ENG0303_733_0"
+    "row_id": "ENG0303"
   },
   {
     "sr_no": 144,
@@ -7863,13 +7863,13 @@
     "items_group_code": "112",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-07",
+    "entry_date": "2026-10-21",
     "created_at": "2026-11-16T16:46:28.001387+05:30",
     "updated_at": "2025-08-12 11:03:19",
     "last_submitted_at": null,
     "remark": "PRNO.26271130 Dt.05.10.2026 - Ritwik Maiti\r\rFor CNCX015 - Stock",
     "last_submitted_by": null,
-    "record_category": "Pending Receipt",
+    "record_category": "Received Stock",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-07",
@@ -7883,7 +7883,7 @@
     "grpo_doc_entry": 763,
     "grpo_line_num": 0,
     "po_line_num": 0,
-    "row_id": "ENG0384"
+    "row_id": "ENG0384_763_0"
   },
   {
     "sr_no": 152,
@@ -8321,13 +8321,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-17",
+    "entry_date": "2026-10-16",
     "created_at": "2026-11-16T16:48:18.679201+05:30",
     "updated_at": "2026-10-16 12:33:07",
     "last_submitted_at": null,
     "remark": "PRNO.26271144 Dt.16.10.2026 - Ritwik Maiti\r\rFor CNCX015 Machine",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2025-01-07",
     "so_date": null,
     "po_date": "2026-10-16",
@@ -8341,7 +8341,7 @@
     "grpo_doc_entry": 754,
     "grpo_line_num": 4,
     "po_line_num": 0,
-    "row_id": "CS0128_754_4"
+    "row_id": "CS0128"
   },
   {
     "sr_no": 162,
@@ -8659,7 +8659,8 @@
     "po_qty": 1.0,
     "remark_history": [],
     "po_doc_entry": 858,
-    "po_line_num": 0
+    "po_line_num": 0,
+    "row_id": "SC0033"
   },
   {
     "sr_no": 169,
@@ -8737,7 +8738,7 @@
     "last_submitted_at": null,
     "remark": "For CNCG010 OD Grinding Machine",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2026-10-13",
     "so_date": null,
     "po_date": "2026-10-13",
@@ -8751,7 +8752,7 @@
     "grpo_doc_entry": 741,
     "grpo_line_num": 0,
     "po_line_num": 0,
-    "row_id": "MSP0412_741_0"
+    "row_id": "MSP0412"
   },
   {
     "sr_no": 171,
@@ -8864,13 +8865,13 @@
     "items_group_code": "109",
     "warehouse_code": "01",
     "is_active": true,
-    "entry_date": "2026-10-20",
+    "entry_date": "2026-10-19",
     "created_at": "2026-11-16T17:04:58.014277+05:30",
     "updated_at": "2026-08-05 11:46:37",
     "last_submitted_at": null,
     "remark": "PRNO.26271070. 1114. 1132. 1135.",
     "last_submitted_by": null,
-    "record_category": "Received Stock",
+    "record_category": "Pending Receipt",
     "item_create_date": "2026-08-05",
     "so_date": null,
     "po_date": "2026-10-19",
@@ -8884,7 +8885,7 @@
     "grpo_doc_entry": 762,
     "grpo_line_num": 0,
     "po_line_num": 1,
-    "row_id": "CS1404_762_0"
+    "row_id": "CS1404"
   },
   {
     "sr_no": 174,

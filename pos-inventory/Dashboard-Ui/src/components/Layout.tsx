@@ -58,7 +58,7 @@ const navItems: NavSectionItem[] = [
       { name: 'Sales Orders', path: '/sales-orders', permission: 'sales_orders.view' },
       { name: 'Sales Invoices', path: '/sales', permission: 'invoices.view' },
       { name: 'Purchase Orders', path: '/purchase-orders', permission: 'purchase_orders.view' },
-      { name: 'Stock Configuration', path: '/stock-configuration', permission: 'products.view' },
+      { name: 'Stock Configuration', path: '/stock-configuration', permission: 'stock_configuration' },
       { name: 'Customers', path: '/customers', permission: 'customers.view' },
       { name: 'Returns & Approvals', path: '/returns', badge: '5', permission: 'returns.view' },
     ],

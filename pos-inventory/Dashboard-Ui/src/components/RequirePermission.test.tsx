@@ -180,4 +180,73 @@ describe('RequirePermission Component Guard', () => {
     expect(html).toContain('User Management Control Panel');
     expect(html).not.toContain('403 Forbidden');
   });
+
+  it('blocks user without stock_configuration permission from accessing Stock Configuration route', () => {
+    vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
+      user: {
+        id: 'u-stock-unauth',
+        username: 'unauth_user',
+        email: 'unauth@atlas.local',
+        name: 'Unauthorized User',
+        role: 'user',
+        is_active: true,
+        token_version: 1,
+        permissions: ['products.view'],
+      },
+      isAuthenticated: true,
+      isLoading: false,
+      isAdmin: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshUser: vi.fn(),
+      hasPermission: vi.fn((p) => p === 'products.view'),
+      canAccess: vi.fn((m) => m === 'products'),
+    });
+
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <RequirePermission permission="stock_configuration">
+          <div id="stock-config-content">Stock Configuration Protected Screen</div>
+        </RequirePermission>
+      </MemoryRouter>
+    );
+
+    expect(html).not.toContain('Stock Configuration Protected Screen');
+    expect(html).toContain('403 Forbidden');
+    expect(html).toContain('stock_configuration');
+  });
+
+  it('allows user with stock_configuration permission to access Stock Configuration route', () => {
+    vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
+      user: {
+        id: 'u-stock-auth',
+        username: 'auth_stock_user',
+        email: 'stock_auth@atlas.local',
+        name: 'Authorized Stock User',
+        role: 'user',
+        is_active: true,
+        token_version: 1,
+        permissions: ['stock_configuration'],
+      },
+      isAuthenticated: true,
+      isLoading: false,
+      isAdmin: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshUser: vi.fn(),
+      hasPermission: vi.fn((p) => p === 'stock_configuration'),
+      canAccess: vi.fn((m) => m === 'stock_configuration'),
+    });
+
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <RequirePermission permission="stock_configuration">
+          <div id="stock-config-content">Stock Configuration Protected Screen</div>
+        </RequirePermission>
+      </MemoryRouter>
+    );
+
+    expect(html).toContain('Stock Configuration Protected Screen');
+    expect(html).not.toContain('403 Forbidden');
+  });
 });

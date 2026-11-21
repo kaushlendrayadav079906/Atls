@@ -56,6 +56,7 @@ const PERMISSION_GROUPS: PermissionGroupConfig[] = [
       { id: 'products.edit', label: 'Edit Product Details', action: 'Edit' },
       { id: 'products.delete', label: 'Delete Products', action: 'Delete' },
       { id: 'products.export', label: 'Export Inventory Data', action: 'Export' },
+      { id: 'stock_configuration', label: 'Stock Configuration', action: 'Manage' },
     ],
   },
   {

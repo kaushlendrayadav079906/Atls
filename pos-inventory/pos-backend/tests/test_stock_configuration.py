@@ -371,7 +371,7 @@ def test_admin_remarks_submission_and_audit_history(auth_headers):
 
 def test_non_admin_cannot_add_or_modify_remarks():
     from app.core.security import create_access_token
-    user_token = create_access_token({"sub": "test_perm_user", "role": "user", "permissions": ["products.view"]})
+    user_token = create_access_token({"sub": "test_perm_user", "role": "user", "permissions": ["stock_configuration"]})
     user_headers = {"Authorization": f"Bearer {user_token}"}
 
     # Non-admin attempting to submit remark should get 403 Forbidden
@@ -978,6 +978,36 @@ def test_export_excel_with_so_no():
     # Also verify empty result export
     empty_bytes = service.export_excel(so_no="NON_EXISTENT_SO_9999999")
     assert len(empty_bytes) > 0
+
+
+def test_stock_configuration_permission_enforcement():
+    from app.core.security import create_access_token
+
+    # 1. User without stock_configuration permission (403 Forbidden)
+    unauthorized_token = create_access_token({
+        "sub": "unauthorized_user",
+        "role": "user",
+        "permissions": ["products.view"],
+    })
+    res_denied = client.get(
+        "/api/v1/stock-configuration",
+        headers={"Authorization": f"Bearer {unauthorized_token}"},
+    )
+    assert res_denied.status_code == 403
+    assert "stock_configuration" in res_denied.json()["detail"]
+
+    # 2. User with stock_configuration permission (200 OK)
+    authorized_token = create_access_token({
+        "sub": "authorized_user",
+        "role": "user",
+        "permissions": ["stock_configuration"],
+    })
+    res_allowed = client.get(
+        "/api/v1/stock-configuration",
+        headers={"Authorization": f"Bearer {authorized_token}"},
+    )
+    assert res_allowed.status_code == 200
+
 
 
 

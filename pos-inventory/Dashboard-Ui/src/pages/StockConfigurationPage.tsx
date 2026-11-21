@@ -57,7 +57,7 @@ const getRowKey = (item: {
   return code;
 };
 
-interface SearchableDropdownProps {
+export interface SearchableDropdownProps {
   id?: string;
   defaultLabel: string;
   value: string;
@@ -72,7 +72,7 @@ interface SearchableDropdownProps {
   ariaLabel?: string;
 }
 
-const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
+export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   id,
   defaultLabel,
   value,
@@ -87,17 +87,38 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   ariaLabel,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [alignRight, setAlignRight] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Focus search input when dropdown opens
+  // Focus search input and check screen boundary alignment when dropdown opens
   useEffect(() => {
     if (isOpen) {
       setSearchTerm('');
       const t = setTimeout(() => {
         searchInputRef.current?.focus();
       }, 50);
-      return () => clearTimeout(t);
+
+      const updateAlignment = () => {
+        if (!dropdownRef.current) return;
+        const rect = dropdownRef.current.getBoundingClientRect();
+        // Estimated minimum popup width (256px / w-64)
+        const estimatedWidth = Math.max(rect.width, 256);
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+        // If extending from rect.left exceeds the viewport width minus 16px padding, align right
+        if (rect.left + estimatedWidth > viewportWidth - 16) {
+          setAlignRight(true);
+        } else {
+          setAlignRight(false);
+        }
+      };
+
+      updateAlignment();
+      window.addEventListener('resize', updateAlignment);
+      return () => {
+        clearTimeout(t);
+        window.removeEventListener('resize', updateAlignment);
+      };
     }
   }, [isOpen]);
 
@@ -143,7 +164,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         onClick={onToggle}
         aria-label={ariaLabel || defaultLabel}
         aria-expanded={isOpen}
-        className={`w-full h-9 px-3 pr-8 flex items-center justify-between text-left text-[14px] font-medium rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${
+        className={`w-full h-9 px-3 ${value ? 'pr-11' : 'pr-8'} flex items-center justify-between text-left text-[13.5px] font-medium rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer ${
           value
             ? isDark
               ? 'border-blue-500/60 bg-blue-950/30 text-blue-300'
@@ -185,25 +206,27 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
       {/* Dropdown Panel */}
       {isOpen && (
         <div
-          className={`absolute top-full left-0 mt-1 min-w-[220px] w-full max-w-[320px] rounded-lg border shadow-xl z-50 overflow-hidden ${
+          className={`absolute top-full ${
+            alignRight ? 'right-0' : 'left-0'
+          } mt-1.5 w-64 min-w-full max-w-[320px] rounded-xl border shadow-xl z-50 overflow-hidden ${
             isDark
-              ? 'bg-slate-900 border-slate-700 text-slate-200'
-              : 'bg-white border-slate-200 text-slate-800 shadow-slate-300/40'
+              ? 'bg-slate-900 border-slate-700 text-slate-200 shadow-slate-950/60'
+              : 'bg-white border-slate-200 text-slate-800 shadow-slate-900/10'
           }`}
         >
           {/* Search Input Area */}
-          <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40">
-            <div className="relative flex items-center">
-              <Search size={13} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+          <div className="p-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60">
+            <div className="relative flex items-center w-full">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder={searchPlaceholder}
-                className={`w-full h-8 pl-8 pr-7 text-[13px] rounded-md border transition focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                className={`w-full h-8.5 pl-8.5 pr-8 text-[13px] rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500/20 box-border ${
                   isDark
-                    ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500'
+                    ? 'bg-slate-800/90 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500'
                     : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500'
                 }`}
               />
@@ -211,33 +234,35 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 <button
                   type="button"
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded cursor-pointer"
                   title="Clear search"
                 >
-                  <X size={12} />
+                  <X size={13} />
                 </button>
               )}
             </div>
           </div>
 
           {/* Options List */}
-          <div className="max-h-56 overflow-y-auto py-1 text-[13.5px] divide-y divide-slate-100/50 dark:divide-slate-800/50">
-            {/* Default "All" option */}
-            <button
-              type="button"
-              onClick={() => handleSelect('')}
-              className={`w-full px-3 py-1.5 flex items-center justify-between text-left transition hover:bg-blue-50/80 dark:hover:bg-slate-800 cursor-pointer ${
-                !value
-                  ? 'bg-blue-50 dark:bg-blue-900/30 font-semibold text-blue-600 dark:text-blue-400'
-                  : 'text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              <span>{defaultLabel}</span>
-              {!value && <Check size={14} className="text-blue-600 dark:text-blue-400 ml-2 shrink-0" />}
-            </button>
+          <div className="max-h-60 overflow-y-auto overscroll-contain py-1 text-[13.5px] divide-y divide-slate-100/60 dark:divide-slate-800/60">
+            {/* Default "All" option at top */}
+            {(!searchTerm.trim() || defaultLabel.toLowerCase().includes(searchTerm.trim().toLowerCase())) && (
+              <button
+                type="button"
+                onClick={() => handleSelect('')}
+                className={`w-full px-3.5 py-2 flex items-center justify-between text-left transition hover:bg-blue-50/80 dark:hover:bg-slate-800/80 cursor-pointer ${
+                  !value
+                    ? 'bg-blue-50/70 dark:bg-blue-950/40 font-semibold text-blue-600 dark:text-blue-400'
+                    : 'text-slate-700 dark:text-slate-300 font-normal'
+                }`}
+              >
+                <span className="truncate text-left flex-1 mr-2">{defaultLabel}</span>
+                {!value && <Check size={14} className="text-blue-600 dark:text-blue-400 shrink-0 ml-auto" />}
+              </button>
+            )}
 
-            {filteredOptions.length === 0 ? (
-              <div className="py-3 px-3 text-center text-[12.5px] text-slate-400 dark:text-slate-500">
+            {filteredOptions.length === 0 && searchTerm.trim() ? (
+              <div className="py-4 px-3 text-center text-[12.5px] text-slate-400 dark:text-slate-500">
                 No matching options found
               </div>
             ) : (
@@ -248,14 +273,16 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                     key={opt}
                     type="button"
                     onClick={() => handleSelect(opt)}
-                    className={`w-full px-3 py-1.5 flex items-center justify-between text-left transition hover:bg-blue-50/80 dark:hover:bg-slate-800 cursor-pointer ${
+                    className={`w-full px-3.5 py-2 flex items-center justify-between text-left transition hover:bg-blue-50/80 dark:hover:bg-slate-800/80 cursor-pointer ${
                       isSelected
-                        ? 'bg-blue-50 dark:bg-blue-900/30 font-semibold text-blue-600 dark:text-blue-400'
-                        : 'text-slate-700 dark:text-slate-300'
+                        ? 'bg-blue-50/70 dark:bg-blue-950/40 font-semibold text-blue-600 dark:text-blue-400'
+                        : 'text-slate-700 dark:text-slate-300 font-normal'
                     }`}
                   >
-                    <span className="truncate">{opt}</span>
-                    {isSelected && <Check size={14} className="text-blue-600 dark:text-blue-400 ml-2 shrink-0" />}
+                    <span className="truncate text-left flex-1 mr-2" title={opt}>{opt}</span>
+                    {isSelected && (
+                      <Check size={14} className="text-blue-600 dark:text-blue-400 shrink-0 ml-auto" />
+                    )}
                   </button>
                 );
               })
@@ -1475,7 +1502,7 @@ export const StockConfigurationPage: React.FC = () => {
       </div>
 
       {/* ── Search and Filters Card ── */}
-      <div className={`p-3 sm:p-3.5 rounded-xl border transition-all duration-200 shadow-xs flex flex-wrap items-center gap-2.5 relative z-20 ${isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
+      <div className={`p-3 sm:p-3.5 rounded-xl border transition-all duration-200 shadow-xs flex flex-wrap items-center gap-2.5 relative z-30 ${isDark ? 'bg-slate-800/80 border-slate-700/80' : 'bg-white border-slate-200/90'
         }`}>
         {/* Search input */}
         <div className="relative flex-1 min-w-[220px]">

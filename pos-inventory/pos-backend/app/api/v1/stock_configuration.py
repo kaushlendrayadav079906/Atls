@@ -31,7 +31,7 @@ async def get_stock_configuration(
     date_from: Optional[str] = Query(None, description="Filter from date (YYYY-MM-DD)"),
     date_to: Optional[str] = Query(None, description="Filter to date (YYYY-MM-DD)"),
     refresh: bool = Query(False, description="Trigger on-demand live stock quantity sync from SAP"),
-    current_user: dict = Depends(require_permission("products.view")),
+    current_user: dict = Depends(require_permission("stock_configuration")),
 ) -> Dict[str, Any]:
     """Retrieve paginated stock configuration items, KPI statistics, filter options, and SAP connection state."""
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -72,7 +72,7 @@ async def get_stock_configuration(
 @router.post("/bulk-update")
 async def bulk_update_stock_items(
     payload: Dict[str, Any],
-    current_user: dict = Depends(require_permission("products.view")),
+    current_user: dict = Depends(require_permission("stock_configuration")),
 ) -> Dict[str, Any]:
     """Bulk update user-configurable fields for multiple stock items and sync to SAP."""
     if not isinstance(payload, dict) or "items" not in payload:
@@ -144,7 +144,7 @@ async def bulk_update_stock_items(
 async def update_stock_item(
     item_code: str,
     data: Dict[str, Any],
-    current_user: dict = Depends(require_permission("products.view")),
+    current_user: dict = Depends(require_permission("stock_configuration")),
 ) -> Dict[str, Any]:
     """Update user-editable stock configuration fields for a row and automatically sync to SAP."""
     role = str(current_user.get("role") or "").strip().lower()
@@ -207,7 +207,7 @@ async def update_stock_item(
 @router.get("/items/{item_code}/remarks-history")
 async def get_item_remarks_history(
     item_code: str,
-    current_user: dict = Depends(require_permission("products.view")),
+    current_user: dict = Depends(require_permission("stock_configuration")),
 ) -> Dict[str, Any]:
     """Retrieve audit history of remarks for a stock configuration item."""
     try:
@@ -221,7 +221,7 @@ async def get_item_remarks_history(
 @router.post("/items")
 async def add_stock_item(
     data: Dict[str, Any],
-    current_user: dict = Depends(require_permission("products.view")),
+    current_user: dict = Depends(require_permission("stock_configuration")),
 ) -> Dict[str, Any]:
     """Manually add a new item to stock configuration."""
     try:
@@ -237,7 +237,7 @@ async def add_stock_item(
 @router.delete("/items/{item_code}")
 async def delete_stock_item(
     item_code: str,
-    current_user: dict = Depends(require_permission("products.view")),
+    current_user: dict = Depends(require_permission("stock_configuration")),
 ) -> Dict[str, Any]:
     """Delete an item from stock configuration."""
     try:
@@ -252,7 +252,7 @@ async def delete_stock_item(
 
 @router.post("/sync")
 async def sync_stock_from_sap(
-    current_user: dict = Depends(require_permission("products.view")),
+    current_user: dict = Depends(require_permission("stock_configuration")),
 ) -> Dict[str, Any]:
     """Trigger live SAP Business One synchronization for stock items and warehouses."""
     try:
@@ -270,7 +270,7 @@ async def sync_stock_from_sap(
 @router.post("/refresh")
 async def refresh_stock_from_sap(
     payload: Optional[Dict[str, Any]] = None,
-    current_user: dict = Depends(require_permission("products.view")),
+    current_user: dict = Depends(require_permission("stock_configuration")),
 ) -> Dict[str, Any]:
     """Fast on-demand live stock quantity sync from SAP Business One without heavy full-table rebuild."""
     try:
@@ -290,7 +290,7 @@ async def refresh_stock_from_sap(
 
 @router.get("/sync-status")
 async def get_sync_status(
-    current_user: dict = Depends(require_permission("products.view")),
+    current_user: dict = Depends(require_permission("stock_configuration")),
 ) -> Dict[str, Any]:
     """Retrieve the real-time status of the SAP synchronization background worker."""
     from app.services.stock_configuration_service import stock_sync_worker
@@ -307,7 +307,7 @@ async def get_sync_status(
 async def import_stock_excel(
     file: UploadFile = File(...),
     preview: bool = Form(True),
-    current_user: dict = Depends(require_permission("products.view")),
+    current_user: dict = Depends(require_permission("stock_configuration")),
 ) -> Dict[str, Any]:
     """Import stock items from an Excel (.xlsx) or CSV file with validation and preview options."""
     if not file.filename:
@@ -338,7 +338,7 @@ async def export_stock_excel(
     period: Optional[str] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-    current_user: dict = Depends(require_permission("products.view")),
+    current_user: dict = Depends(require_permission("stock_configuration")),
 ):
     """Export filtered stock items into a formatted Excel (.xlsx) workbook preserving all business columns."""
     try:

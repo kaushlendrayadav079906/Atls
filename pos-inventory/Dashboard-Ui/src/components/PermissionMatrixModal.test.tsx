@@ -204,5 +204,38 @@ describe('PermissionMatrixModal User Profile Verification', () => {
     expect(html).toContain('aria-label="Search permissions or role templates"');
     expect(html).toContain('data-testid="permission-search-input"');
   });
+
+  it('renders Stock Configuration permission under Product & Inventory group', () => {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(['user-permissions', 'user-stock-1'], {
+      user_id: 'user-stock-1',
+      role: 'user',
+      effective_permissions: [],
+    });
+    vi.spyOn(EndpointsModule.adminApi, 'getUserPermissions').mockResolvedValue({
+      user_id: 'user-stock-1',
+      role: 'user',
+      effective_permissions: [],
+    });
+    vi.spyOn(EndpointsModule.adminApi, 'getRoles').mockResolvedValue([]);
+
+    const userObj = {
+      id: 'user-stock-1',
+      name: 'Stock Officer',
+      username: 'stock_officer',
+      email: 'stock@atlas.local',
+      role: 'user',
+      is_active: true,
+    };
+
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <PermissionMatrixModal user={userObj} onClose={vi.fn()} />
+      </QueryClientProvider>
+    );
+
+    expect(html).toContain('Product &amp; Inventory');
+    expect(html).toContain('Stock Configuration');
+  });
 });
 
